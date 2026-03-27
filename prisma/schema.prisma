@@ -1,0 +1,35 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                  Int       @id @default(autoincrement())
+  username            String    @unique
+  passwordHash        String
+  customInstructions  String    @default("")
+  createdAt           DateTime  @default(now())
+  chats               Chat[]
+  councilConfig       CouncilConfig?
+}
+
+model Chat {
+  id        Int      @id @default(autoincrement())
+  userId    Int?
+  question  String
+  verdict   String
+  opinions  Json
+  createdAt DateTime @default(now())
+  user      User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+}
+
+model CouncilConfig {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  config    Json
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
