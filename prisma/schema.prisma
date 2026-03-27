@@ -1,0 +1,87 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model User {
+  id                 Int            @id @default(autoincrement())
+  username           String         @unique
+  passwordHash       String
+  customInstructions String         @default("")
+  createdAt          DateTime       @default(now())
+  chats              Chat[]
+  conversations      Conversation[]
+  councilConfig      CouncilConfig?
+  dailyUsages        DailyUsage[]
+}
+
+model Conversation {
+  id        String   @id @default(uuid())
+  userId    Int?
+  title     String   @default("New Conversation")
+  isPublic  Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  chats     Chat[]
+  user      User?    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Chat {
+  id             Int           @id @default(autoincrement())
+  userId         Int?
+  conversationId String?
+  question       String
+  verdict        String
+  opinions       Json
+  durationMs     Int?
+  tokensUsed     Int?
+  cacheHit       Boolean       @default(false)
+  createdAt      DateTime      @default(now())
+  user           User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  conversation   Conversation? @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@index([conversationId, createdAt])
+}
+
+model CouncilConfig {
+  id        Int      @id @default(autoincrement())
+  userId    Int      @unique
+  config    Json
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model RevokedToken {
+  id        Int      @id @default(autoincrement())
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model DailyUsage {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  date      DateTime @db.Date
+  requests  Int      @default(0)
+  tokens    Int      @default(0)
+  updatedAt DateTime @updatedAt
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, date])
+}
+
+model SemanticCache {
+  id        Int      @id @default(autoincrement())
+  keyHash   String   @unique
+  prompt    String
+  verdict   String   @db.Text
+  opinions  Json
+  // NOTE: embedding column was dropped in migration 20260325113050_sync_schema.
+  // To re-enable vector similarity search, re-add the column via a new migration
+  // and ensure the pgvector extension is enabled (see docker-compose.yml).
+  createdAt DateTime @default(now())
+  expiresAt DateTime
+}
