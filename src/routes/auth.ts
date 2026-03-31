@@ -1,10 +1,12 @@
-import { Router, Response } from "express";
+import { Router, Response, NextFunction } from "express";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import prisma from "../lib/db.js";
+import redis from "../lib/redis.js";
 import logger from "../lib/logger.js";
 import { env } from "../config/env.js";
-import { requireAuth, AuthRequest } from "../middleware/auth.js";
+import { requireAuth } from "../middleware/auth.js";
+import { AuthRequest } from "../types/index.js";
 import { validate, authSchema, configSchema } from "../middleware/validate.js";
 import { encryptConfig, decryptConfig } from "../lib/crypto.js";
 import { AppError } from "../middleware/errorHandler.js";
@@ -15,7 +17,7 @@ const router = Router();
 router.post("/register", validate(authSchema), async (req, res: Response, next) => {
   try {
     const { username, password } = req.body;
-    const hash = bcrypt.hashSync(password, 12);
+    const hash = await bcrypt.hash(password, 12);
 
     const user = await prisma.user.create({
       data: { username, passwordHash: hash },
@@ -44,7 +46,7 @@ router.post("/login", validate(authSchema), async (req, res: Response, next) => 
     const { username, password } = req.body;
     const user = await prisma.user.findUnique({ where: { username } });
 
-    if (!user || !bcrypt.compareSync(password, user.passwordHash)) {
+    if (!user || !(await bcrypt.compare(password, user.passwordHash))) {
       throw new AppError(401, "Invalid username or password");
     }
 
@@ -61,6 +63,28 @@ router.post("/login", validate(authSchema), async (req, res: Response, next) => 
   }
 });
 
+// ── Logout ──────────────────────────────────────────────
+router.post("/logout", requireAuth, async (req: AuthRequest, res: Response, next) => {
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader?.startsWith("Bearer ")) {
+       const token = authHeader.split(" ")[1];
+       const payload = jwt.decode(token) as any;
+       const expiresAt = payload?.exp ? new Date(payload.exp * 1000) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+       
+       const ttlSecs = Math.max(1, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
+       await redis.set(`revoked:${token}`, "1", "EX", ttlSecs);
+
+       await prisma.revokedToken.create({
+         data: { token, expiresAt }
+       });
+    }
+    res.json({ success: true });
+  } catch (e) {
+    next(e);
+  }
+});
+
 // ── Get profile ─────────────────────────────────────────
 router.get("/me", requireAuth, async (req: AuthRequest, res: Response, next) => {
   try {
@@ -71,6 +95,22 @@ router.get("/me", requireAuth, async (req: AuthRequest, res: Response, next) => 
 
     if (!user) throw new AppError(404, "User not found");
     res.json(user);
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ── Refresh Token ───────────────────────────────────────
+router.post("/refresh", requireAuth, async (req: AuthRequest, res: Response, next) => {
+  try {
+    const token = jwt.sign(
+      { userId: req.userId, username: req.username },
+      env.JWT_SECRET,
+      { expiresIn: "7d" }
+    );
+
+    logger.info({ username: req.username }, "Token refreshed");
+    res.json({ token, username: req.username });
   } catch (e) {
     next(e);
   }
@@ -122,6 +162,35 @@ router.get("/config", requireAuth, async (req: AuthRequest, res: Response, next)
     if (!row) { res.json(null); return; }
     const decrypted = decryptConfig(row.config);
     res.json(decrypted);
+  } catch (e) {
+    next(e);
+  }
+});
+
+// ── Rotate council config keys (F3) ──────────────────────
+router.post("/config/rotate", requireAuth, async (req: AuthRequest, res: Response, next) => {
+  try {
+    const row = await prisma.councilConfig.findUnique({
+      where: { userId: req.userId },
+    });
+
+    if (!row) {
+      throw new AppError(404, "No configuration found to rotate");
+    }
+
+    // Decrypts using the old/current key logic
+    const decrypted = decryptConfig(row.config);
+    
+    // Re-encrypts forcing the new CURRENT_ENCRYPTION_VERSION
+    const reEncrypted = encryptConfig(decrypted);
+
+    await prisma.councilConfig.update({
+      where: { userId: req.userId! },
+      data: { config: reEncrypted },
+    });
+
+    logger.info({ userId: req.userId }, "Rotated API keys for user config");
+    res.json({ success: true, message: "Keys rotated successfully" });
   } catch (e) {
     next(e);
   }

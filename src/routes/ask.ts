@@ -1,73 +1,289 @@
-import { Router, Response } from "express";
-import { askProvider } from "../lib/providers.js";
+import { Router, Response, NextFunction } from "express";
+import { askCouncil } from "../lib/council.js";
+import { Message } from "../lib/providers.js";
 import prisma from "../lib/db.js";
 import logger from "../lib/logger.js";
-import { optionalAuth, AuthRequest } from "../middleware/auth.js";
+import { optionalAuth } from "../middleware/auth.js";
+import { AuthRequest } from "../types/index.js";
+import { checkQuota } from "../middleware/quota.js";
 import { validate, askSchema } from "../middleware/validate.js";
 import { AppError } from "../middleware/errorHandler.js";
+import { getCachedResponse, setCachedResponse } from "../lib/cache.js";
+import { prepareCouncilMembers, streamCouncil } from "../lib/council.js";
+import { getRecentHistory } from "../lib/history.js";
+import { env } from "../config/env.js";
+
+/** Build default members from server-side env API keys */
+function getDefaultMembers(count = 3) {
+  const providers: any[] = [];
+  if (env.OPENAI_API_KEY) {
+    providers.push({ type: "openai-compat", apiKey: env.OPENAI_API_KEY, model: "gpt-4o-mini", name: "OpenAI" });
+  }
+  if (env.GOOGLE_API_KEY) {
+    providers.push({ type: "google", apiKey: env.GOOGLE_API_KEY, model: "gemini-2.0-flash", name: "Gemini" });
+  }
+  if (env.ANTHROPIC_API_KEY) {
+    providers.push({ type: "anthropic", apiKey: env.ANTHROPIC_API_KEY, model: "claude-sonnet-4-20250514", name: "Claude" });
+  }
+  if (providers.length === 0) {
+    throw new AppError(400, "No AI provider API keys configured. Set OPENAI_API_KEY, GOOGLE_API_KEY, or ANTHROPIC_API_KEY in your environment.");
+  }
+  while (providers.length < count) {
+    providers.push({ ...providers[providers.length % providers.length] });
+  }
+  return providers.slice(0, count);
+}
+
+function getDefaultMaster() {
+  if (env.OPENAI_API_KEY) return { type: "openai-compat" as const, apiKey: env.OPENAI_API_KEY, model: "gpt-4o-mini", name: "Master" };
+  if (env.GOOGLE_API_KEY) return { type: "google" as const, apiKey: env.GOOGLE_API_KEY, model: "gemini-2.0-flash", name: "Master" };
+  if (env.ANTHROPIC_API_KEY) return { type: "anthropic" as const, apiKey: env.ANTHROPIC_API_KEY, model: "claude-sonnet-4-20250514", name: "Master" };
+  throw new AppError(400, "No AI provider API keys configured.");
+}
 
 const router = Router();
 
-router.post("/", optionalAuth, validate(askSchema), async (req: AuthRequest, res: Response, next) => {
-  const { question, members, master } = req.body;
+// ── GET /api/ask (Basic Test) ────────────────────────────────────────────────
+router.get("/", (req, res) => {
+  res.json({ message: "Council is listening. Use POST to ask." });
+});
+
+// ── POST /api/ask (Main Execution) ───────────────────────────────────────────
+router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: AuthRequest, res: Response, next: NextFunction) => {
   const startTime = Date.now();
-
   try {
-    logger.info({ question: question.slice(0, 80), memberCount: members.length }, "Council ask started");
+    const { question, conversationId, summon, maxTokens, rounds = 1, context } = req.body;
+    const members = req.body.members || getDefaultMembers();
+    const master = req.body.master || getDefaultMaster();
+    const userId = req.userId;
 
-    // Ask all council members simultaneously
-    const opinions = await Promise.all(
-      members.map(async (m: any) => {
-        try {
-          const answer = await askProvider(m, question);
-          return { name: m.name, answer, error: false };
-        } catch (e: any) {
-          logger.warn({ member: m.name, error: e.message }, "Member failed");
-          return { name: m.name, answer: `[${m.name} failed to respond]`, error: true };
-        }
-      })
-    );
+    let effectiveConversationId = conversationId;
+    let messages: Message[] = [];
 
-    // Only synthesize successful responses
-    const successfulOpinions = opinions.filter(o => !o.error);
-    if (successfulOpinions.length === 0) {
-      throw new AppError(502, "All council members failed to respond");
+    // 1. Sync or Create Conversation
+    if (effectiveConversationId) {
+      const convo = await prisma.conversation.findFirst({
+        where: { id: effectiveConversationId, userId: userId ?? null }
+      });
+      if (!convo) {
+        throw new AppError(404, "Conversation not found or does not belong to you");
+      }
+      messages = await getRecentHistory(effectiveConversationId);
     }
 
-    // Build synthesis prompt
-    const synthesisPrompt = `You are the master of an AI council. Multiple AI models were asked:
+    const councilMembers = await prepareCouncilMembers(members, summon, userId);
 
-"${question}"
+    const questionWithContext = context ? `GROUND TRUTH CONTEXT:\n${context}\n\n---\n\nQUESTION: ${question}` : question;
+    const currentMessages = [...messages, { role: "user" as const, content: questionWithContext }];
 
-Their responses:
-${successfulOpinions.map((o, i) => `[${i + 1}] ${o.name}:\n${o.answer}`).join("\n\n")}
-
-Write a single synthesized verdict. Be concise and direct. Note where models agreed or disagreed.`;
+    const cached = await getCachedResponse(question, councilMembers, master, messages);
 
     let verdict = "";
-    try {
-      verdict = await askProvider({ ...master, systemPrompt: undefined }, synthesisPrompt);
-    } catch (e: any) {
-      logger.error({ error: e.message }, "Master synthesis failed");
-      verdict = successfulOpinions.map(o => `**${o.name}:** ${o.answer}`).join("\n\n");
+    let finalOpinions: any[] = [];
+    let tokensUsed = 0;
+    let isCacheHit = false;
+
+    if (cached) {
+      verdict = cached.verdict;
+      finalOpinions = cached.opinions as any;
+      isCacheHit = true;
+      logger.info({ question: question.slice(0, 50) }, "Serving from semantic cache");
+    } else {
+      logger.info({ question: question.slice(0, 80), memberCount: councilMembers.length, summon, rounds }, "Council ask started");
+
+      const councilResponse = await askCouncil(councilMembers, master, currentMessages, maxTokens, rounds);
+      verdict = councilResponse.verdict;
+      finalOpinions = councilResponse.opinions;
+      tokensUsed = councilResponse.tokensUsed ?? 0;
+
+      await setCachedResponse(question, councilMembers, master, messages, verdict, finalOpinions);
     }
 
-    // Save to PostgreSQL via Prisma
-    await prisma.chat.create({
-      data: {
-        userId: req.userId ?? null,
-        question,
-        verdict,
-        opinions,
-      },
+    if (userId) {
+      if (!effectiveConversationId) {
+        const newConvo = await prisma.conversation.create({
+          data: {
+            userId,
+            title: question.slice(0, 50) + (question.length > 50 ? "..." : "")
+          }
+        });
+        effectiveConversationId = newConvo.id;
+      }
+
+      await prisma.chat.create({
+        data: {
+          userId,
+          conversationId: effectiveConversationId,
+          question,
+          verdict,
+          opinions: finalOpinions,
+          durationMs: Date.now() - startTime,
+          tokensUsed,
+          cacheHit: isCacheHit,
+        }
+      });
+
+      if (!isCacheHit && tokensUsed > 0) {
+        const today = new Date();
+        today.setUTCHours(0, 0, 0, 0);
+        prisma.dailyUsage.upsert({
+           where: { userId_date: { userId, date: today } },
+           update: { tokens: { increment: tokensUsed } },
+           create: { userId, date: today, tokens: tokensUsed, requests: 1 }
+        }).catch((err: any) => logger.error({ err, userId, tokensUsed }, "Failed to update daily tokens in ask"));
+      }
+    }
+
+    res.json({
+      success: true,
+      conversationId: effectiveConversationId,
+      verdict,
+      opinions: finalOpinions,
+      latency: Date.now() - startTime,
+      // FIX: cacheHit was missing from the non-stream response
+      cacheHit: isCacheHit,
     });
 
-    const duration = Date.now() - startTime;
-    logger.info({ duration, memberCount: members.length }, "Council ask completed");
-
-    res.json({ verdict, opinions, duration });
-  } catch (e) {
+  } catch (e: any) {
     next(e);
+  }
+});
+
+// ── POST /api/ask/stream (SSE) ────────────────────────────────────────────────
+router.post("/stream", optionalAuth, checkQuota, validate(askSchema), async (req: AuthRequest, res: Response, next: NextFunction) => {
+  const startTime = Date.now();
+  res.setHeader("Content-Type", "text/event-stream");
+  res.setHeader("Cache-Control", "no-cache");
+  res.setHeader("Connection", "keep-alive");
+  res.flushHeaders();
+
+  try {
+    const { question, conversationId, summon, maxTokens, rounds = 1, context } = req.body;
+    const members = req.body.members || getDefaultMembers();
+    const master = req.body.master || getDefaultMaster();
+    const userId = req.userId;
+
+    let effectiveConversationId = conversationId;
+    let messages: Message[] = [];
+
+    if (effectiveConversationId) {
+      const convo = await prisma.conversation.findFirst({
+        where: { id: effectiveConversationId, userId: userId ?? null }
+      });
+      if (!convo) {
+        res.write(`data: ${JSON.stringify({ type: "error", message: "Conversation not found" })}\n\n`);
+        return res.end();
+      }
+      messages = await getRecentHistory(effectiveConversationId);
+    }
+
+    // FIX: Pre-create the conversation before streaming starts so we have the
+    // conversationId available to include in the SSE "done" event.
+    // Without this, the frontend never learns the new conversationId from a stream.
+    if (userId && !effectiveConversationId) {
+      const newConvo = await prisma.conversation.create({
+        data: { userId, title: question.slice(0, 50) + (question.length > 50 ? "..." : "") }
+      });
+      effectiveConversationId = newConvo.id;
+    }
+
+    const councilMembers = await prepareCouncilMembers(members, summon, userId);
+    const questionWithContext = context ? `GROUND TRUTH CONTEXT:\n${context}\n\n---\n\nQUESTION: ${question}` : question;
+    const currentMessages = [...messages, { role: "user" as const, content: questionWithContext }];
+
+    const controller = new AbortController();
+    req.on("close", () => {
+      logger.info("SSE client disconnected, aborting ask stream...");
+      controller.abort();
+    });
+
+    let isCacheHit = false;
+    let finalVerdict = "";
+    let finalOpinions: any[] = [];
+    let tokensUsed = 0;
+
+    const cached = await getCachedResponse(question, councilMembers, master, messages);
+    if (cached) {
+      isCacheHit = true;
+      finalVerdict = cached.verdict;
+      finalOpinions = cached.opinions as any;
+      // FIX: include conversationId so the frontend can update its state
+      res.write(`data: ${JSON.stringify({
+        type: "done",
+        cached: true,
+        verdict: cached.verdict,
+        opinions: cached.opinions,
+        conversationId: effectiveConversationId ?? null,
+      })}\n\n`);
+      res.end();
+    } else {
+      logger.info({ question: question.slice(0, 80), memberCount: councilMembers.length, summon, rounds }, "Council SSE stream started");
+
+      const emitEvent = (type: string, data: any) => {
+        if (!controller.signal.aborted) {
+          // FIX: for the "done" event, inject conversationId so the frontend
+          // can update activeConvoId and reload the conversation list.
+          const payload = type === "done"
+            ? { ...data, conversationId: effectiveConversationId ?? null }
+            : data;
+          res.write(`data: ${JSON.stringify({ type, ...payload })}\n\n`);
+          const flush = (res as any).flush;
+          if (flush) flush();
+        }
+      };
+
+      finalVerdict = await streamCouncil(
+        councilMembers,
+        master,
+        currentMessages,
+        (event, data) => {
+          if (event === "opinion") finalOpinions.push(data);
+          if (event === "done") tokensUsed = data.tokensUsed || 0;
+          emitEvent(event, data);
+        },
+        maxTokens,
+        rounds,
+        controller.signal
+      );
+
+      res.end();
+      await setCachedResponse(question, councilMembers, master, messages, finalVerdict, finalOpinions);
+    }
+
+    if (userId && !controller.signal.aborted) {
+      // Conversation was pre-created above; just save the chat record.
+      if (effectiveConversationId) {
+        await prisma.chat.create({
+          data: {
+            userId,
+            conversationId: effectiveConversationId,
+            question,
+            verdict: finalVerdict,
+            opinions: finalOpinions,
+            durationMs: Date.now() - startTime,
+            tokensUsed,
+            cacheHit: isCacheHit
+          }
+        });
+      }
+      if (!isCacheHit && tokensUsed > 0) {
+         const today = new Date();
+         today.setUTCHours(0, 0, 0, 0);
+         prisma.dailyUsage.upsert({
+           where: { userId_date: { userId, date: today } },
+           update: { tokens: { increment: tokensUsed } },
+           create: { userId, date: today, tokens: tokensUsed, requests: 1 }
+         }).catch((err: any) => logger.error({ err }, "Failed to update daily tokens in SSE ask"));
+      }
+    }
+
+  } catch (e: any) {
+    if (!res.headersSent) {
+      next(e);
+    } else {
+      res.write(`data: ${JSON.stringify({ type: "error", message: e.message })}\n\n`);
+      res.end();
+    }
   }
 });
 

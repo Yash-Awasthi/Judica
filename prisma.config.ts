@@ -1,18 +1,16 @@
 import path from "path";
+import "dotenv/config";
 import { defineConfig } from "prisma/config";
-import { PrismaPg } from "@prisma/adapter-pg";
 
-const connectionString = process.env.DATABASE_URL ?? "postgresql://council:council123@localhost:5432/councildb";
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+  throw new Error("DATABASE_URL must be defined in your environment or .env file.");
+}
 
 export default defineConfig({
-  earlyAccess: true,
   schema: path.join("prisma", "schema.prisma"),
   datasource: {
     url: connectionString,
-  },
-  migrate: {
-    async adapter() {
-      return new PrismaPg({ connectionString });
-    },
   },
 });

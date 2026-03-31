@@ -36,7 +36,7 @@ router.post("/", optionalAuth, validate(askSchema), async (req: AuthRequest, res
             ...m,
             systemPrompt: (m.systemPrompt || "") + "\nRespond directly and concisely. Do not narrate your reasoning process. Just give the answer.",
           };
-          fullAnswer = await askProviderStream(memberWithPrompt, question, (chunk) => {
+          fullAnswer = await askProviderStream(memberWithPrompt, question, (chunk: string) => {
 
             send("member_chunk", { name: m.name, chunk });
           });
@@ -75,7 +75,7 @@ Write a single synthesized verdict. Be concise and direct. Note where models agr
       verdict = await askProviderStream(
   { ...master, systemPrompt: "You are a council master. Be concise and direct. Do not narrate your reasoning. Just synthesize and conclude." },
   synthesisPrompt,
-          (chunk) => send("master_chunk", { chunk })
+          (chunk: string) => send("master_chunk", { chunk })
         );
       verdict = verdict.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
     } catch (e: any) {

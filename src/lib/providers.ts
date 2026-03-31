@@ -1,3 +1,29 @@
+import { withRetry } from "./retry.js";
+import { getFallbackProvider } from "../config/fallbacks.js";
+import logger from "./logger.js";
+import { askAnthropic, streamAnthropic } from "./strategies/anthropic.js";
+import { askGoogle, streamGoogle } from "./strategies/google.js";
+import { askOpenAI, streamOpenAI } from "./strategies/openai.js";
+import { getBreaker } from "./breaker.js";
+
+export interface Message {
+  role: "user" | "assistant" | "tool";
+  content: string | any[];
+  tool_call_id?: string;
+  name?: string;
+}
+
+export interface ProviderUsage {
+  promptTokens: number;
+  completionTokens: number;
+  totalTokens: number;
+}
+
+export interface ProviderResponse {
+  text: string;
+  usage?: ProviderUsage;
+}
+
 export interface Provider {
   name: string;
   type: "openai-compat" | "anthropic" | "google";
@@ -5,253 +31,173 @@ export interface Provider {
   model: string;
   baseUrl?: string;
   systemPrompt?: string;
+  maxTokens?: number;
+  tools?: string[];
 }
 
-export async function askProvider(provider: Provider, question: string): Promise<string> {
-  const { apiKey, model, baseUrl, systemPrompt } = provider;
-  
-  // Auto-detect type from model name if missing
-  let type = provider.type;
-  if (!type || type === "openai-compat") {
-    if (model?.includes("gemini")) type = "google";
-    else if (model?.includes("claude")) type = "anthropic";
-    else type = "openai-compat";
+// ── Structured provider registry ───────────────────────────────────────────────────
+interface ProviderRegistryEntry {
+  baseUrl?: string;
+  type: "openai-compat" | "anthropic" | "google";
+  defaultMaxTokens: number;
+}
+
+/**
+ * Model-prefix registry: maps a substring of the model name to a provider config.
+ * Order matters — first match wins. More specific prefixes should come first.
+ */
+const PROVIDER_REGISTRY: Record<string, ProviderRegistryEntry> = {
+  // NVIDIA-hosted OpenAI-compatible models
+  "kimi":     { baseUrl: "https://integrate.api.nvidia.com/v1", type: "openai-compat", defaultMaxTokens: 2048 },
+  "glm":      { baseUrl: "https://integrate.api.nvidia.com/v1", type: "openai-compat", defaultMaxTokens: 2048 },
+  "minimax":  { baseUrl: "https://integrate.api.nvidia.com/v1", type: "openai-compat", defaultMaxTokens: 2048 },
+  "llama":    { baseUrl: "https://integrate.api.nvidia.com/v1", type: "openai-compat", defaultMaxTokens: 4096 },
+  "nemotron": { baseUrl: "https://integrate.api.nvidia.com/v1", type: "openai-compat", defaultMaxTokens: 4096 },
+  "qwen":     { baseUrl: "https://integrate.api.nvidia.com/v1", type: "openai-compat", defaultMaxTokens: 4096 },
+  // Native API providers (no custom base URL needed)
+  "gemini":   { type: "google",    defaultMaxTokens: 4096 },
+  "claude":   { type: "anthropic", defaultMaxTokens: 4096 },
+};
+
+interface ResolvedProvider {
+  type: "openai-compat" | "anthropic" | "google";
+  resolvedBaseUrl: string | undefined;
+  maxTokens: number;
+}
+
+function resolveProvider(provider: Provider): ResolvedProvider {
+  let resolvedBaseUrl = provider.baseUrl?.trim() || undefined;
+  let type: "openai-compat" | "anthropic" | "google" = provider.type || "openai-compat";
+  let maxTokens = provider.maxTokens ?? 1024;
+
+  const model = provider.model?.toLowerCase() || "";
+  const match = Object.keys(PROVIDER_REGISTRY).find((p) => model.includes(p));
+
+  if (match) {
+    const entry = PROVIDER_REGISTRY[match];
+    if (!resolvedBaseUrl && entry.baseUrl) resolvedBaseUrl = entry.baseUrl;
+    if (!provider.type || provider.type === "openai-compat") type = entry.type;
+    if (!provider.maxTokens) maxTokens = entry.defaultMaxTokens;
   }
 
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60000);
+  return { type, resolvedBaseUrl, maxTokens };
+}
 
+// ── Non-streaming ask ─────────────────────────────────────────────────────────
+
+export async function askProvider(
+  provider: Provider,
+  messages: Message[] | string,
+  isFallback = false,
+  abortSignal?: AbortSignal
+): Promise<ProviderResponse> {
   try {
-    // ── Anthropic ──────────────────────────────────────────
-    if (type === "anthropic") {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        signal: controller.signal,
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: model || "claude-3-5-haiku-20241022",
-          max_tokens: 512,
-          messages: [{ role: "user", content: question }],
-        }),
-      });
-      const data = await res.json() as any;
-      return data.content?.[0]?.text ?? JSON.stringify(data);
-    }
+    return await withRetry(async () => {
+      const normMessages: Message[] = typeof messages === "string"
+        ? [{ role: "user", content: messages }]
+        : messages;
+      const { type, resolvedBaseUrl, maxTokens } = resolveProvider(provider);
 
-    // ── Google Gemini ──────────────────────────────────────
-    if (type === "google") {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model || "gemini-2.5-flash"}:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          signal: controller.signal,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: question }] }],
-          }),
+      const controller = new AbortController();
+
+      const onAbort = () => controller.abort();
+      if (abortSignal) {
+        abortSignal.addEventListener("abort", onAbort);
+        if (abortSignal.aborted) controller.abort();
+      }
+      const timeout = setTimeout(() => controller.abort(), 60_000);
+
+      try {
+        if (type === "anthropic") {
+          const breaker = getBreaker(provider, askAnthropic);
+          return await breaker.fire(provider, normMessages, maxTokens, controller.signal);
         }
-      );
-      const data = await res.json() as any;
-      return data.candidates?.[0]?.content?.parts?.[0]?.text ?? JSON.stringify(data);
-    }
-
-    // ── OpenAI-compatible (NVIDIA, OpenAI, Groq, OpenRouter) ──
-    const url = (baseUrl ?? "https://api.openai.com/v1").replace(/\/$/, "");
-    const res = await fetch(`${url}/chat/completions`, {
-      method: "POST",
-      signal: controller.signal,
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        messages: [
-          ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
-          { role: "user", content: question },
-        ],
-        max_tokens: 512,
-      }),
+        if (type === "google") {
+          const breaker = getBreaker(provider, askGoogle);
+          return await breaker.fire(provider, normMessages, maxTokens, controller.signal);
+        }
+        // Default: openai-compat
+        const breaker = getBreaker(provider, askOpenAI);
+        return await breaker.fire(
+          provider, normMessages, resolvedBaseUrl, maxTokens, controller.signal, isFallback,
+          (p: any, msgs: any, fb: any) => askProvider(p, msgs, fb, abortSignal)
+        );
+      } finally {
+        clearTimeout(timeout);
+        if (abortSignal) {
+          abortSignal.removeEventListener("abort", onAbort);
+        }
+      }
+    }, {
+      onRetry: (err, attempt) => {
+        logger.warn({ attempt, provider: provider.name, error: err.message }, "Retry initiated");
+      }
     });
-    const data = await res.json() as any;
-    const msg = data.choices?.[0]?.message;
-    const raw = msg?.content || msg?.reasoning || JSON.stringify(data);
-    return raw.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
-
-  } catch (e: any) {
-    if (e.name === "AbortError") return "[Error: request timed out after 30s]";
-    throw e;
-  } finally {
-    clearTimeout(timeout);
+  } catch (err: any) {
+    if (!isFallback && (!abortSignal || !abortSignal.aborted)) {
+      const fallback = getFallbackProvider(provider);
+      if (fallback) return askProvider(fallback, messages, true, abortSignal);
+    }
+    throw err;
   }
 }
+
+// ── Streaming ask ─────────────────────────────────────────────────────────────
 
 export async function askProviderStream(
   provider: Provider,
-  question: string,
-  onChunk: (chunk: string) => void
-): Promise<string> {
-  const { apiKey, model, baseUrl, systemPrompt } = provider;
-
-  let type = provider.type;
-  if (!type || type === "openai-compat") {
-    if (model?.includes("gemini")) type = "google";
-    else if (model?.includes("claude")) type = "anthropic";
-    else type = "openai-compat";
-  }
-
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 60000);
-  let fullText = "";
-
+  messages: Message[] | string,
+  onChunk: (chunk: string) => void,
+  isFallback = false,
+  abortSignal?: AbortSignal
+): Promise<ProviderResponse> {
   try {
-    // ── Anthropic streaming ────────────────────────────
-    if (type === "anthropic") {
-      const res = await fetch("https://api.anthropic.com/v1/messages", {
-        method: "POST",
-        signal: controller.signal,
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: model || "claude-3-5-haiku-20241022",
-          max_tokens: 512,
-          stream: true,
-          messages: [{ role: "user", content: question }],
-        }),
-      });
+    return await withRetry(async () => {
+      const normMessages: Message[] = typeof messages === "string"
+        ? [{ role: "user", content: messages }]
+        : messages;
+      const { type, resolvedBaseUrl, maxTokens } = resolveProvider(provider);
 
-      const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
+      const controller = new AbortController();
 
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const lines = decoder.decode(value).split("\n");
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              const json = JSON.parse(line.slice(6));
-              const chunk = json.delta?.text ?? "";
-              if (chunk) { fullText += chunk; onChunk(chunk); }
-            } catch {}
-          }
+      const onAbort = () => controller.abort();
+      if (abortSignal) {
+        abortSignal.addEventListener("abort", onAbort);
+        if (abortSignal.aborted) controller.abort();
+      }
+      const timeout = setTimeout(() => controller.abort(), 60_000);
+
+      try {
+        if (type === "anthropic") {
+          const breaker = getBreaker(provider, streamAnthropic);
+          return await breaker.fire(provider, normMessages, maxTokens, controller.signal, onChunk);
+        }
+        if (type === "google") {
+          const breaker = getBreaker(provider, streamGoogle);
+          return await breaker.fire(provider, normMessages, maxTokens, controller.signal, onChunk);
+        }
+        // Default: openai-compat
+        const breaker = getBreaker(provider, streamOpenAI);
+        return await breaker.fire(
+          provider, normMessages, resolvedBaseUrl, maxTokens, controller.signal, isFallback, onChunk,
+          (p: any, msgs: any, chunk: any, fb: any) => askProviderStream(p, msgs, chunk, fb, abortSignal)
+        );
+      } finally {
+        clearTimeout(timeout);
+        if (abortSignal) {
+          abortSignal.removeEventListener("abort", onAbort);
         }
       }
-      return fullText;
-    }
-
-    // ── Google streaming ───────────────────────────────
-    if (type === "google") {
-      const res = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model || "gemini-2.5-flash"}:streamGenerateContent?key=${apiKey}&alt=sse`,
-        {
-          method: "POST",
-          signal: controller.signal,
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ parts: [{ text: question }] }] }),
-        }
-      );
-
-      const reader = res.body!.getReader();
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const lines = decoder.decode(value).split("\n");
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              const json = JSON.parse(line.slice(6));
-              const chunk = json.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
-              if (chunk) { fullText += chunk; onChunk(chunk); }
-            } catch {}
-          }
-        }
+    }, {
+      onRetry: (err, attempt) => {
+        logger.warn({ attempt, provider: provider.name, error: err.message }, "Retry stream initiated");
       }
-      return fullText;
-    }
-
-    // ── OpenAI-compatible streaming ────────────────────
-    const url = (baseUrl ?? "https://api.openai.com/v1").replace(/\/$/, "");
-    const res = await fetch(`${url}/chat/completions`, {
-      method: "POST",
-      signal: controller.signal,
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model,
-        stream: true,
-        messages: [
-          ...(systemPrompt ? [{ role: "system", content: systemPrompt }] : []),
-          { role: "user", content: question },
-        ],
-        max_tokens: 512,
-      }),
     });
-
-    const reader = res.body!.getReader();
-    const decoder = new TextDecoder();
-    let inThink = false;
-
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      const lines = decoder.decode(value).split("\n");
-      for (const line of lines) {
-        if (line.startsWith("data: ") && line !== "data: [DONE]") {
-          try {
-            const json = JSON.parse(line.slice(6));           
-            const delta = json.choices?.[0]?.delta ?? {};
-            const chunk = delta.content || delta.reasoning || "";
-            if (chunk) {
-              fullText += chunk;
-              let toSend = "";
-              let remaining = chunk;
-
-              while (remaining.length > 0) {
-                if (inThink) {
-                  const endIdx = remaining.indexOf("</think>");
-                  if (endIdx === -1) {
-                    remaining = "";
-                  } else {
-                    inThink = false;
-                    remaining = remaining.slice(endIdx + 8);
-                  }
-                } else {
-                  const startIdx = remaining.indexOf("<think>");
-                  if (startIdx === -1) {
-                    toSend += remaining;
-                    remaining = "";
-                  } else {
-                    toSend += remaining.slice(0, startIdx);
-                    inThink = true;
-                    remaining = remaining.slice(startIdx + 7);
-                  }
-                }
-              }
-
-              if (toSend) onChunk(toSend);
-            }
-          } catch {}
-        }
-      }
+  } catch (err: any) {
+    if (!isFallback && (!abortSignal || !abortSignal.aborted)) {
+      const fallback = getFallbackProvider(provider);
+      if (fallback) return askProviderStream(fallback, messages, onChunk, true, abortSignal);
     }
-    return fullText;
-
-  } catch (e: any) {
-    if (e.name === "AbortError") return "[Error: request timed out]";
-    throw e;
-  } finally {
-    clearTimeout(timeout);
+    throw err;
   }
 }
