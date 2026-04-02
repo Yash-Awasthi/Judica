@@ -107,43 +107,69 @@ function App() {
     return saved ? parseInt(saved, 10) : 264;
   });
 
-  const [members, setMembers] = useState<CouncilMember[]>([
-    {
-      id: "1",
-      name: "The Architect",
-      type: "openai-compat",
-      apiKey: "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",
-      model: "moonshotai/kimi-k2.5",
-      baseUrl: "https://integrate.api.nvidia.com/v1",
-      active: true,
-      role: "Expert",
-      tone: "Academic",
-      customBehaviour: ""
-    },
-    {
-      id: "2",
-      name: "The Contrarian",
-      type: "openai-compat",
-      apiKey: "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",
-      model: "google/gemini-2.0-flash-exp:free",
-      baseUrl: "https://openrouter.ai/api/v1",
-      active: true,
-      role: "Devil's Advocate",
-      tone: "Blunt",
-      customBehaviour: ""
-    },
-    {
-      id: "3",
-      name: "The Pragmatist",
-      type: "google",
-      apiKey: "AIzaSyDVEcO98M1F5wCT7EPd3kt9_MPxIzTi5c4",
-      model: "gemini-2.5-flash",
-      active: true,
-      role: "Pragmatist",
-      tone: "Concise",
-      customBehaviour: ""
+  const [members, setMembers] = useState<CouncilMember[]>(() => {
+    const saved = localStorage.getItem("council_members");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (err) {
+        console.error("Failed to parse cached council members", err);
+      }
     }
-  ]);
+    return [
+      {
+        id: "1",
+        name: "The Architect",
+        type: "openai-compat",
+        apiKey: "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",
+        model: "moonshotai/kimi-k2.5",
+        baseUrl: "https://integrate.api.nvidia.com/v1",
+        active: true,
+        role: "Expert",
+        tone: "Academic",
+        customBehaviour: ""
+      },
+      {
+        id: "2",
+        name: "The Contrarian",
+        type: "openai-compat",
+        apiKey: "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",
+        model: "google/gemini-2.0-flash-exp:free",
+        baseUrl: "https://openrouter.ai/api/v1",
+        active: true,
+        role: "Devil's Advocate",
+        tone: "Blunt",
+        customBehaviour: ""
+      },
+      {
+        id: "3",
+        name: "The Pragmatist",
+        type: "google",
+        apiKey: "AIzaSyAKFgXhT2V25HtTnHcXMPb3Z_dCljH5lhY",
+        model: "gemini-2.5-flash",
+        active: true,
+        role: "Pragmatist",
+        tone: "Concise",
+        customBehaviour: ""
+      },
+      {
+        id: "4",
+        name: "The Summarizer",
+        type: "openai-compat",
+        apiKey: "sk-sgwx63u9f654ly3nusxlkdqzzzziezx7f6a4xx8ryogcgnds",
+        model: "xiaomi/MiMo-V2-Flash",
+        baseUrl: "https://api.siliconflow.cn/v1",
+        active: true,
+        role: "Critic",
+        tone: "Concise",
+        customBehaviour: "You are an Unbiased Summarizer. Provide a completely neutral, objective summary of the debate. Do not invent new arguments."
+      }
+    ];
+  });
+
+  useEffect(() => {
+    localStorage.setItem("council_members", JSON.stringify(members));
+  }, [members]);
 
   useEffect(() => {
     localStorage.setItem("council_sidebar_width", sidebarWidth.toString());

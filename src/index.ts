@@ -18,6 +18,7 @@ import providersRouter from "./routes/providers.js";
 import councilRouter from "./routes/council.js";
 import metricsRouter from "./routes/metrics.js";
 import exportRouter from "./routes/export.js";
+import ttsRouter from "./routes/tts.js";
 import { startSweepers } from "./lib/sweeper.js";
 import { initSocket } from "./lib/socket.js";
 import prisma, { pool } from "./lib/db.js";
@@ -108,6 +109,7 @@ app.use("/api/templates", templatesRouter);
 app.use("/api/providers", providersRouter);
 app.use("/api/metrics",   metricsRouter);
 app.use("/api/export",    exportRouter);
+app.use("/api/tts",       askLimiter, ttsRouter);
 
 // ── Deep Health Check ─────────────────────────────────────────────────────────
 app.get("/health", async (req, res) => {

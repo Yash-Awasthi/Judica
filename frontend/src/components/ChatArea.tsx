@@ -84,8 +84,48 @@ export function ChatArea({
   const [useStream, setUseStream] = useState(true);
   const [showExport, setShowExport] = useState(false);
   const [showMemberConfig, setShowMemberConfig] = useState(false);
+  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  const handlePlayTTS = async (msgId: string, text: string) => {
+    if (playingAudioId === msgId) {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+      setPlayingAudioId(null);
+      return;
+    }
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    setPlayingAudioId(msgId);
+    try {
+      const token = localStorage.getItem("council_token");
+      const res = await fetch("/api/tts", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {})
+        },
+        body: JSON.stringify({ text })
+      });
+      if (!res.ok) throw new Error("TTS failed");
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => setPlayingAudioId(null);
+      audio.onerror = () => setPlayingAudioId(null);
+      audio.play();
+    } catch (err) {
+      console.error(err);
+      setPlayingAudioId(null);
+    }
+  };
 
   useEffect(() => {
     setSummon(defaultSummon);
@@ -307,11 +347,32 @@ export function ChatArea({
                 {msg.verdict && (
                   <div className="mt-8 verdict-box rounded-2xl p-6 animate-slide-up">
                     {/* Header */}
-                    <div className="flex items-center gap-2.5 mb-4">
-                      <div className="w-1 h-5 bg-accent rounded-full" />
-                      <span className="text-[10px] font-black uppercase tracking-[0.2em] text-accent">
-                        Final Verdict
-                      </span>
+                    <div className="flex items-center justify-between mb-4">
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-1 h-5 bg-accent rounded-full" />
+                        <span className="text-[10px] font-black uppercase tracking-[0.2em] text-accent">
+                          Final Verdict
+                        </span>
+                      </div>
+                      
+                      <button 
+                        onClick={() => handlePlayTTS(msg.id || "temp", msg.verdict!)}
+                        disabled={isStreaming}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent/10 hover:bg-accent/20 text-accent transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {playingAudioId === (msg.id || "temp") ? (
+                          <div className="flex items-center gap-1">
+                            <span className="w-1 h-2 bg-accent animate-pulse" style={{ animationDelay: "0ms" }} />
+                            <span className="w-1 h-3 bg-accent animate-pulse" style={{ animationDelay: "150ms" }} />
+                            <span className="w-1 h-2 bg-accent animate-pulse" style={{ animationDelay: "300ms" }} />
+                          </div>
+                        ) : (
+                          <span className="material-symbols-outlined text-[16px]">volume_up</span>
+                        )}
+                        <span className="text-[9px] font-black uppercase tracking-widest hidden sm:inline">
+                          {playingAudioId === (msg.id || "temp") ? "Stop" : "Listen"}
+                        </span>
+                      </button>
                     </div>
 
                     {/* Verdict text with Markdown */}
@@ -381,9 +442,32 @@ export function ChatArea({
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-[10px] text-text-dim uppercase tracking-widest font-bold">Total Members: {members.length}</span>
+                <button
+                  onClick={() => {
+                    const newMember = {
+                      id: Math.random().toString(36).substring(7),
+                      name: "New Member",
+                      type: "openai-compat" as const,
+                      apiKey: "",
+                      model: "gpt-4o-mini",
+                      active: true,
+                      role: "Default",
+                      tone: "Concise",
+                      customBehaviour: "Respond helpfully."
+                    };
+                    onUpdateMembers([...members, newMember]);
+                  }}
+                  className="px-3 py-1 bg-accent/10 hover:bg-accent/20 text-accent text-[9px] font-black uppercase tracking-widest rounded-lg flex items-center gap-1 transition-colors"
+                >
+                  <span className="material-symbols-outlined text-[14px]">add</span>
+                  Add Member
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[60vh] overflow-y-auto scrollbar-custom pr-2">
                 {members.map((member, idx) => {
-                  const color = getMemberColor(idx);
                   return (
                     <div
                       key={member.id}
@@ -394,17 +478,30 @@ export function ChatArea({
                       }`}
                     >
                       {/* Member header */}
-                      <div className="flex items-center justify-between mb-3">
-                        <div className="flex items-center gap-2">
-                          <div
-                            className="member-avatar w-6 h-6 rounded-md text-[9px]"
-                            style={{ backgroundColor: color.bg }}
-                          >
-                            {member.name[0]}
-                          </div>
-                          <span className="text-[11px] font-bold text-text truncate max-w-[80px]">{member.name}</span>
+                      <div className="flex items-center justify-between mb-3 border-b border-white/[0.04] pb-3">
+                        <div className="flex items-center gap-2 flex-1 mr-2">
+                          <input
+                            type="text"
+                            value={member.name}
+                            onChange={(e) => {
+                              const newMembers = [...members];
+                              newMembers[idx] = { ...member, name: e.target.value };
+                              onUpdateMembers(newMembers);
+                            }}
+                            className="bg-transparent border-none text-[12px] font-bold text-text outline-none focus:ring-0 p-0 w-full"
+                          />
                         </div>
-                        <label className="relative cursor-pointer">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => {
+                              onUpdateMembers(members.filter((_, i) => i !== idx));
+                            }}
+                            className="text-danger/50 hover:text-danger transition-colors p-1"
+                            title="Delete Member"
+                          >
+                            <span className="material-symbols-outlined text-[16px]">delete</span>
+                          </button>
+                          <label className="relative cursor-pointer">
                           <input
                             type="checkbox"
                             checked={member.active}
@@ -425,6 +522,7 @@ export function ChatArea({
                             />
                           </div>
                         </label>
+                        </div>
                       </div>
 
                       <div className="space-y-2.5">
@@ -482,9 +580,69 @@ export function ChatArea({
                           />
                         </div>
 
-                        {/* Model badge */}
-                        <div className="text-[8px] text-text-dim font-mono bg-white/[0.03] rounded px-2 py-1 truncate">
-                          {member.model}
+                        {/* API Key */}
+                        <div className="space-y-1">
+                          <label className="text-[8px] text-text-dim uppercase font-black tracking-widest">API Key</label>
+                          <input
+                            type="password"
+                            value={member.apiKey}
+                            onChange={(e) => {
+                              const newMembers = [...members];
+                              newMembers[idx] = { ...member, apiKey: e.target.value };
+                              onUpdateMembers(newMembers);
+                            }}
+                            className="w-full bg-black/50 border border-white/8 rounded-lg text-[10px] text-text p-1.5 outline-none focus:border-accent/30 font-mono"
+                            placeholder="sk-..."
+                          />
+                        </div>
+
+                        {/* Model & provider row */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <label className="text-[8px] text-text-dim uppercase font-black tracking-widest">Model Name</label>
+                            <input
+                              type="text"
+                              value={member.model}
+                              onChange={(e) => {
+                                const newMembers = [...members];
+                                newMembers[idx] = { ...member, model: e.target.value };
+                                onUpdateMembers(newMembers);
+                              }}
+                              className="w-full bg-black/50 border border-white/8 rounded-lg text-[10px] text-text p-1.5 outline-none focus:border-accent/30 font-mono"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label className="text-[8px] text-text-dim uppercase font-black tracking-widest">Type</label>
+                            <select
+                              value={member.type}
+                              onChange={(e) => {
+                                const newMembers = [...members];
+                                newMembers[idx] = { ...member, type: e.target.value as any };
+                                onUpdateMembers(newMembers);
+                              }}
+                              className="w-full bg-black/50 border border-white/8 rounded-lg text-[10px] text-text p-1.5 outline-none focus:border-accent/30"
+                            >
+                              <option value="openai-compat">OpenAI-Compat</option>
+                              <option value="google">Google</option>
+                              <option value="anthropic">Anthropic</option>
+                            </select>
+                          </div>
+                        </div>
+
+                        {/* Base URL (Optional) */}
+                        <div className="space-y-1">
+                          <label className="text-[8px] text-text-dim uppercase font-black tracking-widest">Base URL (optional)</label>
+                          <input
+                            type="url"
+                            value={member.baseUrl || ""}
+                            onChange={(e) => {
+                              const newMembers = [...members];
+                              newMembers[idx] = { ...member, baseUrl: e.target.value };
+                              onUpdateMembers(newMembers);
+                            }}
+                            className="w-full bg-black/50 border border-white/8 rounded-lg text-[10px] text-text p-1.5 outline-none focus:border-accent/30 font-mono"
+                            placeholder="e.g. https://api.openai.com/v1"
+                          />
                         </div>
                       </div>
                     </div>
