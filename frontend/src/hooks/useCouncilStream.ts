@@ -1,11 +1,39 @@
 import { useRef, useEffect, useCallback, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 
+export interface PeerReview {
+  reviewer: string;
+  ranking: string[];
+  critique: string;
+}
+
+export interface ScoredOpinion {
+  name: string;
+  opinion: string;
+  scores: {
+    confidence: number;
+    agreement: number;
+    peerRanking: number;
+    final: number;
+  };
+}
+
+export interface ModelCost {
+  model: string;
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
+  latencyMs: number;
+}
+
 export type SSEEvent =
   | { type: "member_chunk"; name: string; chunk: string }
   | { type: "opinion"; name: string; archetype: string; opinion: string }
   | { type: "verdict"; verdict: string }
   | { type: "verdict_chunk"; chunk: string }
+  | { type: "peer_review"; round: number; reviews: PeerReview[] }
+  | { type: "scored"; round: number; scored: ScoredOpinion[] }
+  | { type: "cost"; models: ModelCost[]; totalUsd: number }
   | { type: "done"; verdict: string; latency?: number; cacheHit?: boolean; tokensUsed?: number; conversationId?: string | null }
   | { type: "error"; message: string }
   | { type: "status"; message: string; round?: number };

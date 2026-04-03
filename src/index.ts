@@ -1,4 +1,5 @@
 import templatesRouter from "./routes/templates.js";
+import piiRouter from "./routes/pii.js";
 import { env } from "./config/env.js";
 import express from "express";
 import helmet from "helmet";
@@ -8,7 +9,9 @@ import path from "path";
 import fs from "fs";
 import logger from "./lib/logger.js";
 import { askLimiter, authLimiter } from "./middleware/rateLimit.js";
+import { perUserLimiter } from "./middleware/limiter.js";
 import { errorHandler } from "./middleware/errorHandler.js";
+import { requireAuth } from "./middleware/auth.js";
 import { requestId } from "./middleware/requestId.js";
 import { cspNonce } from "./middleware/cspNonce.js";
 import askRouter from "./routes/ask.js";
@@ -20,9 +23,11 @@ import metricsRouter from "./routes/metrics.js";
 import exportRouter from "./routes/export.js";
 import ttsRouter from "./routes/tts.js";
 import { startSweepers } from "./lib/sweeper.js";
+import "./lib/tools/builtin.js";
 import { initSocket } from "./lib/socket.js";
 import prisma, { pool } from "./lib/db.js";
 import redis from "./lib/redis.js";
+import { requestContext } from "./lib/context.js";
 
 const app = express();
 
@@ -37,14 +42,24 @@ app.use(helmet({
       scriptSrc: ["'self'", (_req: any, res: any) => `'nonce-${res.locals.cspNonce}'`],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      connectSrc: ["'self'"],
+      connectSrc: ["'self'", "http://localhost:3000", "ws://localhost:3000", "http://localhost:5173"],
     },
   },
 }));
 
 // ── Trust proxy (for rate limiter behind nginx/reverse proxy) ─────────────────
-const trustProxyConfig = env.TRUST_PROXY || 1;
-app.set("trust proxy", !isNaN(Number(trustProxyConfig)) ? Number(trustProxyConfig) : trustProxyConfig);
+const trustProxyConfig = env.TRUST_PROXY;
+if (trustProxyConfig === "true") {
+  app.set("trust proxy", true);
+} else if (trustProxyConfig === "false") {
+  app.set("trust proxy", false);
+} else if (trustProxyConfig && !isNaN(Number(trustProxyConfig))) {
+  app.set("trust proxy", Number(trustProxyConfig));
+} else if (trustProxyConfig) {
+  app.set("trust proxy", trustProxyConfig);
+} else {
+  app.set("trust proxy", 1); // Default to 1 hop
+}
 
 // ── CORS — reads ALLOWED_ORIGINS from env, falls back to localhost:3000 ─────
 const allowedOrigins = env.ALLOWED_ORIGINS
@@ -65,6 +80,13 @@ app.use(express.json({ limit: "200kb" }));
 
 // ── Request ID (attach before logging so it can be threaded through) ──────────
 app.use(requestId);
+
+// ── Request Context (AsyncLocalStorage for request-scoped data) ─────────────
+app.use((req: any, res, next) => {
+  requestContext.run({ requestId: req.requestId || res.getHeader('x-request-id') as string }, () => {
+    next();
+  });
+});
 
 const publicPath = fs.existsSync(path.join(process.cwd(), "frontend/dist"))
   ? path.join(process.cwd(), "frontend/dist")
@@ -94,11 +116,13 @@ app.get("/", (req, res) => {
   }
 });
 
-// ── Request logging ───────────────────────────────────────────────────────────
 app.use((req: any, res, next) => {
   logger.debug({ method: req.method, path: req.path }, "Incoming request");
   next();
 });
+
+// ── Per-User Rate/Concurrency Limit ──────────────────────────────────────────
+app.use(perUserLimiter);
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use("/api/auth",      authLimiter, authRouter);
@@ -110,6 +134,7 @@ app.use("/api/providers", providersRouter);
 app.use("/api/metrics",   metricsRouter);
 app.use("/api/export",    exportRouter);
 app.use("/api/tts",       askLimiter, ttsRouter);
+app.use("/api/pii",       requireAuth, piiRouter);
 
 // ── Deep Health Check ─────────────────────────────────────────────────────────
 app.get("/health", async (req, res) => {

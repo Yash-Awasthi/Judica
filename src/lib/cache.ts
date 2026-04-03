@@ -1,8 +1,8 @@
 import crypto from "crypto";
-import prisma, { pool } from "./db.js";
-import redis from "./redis.js";
 import logger from "./logger.js";
 import { env } from "../config/env.js";
+import { redisBackend, postgresBackend } from "./cache/backends.js";
+import type { CacheEntry } from "./cache/CacheBackend.js";
 
 /**
  * CACHE ARCHITECTURE NOTE:
@@ -13,6 +13,29 @@ import { env } from "../config/env.js";
  * the `embedding` column in `prisma/schema.prisma`.
  */
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+
+// Cache locking for embedding generation to prevent stampede
+const embeddingLocks = new Map<string, Promise<number[] | null>>();
+
+export async function getEmbeddingWithLock(text: string): Promise<number[] | null> {
+  const key = crypto.createHash("md5").update(text).digest("hex");
+  
+  // Check if already in progress
+  const existing = embeddingLocks.get(key);
+  if (existing) {
+    return await existing;
+  }
+  
+  // Create new request and lock
+  const promise = getEmbedding(text);
+  embeddingLocks.set(key, promise);
+  
+  try {
+    return await promise;
+  } finally {
+    embeddingLocks.delete(key);
+  }
+}
 
 export function generateCacheKey(prompt: string, members: any[], master?: any, history: any[] = []): string {
   const memberConfigs = members.map(m => ({
@@ -51,8 +74,8 @@ async function getEmbedding(text: string): Promise<number[] | null> {
     if (data.data?.[0]?.embedding) {
       return data.data[0].embedding;
     }
-  } catch (err: any) {
-    logger.warn({ error: err.message }, "Failed to fetch embeddings");
+  } catch (err) {
+    logger.warn({ error: (err as Error).message }, "Failed to fetch embeddings");
   }
   return null;
 }
@@ -61,62 +84,47 @@ export async function getCachedResponse(prompt: string, members: any[], master?:
   const keyHash = generateCacheKey(prompt, members, master, history);
   
   // 1. Exact match via Redis (fastest)
-  const redisHit = await redis.get(`cache:${keyHash}`);
+  const redisHit = await redisBackend.get(keyHash);
   if (redisHit) {
     logger.info({ keyHash, match: "exact", source: "redis" }, "Cache hit");
-    return JSON.parse(redisHit);
+    return redisHit;
   }
 
-  // Clean up expired cache entries manually in background, probabilistically (5%) to reduce DB contention under load
+  // Clean up expired cache entries in background (5% probability)
   if (Math.random() < 0.05) {
-    pool.query(`DELETE FROM "SemanticCache" WHERE "expiresAt" < NOW()`).catch(() => {});
+    postgresBackend.cleanup?.().catch(() => {});
   }
 
-  const embedding = env.ENABLE_VECTOR_CACHE ? await getEmbedding(prompt) : null;
+  const embedding = env.ENABLE_VECTOR_CACHE ? await getEmbeddingWithLock(prompt) : null;
 
   if (embedding) {
-    try {
-      // 2. Vector similarity search (threshold < 0.15 for high similarity)
-      const result = await pool.query(`
-        SELECT id, verdict, opinions, embedding <-> $1 as distance
-        FROM "SemanticCache"
-        WHERE "expiresAt" > NOW() AND embedding IS NOT NULL
-        ORDER BY embedding <-> $1
-        LIMIT 1
-      `, [`[${embedding.join(',')}]`]);
-
-      if (result.rows.length > 0 && result.rows[0].distance < 0.15) {
-        logger.info({ keyHash, match: "vector", distance: result.rows[0].distance, source: "postgres" }, "Cache hit (vector)");
-        const responseData = {
-          verdict: result.rows[0].verdict,
-          opinions: typeof result.rows[0].opinions === 'string' ? JSON.parse(result.rows[0].opinions) : result.rows[0].opinions
-        };
-        // Background populate Redis to accelerate future exact matches
-        redis.set(`cache:${keyHash}`, JSON.stringify(responseData), "PX", CACHE_TTL_MS).catch(() => {});
-        return responseData;
-      }
-    } catch(err: any) {
-      logger.warn({ err: err.message }, "Vector search failed");
+    // 2. Vector similarity search via Postgres
+    const vectorHit = await postgresBackend.searchSemantic?.(embedding, 0.15);
+    if (vectorHit) {
+      logger.info({ keyHash, match: "vector", distance: vectorHit.distance, source: "postgres" }, "Cache hit (vector)");
+      const responseData: CacheEntry = {
+        verdict: vectorHit.verdict,
+        opinions: vectorHit.opinions
+      };
+      // Background populate Redis for future exact matches
+      redisBackend.set(keyHash, responseData, CACHE_TTL_MS).catch(() => {});
+      return responseData;
     }
   }
 
-  // Fallback to exact match
-  const hit = await prisma.semanticCache.findUnique({ where: { keyHash } });
+  // 3. Fallback to exact match via Postgres
+  const hit = await postgresBackend.get(keyHash);
 
-  if (!hit || hit.expiresAt < new Date()) {
+  if (!hit) {
     return null;
   }
 
   logger.info({ keyHash, match: "exact", source: "postgres" }, "Cache hit");
-  const responseData = {
-    verdict: hit.verdict,
-    opinions: hit.opinions as any[]
-  };
   
-  const ttl = Math.max(1000, hit.expiresAt.getTime() - Date.now());
-  redis.set(`cache:${keyHash}`, JSON.stringify(responseData), "PX", ttl).catch(() => {});
+  // Populate Redis cache
+  redisBackend.set(keyHash, hit, CACHE_TTL_MS).catch(() => {});
   
-  return responseData;
+  return hit;
 }
 
 export async function setCachedResponse(
@@ -128,38 +136,21 @@ export async function setCachedResponse(
   opinions: any[]
 ) {
   const keyHash = generateCacheKey(prompt, members, master, history);
-  const expiresAt = new Date(Date.now() + CACHE_TTL_MS);
-  const embedding = env.ENABLE_VECTOR_CACHE ? await getEmbedding(prompt) : null;
+  const embedding = env.ENABLE_VECTOR_CACHE ? await getEmbeddingWithLock(prompt) : null;
+
+  const cacheEntry: CacheEntry = {
+    verdict,
+    opinions,
+    metadata: { prompt: prompt.slice(0, 500) }
+  };
 
   try {
-    if (embedding) {
-      await pool.query(`
-        INSERT INTO "SemanticCache" ("keyHash", prompt, verdict, opinions, "expiresAt", embedding)
-        VALUES ($1, $2, $3, $4, $5, $6)
-        ON CONFLICT ("keyHash") DO UPDATE SET 
-          verdict = EXCLUDED.verdict, 
-          opinions = EXCLUDED.opinions,
-          "expiresAt" = EXCLUDED."expiresAt",
-          embedding = EXCLUDED.embedding
-      `, [
-        keyHash, 
-        prompt.slice(0, 500), 
-        verdict, 
-        JSON.stringify(opinions), 
-        expiresAt.toISOString(),
-        `[${embedding.join(',')}]`
-      ]);
-    } else {
-      await prisma.semanticCache.upsert({
-        where: { keyHash },
-        update: { verdict, opinions, expiresAt: expiresAt, createdAt: new Date() },
-        create: { keyHash, prompt: prompt.slice(0, 500), verdict, opinions, expiresAt: expiresAt }
-      });
-    }
+    // Store in Postgres (with embedding if available)
+    await postgresBackend.setSemantic?.(keyHash, prompt, cacheEntry, embedding, CACHE_TTL_MS);
     
-    // Sync cache to Redis
-    await redis.set(`cache:${keyHash}`, JSON.stringify({ verdict, opinions }), "PX", CACHE_TTL_MS);
-  } catch (e: any) {
-    logger.warn({ error: e.message }, "Failed to write to semantic cache");
+    // Sync to Redis for fast lookups
+    await redisBackend.set(keyHash, cacheEntry, CACHE_TTL_MS);
+  } catch (e) {
+    logger.warn({ error: (e as Error).message }, "Failed to write to semantic cache");
   }
 }

@@ -8,7 +8,7 @@ import { env } from "../config/env.js";
 import { requireAuth } from "../middleware/auth.js";
 import { AuthRequest } from "../types/index.js";
 import { validate, authSchema, configSchema } from "../middleware/validate.js";
-import { encryptConfig, decryptConfig } from "../lib/crypto.js";
+import { encrypt, decrypt } from "../lib/crypto.js";
 import { AppError } from "../middleware/errorHandler.js";
 
 const router = Router();
@@ -73,7 +73,7 @@ router.post("/logout", requireAuth, async (req: AuthRequest, res: Response, next
        const expiresAt = payload?.exp ? new Date(payload.exp * 1000) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
        
        const ttlSecs = Math.max(1, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
-       await redis.set(`revoked:${token}`, "1", "EX", ttlSecs);
+       await redis.set(`revoked:${token}`, "1", { EX: ttlSecs });
 
        await prisma.revokedToken.create({
          data: { token, expiresAt }
@@ -138,7 +138,7 @@ router.patch("/me", requireAuth, async (req: AuthRequest, res: Response, next) =
 // ── Save council config ─────────────────────────────────
 router.post("/config", requireAuth, validate(configSchema), async (req: AuthRequest, res: Response, next) => {
   try {
-    const encrypted = encryptConfig(req.body.config);
+    const encrypted = encrypt(JSON.stringify(req.body.config));
 
     await prisma.councilConfig.upsert({
       where: { userId: req.userId! },
@@ -160,7 +160,7 @@ router.get("/config", requireAuth, async (req: AuthRequest, res: Response, next)
     });
 
     if (!row) { res.json(null); return; }
-    const decrypted = decryptConfig(row.config);
+    const decrypted = JSON.parse(decrypt(row.config as string));
     res.json(decrypted);
   } catch (e) {
     next(e);
@@ -179,10 +179,10 @@ router.post("/config/rotate", requireAuth, async (req: AuthRequest, res: Respons
     }
 
     // Decrypts using the old/current key logic
-    const decrypted = decryptConfig(row.config);
+    const decrypted = JSON.parse(decrypt(row.config as string));
     
     // Re-encrypts forcing the new CURRENT_ENCRYPTION_VERSION
-    const reEncrypted = encryptConfig(decrypted);
+    const reEncrypted = encrypt(JSON.stringify(decrypted));
 
     await prisma.councilConfig.update({
       where: { userId: req.userId! },

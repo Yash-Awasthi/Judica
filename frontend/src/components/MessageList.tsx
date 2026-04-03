@@ -1,0 +1,347 @@
+import React from "react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+
+export interface Opinion {
+  name: string;
+  archetype: string;
+  opinion: string;
+}
+
+export interface PeerReview {
+  reviewer: string;
+  ranking: string[];
+  critique: string;
+}
+
+export interface ScoredOpinion {
+  name: string;
+  opinion: string;
+  scores: {
+    confidence: number;
+    agreement: number;
+    peerRanking: number;
+    final: number;
+  };
+}
+
+export interface ModelCost {
+  model: string;
+  tokensIn: number;
+  tokensOut: number;
+  costUsd: number;
+  latencyMs: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  question: string;
+  verdict?: string;
+  opinions?: Opinion[];
+  peerReviews?: PeerReview[];
+  scored?: ScoredOpinion[];
+  costs?: ModelCost[];
+  totalCostUsd?: number;
+  durationMs?: number;
+  cacheHit?: boolean;
+}
+
+interface MessageListProps {
+  messages: ChatMessage[];
+  playingAudioId: string | null;
+  onPlayTTS: (msgId: string, text: string) => void;
+  getMemberColor: (name: string) => { bg: string; shadow: string };
+  visibleKeyIds: Record<string, boolean>;
+  setVisibleKeyIds: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+}
+
+const mdComponents = {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  code: ({ className, children, ...props }: any) => {
+    const isBlock = className?.includes("language-");
+    if (isBlock) {
+      return (
+        <pre className="bg-white/[0.04] border border-white/8 rounded-xl p-4 overflow-x-auto my-3 text-xs font-mono leading-relaxed scrollbar-custom">
+            <code className={className} {...props}>{children}</code>
+          </pre>
+      );
+    }
+    return (
+      <code className="bg-white/[0.06] border border-white/8 rounded px-1.5 py-0.5 text-accent/80 text-[0.85em] font-mono" {...props}>
+        {children}
+      </code>
+    );
+  },
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  p: ({ children }: any) => <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ul: ({ children }: any) => <ul className="list-disc list-inside mb-3 space-y-1 text-text-muted">{children}</ul>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ol: ({ children }: any) => <ol className="list-decimal list-inside mb-3 space-y-1 text-text-muted">{children}</ol>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  li: ({ children }: any) => <li className="text-sm leading-relaxed">{children}</li>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  strong: ({ children }: any) => <strong className="font-bold text-text">{children}</strong>,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  blockquote: ({ children }: any) => (
+    <blockquote className="pl-4 border-l-2 border-accent/30 text-text-muted my-3 italic">{children}</blockquote>
+  ),
+};
+
+export function MessageList({
+  messages,
+  playingAudioId,
+  onPlayTTS,
+  getMemberColor,
+  visibleKeyIds,
+  setVisibleKeyIds
+}: MessageListProps) {
+  return (
+    <div className="space-y-10">
+      {messages.map((msg, idx) => (
+        <div key={msg.id || idx} className="max-w-3xl mx-auto space-y-6 animate-slide-up">
+
+          {/* User question bubble */}
+          <div className="flex justify-end">
+            <div className="glass-panel px-5 py-3.5 rounded-2xl rounded-tr-sm max-w-[85%] md:max-w-[75%] text-sm leading-relaxed shadow-2xl text-text border border-white/[0.06]">
+              {msg.question}
+            </div>
+          </div>
+
+          {/* Opinions */}
+          {(msg.opinions?.length ?? 0) > 0 && (
+            <div className="space-y-5">
+              {msg.opinions?.map((op, i) => {
+                const color = getMemberColor(op.name);
+                return (
+                  <div
+                    key={i}
+                    className="animate-slide-up"
+                    style={{ animationDelay: `${i * 100}ms` }}
+                  >
+                    {/* Member header */}
+                    <div className="flex items-center gap-3 mb-2">
+                      <div
+                        className="member-avatar"
+                        style={{
+                          backgroundColor: color.bg,
+                          boxShadow: `0 0 12px -3px ${color.shadow}`
+                        }}
+                      >
+                        <span className="text-[10px] font-black">{op.name.charAt(0).toUpperCase()}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-xs font-black text-text-dim uppercase tracking-[0.2em]">
+                          {op.name} • {op.archetype}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => onPlayTTS(`${msg.id}-${op.name}`, op.opinion)}
+                        className="p-1.5 text-text-dim hover:text-text hover:bg-white/5 rounded-lg transition-colors"
+                        title="Play TTS"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">
+                          {playingAudioId === `${msg.id}-${op.name}` ? "pause" : "play_arrow"}
+                        </span>
+                      </button>
+                    </div>
+
+                    {/* Opinion content */}
+                    <div className="glass-panel p-4 rounded-xl border border-white/[0.04]">
+                      <ReactMarkdown 
+                        remarkPlugins={[remarkGfm]}
+                        components={mdComponents}
+                      >
+                        {op.opinion}
+                      </ReactMarkdown>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Verdict */}
+          {msg.verdict && (
+            <div className="animate-slide-up" style={{ animationDelay: "300ms" }}>
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-8 h-8 bg-gradient-to-br from-accent to-purple-500 rounded-xl flex items-center justify-center shadow-glow">
+                  <span className="material-symbols-outlined text-[14px] text-white">gavel</span>
+                </div>
+                <div className="text-xs font-black text-text-dim uppercase tracking-[0.2em]">
+                  Council Verdict
+                  {msg.cacheHit && (
+                    <span className="ml-2 px-2 py-0.5 bg-green-500/20 text-green-400 rounded-full text-[9px]">
+                      CACHE HIT
+                    </span>
+                  )}
+                </div>
+                <button
+                  onClick={() => msg.verdict && onPlayTTS(msg.id, msg.verdict)}
+                  className="p-1.5 text-text-dim hover:text-text hover:bg-white/5 rounded-lg transition-colors ml-auto"
+                  title="Play TTS"
+                >
+                  <span className="material-symbols-outlined text-[14px]">
+                    {playingAudioId === msg.id ? "pause" : "play_arrow"}
+                  </span>
+                </button>
+              </div>
+
+              <div className="glass-panel p-5 rounded-xl border border-white/[0.06] shadow-2xl">
+                <ReactMarkdown 
+                  remarkPlugins={[remarkGfm]}
+                  components={mdComponents}
+                >
+                  {msg.verdict}
+                </ReactMarkdown>
+              </div>
+
+              {/* Cost breakdown */}
+              {msg.costs && msg.costs.length > 0 && (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  {msg.costs.map((cost, i) => (
+                    <div
+                      key={i}
+                      className="px-2 py-1 bg-white/[0.03] border border-white/[0.08] rounded-lg text-[10px] font-mono text-text-dim"
+                      title={`Tokens: ${cost.tokensIn}→${cost.tokensOut} • Latency: ${cost.latencyMs}ms`}
+                    >
+                      {cost.model}: ${cost.costUsd.toFixed(4)}
+                    </div>
+                  ))}
+                  {msg.totalCostUsd && (
+                    <div className="px-2 py-1 bg-accent/10 border border-accent/20 rounded-lg text-[10px] font-mono text-accent font-bold">
+                      Total: ${msg.totalCostUsd.toFixed(4)}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Duration */}
+              {msg.durationMs && (
+                <div className="mt-3 text-xs text-text-dim">
+                  Completed in {(msg.durationMs / 1000).toFixed(1)}s
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Peer reviews */}
+          {msg.peerReviews && msg.peerReviews.length > 0 && (
+            <div className="space-y-4 animate-slide-up" style={{ animationDelay: "400ms" }}>
+              <div className="text-xs font-black text-text-dim uppercase tracking-[0.2em] mb-3">
+                Peer Reviews
+              </div>
+              {msg.peerReviews.map((review, i) => {
+                const color = getMemberColor(review.reviewer);
+                return (
+                  <div key={i} className="glass-panel p-4 rounded-xl border border-white/[0.04]">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div
+                        className="member-avatar"
+                        style={{
+                          backgroundColor: color.bg,
+                          boxShadow: `0 0 12px -3px ${color.shadow}`
+                        }}
+                      >
+                        <span className="text-[10px] font-black">{review.reviewer.charAt(0).toUpperCase()}</span>
+                      </div>
+                      <div className="text-xs font-black text-text-dim uppercase tracking-[0.2em]">
+                        {review.reviewer} Review
+                      </div>
+                      <button
+                        onClick={() => setVisibleKeyIds(prev => ({ ...prev, [`${msg.id}-${review.reviewer}`]: !prev[`${msg.id}-${review.reviewer}`] }))}
+                        className="p-1.5 text-text-dim hover:text-text hover:bg-white/5 rounded-lg transition-colors ml-auto"
+                        title="Toggle details"
+                      >
+                        <span className="material-symbols-outlined text-[14px]">
+                          {visibleKeyIds[`${msg.id}-${review.reviewer}`] ? "visibility" : "visibility_off"}
+                        </span>
+                      </button>
+                    </div>
+
+                    <div className="space-y-3">
+                      {visibleKeyIds[`${msg.id}-${review.reviewer}`] && (
+                        <>
+                          <div>
+                            <div className="text-xs font-black text-text-dim uppercase tracking-[0.2em] mb-1">
+                              Ranking
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {review.ranking.map((ranked, j) => (
+                                <span key={j} className="px-2 py-1 bg-white/[0.03] border border-white/[0.08] rounded-lg text-[10px] text-text-dim">
+                                  {j + 1}. {ranked}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+
+                          <div>
+                            <div className="text-xs font-black text-text-dim uppercase tracking-[0.2em] mb-1">
+                              Critique
+                            </div>
+                            <div className="text-sm leading-relaxed text-text-muted">
+                              <ReactMarkdown 
+                                remarkPlugins={[remarkGfm]}
+                                components={mdComponents}
+                              >
+                                {review.critique}
+                              </ReactMarkdown>
+                            </div>
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+
+          {/* Scored opinions */}
+          {msg.scored && msg.scored.length > 0 && (
+            <div className="space-y-4 animate-slide-up" style={{ animationDelay: "500ms" }}>
+              <div className="text-xs font-black text-text-dim uppercase tracking-[0.2em] mb-3">
+                Final Scoring
+              </div>
+              {msg.scored.map((scored, i) => {
+                const color = getMemberColor(scored.name);
+                return (
+                  <div key={i} className="glass-panel p-4 rounded-xl border border-white/[0.04]">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div
+                        className="member-avatar"
+                        style={{
+                          backgroundColor: color.bg,
+                          boxShadow: `0 0 12px -3px ${color.shadow}`
+                        }}
+                      >
+                        <span className="text-[10px] font-black">{scored.name.charAt(0).toUpperCase()}</span>
+                      </div>
+                      <div className="text-xs font-black text-text-dim uppercase tracking-[0.2em]">
+                        {scored.name} Score
+                      </div>
+                      <div className="ml-auto text-xs font-mono text-accent">
+                        {scored.scores.final.toFixed(2)}
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                      <div className="text-text-dim">Confidence</div>
+                      <div className="font-mono">{scored.scores.confidence.toFixed(2)}</div>
+                      <div className="text-text-dim">Agreement</div>
+                      <div className="font-mono">{scored.scores.agreement.toFixed(2)}</div>
+                      <div className="text-text-dim">Peer Rank</div>
+                      <div className="font-mono">#{scored.scores.peerRanking}</div>
+                      <div className="text-text-dim">Final</div>
+                      <div className="font-mono text-accent font-bold">{scored.scores.final.toFixed(2)}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}

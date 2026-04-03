@@ -1,74 +1,109 @@
 [ 📖 README ](./README.md) | [ 🗺️ ROADMAP ](./ROADMAP.md)
 
-# 🏛️ AI Council: Multi-Agent Deliberation Engine
+# 🏛️ AI Council: Multi-Agent Deliberation Prototype
 
 ## Description
 
-**A production-grade orchestration platform for high-fidelity AI reasoning, consensus building, and decentralized deliberation.**
+AI Council is a hardened orchestration engine designed to pit multiple AI agents against each other in real-time deliberation. By leveraging diverse architectural perspectives (e.g., The Architect, The Contrarian, The Ethicist), Council eliminates single-model bias, reduces hallucinations, and produces mathematically synthesized "Master Verdicts".
 
-AI Council is a state-of-the-art orchestration engine that allows you to pit multiple AI agents against each other in real-time deliberation. Instead of relying on a single model's output, the Council leverages diverse perspectives from specialized archetypes (e.g., The Architect, The Contrarian, The Ethicist) to identify blind spots, reduce hallucinations, and produce a synthesized "Master Verdict" of superior quality.
+---
 
-### Key Value Propositions
-- **Diverse Perspectives**: 12+ built-in archetypes with unique thinking styles and system prompts.
-- **True Multi-Round Deliberation**: Unlike side-by-side comparison tools, AI Council enforces interactive peer feedback loops. Agents review each other's claims and refine their positions before final synthesis.
-- **Streaming Architecture**: End-to-end SSE (Server-Sent Events) for word-by-word streaming from multiple models simultaneously, with stateful `<think>`-block parsing.
-- **Universal Provider Adapter**: Seamlessly integrates with Google Gemini, Anthropic Claude, OpenAI-compatible APIs (NVIDIA NIM, Groq, Mistral, Cerebras), and local models.
+## 🎯 Key Features
+
+### 🚀 Core Capabilities
+
+- **Deterministic Scoring Engine**: Mathematical consensus based on local ML embeddings (cosine similarity).
+- **Hardened Peer Review**: Structured logic audit {target, claim, issue, correction} for every critique.
+- **Round Quality Validation**: "Bloom Gate" prevents refinement rounds from degrading the previous best score.
+- **Outlier Filtering**: Mathematically excludes agents with low agreement (< 0.5) to protect the consensus core.
+- **Fallback Normalization**: Automatic 0.9x score penalty for fallback models.
+
+### 🎭 Diverse Perspectives
+- **12+ built-in archetypes** with unique thinking styles, system prompts, and tool access
+- **True Multi-Round Deliberation**: Interactive peer feedback loops with iterative refinement
+- **Streaming Architecture**: End-to-end SSE for real-time word-by-word streaming from multiple models
+
+### 🧠 Robust Consensus Building
+- **Deterministic Scoring Engine**: Evaluates agreement levels, identifies outliers, and detects early consensus
+- **Cold Validator / Fresh Eyes**: Independent model validates final synthesis for hallucinations and logical gaps
+- **Semantic Memory**: Persistent conversation history with pgvector for context-aware responses
+
+### 🔧 Universal Provider Adapter
+- **Seamless Integration**: Works with Google Gemini, Anthropic Claude, OpenAI-compatible APIs (NVIDIA NIM, Groq, Mistral, Cerebras), and local models
+- **Built-in Fallbacks**: Graceful degradation when providers fail or rate limit
 
 ---
 
 ## 📊 System Architecture
 
-### Orchestration Flow
 ```mermaid
-graph TD
-    User([User]) --> WebUI[React Frontend]
-    WebUI -- SSE / JSON --> API[Express Backend]
-    API -- Prisma --> DB[(PostgreSQL)]
-    API -- Node-Cache --> Redis[(Redis)]
-    
-    subgraph "Orchestration Engine"
-        Router["Router (planned)"]
-        Deliberator[Council Deliberator]
-        Critic["Critic Model (planned split)"]
-        Synthesizer[Master/Synthesis Model]
+flowchart TD
+    subgraph "Frontend"
+        UI[React Tabbed UI]
+        PIIWarn[PII Warning Modal]
+        Cost[Cost Tracker]
+        Audit[Audit Logs]
     end
     
-    API --> Router
-    Router --> Deliberator
-    Deliberator -- Parallel Calls --> P1[Provider 1]
-    Deliberator -- Parallel Calls --> P2[Provider 2]
-    Deliberator -- Parallel Calls --> P3[Provider 3]
+    subgraph "API Layer"
+        Router[Express Router]
+        PII[PII Middleware]
+        Ask[/api/ask]
+        Stream[/api/ask/stream]
+        PiiRoute[/api/pii]
+    end
     
-    P1 & P2 & P3 -- Stream --> Deliberator
-    Deliberator -- Opinion Feedback --> Critic
-    Critic -- Directive --> Deliberator
-    Deliberator -- Final Context --> Synthesizer
-    Synthesizer -- SSE Stream --> API
-    API -- Real-time Updates --> WebUI
+    subgraph "Core Engine"
+        Delib[Council Deliberator]
+        MLWorker[ML Worker / Transformers.js]
+        Score[Deterministic Scoring Engine]
+        Controller[Deliberation Controller]
+        Cold[Cold Validator]
+        Arche[Archetype System]
+    end
+    
+    subgraph "Providers"
+        Remote[OpenAI/Claude/Gemini]
+        Local[Ollama/Local AI]
+    end
+    
+    subgraph "Data Layer"
+        PG[(PostgreSQL + pgvector)]
+        Redis[(Redis Cache)]
+    end
+    
+    UI --> Router
+    PIIWarn --> PII
+    Router --> PII
+    PII --> Ask
+    Ask --> Delib
+    Delib --> Score
+    Score --> Cold
+    Delib --> Arche
+    Delib --> Remote
+    Delib --> Local
+    Delib --> PG
+    Delib --> Redis
+    Cold --> PG
 ```
 
 ---
 
 ## 🧰 Tech Stack
 
-| Component | Technology | Description |
-| :--- | :--- | :--- |
-| **Backend** | Node.js / Express / TypeScript | Robust logic engine with high-concurrency SSE support. |
-| **Frontend** | React / Vite / Tailwind | Premium UI with dynamic identity generation and tabbed result panes. |
-| **Database** | PostgreSQL + Prisma | Persistent conversation history, user configs, and metadata. |
-| **Cache** | Redis / Node-Cache | High-speed deliberation state management and session caching. |
-| **Security** | AES-256 / Helmet / Zod | Encrypted API keys, CSP protection, and strict schema validation. |
-| **Auth** | JWT / bcryptjs | Hardened authentication with silent-refresh. |
-| **Synthesis** | Gemini 2.5 Flash | Fast, efficient master model for final verdict synthesis. |
+| **Scoring** | Deterministic ML | Average pairwise cosine similarity via local embeddings. |
+| **ML Worker** | Transformers.js / Python | High-fidelity sentence embeddings (all-MiniLM-L6-v2). |
+| **Logic Purge** | 100% Mathematical | Zero LLM-influence on consensus or early-halt decisions. |
+| **Synthesis** | Gemini / OpenAI | Master model for final verdict synthesis. |
 
 ---
 
-## Installation
+## � Quick Start (Docker - Recommended)
 
-### 📦 Quick Start (Docker - Recommended)
-The easiest way to get the Council running is via Docker Compose. This ensures all constraints and dependencies are perfectly isolated.
+The easiest way to get AI Council running is via Docker Compose. This ensures all constraints and dependencies are perfectly isolated.
+
 ```bash
-# Clone the repository
+# Clone repository
 git clone https://github.com/Yash-Awasthi/ai-council.git
 cd ai-council
 
@@ -76,23 +111,38 @@ cd ai-council
 docker-compose up -d
 ```
 
-### 🛠️ Manual Installation
-1.  **Install dependencies**:
-    ```bash
-    npm install
-    cd frontend && npm install && cd ..
-    ```
-2.  **Environment Setup**:
-    Copy `.env.example` to `.env` and fill in your API keys.
-3.  **Initialize Database**:
-    ```bash
-    npx prisma generate
-    npx prisma migrate dev --name init
-    ```
-4.  **Run Dev Servers**:
-    ```bash
-    npm run dev:all
-    ```
+---
+
+## 🛠️ Manual Installation
+
+### 1. Install Dependencies
+```bash
+npm install
+cd frontend && npm install && cd ..
+```
+
+### 2. Environment Setup
+Copy `.env.example` to `.env` and fill in your API keys.
+
+```env
+JWT_SECRET=your_jwt_secret
+ENCRYPTION_KEY=32_char_aes_key
+DATABASE_URL="postgresql://user:pass@localhost:5432/ai_council"
+OPENAI_API_KEY=sk-...
+GOOGLE_API_KEY=...
+ANTHROPIC_API_KEY=...
+```
+
+### 3. Initialize Database
+```bash
+npx prisma generate
+npx prisma migrate dev --name init
+```
+
+### 4. Run Dev Servers
+```bash
+npm run dev:all
+```
 
 ---
 
@@ -100,15 +150,17 @@ docker-compose up -d
 
 ### Model Adapters
 The Universal Provider Adapter supports multiple endpoint types out of the box, with built-in prefixes and fallback support:
--   **OpenAI-Compatible**: NVIDIA NIM, Groq, OpenRouter, Mistral, Cerebras.
--   **Native Google**: Gemini models (Gemini 2.5 Flash used as default Master).
--   **Native Anthropic**: Claude models.
+
+- **OpenAI-Compatible**: NVIDIA NIM, Groq, OpenRouter, Mistral, Cerebras
+- **Native Google**: Gemini models (Gemini 2.5 Flash used as default Master)
+- **Native Anthropic**: Claude models
 
 ### Council Templates
-Pre-configured templates define the composition of the council:
-- **Debate Council**: Contrarian, Architect, Pragmatist.
-- **Research Council**: Empiricist, Historian, Outsider.
-- **Technical Council**: Architect, Minimalist, Empiricist.
+Pre-configured templates define composition of councils:
+
+- **Debate Council**: Contrarian, Architect, Pragmatist
+- **Research Council**: Empiricist, Historian, Outsider
+- **Technical Council**: Architect, Minimalist, Empiricist
 
 ### Key Environment Variables
 ```env
@@ -124,38 +176,179 @@ ANTHROPIC_API_KEY=...
 
 ## 🏛️ How It Works (The Deliberation Pipeline)
 
-AI Council operates as a decentralized orchestration engine designed to harness the collective intelligence of multiple AI models. By pitting diverse, specialized agents against each other, the system systematically identifies logical gaps, reduces hallucinations, and synthesizes a high-fidelity "Master Verdict." Its primary differentiator is **interactive consensus building** through structured deliberation.
+When a user submits a query, AI Council orchestrates a multi-step deliberation process:
 
-### The Full Working of the Deliberation Pipeline
+### 1. Auto-Routing
+The system automatically classifies queries and selects optimal archetypes using keyword and heuristic analysis.
 
-When a user submits a query, the platform orchestrates a multi-step deliberation process:
-1. **Initial Assessment**: The system determines the nature of the prompt and can eventually route it to the best-suited archetypes.
-2. **Parallel Agent Generation**: Multiple agents (e.g., The Contrarian, The Architect) process the query concurrently, streaming their distinct reasoning and formulated opinions back to the deliberator.
-3. **Peer Review & Feedback**: Agents review the generated opinions from their peers, formulating critiques and identifying blind spots in opposing viewpoints.
-4. **Synthesis**: A Master/Synthesis Model processes the context, integrating valid points from all agents while discarding debunked claims, crafting a comprehensive, nuanced final response.
-5. **Real-Time Streaming**: The entire process is fed back to the client in real-time via Server-Sent Events (SSE), allowing the user to watch the deliberation and synthesis unfold word-by-word.
+### 2. Parallel Agent Generation
+Multiple agents (e.g., The Contrarian, The Architect, The Ethicist) process the query concurrently, each streaming their distinct reasoning.
 
-### The Final Target Pipeline
-1.  **PII Check (planned)**: Pre-flight scan of user prompt for sensitive data.
-2.  **Router (planned)**: Auto-classifies query to select optimal archetype subset.
-3.  **Parallel Agent Responses**: All council members formulate initial positions concurrently.
-4.  **Peer Review + Anonymized Ranking (planned)**: Agents critique and rank anonymized responses.
-5.  **Scoring Engine (planned)**: Deterministic evaluation based on agreement, confidence, and rankings.
-6.  **Multi-Round Refinement**: Repeated debate loops (with a planned Consensus Metric to halt early).
-7.  **Tool Use (planned)**: Agents invoke web search or code execution.
-8.  **Final Synthesis**: The Master Model reviews the entire debate history and constructs a cohesive verdict.
-9.  **Cold Validator / Fresh Eyes (planned)**: A distinct, zero-context model validates the final synthesis for hallucinations or logic gaps.
-10. **Memory Update (planned)**: Session context summarized and stored in pgvector.
-11. **Cost + Audit Log (planned)**: Detailed ledger of tokens used and exact prompts sent.
+### 3. Initial Responses (Round 1)
+Agents provide their first perspectives on the query, formatted as structured JSON with confidence scores.
 
-*(Note: Features marked "planned" are detailed in `ROADMAP.md`)*
+### 4. Peer Review & Ranking
+Agents review anonymized responses from their peers, formulating critiques and identifying blind spots.
 
-### <think>-Block Streaming
-Some models (e.g. DeepSeek, QwQ) emit verbose `<think>` reasoning blocks before their final answer. The backend SSE pipeline features a stateful parser that strips these blocks from the user-facing UI while preserving them for the Master Model's synthesis context.
+### 5. Multi-Round Debate Refinement (Phases 4-9)
+Agents receive their original answers plus summarized responses of other agents, then engage in iterative debate rounds:
+- Identify flaws or gaps in other responses
+- Compare with their own reasoning  
+- Refine answers based on critique
+- Maintain perspective unless strong evidence demands change
+- Update confidence based on reasoning quality
+
+### 6. Consensus & Scoring (Mathematical Purity)
+A deterministic scoring engine evaluates agreement levels based on ML embeddings.
+- **Formula**: `final_score = (0.6 * Agreement) + (0.4 * PeerRanking)`
+- **Stopping Rule**: Deliberation halts ONLY when consensus hits the **0.85 (85%)** threshold.
+- **Outlier Removal**: Responses with < 0.5 average agreement are excluded.
+
+### 7. Final Synthesis
+A Master Model reviews the entire debate history and constructs a cohesive, nuanced final response.
+
+### 8. Cold Validation (Phase 21)
+An independent, zero-context model validates the final synthesis for:
+- Factual inaccuracies or hallucinations
+- Unsupported claims without evidence
+- Logical inconsistencies  
+- Overconfidence or misleading tone
+- Missing critical considerations
 
 ---
 
-## 🔌 API Reference
+## 🏛️ Core System Architecture (Technical Summary)
+
+AI Council utilizes a **Stateful Generator Architecture** built on Node.js and TypeScript, designed specifically for high-concurrency multi-agent flows.
+
+### 🛡️ Hardened Scoring Engine
+Unlike traditional LLM aggregators, Council uses a **Deterministic ML Validator**. Every opinion is converted into high-fidelity sentence embeddings using a local **Transformers.js** worker (`all-MiniLM-L6-v2`). 
+- **Pairwise Similarity Analysis**: Agents are mathematically ranked based on how closely their reasoning aligns with the core consensus.
+- **Outlier Rejection**: Responses with a consistency score below **0.5 (Scale 0-1)** are automatically stripped from the final synthesis to prevent low-quality inputs from polluting the verdict.
+
+### 🔄 Anti-Convergence Protocol
+To prevent "groupthink", the system implements a **Round Quality Validation** gate. During debate rounds, if a refinement step results in a lower mathematical consensus score than the previous round, the system immediately reverts to the higher-quality state and halts the deliberation.
+
+### 9. Real-Time Streaming
+The entire process is fed back to the client via Server-Sent Events (SSE), allowing users to watch deliberation and synthesis unfold word-by-word.
+
+### 10. Memory Integration
+Session context is summarized and stored in pgvector for future reference, enabling the system to build upon previous discussions.
+
+---
+
+## 📡 API Reference
+
+### /ask endpoint
+
+Execute a council deliberation with configurable providers and modes.
+
+#### `POST /api/ask`
+
+**Request Body:**
+```json
+{
+  "question": "What are the implications of quantum computing on cryptography?",
+  "mode": "auto | manual",
+  "userConfig": {
+    "providers": [
+      { 
+        "name": "openai", 
+        "enabled": true,
+        "role": "master",
+        "priority": 100 
+      },
+      { 
+        "name": "ollama", 
+        "enabled": true,
+        "role": "member",
+        "priority": 90 
+      }
+    ],
+    "maxAgents": 4,
+    "allowRPA": true,
+    "preferLocalMix": false
+  }
+}
+```
+
+**Parameters:**
+- `question` (string, required): The question or prompt for the council to deliberate
+- `mode` (string, optional): 
+  - `"auto"`: Use system defaults and automatic provider selection
+  - `"manual"`: Use userConfig for explicit provider control
+- `userConfig` (object, optional): Custom council configuration
+  - `providers`: Array of provider configurations
+    - `name`: Provider name (must match system provider)
+    - `enabled`: Boolean to enable/disable this provider
+    - `role`: `"master"` or `"member"` (default: `"member"`)
+    - `priority`: Number for selection priority (higher = preferred)
+  - `maxAgents`: Number of agents to include (1-6, default: 4)
+  - `allowRPA`: Boolean to allow RPA providers (default: true)
+  - `preferLocalMix`: Boolean to prefer local/API mix (default: false)
+
+**Response:**
+```json
+{
+  "verdict": "Based on the deliberation, quantum computing presents both opportunities and challenges for cryptography...",
+  "opinions": [
+    {
+      "name": "OpenAI",
+      "archetype": "architect", 
+      "opinion": "Quantum computing threatens current cryptographic systems..."
+    },
+    {
+      "name": "Ollama",
+      "archetype": "contrarian",
+      "opinion": "While quantum computing is promising, practical implementation remains distant..."
+    }
+  ],
+  "tokensUsed": 2450,
+  "duration": 8500
+}
+```
+
+**Examples:**
+
+1. **Auto mode with defaults:**
+```json
+{
+  "question": "Explain machine learning",
+  "mode": "auto"
+}
+```
+
+2. **Manual mode with custom providers:**
+```json
+{
+  "question": "Should we adopt remote work permanently?",
+  "mode": "manual",
+  "userConfig": {
+    "providers": [
+      { "name": "openai", "enabled": true, "role": "master" },
+      { "name": "anthropic", "enabled": true, "role": "member" },
+      { "name": "google", "enabled": true, "role": "member" }
+    ],
+    "maxAgents": 3
+  }
+}
+```
+
+3. **Local-only council:**
+```json
+{
+  "question": "Analyze this codebase",
+  "mode": "manual", 
+  "userConfig": {
+    "providers": [
+      { "name": "ollama", "enabled": true, "role": "master" },
+      { "name": "lmstudio", "enabled": true, "role": "member" }
+    ],
+    "maxAgents": 2,
+    "allowRPA": false
+  }
+}
+```
 
 | Endpoint | Method | Description |
 | :--- | :--- | :--- |
@@ -163,19 +356,190 @@ Some models (e.g. DeepSeek, QwQ) emit verbose `<think>` reasoning blocks before 
 | `/api/ask/stream` | `POST` | Execute a council deliberation with SSE streaming. |
 | `/api/council/archetypes` | `GET/POST/DELETE` | Manage council archetypes. |
 | `/api/history` | `GET` | Retrieve past conversation history. |
+| `/api/history/search` | `GET` | Search conversation history with filters. |
+| `/api/pii/check` | `POST` | Check text for PII and get anonymized version. |
+| `/api/audit/logs` | `GET` | Retrieve audit logs for requests. |
+| `/api/metrics` | `GET` | Token usage and cost metrics. |
+| `/api/benchmark` | `POST` | Run automated benchmark tests. |
 
 ---
 
-## 📸 Screenshots
-*(Coming soon: Place UI screenshots here)*
+## 🔌 Features
+
+### 🤖 Auto-Routing System (Phase 12)
+Automatically selects optimal council members based on query type using keyword and heuristic classification.
+
+### 🧠 Multi-Round Debate Refinement (Phases 4-9)
+Agents refine answers through iterative debate rounds with anti-convergence safeguards and confidence-based updates.
+
+### 🛡️ Cold Validator (Phase 21)
+Independent model validates final synthesis for factual errors, hallucinations, and logical gaps with strict fallback handling.
+
+### �️ PII Detection & Enforcement (Phase 13)
+- Client-side warnings with risk scoring
+- Server-side blocking for high-risk PII (SSN, credit cards, API keys)
+- Auto-anonymization with placeholder replacement
+
+### 🖥️ RPA Setup (ChatGPT/Claude Desktop Apps)
+
+RPA (Robotic Process Automation) allows AI Council to interact with ChatGPT and Claude via their web interfaces using Playwright automation.
+
+**Install Playwright:**
+```bash
+npm install playwright
+npx playwright install
+```
+
+**First-time Login (Required to create sessions):**
+```bash
+# Login to ChatGPT
+npx playwright open https://chat.openai.com
+
+# Login to Claude
+npx playwright open https://claude.ai
+```
+
+**Sessions are stored in:**
+```
+./sessions/{provider}.json
+```
+
+**Usage in providers.json:**
+```json
+{
+  "name": "chatgpt-rpa",
+  "type": "rpa",
+  "baseUrl": "rpa://chatgpt",
+  "models": ["gpt-4"],
+  "enabled": true
+}
+```
+
+**Supported RPA providers:**
+- `rpa://chatgpt` - ChatGPT web interface
+- `rpa://claude` - Claude.ai web interface
+
+**Limits & Warnings:**
+- Max 1 ChatGPT + 1 Claude RPA provider (enforced by limits)
+- Not suitable for high concurrency (synchronous browser automation)
+- Slower than API providers (~5-10s response time)
+- Sessions expire after ~24 hours (requires re-login)
+
+**Common Failure Cases:**
+- Login session expired → Re-run `npx playwright open`
+- DOM changes on provider website → Update selector in `rpaConnector.ts`
+- Rate limiting by provider → Automatic fallback to API providers
+
+---
+
+### ➕ Adding New Providers (DeepSeek, Gemini, etc.)
+
+The provider system is **config-driven**. Adding a new model typically requires only editing `src/config/providers.json`.
+
+**Step 1: Edit `src/config/providers.json`**
+
+```json
+{
+  "name": "deepseek",
+  "type": "api",
+  "baseUrl": "https://api.deepseek.com/v1",
+  "models": ["deepseek-chat", "deepseek-coder"],
+  "defaultModel": "deepseek-chat",
+  "priority": 100,
+  "enabled": true
+}
+```
+
+**Step 2: Add API Key to Environment**
+```env
+DEEPSEEK_API_KEY=sk-...
+```
+
+**Step 3: No code change needed!**
+
+If the API is **OpenAI-compatible** (most are), the system will automatically route to the correct handler.
+
+---
+
+**When to Add Custom Handler:**
+
+If the API is **NOT** OpenAI-compatible, add a handler in `src/lib/providers.ts`:
+
+```typescript
+// In askAPIProvider(), add a new case:
+if (provider.name === "custom-provider") {
+  return await askCustomProvider(provider, messages, maxTokens, signal);
+}
+```
+
+Or create a new connector in `src/lib/connectors/`.
+
+**Provider Types:**
+- `"api"` - Cloud APIs (OpenAI, Anthropic, Google, DeepSeek, etc.)
+- `"local"` - Local endpoints (Ollama, LMStudio)
+- `"rpa"` - Browser automation (ChatGPT, Claude web apps)
+
+---
+
+### 🏠 Local AI Integration (Phase 22)
+Native connectors for Ollama (`http://localhost:11434`) and OpenAI-compatible local endpoints with automatic fallback to remote providers.
+
+### 🧪 Benchmark Framework (Phase 18)
+Automated quality testing with keyword matching. Run via `npm run benchmark`.
+
+### ��️ Tool System (SERP)
+Agents can invoke web search and code execution with automatic decision logic.
+
+### 🧠 Semantic Memory (pgvector)
+Persistent conversation context with vector similarity search for relevant past discussions.
+
+### 📊 Streaming Architecture
+End-to-end SSE for real-time word-by-word streaming with stateful `done` events containing final verdict.
+
+### � Cost Tracking (Phase 17)
+Real-time cost ledger with color tiers: green (<$0.01), yellow ($0.01–$0.05), red (>$0.05).
+
+### �� Security & Reliability
+- AES-256 encryption for API keys
+- CSP protection and Zod schema validation
+- Graceful provider fallbacks and rate limit handling
+- Comprehensive error mapping and logging
+
+---
+
+## 🎯 Future Improvements / Known Limitations
+
+### Minor Limitations
+- **Benchmark CLI-only**: Automated testing runs via command line only; not integrated into web UI
+- **ChatArea State**: When using MainTabs standalone, state persists only within that component instance
+- **Desktop App Connectors**: Phase 22 partially complete — local AI (Ollama) implemented, OS-level desktop app automation not implemented
+
+### Planned Enhancements
+- Enhanced scoring engine with weighted agreement metrics
+- Dynamic archetype configuration based on user feedback
+- Advanced consensus detection algorithms
+- Performance benchmarking visualization in UI
+- Plugin system for custom archetypes and tools
+
+---
+
+### 🎨 User Interface
+The UI is a premium, high-fidelity React dashboard featuring:
+- **Real-Time Deliberation Tracks**: Watch agents reason line-by-line via SSE.
+- **Cost & Token Transparency**: Real-time ledger tracking usage across 12+ providers.
+- **Audit Logs**: Deep inspection of every deliberation phase, from initial prompt to cold validation results.
 
 ---
 
 ## 🤝 Contributing
-We welcome contributions! Please check our community health files in the `.github/` folder:
+
+We welcome contributions! Please check our community health files in `.github/` folder:
+
 - [Security Policy](.github/SECURITY.md)
+- [Contributing Guidelines](.github/CONTRIBUTING.md)
 
 ---
 
 ## 📜 License
+
 Built with ❤️ by **Yash Awasthi**. Licensed under the MIT License.

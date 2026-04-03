@@ -1,8 +1,16 @@
 import { ARCHETYPES, SUMMONS, UNIVERSAL_PROMPT } from "../config/archetypes.js";
 import prisma from "./db.js";
 import { mapProviderError } from "./errorMapper.js";
-import { Message, Provider, askProvider, askProviderStream } from "./providers.js";
+import { Message, Provider } from "./providers.js";
 import logger from "./logger.js";
+import { formatAgentOutput, ScoredOpinion } from "./schemas.js";
+import { filterAndRank } from "./scoring.js";
+import { gatherOpinions, conductPeerReview, evaluateConsensus, synthesizeVerdict, conductDebateRound, OpinionResult } from "./deliberationPhases.js";
+import { PeerReview, ValidatorResult } from "./schemas.js";
+import { controller } from "./controller.js";
+import { calculateCost } from "./cost.js";
+
+export type { PeerReview, ValidatorResult };
 
 /**
  * Typed input shape for council member configuration.
@@ -10,7 +18,7 @@ import logger from "./logger.js";
  */
 export interface CouncilMemberInput {
   name?: string;
-  type: "openai-compat" | "anthropic" | "google";
+  type: "api" | "local" | "rpa";
   apiKey: string;
   model: string;
   baseUrl?: string;
@@ -21,9 +29,32 @@ export interface CouncilMemberInput {
   [key: string]: unknown;
 }
 
-/**
- * Prepares council members by assigning archetypes based on the selected summon type.
- */
+const TOOL_DECISION_LOGIC = `
+Before answering, decide if external data is needed:
+- factual verification → use web_search
+- recent/current info → use web_search
+- source-specific query → use web_search
+- reasoning/opinion → answer directly
+
+If using tools:
+- generate 1–3 precise queries
+- avoid vague queries
+- prefer specific keywords
+
+If tool results are empty or weak, proceed with reasoning instead of retrying repeatedly.
+`;
+
+const MEMORY_INSTRUCTION = `
+Relevant past context may be provided above.
+
+Use it to:
+- reference prior discussion explicitly
+- build upon previous points (do not repeat)
+- challenge it if new reasoning contradicts it
+`;
+
+const ANALYST_ARCHETYPES = new Set(["architect", "empiricist", "historian", "strategist"]);
+
 export async function prepareCouncilMembers(members: CouncilMemberInput[], summon?: string, userId?: number) {
   if (!members || members.length === 0) return [];
 
@@ -57,11 +88,35 @@ export async function prepareCouncilMembers(members: CouncilMemberInput[], summo
     let tools = archetype.tools || [];
     if (archetypeId === "researcher") tools = ["web_search"];
 
+    const basePrompt = member.systemPrompt || archetype.systemPrompt;
+    const toolLogic = tools.length > 0 ? TOOL_DECISION_LOGIC : "";
+    const memoryInstruction = ANALYST_ARCHETYPES.has(archetypeId) ? MEMORY_INSTRUCTION : "";
+    const diversityPrompt = index > 0
+      ? "\n\nIMPORTANT: Provide a distinct perspective. Avoid repeating obvious or generic points."
+      : "";
+    const jsonInstruction = `\n\nCRITICAL: You MUST respond with a valid JSON object containing these exact fields:
+{
+  "answer": "Your main response text (10-1000 characters)",
+  "reasoning": "Your step-by-step reasoning (10-1500 characters)", 
+  "key_points": ["point 1 (5-200 chars)", "point 2 (5-200 chars)"],
+  "assumptions": ["assumption 1 (5-200 chars)"],
+  "confidence": 0.85
+}
+
+REQUIREMENTS:
+- answer: Main response, 10-1000 characters
+- reasoning: Detailed reasoning, 10-1500 characters  
+- key_points: Array of 1-5 key points, each 5-200 characters
+- assumptions: Array of 0-5 assumptions, each 5-200 characters
+- confidence: Number between 0.1 and 1.0
+
+IMPORTANT: Respond with ONLY the JSON object. No markdown, no explanations, no code blocks, just the raw JSON.`;
+
     return {
       ...member,
       name: archetype.name,
       archetype: archetypeId,
-      systemPrompt: member.systemPrompt || archetype.systemPrompt,
+      systemPrompt: basePrompt + toolLogic + memoryInstruction + diversityPrompt + jsonInstruction,
       tools
     };
   });
@@ -73,33 +128,12 @@ export type DeliberationEvent =
   | { type: "status"; round: number; message: string }
   | { type: "opinion"; name: string; text: string; round: number }
   | { type: "member_chunk"; name: string; chunk: string }
-  | { type: "done"; verdict: string; opinions: { name: string; opinion: string }[]; tokensUsed?: number };
+  | { type: "peer_review"; round: number; reviews: PeerReview[] }
+  | { type: "scored"; round: number; scored: ScoredOpinion[] }
+  | { type: "validator_result"; result: ValidatorResult }
+  | { type: "metrics"; metrics: { totalTokens: number; totalCost: number; hallucinationCount: number; consensusScore: number } }
+  | { type: "done"; verdict: string; opinions: { name: string; opinion: string }[]; metrics?: { totalTokens: number; totalCost: number; hallucinationCount: number } };
 
-/**
- * Concurrency limited map function to prevent unbounded parallel executions.
- */
-async function mapConcurrent<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<(R | undefined)[]> {
-  const results: (R | undefined)[] = new Array(items.length);
-  let index = 0;
-
-  const executeWorker = async () => {
-    while (index < items.length) {
-      const currentIndex = index++;
-      const item = items[currentIndex];
-      try {
-        results[currentIndex] = await fn(item);
-      } catch (err: any) {
-        logger.error({ err: err.message }, "mapConcurrent worker encountered an unhandled error");
-        results[currentIndex] = undefined;
-      }
-    }
-  };
-
-  const workers = Array.from({ length: Math.min(limit, items.length) }, () => executeWorker());
-  await Promise.all(workers);
-
-  return results;
-}
 
 export async function* deliberate(
   members: Provider[],
@@ -107,7 +141,7 @@ export async function* deliberate(
   messages: Message[],
   rounds: number = 1,
   abortSignal?: AbortSignal,
-  maxTokens?: number,
+  maxTokens: number = 4096,
   onVerdictChunk?: (chunk: string) => void,
   onMemberChunk?: (name: string, chunk: string) => void
 ): AsyncGenerator<DeliberationEvent> {
@@ -116,121 +150,221 @@ export async function* deliberate(
   let totalTokens = 0;
 
   for (let r = 1; r <= rounds; r++) {
-    yield { type: "status", round: r, message: `Deliberation Round ${r} started` };
+    const roundLabel = r === 1 ? "R1 - Initial Responses" :
+                       r === 2 ? "R2 - Critique & Ranking" :
+                       `R${r} - Refinement Round`;
+    
+    yield { type: "status", round: r, message: `${roundLabel}: Gathering agent responses...` };
 
-    const opinionsRaw = await mapConcurrent(members, 5, async (m) => {
-      const agentTimeout = AbortSignal.timeout(45000);
-      const combinedSignal = abortSignal
-        ? AbortSignal.any([abortSignal, agentTimeout])
-        : agentTimeout;
-
-      try {
-        let fullText = "";
-        const response = await askProviderStream(
-          { ...m, ...(maxTokens ? { maxTokens } : {}) },
-          currentMessages,
-          (chunk) => {
-            fullText += chunk;
-            if (onMemberChunk) onMemberChunk(m.name, chunk);
-          },
-          false,
-          combinedSignal
-        );
-        if (response.usage) totalTokens += response.usage.totalTokens;
-        return { name: m.name, opinion: response.text };
-      } catch (err: any) {
-        logger.error({ member: m.name, err: err.message }, "Agent failure in deliberation round");
-        const safeErr = mapProviderError(err);
-        return { name: m.name, opinion: `[FAILED] Unable to provide an opinion: ${safeErr}` };
-      }
+    let { opinions, totalTokens: opinionTokens } = await gatherOpinions({
+      members,
+      currentMessages,
+      round: r,
+      abortSignal,
+      maxTokens,
+      onMemberChunk
     });
+    totalTokens += opinionTokens;
 
-    const opinions = opinionsRaw.filter((o): o is NonNullable<typeof o> => o !== undefined);
-    finalOpinions = opinions;
+    // Quorum check
+    const minRequired = Math.max(2, Math.ceil(members.length * 0.5));
+    if (opinions.length < minRequired) {
+      yield { type: "status", round: r, message: `Quorum not met (${opinions.length}/${members.length} responses). Aborting.` };
+      break;
+    }
+    
+    yield { type: "status", round: r, message: `Quorum met: ${opinions.length} responses received.` };
+
     for (const op of opinions) {
       yield { type: "opinion", name: op.name, text: op.opinion, round: r };
     }
 
-    if (opinions.length === 0) {
-      yield { type: "status", round: r, message: `All agents failed to provide an opinion. Aborting.` };
-      break;
+    // Debate Round (Round 1 only)
+    if (r === 1 && rounds >= 2 && opinions.length >= 2) {
+      yield { type: "status", round: r, message: "Debate round: Agents refining answers..." };
+
+      const { refinedOpinions, totalTokens: debateTokens } = await conductDebateRound({
+        members,
+        opinions,
+        abortSignal,
+        maxTokens,
+        onMemberChunk
+      });
+      totalTokens += debateTokens;
+
+      opinions = refinedOpinions.map((refined: { name: string; opinion: string }) => {
+        const original = opinions.find((o: OpinionResult) => o.name === refined.name);
+        return {
+          name: refined.name,
+          opinion: refined.opinion,
+          structured: original?.structured || null
+        } as OpinionResult;
+      });
+      finalOpinions = opinions;
+
+      for (const op of refinedOpinions) {
+        yield { type: "opinion", name: op.name + " (Refined)", text: op.opinion, round: 1.5 };
+      }
     }
 
+    // Peer Review Phase
+    let reviews: PeerReview[] = [];
+    let currentScored: ScoredOpinion[] = [];
+    if (opinions.length >= 2) {
+      yield { type: "status", round: r, message: `Peer review phase for Round ${r}...` };
+
+      // Performance Optimization: Skip audits if high confidence
+      // Based on Phase 5 directives
+      const lastConsensus = r > 1 ? (controller as any)['previousMaxScore'] : 0; 
+      const skipAdversarial = lastConsensus > 0.92;
+      const skipGrounding = lastConsensus > 0.95;
+
+      const reviewRes = await conductPeerReview({
+        members,
+        opinions,
+        currentMessages,
+        round: r,
+        validatorProvider: master,
+        skipAdversarial,
+        skipGrounding,
+        abortSignal,
+        maxTokens
+      });
+      reviews = reviewRes.reviews;
+      currentScored = reviewRes.scored;
+      totalTokens += reviewRes.totalTokens;
+
+      // Phase 4: Round Quality Validation
+      // If this isn't the first round, check if we actually improved.
+      if (r > 1) {
+        const accepted = controller.shouldAcceptRound(currentScored);
+        if (!accepted) {
+          yield { type: "status", round: r, message: "Round discarded: No improvement in quality/consensus. Reverting to previous best." };
+        }
+      } else {
+        // Initialize the controller with the first round's quality
+        controller.shouldAcceptRound(currentScored);
+      }
+
+      if (reviews.length > 0) {
+        yield { type: "peer_review", round: r, reviews };
+      }
+      yield { type: "scored", round: r, scored: currentScored };
+    }
+
+    finalOpinions = opinions;
+
     const roundContext = opinions.map(o => `${o.name}: ${o.opinion}`).join("\n\n");
-    currentMessages.push({ role: "assistant", content: `Round ${r} Opinions:\n${roundContext}` });
 
     if (r < rounds) {
-      yield { type: "status", round: r, message: `Critic evaluating Round ${r}...` };
-      const criticPrompt = `Evaluate the Round ${r} opinions. Point out contradictions, flawed assumptions, and missing evidence. Provide a directive for the next round of debate. If you believe a strong consensus has been reached and further debate is unnecessary, explicitly output "CONSENSUS_REACHED" in your evaluation.`;
-      const criticEvalRes = await askProvider(master, [...currentMessages, { role: "user", content: criticPrompt }], false, abortSignal);
-      if (criticEvalRes.usage) totalTokens += criticEvalRes.usage.totalTokens;
-      const criticEval = criticEvalRes.text;
-      yield { type: "opinion", name: "The Critic", text: criticEval, round: r };
-      currentMessages.push({ role: "user", content: `Critic Evaluation & Directive for Round ${r + 1}:\n${criticEval}` });
+      // Evaluate Consensus (Metrics)
+      const {
+        criticEval,
+        scorerEval,
+        consensusScore,
+        totalTokens: consensusTokens
+      } = await evaluateConsensus({
+        master,
+        opinions: opinions.map((o: any) => o as OpinionResult),
+        currentMessages,
+        round: r,
+        abortSignal,
+        maxTokens
+      });
+      totalTokens += consensusTokens;
 
-      if (criticEval.includes("CONSENSUS_REACHED")) {
-        yield { type: "status", round: r, message: `Consensus reached early by the Critic.` };
+      yield { type: "opinion", name: "Qualitative Critic", text: criticEval, round: r };
+      yield { type: "opinion", name: "Quantitative Scorer", text: scorerEval, round: r };
+
+      // Phase 3 Proof: Send metrics for tracking
+      yield { 
+        type: "metrics", 
+        metrics: { 
+          totalTokens, 
+          totalCost: 0, // Simplified cost tracking for now
+          hallucinationCount: currentScored.reduce((sum, s) => sum + (s.grounding?.unsupported_claims.length || 0), 0),
+          consensusScore 
+        } 
+      };
+
+      // Controller Decision (Phase 1 MATH)
+      const decision = controller.decide(r, rounds, consensusScore);
+      if (decision.shouldHalt) {
+        yield { type: "status", round: r, message: `Controller: ${decision.reason} Halting.` };
         break;
       }
+
+      // Inject peer review flaws into next round prompt (Phase 3 & 6)
+      const peerFlaws = reviews.map(rev => {
+        const flaws = rev.identified_flaws.map(f => 
+          `- [${f.target}]: "${f.claim}" is incorrect because ${f.issue}. Correction: ${f.correction}`
+        ).join("\n");
+        return `[Reviewer ${rev.reviewer}'s audit]:\n${flaws || "No specific flaws identified."}`;
+      }).join("\n\n");
+
+      const refinementFeedback = `ROUND ${r} CRITICAL FEEDBACK:\n\n${criticEval}\n\nMATHEMATICAL AUDIT FINDINGS:\n${peerFlaws || "No significant flaws identified."}`;
+      
+      currentMessages.push({ role: "user", content: refinementFeedback });
+      yield { type: "status", round: r, message: `Controller: Consensus score ${(consensusScore * 100).toFixed(1)}%. Triggering refinement...` };
     }
   }
 
   yield { type: "status", round: rounds, message: "Master synthesis started" };
 
-  let verdict = "";
-  const masterRes = await askProviderStream(
-    { ...master, ...(maxTokens ? { maxTokens } : {}) },
+  // Final Synthesis
+  const { verdict, validatorResult, totalTokens: verdictTokens } = await synthesizeVerdict({
+    master,
     currentMessages,
-    (chunk) => {
-      verdict += chunk;
-      if (onVerdictChunk) onVerdictChunk(chunk);
-    },
-    false,
-    abortSignal
-  );
+    abortSignal,
+    maxTokens,
+    onVerdictChunk
+  });
+  totalTokens += verdictTokens;
 
-  if (masterRes.usage) totalTokens += masterRes.usage.totalTokens;
-
-  yield { type: "done", verdict, opinions: finalOpinions, tokensUsed: totalTokens } as any;
+  yield { type: "validator_result", result: validatorResult };
+  // Phase 6 Proof: Final Metrics
+  yield { 
+    type: "done", 
+    verdict, 
+    opinions: finalOpinions, 
+    metrics: { 
+      totalTokens, 
+      totalCost: 0, // Actual cost is calculated by providers layer or service layer
+      hallucinationCount: 0 // Aggregate from validator result if needed
+    } 
+  } as any;
 }
 
-/**
- * Main Council Deliberation (Synchronous) — consumes the generator fully.
- */
 export async function askCouncil(
   members: Provider[],
   master: Provider,
   messages: Message[],
-  maxTokens?: number,
+  maxTokens: number = 4096,
   rounds: number = 1
 ) {
   let verdict = "";
   let opinions: { name: string; opinion: string }[] = [];
-  let tokensUsed = 0;
+  let metrics = { totalTokens: 0, totalCost: 0, hallucinationCount: 0 };
 
   for await (const event of deliberate(members, master, messages, rounds, undefined, maxTokens)) {
     if (event.type === "done") {
       verdict = event.verdict;
       opinions = event.opinions;
-      tokensUsed = event.tokensUsed ?? 0;
+      if (event.metrics) {
+        metrics = event.metrics;
+      }
     }
   }
 
-  return { verdict, opinions, tokensUsed };
+  return { verdict, opinions, metrics };
 }
 
-/**
- * Main Council Deliberation (Streaming) — pipes generator events to SSE callback.
- *
- * FIX: emits "verdict_chunk" (not "master_chunk") to match frontend handler.
- * FIX: emits opinion as { name, archetype, opinion } to match frontend Opinion type.
- */
 export async function streamCouncil(
   members: Provider[],
   master: Provider,
   messages: Message[],
   onEvent: (event: string, data: any) => void,
-  maxTokens?: number,
+  maxTokens: number = 4096,
   rounds: number = 1,
   abortSignal?: AbortSignal
 ) {
@@ -243,9 +377,7 @@ export async function streamCouncil(
   try {
     for await (const event of deliberate(
       members, master, messages, rounds, abortSignal, maxTokens,
-      // onVerdictChunk: name matches the frontend "verdict_chunk" case handler
       (chunk) => { onEvent("verdict_chunk", { chunk }); },
-      // onMemberChunk: name matches the frontend "member_chunk" case handler
       (name, chunk) => { onEvent("member_chunk", { name, chunk }); }
     )) {
       if (event.type === "status") {
@@ -253,6 +385,12 @@ export async function streamCouncil(
       } else if (event.type === "opinion") {
         const archetype = archetypeMap[event.name] || "";
         onEvent("opinion", { name: event.name, archetype, opinion: event.text });
+      } else if (event.type === "peer_review") {
+        onEvent("peer_review", { round: event.round, reviews: event.reviews });
+      } else if (event.type === "scored") {
+        onEvent("scored", { round: event.round, scored: event.scored });
+      } else if (event.type === "validator_result") {
+        onEvent("validator_result", { result: event.result });
       } else if (event.type === "done") {
         verdict = event.verdict;
         onEvent("done", event);

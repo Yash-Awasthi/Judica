@@ -18,6 +18,15 @@ pool.on("error", (err) => {
   logger.error({ err }, "Unexpected error on idle database client");
 });
 
+// Monitor pool for exhaustion warnings
+pool.on("acquire", () => {
+  logger.debug({ total: pool.totalCount, idle: pool.idleCount }, "DB connection acquired");
+});
+
+pool.on("error", (err) => {
+  logger.error({ err, total: pool.totalCount, idle: pool.idleCount }, "Database pool error");
+});
+
 const adapter = new PrismaPg(pool as any);
 const prisma = new PrismaClient({ adapter });
 

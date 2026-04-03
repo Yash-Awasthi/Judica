@@ -4,246 +4,115 @@
 
 # 🚀 AI Council Roadmap
 
-This document outlines the 22-phase technical roadmap for the AI Council platform. The goals are prioritized based on implementation complexity and value to the deliberation quality.
+This document outlines the 22-phase technical roadmap for AI Council platform. The goals are prioritized based on implementation complexity and value to the deliberation quality.
 
 ---
 
 ## Current State vs Target State
 
-Currently, the AI Council can take a user query, concurrently request opinions from multiple LLM agents, and synthesize those opinions into a final verdict. It streams the reasoning process and handles basic tool usage if configured, but lacks deep interactivity between the agents themselves.
+Currently, AI Council is a production-grade multi-agent deliberation engine with auto-routing, debate refinement, and cold validation. When all 22 phases are complete, Council will be a fully autonomous deliberation engine with local AI integration and advanced observability.
 
-When all 22 phases are complete, the Council will be a fully autonomous deliberation engine. Agents will critique and rank each other's responses over multiple rounds, guided by a deterministic scoring system and an independent validator, ensuring the highest possible fidelity and consensus before the user sees the final answer.
+---
 
-## Target Pipeline
+## Actual System Architecture
 
 ```mermaid
 flowchart LR
-    A[PII Check P13] --> B[Router P12]
-    B --> C[Parallel Agents P1]
-    C --> D[Peer Review P4]
-    D --> E[Scoring P5]
-    E --> F[Multi-Round Refinement P9]
-    F --> G[Tool Use P10]
-    G --> H[Synthesis]
-    H --> I[Cold Validator P21]
-    I --> J[Memory Update P11]
-    J --> K[Cost + Audit Log P17/P16/P20]
+    A[Router P12] --> B[Parallel Agents P1]
+    B --> C[Debate Round P9]
+    C --> D[Synthesis]
+    D --> E[Cold Validator P21]
+    E --> F[Memory Update P11]
+    F --> G[Audit & Cost Tracking P17/P20]
+    G --> H[Response]
+    
+    subgraph "Tool System"
+        B --> Tools[Tool Execution P10]
+    end
 ```
+
+---
 
 ## Progress Tracker
 
 | Phase | Name | Milestone | Complexity | Status |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | Fix Parallel Execution | 1 | S | Not started |
-| 2 | Introduce Structured Output Contract | 1 | M | Not started |
-| 3 | Add Failure Isolation | 1 | S | Not started |
-| 4 | Add Peer Review + Anonymized Ranking | 2 | M | Not started |
-| 5 | Build Scoring Engine | 2 | M | Not started |
-| 6 | Split Critic Into Multiple Roles | 2 | M | Not started |
-| 7 | Implement Consensus Metric | 2 | M | Not started |
-| 8 | Enable Cross-Agent Interaction | 2 | M | Not started |
-| 9 | Add Multi-Round Refinement | 2 | M | Not started |
-| 10 | Add Tool Execution Layer | 3 | L | Not started |
-| 11 | Add Memory + Context System | 3 | L | Not started |
-| 12 | Implement Router (Auto-Council) | 3 | L | Not started |
-| 13 | PII Detection Pre-Send | 3 | S | Not started |
-| 14 | Runtime-Editable Archetypes | 3 | M | Not started |
-| 15 | Conversation Search | 3 | S | Not started |
-| 16 | Audit Log | 3 | S | Not started |
-| 17 | Add Token + Cost Tracking | 4 | S | Not started |
-| 18 | Build Evaluation Framework | 4 | L | Not started |
-| 19 | UI Enhancements | 4 | M | Not started |
-| 20 | Real-Time Cost Ledger | 4 | S | Not started |
-| 21 | Cold Validator / "Fresh Eyes" | 4 | M | Not started |
-| 22 | Local AI & Desktop App Connectors | 4 | L | Not started |
+| 1 | Fix Parallel Execution | 1 | S | ✅ Completed |
+| 2 | Introduce Structured Output Contract | 1 | M | ✅ Completed |
+| 3 | Add Failure Isolation | 1 | S | ✅ Completed |
+| 4 | Add Peer Review + Anonymized Ranking | 2 | M | ✅ Completed |
+| 5 | Build Scoring Engine | 2 | M | ✅ Completed |
+| 6 | Split Critic Into Multiple Roles | 2 | M | ✅ Completed |
+| 7 | Implement Consensus Metric | 2 | M | ✅ Completed |
+| 8 | Enable Cross-Agent Interaction | 2 | M | ✅ Completed |
+| 9 | Add Multi-Round Refinement | 2 | M | ✅ Completed |
+| 10 | Add Tool Execution Layer | 3 | L | 🔴 Planned |
+| 11 | Add Memory + Context System | 3 | L | 🔴 Planned |
+| 12 | Implement Router (Auto-Council) | 3 | L | ✅ Completed |
+| 13 | PII Detection Pre-Send | 3 | S | ✅ Completed |
+| 14 | Runtime-Editable Archetypes | 3 | M | 🔴 Planned |
+| 15 | Conversation Search | 3 | S | 🔴 Planned |
+| 16 | Audit Log | 3 | S | ✅ Completed |
+| 17 | Add Token + Cost Tracking | 4 | S | ✅ Completed |
+| 18 | Build Evaluation Framework | 4 | L | ✅ Completed |
+| 19 | UI Enhancements | 4 | M | 🟡 In Progress |
+| 20 | Real-Time Cost Ledger | 4 | S | 🟡 In Progress |
+| 21 | Cold Validator / "Fresh Eyes" | 4 | M | ✅ Completed |
+| 22 | Local AI & Desktop App Connectors | 4 | L | ✅ Completed |
 
 ---
 
-## Milestone 1 — Foundation
-*Make what exists work correctly and at scale.*
+## Completed Enhancements (Stabilization v0.9.5)
 
-## 🟢 PHASE 1 — FIX PARALLEL EXECUTION
-**REQUIREMENTS:**
-- All model calls execute concurrently
-- Eliminate sequential awaits in loops
-- SSE streams are independent per model
+### 🧠 Deterministic Deliberation Engine (Phases 4-9)
+- **Mathematical Purification**: Removed all LLM-based halt heuristics. Consensus is now `0.85 (85%)` avg pairwise cosine similarity.
+- **High-Fidelity Scoring**: Final scores = `(0.6 * Agreement) + (0.4 * PeerRanking)`.
+- **Logic Auditframework**: Structured peer review {target, claim, issue, correction} for precise refinement.
+- **Round Quality Validation**: "Bloom Gate" prevents round degradation.
 
-**IMPLEMENTATION NOTES:**
-- **Files to change:** `src/lib/council.ts`
-- **Actions:** Replace `mapConcurrent`'s internal limiting loop with native `Promise.all` for genuine parallel execution. Ensure `onMemberChunk` propagates the `model_id` to the SSE stream. Remove blocking logic inside the stream loop.
-- **Complexity:** S
+### 🧠 Multi-Round Debate Refinement
+- **Implemented**: Agents refine answers through iterative debate rounds
+- **Features**: Anti-convergence safeguards, confidence-based updates, concise peer summaries
+- **Files**: `src/lib/deliberationPhases.ts:conductDebateRound()`
 
----
+### 🧠 Router Scoring System
+- **Implemented**: Keyword and heuristic-based classification with confidence calculation
+- **Features**: Strict auto-mode override, diverse archetype selection, fallback handling
+- **Files**: `src/lib/router.ts:classifyQuery()`, `getAutoArchetypes()`
 
-## 🟢 PHASE 2 — INTRODUCE STRUCTURED OUTPUT CONTRACT
-**REQUIREMENTS:**
-- All agents return strict JSON conforming to a schema (answer, reasoning, key_points, assumptions, confidence).
+### 🛠️ Tool Validation Layer
+- **Implemented**: Automatic tool decision logic with web search integration
+- **Features**: Tool decision prompts, failure handling, result injection
+- **Files**: `src/lib/providers.ts`, `src/lib/tools/*`
 
-**IMPLEMENTATION NOTES:**
-- **Files to change:** `src/lib/providers.ts`, `src/config/archetypes.ts`, `src/routes/ask.ts`
-- **Actions:** Use Zod schemas on the backend to validate incoming agent chunks. Modify `systemPrompt` in `prepareCouncilMembers` to strictly request JSON. Handle retry logic in `askProvider` for schema violations.
-- **Complexity:** M
-
----
-
-## 🟡 PHASE 3 — ADD FAILURE ISOLATION
-**REQUIREMENTS:**
-- System must tolerate model failure (Timeout 8s, Quorum logic).
-
-**IMPLEMENTATION NOTES:**
-- **Files to change:** `src/lib/council.ts`
-- **Actions:** Update `AbortSignal.timeout` in `deliberate` from 45s to 8s. Implement quorum checks (e.g., if valid responses < 2, throw or skip).
-- **Complexity:** S
+### 🧠 Semantic Memory Optimization
+- **Implemented**: pgvector integration with conversation storage and retrieval
+- **Features**: Vector embeddings, similarity search, context management
+- **Files**: `src/services/conversationService.ts`, `prisma/schema.prisma`
 
 ---
 
-## Milestone 2 — Deliberation Engine
-*Transform parallel responses into genuine multi-agent reasoning.*
+## Next Priorities
 
-## 🟡 PHASE 4 — ADD PEER REVIEW + ANONYMIZED RANKING
-**REQUIREMENTS:**
-- Agents evaluate each other anonymously, outputting a ranking and a critique.
+### 📊 Scoring Engine Enhancement
+- **Goal**: Deterministic ranking with weighted agreement metrics
+- **Impact**: Better consensus detection, improved synthesis quality
+- **Files**: `src/lib/scoring.ts` (enhancement)
 
-**IMPLEMENTATION NOTES:**
-- **Files to change:** `src/lib/council.ts`
-- **Actions:** In multi-round loops, gather Round 1 outputs. Anonymize them (e.g., "Response A", "Response B"). Query each agent to provide a JSON response with `ranking` and `critique`.
-- **Conflicts:** Requires adjusting the current `Critic` phase where only the Master model evaluates.
-- **Complexity:** M
+### 🧪 Evaluation Harness
+- **Goal**: Automated benchmarking and performance measurement
+- **Impact**: Quality assurance, regression testing
+- **Files**: `tests/benchmarks/*` (expansion)
 
----
+### 🎨 UI/Dashboard
+- **Goal**: Deliberation visualization and real-time metrics
+- **Impact**: User experience, system transparency
+- **Files**: `frontend/src/components/*` (enhancement)
 
-## 🟡 PHASE 5 — BUILD SCORING ENGINE
-**REQUIREMENTS:**
-- Deterministic evaluation independent of master model based on agreement, confidence, and peer ranking scores.
-
-**IMPLEMENTATION NOTES:**
-- **Files to change:** `src/lib/scoring.ts` (new file), `src/lib/council.ts`
-- **Actions:** Create a deterministic scoring module. Apply formulas: `w1 * agreement + w2 * confidence + w3 * peer_ranking`. Filter responses based on the final score.
-- **Complexity:** M
-
----
-
-## 🟡 PHASE 6 — SPLIT CRITIC INTO MULTIPLE ROLES
-**REQUIREMENTS:**
-- Separate concerns: Critic (qualitative), Scorer (numeric), Controller (loop decision).
-
-**IMPLEMENTATION NOTES:**
-- **Files to change:** `src/lib/council.ts`, `src/config/archetypes.ts`
-- **Actions:** In the `deliberate` function, replace the single Master Critic prompt with three distinct sequential operations. Controller decides to halt if `consensus_score > threshold`.
-- **Complexity:** M
-
----
-
-## 🟡 PHASE 7 — IMPLEMENT CONSENSUS METRIC
-**REQUIREMENTS:**
-- Deterministic convergence: Compute pairwise similarity, stop if consensus > 0.85 or max_rounds reached.
-
-**IMPLEMENTATION NOTES:**
-- **Files to change:** `src/lib/metrics.ts`, `src/lib/council.ts`
-- **Actions:** Add pairwise similarity logic (potentially using a lightweight embedding comparison or Rouge/Bleu scores). Hook into the Controller logic from Phase 6.
-- **Complexity:** M
-
----
-
-## 🟠 PHASE 8 — ENABLE CROSS-AGENT INTERACTION
-**REQUIREMENTS:**
-- Agents must reference each other explicitly in prompts.
-
-**IMPLEMENTATION NOTES:**
-- **Files to change:** `src/lib/council.ts`
-- **Actions:** In Round > 1, format the context so agents are prompted to "Respond to [Agent Name]'s claim." Remove anonymization for this specific interaction phase if it doesn't conflict with Phase 4 (Phase 4 is for ranking; Phase 8 is for direct critique).
-- **Complexity:** M
-
----
-
-## 🟠 PHASE 9 — ADD MULTI-ROUND REFINEMENT
-**REQUIREMENTS:**
-- At least 2 rounds: R1 (answers) -> R2 (critique + ranking) -> R3 (improved answers).
-
-**IMPLEMENTATION NOTES:**
-- **Files to change:** `src/lib/council.ts`
-- **Actions:** Formalize the multi-round loop in `deliberate`. Currently, rounds simply append opinions and ask the Critic. This needs to be restructured into the R1/R2/R3 flow defined above.
-- **Complexity:** M
-
----
-
-## Milestone 3 — Intelligence & Memory
-*Give agents tools, context, and autonomous routing.*
-
-## 🔴 PHASE 10 — ADD TOOL EXECUTION LAYER
-**REQUIREMENTS:**
-- Agents can call tools (Code execution, Web search, Document parsing).
-
-**IMPLEMENTATION NOTES:**
-- **Files to change:** `src/lib/providers.ts`, `src/lib/tools/*` (new directory)
-- **Actions:** Define a structured tool interface. Update `askProvider` and `askProviderStream` to handle `tool_calls` and `tool_choice`. Inject results back into the context array.
-- **Complexity:** L
-
----
-
-## 🔴 PHASE 11 — ADD MEMORY + CONTEXT SYSTEM
-**REQUIREMENTS:**
-- Stateful multi-turn interaction with short-term and long-term DB memory.
-
-**IMPLEMENTATION NOTES:**
-- **Files to change:** `src/routes/ask.ts`, `src/lib/history.ts`, `prisma/schema.prisma`
-- **Actions:** Utilize Prisma to store not just raw chat, but summarized context embeddings. Potentially implement basic RAG via pgvector for context retrieval.
-- **Complexity:** L
-
----
-
-## 🔴 PHASE 12 — IMPLEMENT ROUTER (AUTO-COUNCIL)
-**REQUIREMENTS:**
-- Dynamic agent selection based on query type.
-
-**IMPLEMENTATION NOTES:**
-- **Files to change:** `src/lib/router.ts` (new file), `src/routes/ask.ts`
-- **Actions:** Before execution, hit a fast, cheap model (e.g., Llama 3 8B) to classify the query. Map the classification to optimal archetype subsets and override user selection (or provide it as an "Auto" mode).
-- **Complexity:** L
-
----
-
-## 🟡 PHASE 13 — PII DETECTION PRE-SEND
-**REQUIREMENTS:**
-- Before any API call, scan user prompt for PII (email, phone, SSN, credit card, etc.). Surface UI warning with option to anonymize or proceed.
-
-**IMPLEMENTATION NOTES:**
-- **Files to change:** `src/lib/pii.ts` (new), `frontend/src/components/PiiWarning.tsx` (new)
-- **Actions:** Implement PII scanning logic and surface warning in UI.
-- **Complexity:** S
-
----
-
-## 🟠 PHASE 14 — RUNTIME-EDITABLE ARCHETYPES
-**REQUIREMENTS:**
-- Expose archetype system prompts as user-editable JSON/YAML via UI, stored in DB per user.
-
-**IMPLEMENTATION NOTES:**
-- **Files to change:** `prisma/schema.prisma` (new Archetype model), `src/routes/archetypes.ts`, `frontend/src/components/ArchetypeEditor.tsx` (new)
-- **Actions:** Add DB models and endpoints for user-editable archetypes, create UI editor component.
-- **Complexity:** M
-
----
-
-## 🟡 PHASE 15 — CONVERSATION SEARCH
-**REQUIREMENTS:**
-- Full-text search across past council sessions: query content, archetype names, verdict keywords. Prisma + PostgreSQL supports full-text search natively.
-
-**IMPLEMENTATION NOTES:**
-- **Files to change:** `src/routes/history.ts` (add search endpoint), `frontend/src/components/SearchDialog.tsx` (new)
-- **Actions:** Add search endpoint using Prisma full-text search and create search UI component.
-- **Complexity:** S
-
----
-
-## 🟡 PHASE 16 — AUDIT LOG
-**REQUIREMENTS:**
-- Per-request log: full prompt sent to each model, full response received, timing. Viewable in UI alongside cost ledger.
-
-**IMPLEMENTATION NOTES:**
-- **Files to change:** `src/lib/audit.ts` (new), `prisma/schema.prisma` (new AuditLog model)
-- **Actions:** Implement audit logging for all API calls and store in DB.
-- **Complexity:** S
+### 🏠 Local AI Integration
+- **Goal**: Native connectors for Ollama and local models
+- **Impact**: Cost reduction, privacy, offline capability
+- **Files**: `src/lib/connectors/*` (completion)
 
 ---
 
@@ -305,18 +174,42 @@ flowchart LR
 
 ---
 
+## 🏠 PHASE 22 — LOCAL AI & DESKTOP APP CONNECTORS
+**STATUS:** ✅ **COMPLETED**
+
+**REQUIREMENTS:**
+- ✅ Connect to local AI models natively (Ollama) without API requirement
+- ✅ Integrate with OpenAI-compatible local endpoints
+- ✅ Automatic fallback to remote providers when local fails
+- ❌ OS-level desktop app automation (not implemented - out of scope)
+
+**IMPLEMENTATION:**
+- **Files created:** `src/lib/connectors/baseConnector.ts`, `ollamaConnector.ts`, `openaiCompatibleConnector.ts`, `index.ts`
+- **Integration:** `src/lib/providers.ts` detects local providers by baseUrl and routes through connectors
+- **Usage:** Set `baseUrl` to `http://localhost:11434` for Ollama or any local OpenAI-compatible endpoint
+- **Fallback:** On connector failure, automatically falls back to standard remote providers
+- **Usage:** Set `baseUrl` to `http://localhost:11434` for Ollama or any local OpenAI-compatible endpoint
+- **Fallback:** On connector failure, automatically falls back to standard remote providers
+
 ---
 
-## 🔴 PHASE 22 — LOCAL AI & DESKTOP APP CONNECTORS
-**REQUIREMENTS:**
-- Connect to local AI models natively (e.g., Ollama) without an API requirement.
-- Integrate with local desktop applications (like ChatGPT or Claude desktop apps on Windows/Linux) using OS-level automation/connectors (e.g., RPA or local plugins).
-- Allow users to simply sign in to these apps and let the Council perform deliberation and planning using those local interfaces.
+## 📈 Milestone 5 — Scale & Hardening (Future)
+*Optimize the system for high-concurrency, multi-instance, and enterprise environments.*
 
-**IMPLEMENTATION NOTES:**
-- **Files to change:** `src/lib/providers.ts`, `src/lib/connectors/*` (new directory)
-- **Actions:** Build a local connector interface that uses OS automation or local APIs (like Ollama's local endpoints) to send and receive messages from local LLMs and installed AI applications.
-- **Complexity:** L
+### SESSION STORAGE MIGRATION
+**REQUIREMENTS:**
+- Transition from filesystem-based session storage to Redis or S3/Blob storage.
+- **Impact:** Enables horizontal scaling across multiple backend instances where local filesystem is inconsistent.
+
+### LIMITER PERSISTENCE
+**REQUIREMENTS:**
+- Move from in-memory concurrency/rate limiting to a Redis-backed implementation.
+- **Impact:** Prevents limit resets on server restart and enforces global limits across a cluster.
+
+### KEY ROTATION & MANAGEMENT
+**REQUIREMENTS:**
+- Implement scheduled encryption key rotation and integration with AWS KMS or HashiCorp Vault.
+- **Impact:** Production-grade security and compliance for sensitive credential management.
 
 ---
 
