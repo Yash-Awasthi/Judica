@@ -1,5 +1,7 @@
 [ 📖 README ](./README.md) | [ 🗺️ ROADMAP ](./ROADMAP.md)
 
+> Agent instruction: Implement phases sequentially from 1 to 21. Each phase depends on the previous. Do not skip, reorder, or ask for clarification — all required context is contained within each phase block.
+
 # 🚀 AI Council Roadmap
 
 This document outlines the 15-phase technical roadmap for the AI Council platform. The goals are prioritized based on implementation complexity and value to the deliberation quality.
@@ -16,16 +18,16 @@ When all 15 phases are complete, the Council will be a fully autonomous delibera
 
 ```mermaid
 flowchart LR
-    A[PII Check] --> B[Router]
-    B --> C[Parallel Agents]
-    C --> D[Peer Review]
-    D --> E[Scoring]
-    E --> F[Multi-Round Refinement]
-    F --> G[Tool Use]
+    A[PII Check P16] --> B[Router P11]
+    B --> C[Parallel Agents P1]
+    C --> D[Peer Review P3]
+    D --> E[Scoring P4]
+    E --> F[Multi-Round Refinement P8]
+    F --> G[Tool Use P9]
     G --> H[Synthesis]
-    H --> I[Cold Validator]
-    I --> J[Memory Update]
-    J --> K[Cost + Audit Log]
+    H --> I[Cold Validator P21]
+    I --> J[Memory Update P10]
+    J --> K[Cost + Audit Log P13/P19/P20]
 ```
 
 ## Progress Tracker
@@ -34,6 +36,7 @@ flowchart LR
 | :--- | :--- | :--- | :--- | :--- |
 | 1 | Fix Parallel Execution | 1 | S | Not started |
 | 2 | Introduce Structured Output Contract | 1 | M | Not started |
+| 12 | Add Failure Isolation | 1 | S | Not started |
 | 3 | Add Peer Review + Anonymized Ranking | 2 | M | Not started |
 | 4 | Build Scoring Engine | 2 | M | Not started |
 | 5 | Split Critic Into Multiple Roles | 2 | M | Not started |
@@ -43,16 +46,15 @@ flowchart LR
 | 9 | Add Tool Execution Layer | 3 | L | Not started |
 | 10 | Add Memory + Context System | 3 | L | Not started |
 | 11 | Implement Router (Auto-Council) | 3 | L | Not started |
-| 12 | Add Failure Isolation | 1 | S | Not started |
+| 16 | PII Detection Pre-Send | 3 | S | Not started |
+| 17 | Runtime-Editable Archetypes | 3 | M | Not started |
+| 18 | Conversation Search | 3 | S | Not started |
+| 19 | Audit Log | 3 | S | Not started |
 | 13 | Add Token + Cost Tracking | 4 | S | Not started |
 | 14 | Build Evaluation Framework | 4 | L | Not started |
 | 15 | UI Enhancements | 4 | M | Not started |
-| A | Real-Time Cost Ledger | 4 | S | Not started |
-| B | Cold Validator / "Fresh Eyes" | 4 | M | Not started |
-| C | PII Detection Pre-Send | 3 | S | Not started |
-| D | Runtime-Editable Archetypes | 3 | M | Not started |
-| E | Conversation Search | 3 | S | Not started |
-| F | Audit Log | 3 | S | Not started |
+| 20 | Real-Time Cost Ledger | 4 | S | Not started |
+| 21 | Cold Validator / "Fresh Eyes" | 4 | M | Not started |
 
 ---
 
@@ -80,6 +82,17 @@ flowchart LR
 - **Files to change:** `src/lib/providers.ts`, `src/config/archetypes.ts`, `src/routes/ask.ts`
 - **Actions:** Use Zod schemas on the backend to validate incoming agent chunks. Modify `systemPrompt` in `prepareCouncilMembers` to strictly request JSON. Handle retry logic in `askProvider` for schema violations.
 - **Complexity:** M
+
+---
+
+## 🟡 PHASE 12 — ADD FAILURE ISOLATION
+**REQUIREMENTS:**
+- System must tolerate model failure (Timeout 8s, Quorum logic).
+
+**IMPLEMENTATION NOTES:**
+- **Files to change:** `src/lib/council.ts`
+- **Actions:** Update `AbortSignal.timeout` in `deliberate` from 45s to 8s. Implement quorum checks (e.g., if valid responses < 2, throw or skip).
+- **Complexity:** S
 
 ---
 
@@ -189,32 +202,47 @@ flowchart LR
 
 ---
 
-## 🟡 PHASE 12 — ADD FAILURE ISOLATION
+## 🟡 PHASE 16 — PII DETECTION PRE-SEND
 **REQUIREMENTS:**
-- System must tolerate model failure (Timeout 8s, Quorum logic).
+- Before any API call, scan user prompt for PII (email, phone, SSN, credit card, etc.). Surface UI warning with option to anonymize or proceed.
 
 **IMPLEMENTATION NOTES:**
-- **Files to change:** `src/lib/council.ts`
-- **Actions:** Update `AbortSignal.timeout` in `deliberate` from 45s to 8s. Implement quorum checks (e.g., if valid responses < 2, throw or skip).
+- **Files to change:** `src/lib/pii.ts` (new), `frontend/src/components/PiiWarning.tsx` (new)
+- **Actions:** Implement PII scanning logic and surface warning in UI.
 - **Complexity:** S
 
 ---
 
-### C — PII DETECTION PRE-SEND (MEDIUM priority, S complexity)
-- **Actions:** Before any API call, scan user prompt for PII (email, phone, SSN, credit card, etc.). Surface UI warning with option to anonymize or proceed.
-- **Files:** `src/lib/pii.ts` (new), `frontend/src/components/PiiWarning.tsx` (new)
+## 🟠 PHASE 17 — RUNTIME-EDITABLE ARCHETYPES
+**REQUIREMENTS:**
+- Expose archetype system prompts as user-editable JSON/YAML via UI, stored in DB per user.
 
-### D — RUNTIME-EDITABLE ARCHETYPES (MEDIUM priority, M complexity)
-- **Actions:** Expose archetype system prompts as user-editable JSON/YAML via UI, stored in DB per user.
-- **Files:** `prisma/schema.prisma` (new Archetype model), `src/routes/archetypes.ts`, `frontend/src/components/ArchetypeEditor.tsx` (new)
+**IMPLEMENTATION NOTES:**
+- **Files to change:** `prisma/schema.prisma` (new Archetype model), `src/routes/archetypes.ts`, `frontend/src/components/ArchetypeEditor.tsx` (new)
+- **Actions:** Add DB models and endpoints for user-editable archetypes, create UI editor component.
+- **Complexity:** M
 
-### E — CONVERSATION SEARCH (MEDIUM priority, S complexity)
-- **Actions:** Full-text search across past council sessions: query content, archetype names, verdict keywords. Prisma + PostgreSQL supports full-text search natively.
-- **Files:** `src/routes/history.ts` (add search endpoint), `frontend/src/components/SearchDialog.tsx` (new)
+---
 
-### F — AUDIT LOG (LOW priority, S complexity)
-- **Actions:** Per-request log: full prompt sent to each model, full response received, timing. Viewable in UI alongside cost ledger.
-- **Files:** `src/lib/audit.ts` (new), `prisma/schema.prisma` (new AuditLog model)
+## 🟡 PHASE 18 — CONVERSATION SEARCH
+**REQUIREMENTS:**
+- Full-text search across past council sessions: query content, archetype names, verdict keywords. Prisma + PostgreSQL supports full-text search natively.
+
+**IMPLEMENTATION NOTES:**
+- **Files to change:** `src/routes/history.ts` (add search endpoint), `frontend/src/components/SearchDialog.tsx` (new)
+- **Actions:** Add search endpoint using Prisma full-text search and create search UI component.
+- **Complexity:** S
+
+---
+
+## 🟡 PHASE 19 — AUDIT LOG
+**REQUIREMENTS:**
+- Per-request log: full prompt sent to each model, full response received, timing. Viewable in UI alongside cost ledger.
+
+**IMPLEMENTATION NOTES:**
+- **Files to change:** `src/lib/audit.ts` (new), `prisma/schema.prisma` (new AuditLog model)
+- **Actions:** Implement audit logging for all API calls and store in DB.
+- **Complexity:** S
 
 ---
 
@@ -254,13 +282,25 @@ flowchart LR
 
 ---
 
-### A — REAL-TIME COST LEDGER (HIGH priority, S complexity)
-- **Actions:** Per-query: per-model token accounting (input + output), estimated cost, cumulative session total. Collapsible: compact summary (total + tokens + latency) expands to full per-model breakdown. Color tiers: green <$0.01, amber $0.01–$0.10, red >$0.10.
-- **Files:** `src/lib/metrics.ts` (add cost table), `frontend/src/components/CostLedger.tsx` (new)
+## 🟠 PHASE 20 — REAL-TIME COST LEDGER
+**REQUIREMENTS:**
+- Per-query: per-model token accounting (input + output), estimated cost, cumulative session total. Collapsible: compact summary (total + tokens + latency) expands to full per-model breakdown. Color tiers: green <$0.01, amber $0.01–$0.10, red >$0.10.
 
-### B — COLD VALIDATOR / "FRESH EYES" (HIGH priority, M complexity)
-- **Actions:** After final synthesis, route the verdict to a SEPARATE model with ZERO prior council context. That model validates cold: checks for errors, hallucinations, overconfidence. New SSE event type: `validator_result`.
-- **Files:** `src/lib/council.ts` (add post-synthesis step)
+**IMPLEMENTATION NOTES:**
+- **Files to change:** `src/lib/metrics.ts` (add cost table), `frontend/src/components/CostLedger.tsx` (new)
+- **Actions:** Implement real-time token tracking and UI ledger.
+- **Complexity:** S
+
+---
+
+## 🔴 PHASE 21 — COLD VALIDATOR / "FRESH EYES"
+**REQUIREMENTS:**
+- After final synthesis, route the verdict to a SEPARATE model with ZERO prior council context. That model validates cold: checks for errors, hallucinations, overconfidence. New SSE event type: `validator_result`.
+
+**IMPLEMENTATION NOTES:**
+- **Files to change:** `src/lib/council.ts` (add post-synthesis step)
+- **Actions:** Add an independent validation step post-synthesis using a fresh model instance.
+- **Complexity:** M
 
 ---
 
