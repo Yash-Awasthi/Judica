@@ -16,7 +16,8 @@ export const readWebpageTool: ToolInstance = {
       required: ["url"]
     }
   },
-  execute: async ({ url }: { url: string }) => {
+  execute: async (args: Record<string, unknown>) => {
+    const url = args.url as string;
     try {
       let currentUrl = url;
       let res;
@@ -70,8 +71,8 @@ export const readWebpageTool: ToolInstance = {
       const text = content.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
 
       return text.length > 10000 ? text.slice(0, 10000) + "... [Truncated]" : text;
-    } catch (err: any) {
-      return `Error reading webpage ${url}: ${err.message}`;
+    } catch (err) {
+      return `Error reading webpage ${url}: ${(err as Error).message}`;
     }
   }
 };

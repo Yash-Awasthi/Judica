@@ -104,11 +104,11 @@ export async function validateSafeUrl(urlInput: string): Promise<string> {
         throw new Error(`URL resolves to a restricted IP address (${res.address})`);
       }
     }
-  } catch (err: any) {
-    if (err.message.includes("restricted IP")) {
+  } catch (err) {
+    if ((err as Error).message.includes("restricted IP")) {
       throw err;
     }
-    throw new Error("Failed to resolve URL hostname: " + err.message, { cause: err });
+    throw new Error("Failed to resolve URL hostname: " + (err as Error).message, { cause: err });
   }
 
   return url.toString();

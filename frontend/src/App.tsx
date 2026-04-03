@@ -116,7 +116,18 @@ function AppContent() {
     const saved = localStorage.getItem("council_members");
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        // Clean up invalid cached models
+        return parsed.map((m: any) => ({
+          ...m,
+          model: m.model === "gemini-2.5-flash" || m.model === "gemini-2.0-flash" ? "mistral-large-latest" : 
+                 m.model === "gpt-4o" ? "llama-3.3-70b-versatile" :
+                 m.model === "claude-sonnet-4-20250514" ? "claude-3-5-sonnet-20241022" : 
+                 m.model,
+          baseUrl: m.model === "gpt-4o" ? "https://api.groq.com/openai/v1" : 
+                   m.model === "gemini-2.0-flash" ? "https://api.mistral.ai/v1" :
+                   m.baseUrl
+        }));
       } catch (err) {
         console.error("Failed to parse cached council members", err);
       }
@@ -125,9 +136,10 @@ function AppContent() {
       {
         id: "1",
         name: "The Architect",
-        type: "google" as const,
+        type: "openai-compat" as const,
         apiKey: "",
-        model: "gemini-2.5-flash",
+        model: "mistral-large-latest",
+        baseUrl: "https://api.mistral.ai/v1",
         active: true,
         role: "Expert",
         tone: "Academic",
@@ -138,8 +150,8 @@ function AppContent() {
         name: "The Contrarian",
         type: "openai-compat" as const,
         apiKey: "",
-        model: "gpt-4o",
-        baseUrl: "https://api.openai.com/v1",
+        model: "llama-3.3-70b-versatile",
+        baseUrl: "https://api.groq.com/openai/v1",
         active: true,
         role: "Devil's Advocate",
         tone: "Blunt",
@@ -162,8 +174,8 @@ function AppContent() {
         name: "The Summarizer",
         type: "openai-compat" as const,
         apiKey: "",
-        model: "qwen-3-235b-a22b-instruct-2507",
-        baseUrl: "https://api.cerebras.ai/v1",
+        model: "llama-3.3-70b-versatile",
+        baseUrl: "https://api.groq.com/openai/v1",
         active: true,
         role: "Critic",
         tone: "Concise",

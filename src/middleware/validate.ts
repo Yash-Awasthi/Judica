@@ -23,8 +23,8 @@ export function validate(schema: ZodSchema) {
 
 export const providerSchema = z.object({
   name: z.string().min(1).max(50),
-  type: z.enum(["openai-compat", "anthropic", "google"]),
-  apiKey: z.string().min(1),
+  type: z.string().min(1).max(20).default("api"),
+  apiKey: z.string().max(1000).optional().or(z.literal("")),
   model: z.string().min(1).max(100),
   baseUrl: z.string().url().optional().or(z.literal("")),
   systemPrompt: z.string().max(2000).optional(),
@@ -46,10 +46,22 @@ export const askSchema = z
       .optional(),
     master: providerSchema.optional(),
     summon: z.enum(["business", "technical", "personal", "creative", "ethical", "strategy", "default"]).optional(),
+    mode: z.enum(["auto", "manual"]).default("manual"),
     maxTokens: z.number().int().min(256).max(8192).optional(),
-    rounds: z.number().int().min(1).max(3).default(1),
+    rounds: z.number().int().min(1).max(5).default(1),
     anonymous: z.boolean().default(false),
     context: z.string().max(100000).optional(),
+    userConfig: z.object({
+      providers: z.array(z.object({
+        name: z.string(),
+        enabled: z.boolean(),
+        role: z.enum(["member", "master"]).optional(),
+        priority: z.number().optional()
+      })).optional(),
+      maxAgents: z.number().int().min(1).max(6).optional(),
+      allowRPA: z.boolean().optional(),
+      preferLocalMix: z.boolean().optional()
+    }).optional()
   });
 
 export const renameConversationSchema = z.object({

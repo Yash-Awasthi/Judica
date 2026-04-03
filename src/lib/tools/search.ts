@@ -1,4 +1,5 @@
 import { z } from "zod";
+import logger from "../logger.js";
 
 export const executeSearchSchema = z.object({
   query: z.string().describe("The search query to execute"),
@@ -16,65 +17,99 @@ export const executeSearchDef = {
   },
 };
 
+interface SerpResult {
+  title: string;
+  url: string;
+  snippet: string;
+}
+
 /**
- * Free DuckDuckGo HTML Scraper for AI Council.
- * Does not require any API keys.
+ * Clean snippet text: remove extra whitespace, trim to ~200 chars
+ */
+function cleanSnippet(snippet: string): string {
+  return snippet
+    .replace(/\s+/g, " ") // Collapse multiple spaces/newlines
+    .trim()
+    .slice(0, 200); // Limit to ~200 chars
+}
+
+/**
+ * SERP API Web Search for AI Council.
+ * Returns clean array of results optimized for LLM consumption.
  */
 export async function executeSearch(args: unknown): Promise<string> {
   const parsed = executeSearchSchema.safeParse(args);
   if (!parsed.success) {
-    throw new Error(`Invalid arguments: ${parsed.error.message}`);
+    logger.error({ error: parsed.error }, "Invalid search arguments");
+    return "[]";
   }
 
   const query = parsed.data.query;
-  const url = `https://html.duckduckgo.com/html/?q=${encodeURIComponent(query)}`;
+  const apiKey = process.env.SERP_API_KEY;
+
+  if (!apiKey) {
+    logger.warn("SERP_API_KEY not configured");
+    return "[]";
+  }
+
+  const params = new URLSearchParams({
+    q: query,
+    api_key: apiKey,
+    engine: "google",
+  });
+
+  const url = `https://serpapi.com/search.json?${params.toString()}`;
 
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
     const response = await fetch(url, {
-      headers: {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36",
-        "Accept-Language": "en-US,en;q=0.9",
-        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8"
-      }
+      signal: controller.signal,
     });
 
+    clearTimeout(timeout);
+
     if (!response.ok) {
-      throw new Error(`DuckDuckGo returned status ${response.status}`);
+      logger.warn({ status: response.status }, "SERP API error");
+      return "[]";
     }
 
-    const html = await response.text();
+    const data = (await response.json()) as {
+      organic_results?: Array<{
+        title?: string;
+        link?: string;
+        snippet?: string;
+      }>;
+    };
+
+    const organicResults = data.organic_results || [];
     
-    // Simple regex parsing of DDG HTML (no added dependencies required)
-    const results: string[] = [];
-    const regex = /<a class="result__url" href="([^"]+)".*?<\/a>.*?<a class="result__snippet[^>]*>(.*?)<\/a>/gs;
+    // Track seen URLs for deduplication
+    const seenUrls = new Set<string>();
     
-    let match;
-    let count = 0;
-    while ((match = regex.exec(html)) !== null && count < 5) {
-      // Decode URL
-      let link = match[1];
-      if (link.startsWith("/l/?uddg=")) {
-        try {
-          link = decodeURIComponent(link.split("uddg=")[1].split("&")[0]);
-        } catch {}
-      }
-      
-      // Clean snippet HTML tags
-      const snippet = match[2].replace(/<\/?[^>]+(>|$)/g, "").replace(/&quot;/g, '"').replace(/&#x27;/g, "'").replace(/&amp;/g, "&").trim();
-      
-      if (link && snippet) {
-        results.push(`Source: ${link}\nSnippet: ${snippet}`);
-        count++;
-      }
-    }
+    const results: SerpResult[] = organicResults
+      .map((result) => ({
+        title: (result.title || "").trim(),
+        url: (result.link || "").trim(),
+        snippet: cleanSnippet(result.snippet || ""),
+      }))
+      .filter((r) => {
+        // Must have both title and URL
+        if (!r.title || !r.url) return false;
+        
+        // Skip duplicate URLs
+        if (seenUrls.has(r.url)) return false;
+        seenUrls.add(r.url);
+        
+        return true;
+      })
+      .slice(0, 5); // Max 5 results
 
-    if (results.length === 0) {
-      return `No results found for "${query}"`;
-    }
-
-    return `Search Results for "${query}":\n\n` + results.join("\n\n");
-  } catch (error: any) {
-    return `Search failed: ${error.message}`;
+    return JSON.stringify(results);
+  } catch (error) {
+    logger.error({ error }, "Search failed");
+    return "[]";
   }
 }
 

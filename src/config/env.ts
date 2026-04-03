@@ -5,7 +5,7 @@ const envSchema = z.object({
   DATABASE_URL: z.string().url("DATABASE_URL must be a valid URL"),
   REDIS_URL: z.string().url("REDIS_URL must be a valid URL").default("redis://localhost:6379"),
   JWT_SECRET: z.string().min(16, "JWT_SECRET must be at least 16 characters"),
-  ENCRYPTION_KEY: z.string().min(32, "ENCRYPTION_KEY must be at least 32 characters"),
+  MASTER_ENCRYPTION_KEY: z.string().min(32, "MASTER_ENCRYPTION_KEY must be at least 32 characters"),
   PORT: z.string().default("3000"),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),

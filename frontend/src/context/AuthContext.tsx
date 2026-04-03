@@ -18,7 +18,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [token, setToken] = useState<string | null>(() => localStorage.getItem("council_token"));
   const [user, setUser] = useState<string>(() => localStorage.getItem("council_user") || "");
 
-  const tokenRef = useRef(token);
+  const tokenRef = useRef<string | null>(token);
   useEffect(() => {
     tokenRef.current = token;
   }, [token]);
@@ -35,6 +35,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         console.error("Logout request failed", err);
       }
     }
+    tokenRef.current = null;
     setToken(null);
     setUser("");
     localStorage.removeItem("council_token");
@@ -42,6 +43,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const login = useCallback((newToken: string, username: string) => {
+    tokenRef.current = newToken;
     setToken(newToken);
     setUser(username);
     localStorage.setItem("council_token", newToken);
@@ -49,9 +51,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const logoutRef = useRef(logout);
-  useEffect(() => {
-    logoutRef.current = logout;
-  }, [logout]);
+  logoutRef.current = logout;
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit): Promise<Response> => {
     const currentToken = tokenRef.current;
@@ -64,9 +64,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const response = await fetch(url, { ...options, headers });
 
     if (response.status === 401) {
-      if (logoutRef.current) {
-         logoutRef.current();
-      }
+      logoutRef.current();
     }
 
     return response;

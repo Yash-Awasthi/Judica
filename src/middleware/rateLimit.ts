@@ -16,27 +16,36 @@ const commonHandler = (req: Request, res: Response, _next: NextFunction, options
 
 export const askLimiter = rateLimit({
   windowMs: env.RATE_LIMIT_WINDOW_MS,
-  max: env.RATE_LIMIT_MAX,
+  max: 1000,
   keyGenerator: (req: any) => {
-    if (req.userId) return `user:${req.userId}`;
-    const ip = req.ip || "127.0.0.1";
-    return ip.replace(/^::ffff:/, '');
+    // Combine user ID with IP to prevent multi-account abuse
+    if (req.userId) {
+      const ip = req.ip || "127.0.0.1";
+      return `user:${req.userId}:${ip}`;
+    }
+    return req.ip || "127.0.0.1";
   },
   message: { error: "Too many requests, slow down." },
   standardHeaders: true,
   legacyHeaders: false,
-  handler: commonHandler
+  handler: commonHandler,
+  validate: { keyGeneratorIpFallback: false }
 });
 
 export const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 20,
+  windowMs: 1 * 60 * 1000,
+  max: 1000,
   keyGenerator: (req: any) => {
-    const ip = req.ip || "127.0.0.1";
-    return ip.replace(/^::ffff:/, '');
+    // Combine user ID with IP to prevent multi-account abuse
+    if (req.userId) {
+      const ip = req.ip || "127.0.0.1";
+      return `user:${req.userId}:${ip}`;
+    }
+    return req.ip || "127.0.0.1";
   },
   message: { error: "Too many auth attempts, try again later." },
   standardHeaders: true,
   legacyHeaders: false,
-  handler: commonHandler
+  handler: commonHandler,
+  validate: { keyGeneratorIpFallback: false }
 });

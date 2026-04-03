@@ -8,30 +8,35 @@ import { env } from "./env.js";
 export const MODEL_FALLBACK_MAP: Record<string, Partial<Provider>> = {};
 
 /**
- * Defines which model types or specific models should fallback to what.
+ * Defines which provider types should fallback to what.
  * All fallbacks point to Gemini 2.5 Flash since it is the most reliably
  * available provider across all configured API keys.
+ * 
+ * Provider types: "api" | "local" | "rpa"
+ * - "api" -> falls back to another API provider
+ * - "local" -> falls back to API provider (cloud)
+ * - "rpa" -> falls back to API provider (cloud)
  */
 export const FALLBACK_MAP: Record<string, Partial<Provider>> = {
-  "anthropic": {
-    type: "google",
+  "api": {
+    type: "api",
     model: "gemini-2.5-flash",
     apiKey: env.GOOGLE_API_KEY || "",
-    name: "Gemini Fallback",
+    name: "Gemini API Fallback",
   },
-  "openai-compat": {
-    type: "google",
+  "local": {
+    // Local failures fallback to cloud API
+    type: "api",
     model: "gemini-2.5-flash",
     apiKey: env.GOOGLE_API_KEY || "",
-    name: "Gemini Fallback",
+    name: "Cloud API Fallback",
   },
-  "google": {
-    // If Google itself fails, try Groq as alternative
-    type: "openai-compat",
-    model: "gpt-4o",
-    apiKey: env.OPENAI_API_KEY || "",
-    baseUrl: "https://api.openai.com/v1",
-    name: "OpenAI Fallback",
+  "rpa": {
+    // RPA failures fallback to cloud API
+    type: "api",
+    model: "gemini-2.5-flash",
+    apiKey: env.GOOGLE_API_KEY || "",
+    name: "Cloud API Fallback",
   },
 };
 

@@ -1,0 +1,17 @@
+[
+  {
+    "question": "Solve for x: 3x + 12 = 30",
+    "expected_properties": ["6", "six"],
+    "description": "Math: Algebra"
+  },
+  {
+    "question": "What is the derivative of x^2?",
+    "expected_properties": ["2x"],
+    "description": "Math: Calculus"
+  },
+  {
+    "question": "What is the area of a circle with radius 5? (use pi = 3.14)",
+    "expected_properties": ["78.5"],
+    "description": "Math: Geometry"
+  }
+]

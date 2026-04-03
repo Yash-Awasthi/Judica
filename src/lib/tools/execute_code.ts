@@ -16,7 +16,8 @@ export const executeCodeTool: ToolInstance = {
       required: ["code"]
     }
   },
-  execute: async ({ code }: { code: string }) => {
+  execute: async (args: Record<string, unknown>) => {
+    const code = args.code as string;
     const isolate = new ivm.Isolate({ memoryLimit: 128 });
     try {
       const context = await isolate.createContext();
@@ -31,9 +32,9 @@ export const executeCodeTool: ToolInstance = {
       if (result === undefined) return "undefined";
       if (typeof result === "object") return JSON.stringify(result, null, 2);
       return String(result);
-    } catch (err: any) {
+    } catch (err) {
       if (!isolate.isDisposed) isolate.dispose();
-      return `Execution Error: ${err.message}`;
+      return `Execution Error: ${(err as Error).message}`;
     }
   }
 };

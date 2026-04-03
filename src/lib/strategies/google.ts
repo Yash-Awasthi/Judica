@@ -45,7 +45,7 @@ export async function askGoogle(
 
   if (part?.functionCall) {
     const { name, args } = part.functionCall;
-    const result = await callTool(name, args);
+    const result = await callTool({ id: `google-${Date.now()}`, name, arguments: args });
     const safeResult = `[UNTRUSTED TOOL OUTPUT]\n${result}\n[/UNTRUSTED TOOL OUTPUT]`;
     
     const nextMessages: Message[] = [...normMessages, 
@@ -110,7 +110,7 @@ export async function streamGoogle(
               totalTokens: json.usageMetadata.totalTokenCount
             };
           }
-        } catch {}
+        } catch { /* ignore malformed JSON lines */ }
       }
     }
   }

@@ -1,0 +1,120 @@
+{
+  "providers": [
+    {
+      "name": "openai",
+      "type": "api",
+      "baseUrl": "https://api.openai.com/v1",
+      "apiType": "openai-compat",
+      "models": ["gpt-4", "gpt-4o", "gpt-4o-mini", "gpt-3.5-turbo"],
+      "defaultModel": "gpt-4o",
+      "priority": 100,
+      "timeoutMs": 60000,
+      "maxConcurrency": 5,
+      "enabled": true
+    },
+    {
+      "name": "claude",
+      "type": "api",
+      "baseUrl": "https://api.anthropic.com",
+      "apiType": "anthropic",
+      "models": ["claude-3-opus", "claude-3-sonnet", "claude-3-haiku"],
+      "defaultModel": "claude-3-sonnet",
+      "priority": 95,
+      "timeoutMs": 70000,
+      "maxConcurrency": 3,
+      "enabled": true
+    },
+    {
+      "name": "gemini",
+      "type": "api",
+      "baseUrl": "https://generativelanguage.googleapis.com",
+      "apiType": "google",
+      "models": ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-pro", "gemini-1.5-flash"],
+      "defaultModel": "gemini-2.5-flash",
+      "priority": 90,
+      "timeoutMs": 65000,
+      "maxConcurrency": 4,
+      "enabled": true
+    },
+    {
+      "name": "groq",
+      "type": "api",
+      "baseUrl": "https://api.groq.com/openai/v1",
+      "apiType": "openai-compat",
+      "models": ["llama-3.1-8b-instant", "llama-3.1-70b", "mixtral-8x7b"],
+      "defaultModel": "llama-3.1-70b",
+      "priority": 85,
+      "timeoutMs": 55000,
+      "maxConcurrency": 10,
+      "enabled": true
+    },
+    {
+      "name": "mistral",
+      "type": "api",
+      "baseUrl": "https://api.mistral.ai/v1",
+      "apiType": "openai-compat",
+      "models": ["mistral-large", "mistral-medium", "mistral-small"],
+      "defaultModel": "mistral-medium",
+      "priority": 80,
+      "timeoutMs": 60000,
+      "maxConcurrency": 6,
+      "enabled": true
+    },
+    {
+      "name": "ollama",
+      "type": "local",
+      "baseUrl": "http://localhost:11434",
+      "models": [],
+      "autoDetect": true,
+      "priority": 70,
+      "timeoutMs": 120000,
+      "maxConcurrency": 2,
+      "enabled": true
+    },
+    {
+      "name": "lmstudio",
+      "type": "local",
+      "baseUrl": "http://localhost:1234",
+      "models": [],
+      "autoDetect": true,
+      "priority": 65,
+      "timeoutMs": 120000,
+      "maxConcurrency": 2,
+      "enabled": true
+    },
+    {
+      "name": "chatgpt-rpa",
+      "type": "rpa",
+      "baseUrl": "rpa://chatgpt",
+      "models": ["gpt-4"],
+      "defaultModel": "gpt-4",
+      "priority": 60,
+      "timeoutMs": 180000,
+      "maxConcurrency": 1,
+      "enabled": false,
+      "requiresSetup": true
+    },
+    {
+      "name": "claude-rpa",
+      "type": "rpa",
+      "baseUrl": "rpa://claude",
+      "models": ["claude-3"],
+      "defaultModel": "claude-3",
+      "priority": 55,
+      "timeoutMs": 180000,
+      "maxConcurrency": 1,
+      "enabled": false,
+      "requiresSetup": true
+    }
+  ],
+  "fallbacks": {
+    "api": "openai",
+    "local": "ollama",
+    "rpa": "chatgpt-rpa"
+  },
+  "limits": {
+    "maxRpaProviders": 2,
+    "maxLocalProviders": 2,
+    "maxApiProviders": 5
+  }
+}
