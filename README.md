@@ -27,9 +27,9 @@ graph TD
     API -- Node-Cache --> Redis[(Redis)]
     
     subgraph "Orchestration Engine"
-        Router[Router <br/><i>(planned)</i>]
+        Router["Router (planned)"]
         Deliberator[Council Deliberator]
-        Critic[Critic Model <br/><i>(planned split)</i>]
+        Critic["Critic Model (planned split)"]
         Synthesizer[Master/Synthesis Model]
     end
     
@@ -124,7 +124,16 @@ ANTHROPIC_API_KEY=...
 
 ## 🏛️ How It Works (The Deliberation Pipeline)
 
-AI Council's primary differentiator is **interactive consensus building**.
+AI Council operates as a decentralized orchestration engine designed to harness the collective intelligence of multiple AI models. By pitting diverse, specialized agents against each other, the system systematically identifies logical gaps, reduces hallucinations, and synthesizes a high-fidelity "Master Verdict." Its primary differentiator is **interactive consensus building** through structured deliberation.
+
+### The Full Working of the Deliberation Pipeline
+
+When a user submits a query, the platform orchestrates a multi-step deliberation process:
+1. **Initial Assessment**: The system determines the nature of the prompt and can eventually route it to the best-suited archetypes.
+2. **Parallel Agent Generation**: Multiple agents (e.g., The Contrarian, The Architect) process the query concurrently, streaming their distinct reasoning and formulated opinions back to the deliberator.
+3. **Peer Review & Feedback**: Agents review the generated opinions from their peers, formulating critiques and identifying blind spots in opposing viewpoints.
+4. **Synthesis**: A Master/Synthesis Model processes the context, integrating valid points from all agents while discarding debunked claims, crafting a comprehensive, nuanced final response.
+5. **Real-Time Streaming**: The entire process is fed back to the client in real-time via Server-Sent Events (SSE), allowing the user to watch the deliberation and synthesis unfold word-by-word.
 
 ### The Final Target Pipeline
 1.  **PII Check (planned)**: Pre-flight scan of user prompt for sensitive data.
