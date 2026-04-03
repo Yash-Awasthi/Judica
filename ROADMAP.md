@@ -1,10 +1,10 @@
 [ 📖 README ](./README.md) | [ 🗺️ ROADMAP ](./ROADMAP.md)
 
-> Agent instruction: Implement phases sequentially from 1 to 21. Each phase depends on the previous. Do not skip, reorder, or ask for clarification — all required context is contained within each phase block.
+> Agent instruction: Implement phases sequentially from 1 to 22. Each phase depends on the previous. Do not skip, reorder, or ask for clarification — all required context is contained within each phase block.
 
 # 🚀 AI Council Roadmap
 
-This document outlines the 15-phase technical roadmap for the AI Council platform. The goals are prioritized based on implementation complexity and value to the deliberation quality.
+This document outlines the 22-phase technical roadmap for the AI Council platform. The goals are prioritized based on implementation complexity and value to the deliberation quality.
 
 ---
 
@@ -12,22 +12,22 @@ This document outlines the 15-phase technical roadmap for the AI Council platfor
 
 Currently, the AI Council can take a user query, concurrently request opinions from multiple LLM agents, and synthesize those opinions into a final verdict. It streams the reasoning process and handles basic tool usage if configured, but lacks deep interactivity between the agents themselves.
 
-When all 15 phases are complete, the Council will be a fully autonomous deliberation engine. Agents will critique and rank each other's responses over multiple rounds, guided by a deterministic scoring system and an independent validator, ensuring the highest possible fidelity and consensus before the user sees the final answer.
+When all 22 phases are complete, the Council will be a fully autonomous deliberation engine. Agents will critique and rank each other's responses over multiple rounds, guided by a deterministic scoring system and an independent validator, ensuring the highest possible fidelity and consensus before the user sees the final answer.
 
 ## Target Pipeline
 
 ```mermaid
 flowchart LR
-    A[PII Check P16] --> B[Router P11]
+    A[PII Check P13] --> B[Router P12]
     B --> C[Parallel Agents P1]
-    C --> D[Peer Review P3]
-    D --> E[Scoring P4]
-    E --> F[Multi-Round Refinement P8]
-    F --> G[Tool Use P9]
+    C --> D[Peer Review P4]
+    D --> E[Scoring P5]
+    E --> F[Multi-Round Refinement P9]
+    F --> G[Tool Use P10]
     G --> H[Synthesis]
     H --> I[Cold Validator P21]
-    I --> J[Memory Update P10]
-    J --> K[Cost + Audit Log P13/P19/P20]
+    I --> J[Memory Update P11]
+    J --> K[Cost + Audit Log P17/P16/P20]
 ```
 
 ## Progress Tracker
@@ -36,25 +36,26 @@ flowchart LR
 | :--- | :--- | :--- | :--- | :--- |
 | 1 | Fix Parallel Execution | 1 | S | Not started |
 | 2 | Introduce Structured Output Contract | 1 | M | Not started |
-| 12 | Add Failure Isolation | 1 | S | Not started |
-| 3 | Add Peer Review + Anonymized Ranking | 2 | M | Not started |
-| 4 | Build Scoring Engine | 2 | M | Not started |
-| 5 | Split Critic Into Multiple Roles | 2 | M | Not started |
-| 6 | Implement Consensus Metric | 2 | M | Not started |
-| 7 | Enable Cross-Agent Interaction | 2 | M | Not started |
-| 8 | Add Multi-Round Refinement | 2 | M | Not started |
-| 9 | Add Tool Execution Layer | 3 | L | Not started |
-| 10 | Add Memory + Context System | 3 | L | Not started |
-| 11 | Implement Router (Auto-Council) | 3 | L | Not started |
-| 16 | PII Detection Pre-Send | 3 | S | Not started |
-| 17 | Runtime-Editable Archetypes | 3 | M | Not started |
-| 18 | Conversation Search | 3 | S | Not started |
-| 19 | Audit Log | 3 | S | Not started |
-| 13 | Add Token + Cost Tracking | 4 | S | Not started |
-| 14 | Build Evaluation Framework | 4 | L | Not started |
-| 15 | UI Enhancements | 4 | M | Not started |
+| 3 | Add Failure Isolation | 1 | S | Not started |
+| 4 | Add Peer Review + Anonymized Ranking | 2 | M | Not started |
+| 5 | Build Scoring Engine | 2 | M | Not started |
+| 6 | Split Critic Into Multiple Roles | 2 | M | Not started |
+| 7 | Implement Consensus Metric | 2 | M | Not started |
+| 8 | Enable Cross-Agent Interaction | 2 | M | Not started |
+| 9 | Add Multi-Round Refinement | 2 | M | Not started |
+| 10 | Add Tool Execution Layer | 3 | L | Not started |
+| 11 | Add Memory + Context System | 3 | L | Not started |
+| 12 | Implement Router (Auto-Council) | 3 | L | Not started |
+| 13 | PII Detection Pre-Send | 3 | S | Not started |
+| 14 | Runtime-Editable Archetypes | 3 | M | Not started |
+| 15 | Conversation Search | 3 | S | Not started |
+| 16 | Audit Log | 3 | S | Not started |
+| 17 | Add Token + Cost Tracking | 4 | S | Not started |
+| 18 | Build Evaluation Framework | 4 | L | Not started |
+| 19 | UI Enhancements | 4 | M | Not started |
 | 20 | Real-Time Cost Ledger | 4 | S | Not started |
 | 21 | Cold Validator / "Fresh Eyes" | 4 | M | Not started |
+| 22 | Local AI & Desktop App Connectors | 4 | L | Not started |
 
 ---
 
@@ -85,7 +86,7 @@ flowchart LR
 
 ---
 
-## 🟡 PHASE 12 — ADD FAILURE ISOLATION
+## 🟡 PHASE 3 — ADD FAILURE ISOLATION
 **REQUIREMENTS:**
 - System must tolerate model failure (Timeout 8s, Quorum logic).
 
@@ -99,7 +100,7 @@ flowchart LR
 ## Milestone 2 — Deliberation Engine
 *Transform parallel responses into genuine multi-agent reasoning.*
 
-## 🟡 PHASE 3 — ADD PEER REVIEW + ANONYMIZED RANKING
+## 🟡 PHASE 4 — ADD PEER REVIEW + ANONYMIZED RANKING
 **REQUIREMENTS:**
 - Agents evaluate each other anonymously, outputting a ranking and a critique.
 
@@ -111,7 +112,7 @@ flowchart LR
 
 ---
 
-## 🟡 PHASE 4 — BUILD SCORING ENGINE
+## 🟡 PHASE 5 — BUILD SCORING ENGINE
 **REQUIREMENTS:**
 - Deterministic evaluation independent of master model based on agreement, confidence, and peer ranking scores.
 
@@ -122,7 +123,7 @@ flowchart LR
 
 ---
 
-## 🟡 PHASE 5 — SPLIT CRITIC INTO MULTIPLE ROLES
+## 🟡 PHASE 6 — SPLIT CRITIC INTO MULTIPLE ROLES
 **REQUIREMENTS:**
 - Separate concerns: Critic (qualitative), Scorer (numeric), Controller (loop decision).
 
@@ -133,29 +134,29 @@ flowchart LR
 
 ---
 
-## 🟡 PHASE 6 — IMPLEMENT CONSENSUS METRIC
+## 🟡 PHASE 7 — IMPLEMENT CONSENSUS METRIC
 **REQUIREMENTS:**
 - Deterministic convergence: Compute pairwise similarity, stop if consensus > 0.85 or max_rounds reached.
 
 **IMPLEMENTATION NOTES:**
 - **Files to change:** `src/lib/metrics.ts`, `src/lib/council.ts`
-- **Actions:** Add pairwise similarity logic (potentially using a lightweight embedding comparison or Rouge/Bleu scores). Hook into the Controller logic from Phase 5.
+- **Actions:** Add pairwise similarity logic (potentially using a lightweight embedding comparison or Rouge/Bleu scores). Hook into the Controller logic from Phase 6.
 - **Complexity:** M
 
 ---
 
-## 🟠 PHASE 7 — ENABLE CROSS-AGENT INTERACTION
+## 🟠 PHASE 8 — ENABLE CROSS-AGENT INTERACTION
 **REQUIREMENTS:**
 - Agents must reference each other explicitly in prompts.
 
 **IMPLEMENTATION NOTES:**
 - **Files to change:** `src/lib/council.ts`
-- **Actions:** In Round > 1, format the context so agents are prompted to "Respond to [Agent Name]'s claim." Remove anonymization for this specific interaction phase if it doesn't conflict with Phase 3 (Phase 3 is for ranking; Phase 7 is for direct critique).
+- **Actions:** In Round > 1, format the context so agents are prompted to "Respond to [Agent Name]'s claim." Remove anonymization for this specific interaction phase if it doesn't conflict with Phase 4 (Phase 4 is for ranking; Phase 8 is for direct critique).
 - **Complexity:** M
 
 ---
 
-## 🟠 PHASE 8 — ADD MULTI-ROUND REFINEMENT
+## 🟠 PHASE 9 — ADD MULTI-ROUND REFINEMENT
 **REQUIREMENTS:**
 - At least 2 rounds: R1 (answers) -> R2 (critique + ranking) -> R3 (improved answers).
 
@@ -169,7 +170,7 @@ flowchart LR
 ## Milestone 3 — Intelligence & Memory
 *Give agents tools, context, and autonomous routing.*
 
-## 🔴 PHASE 9 — ADD TOOL EXECUTION LAYER
+## 🔴 PHASE 10 — ADD TOOL EXECUTION LAYER
 **REQUIREMENTS:**
 - Agents can call tools (Code execution, Web search, Document parsing).
 
@@ -180,7 +181,7 @@ flowchart LR
 
 ---
 
-## 🔴 PHASE 10 — ADD MEMORY + CONTEXT SYSTEM
+## 🔴 PHASE 11 — ADD MEMORY + CONTEXT SYSTEM
 **REQUIREMENTS:**
 - Stateful multi-turn interaction with short-term and long-term DB memory.
 
@@ -191,7 +192,7 @@ flowchart LR
 
 ---
 
-## 🔴 PHASE 11 — IMPLEMENT ROUTER (AUTO-COUNCIL)
+## 🔴 PHASE 12 — IMPLEMENT ROUTER (AUTO-COUNCIL)
 **REQUIREMENTS:**
 - Dynamic agent selection based on query type.
 
@@ -202,7 +203,7 @@ flowchart LR
 
 ---
 
-## 🟡 PHASE 16 — PII DETECTION PRE-SEND
+## 🟡 PHASE 13 — PII DETECTION PRE-SEND
 **REQUIREMENTS:**
 - Before any API call, scan user prompt for PII (email, phone, SSN, credit card, etc.). Surface UI warning with option to anonymize or proceed.
 
@@ -213,7 +214,7 @@ flowchart LR
 
 ---
 
-## 🟠 PHASE 17 — RUNTIME-EDITABLE ARCHETYPES
+## 🟠 PHASE 14 — RUNTIME-EDITABLE ARCHETYPES
 **REQUIREMENTS:**
 - Expose archetype system prompts as user-editable JSON/YAML via UI, stored in DB per user.
 
@@ -224,7 +225,7 @@ flowchart LR
 
 ---
 
-## 🟡 PHASE 18 — CONVERSATION SEARCH
+## 🟡 PHASE 15 — CONVERSATION SEARCH
 **REQUIREMENTS:**
 - Full-text search across past council sessions: query content, archetype names, verdict keywords. Prisma + PostgreSQL supports full-text search natively.
 
@@ -235,7 +236,7 @@ flowchart LR
 
 ---
 
-## 🟡 PHASE 19 — AUDIT LOG
+## 🟡 PHASE 16 — AUDIT LOG
 **REQUIREMENTS:**
 - Per-request log: full prompt sent to each model, full response received, timing. Viewable in UI alongside cost ledger.
 
@@ -249,7 +250,7 @@ flowchart LR
 ## Milestone 4 — Observability & Production
 *Make the system transparent, measurable, and production-ready.*
 
-## 🟡 PHASE 13 — ADD TOKEN + COST TRACKING
+## 🟡 PHASE 17 — ADD TOKEN + COST TRACKING
 **REQUIREMENTS:**
 - Per-request accounting and cost estimation.
 
@@ -260,7 +261,7 @@ flowchart LR
 
 ---
 
-## 🔴 PHASE 14 — BUILD EVALUATION FRAMEWORK
+## 🔴 PHASE 18 — BUILD EVALUATION FRAMEWORK
 **REQUIREMENTS:**
 - Measure system performance: Benchmark dataset, metrics.
 
@@ -271,7 +272,7 @@ flowchart LR
 
 ---
 
-## 🟡 PHASE 15 — UI ENHANCEMENTS
+## 🟡 PHASE 19 — UI ENHANCEMENTS
 **REQUIREMENTS:**
 - Side-by-side comparison, ranking visualization, consensus meter, critique visibility.
 
@@ -304,9 +305,24 @@ flowchart LR
 
 ---
 
+---
+
+## 🔴 PHASE 22 — LOCAL AI & DESKTOP APP CONNECTORS
+**REQUIREMENTS:**
+- Connect to local AI models natively (e.g., Ollama) without an API requirement.
+- Integrate with local desktop applications (like ChatGPT or Claude desktop apps on Windows/Linux) using OS-level automation/connectors (e.g., RPA or local plugins).
+- Allow users to simply sign in to these apps and let the Council perform deliberation and planning using those local interfaces.
+
+**IMPLEMENTATION NOTES:**
+- **Files to change:** `src/lib/providers.ts`, `src/lib/connectors/*` (new directory)
+- **Actions:** Build a local connector interface that uses OS automation or local APIs (like Ollama's local endpoints) to send and receive messages from local LLMs and installed AI applications.
+- **Complexity:** L
+
+---
+
 ## §8 — TABBED PANE UI SPECIFICATION
 
-A concrete UI design requirement for Phase 15 and the Platform Enhancements additions. Implement a tabbed results panel in the frontend that organizes the deliberation output into the following tabs:
+A concrete UI design requirement for Phase 19 and the Platform Enhancements additions. Implement a tabbed results panel in the frontend that organizes the deliberation output into the following tabs:
 
 ### TAB 1 — "Council" (default active tab)
 - All agent responses displayed as cards, one per council member
@@ -337,7 +353,7 @@ A concrete UI design requirement for Phase 15 and the Platform Enhancements addi
 ### TAB 5 — "Config" (inline, no page nav)
 - Active council template name + members list
 - Per-member: archetype name, model assigned, role, editable system prompt (§7-D)
-- Router classification result (§6 Phase 11): what query type was detected, which archetypes were auto-selected and why
+- Router classification result (§6 Phase 12): what query type was detected, which archetypes were auto-selected and why
 - PII detection status: clean / warning (§7-C)
 
 **Implementation Notes:**
