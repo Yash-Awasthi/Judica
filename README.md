@@ -10,7 +10,7 @@ AI Council is a state-of-the-art orchestration engine that allows you to pit mul
 
 ### Key Value Propositions
 - **Diverse Perspectives**: 12+ built-in archetypes with unique thinking styles and system prompts.
-- **True Multi-Round Deliberation**: Unlike side-by-side comparison tools (like Atticus), AI Council enforces interactive peer feedback loops. Agents review each other's claims and refine their positions before final synthesis.
+- **True Multi-Round Deliberation**: Unlike side-by-side comparison tools, AI Council enforces interactive peer feedback loops. Agents review each other's claims and refine their positions before final synthesis.
 - **Streaming Architecture**: End-to-end SSE (Server-Sent Events) for word-by-word streaming from multiple models simultaneously, with stateful `<think>`-block parsing.
 - **Universal Provider Adapter**: Seamlessly integrates with Google Gemini, Anthropic Claude, OpenAI-compatible APIs (NVIDIA NIM, Groq, Mistral, Cerebras), and local models.
 
@@ -124,7 +124,7 @@ ANTHROPIC_API_KEY=...
 
 ## 🏛️ How It Works (The Deliberation Pipeline)
 
-AI Council utilizes a deeply integrated deliberation protocol. While tools like Atticus excel at side-by-side model comparison, AI Council's primary differentiator is **interactive consensus building**.
+AI Council's primary differentiator is **interactive consensus building**.
 
 ### The Final Target Pipeline
 1.  **PII Check (planned)**: Pre-flight scan of user prompt for sensitive data.
