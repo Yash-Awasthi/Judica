@@ -1,10 +1,10 @@
+[ 📖 README ](./README.md) | [ 🗺️ ROADMAP ](./ROADMAP.md)
+
 # 🏛️ AI Council: Multi-Agent Deliberation Engine
 
+## Description
+
 **A production-grade orchestration platform for high-fidelity AI reasoning, consensus building, and decentralized deliberation.**
-
----
-
-## 🏛️ Project Overview
 
 AI Council is a state-of-the-art orchestration engine that allows you to pit multiple AI agents against each other in real-time deliberation. Instead of relying on a single model's output, the Council leverages diverse perspectives from specialized archetypes (e.g., The Architect, The Contrarian, The Ethicist) to identify blind spots, reduce hallucinations, and produce a synthesized "Master Verdict" of superior quality.
 
@@ -63,7 +63,7 @@ graph TD
 
 ---
 
-## 🚀 Getting Started
+## Installation
 
 ### 📦 Quick Start (Docker - Recommended)
 The easiest way to get the Council running is via Docker Compose. This ensures all constraints and dependencies are perfectly isolated.
@@ -164,10 +164,7 @@ Some models (e.g. DeepSeek, QwQ) emit verbose `<think>` reasoning blocks before 
 
 ## 🤝 Contributing
 We welcome contributions! Please check our community health files in the `.github/` folder:
-- [Code of Conduct](.github/CODE_OF_CONDUCT.md)
-- [Governance](.github/GOVERNANCE.md)
 - [Security Policy](.github/SECURITY.md)
-- [Support Guidelines](.github/SUPPORT.md)
 
 ---
 

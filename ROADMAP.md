@@ -1,6 +1,28 @@
+[ 📖 README ](./README.md) | [ 🗺️ ROADMAP ](./ROADMAP.md)
+
 # 🚀 AI Council Roadmap
 
-This document outlines the 15-phase technical roadmap for the AI Council platform, along with Atticus-inspired additions and a concrete UI specification. The goals are prioritized based on implementation complexity and value to the deliberation quality.
+This document outlines the technical roadmap for the AI Council platform, along with Atticus-inspired additions and a concrete UI specification. The goals are prioritized based on implementation complexity and value to the deliberation quality.
+
+---
+
+## Planned Features
+
+### Q2 2026
+- [ ] Implement Phase 1: Fix Parallel Execution
+- [ ] Implement Phase 2: Structured Output Contract
+- [ ] Implement Phase 12: Failure Isolation
+- [ ] Implement Phase 13: Token + Cost Tracking
+- [ ] Implement Atticus Addition A: Real-Time Cost Ledger
+- [ ] Implement Atticus Addition C: PII Detection Pre-Send
+
+### Q3 2026
+- [ ] Implement Phase 3: Peer Review + Anonymized Ranking
+- [ ] Implement Phase 4: Build Scoring Engine
+- [ ] Implement Phase 5: Split Critic Into Multiple Roles
+- [ ] Implement Phase 6: Implement Consensus Metric
+- [ ] Implement Phase 15: UI Enhancements (Tabbed Pane)
+- [ ] Implement Atticus Addition B: Cold Validator / "Fresh Eyes"
 
 ---
 
