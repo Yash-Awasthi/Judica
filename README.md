@@ -1,18 +1,18 @@
+[ 📖 README ](./README.md) | [ 🗺️ ROADMAP ](./ROADMAP.md)
+
 # 🏛️ AI Council: Multi-Agent Deliberation Engine
 
+## Description
+
 **A production-grade orchestration platform for high-fidelity AI reasoning, consensus building, and decentralized deliberation.**
-
----
-
-## 🏛️ Project Overview
 
 AI Council is a state-of-the-art orchestration engine that allows you to pit multiple AI agents against each other in real-time deliberation. Instead of relying on a single model's output, the Council leverages diverse perspectives from specialized archetypes (e.g., The Architect, The Contrarian, The Ethicist) to identify blind spots, reduce hallucinations, and produce a synthesized "Master Verdict" of superior quality.
 
 ### Key Value Propositions
 - **Diverse Perspectives**: 12+ built-in archetypes with unique thinking styles and system prompts.
-- **Real-Time Deliberation**: Multi-round peer feedback loops with consensus-detection logic.
-- **Streaming Architecture**: End-to-end SSE (Server-Sent Events) for word-by-word streaming from multiple models simultaneously.
-- **Provider Agnostic**: Seamlessly integrates with Google Gemini, Anthropic Claude, OpenAI, and NVIDIA NIM (OpenAI-compatible).
+- **True Multi-Round Deliberation**: Unlike side-by-side comparison tools, AI Council enforces interactive peer feedback loops. Agents review each other's claims and refine their positions before final synthesis.
+- **Streaming Architecture**: End-to-end SSE (Server-Sent Events) for word-by-word streaming from multiple models simultaneously, with stateful `<think>`-block parsing.
+- **Universal Provider Adapter**: Seamlessly integrates with Google Gemini, Anthropic Claude, OpenAI-compatible APIs (NVIDIA NIM, Groq, Mistral, Cerebras), and local models.
 
 ---
 
@@ -27,12 +27,14 @@ graph TD
     API -- Node-Cache --> Redis[(Redis)]
     
     subgraph "Orchestration Engine"
+        Router["Router (planned)"]
         Deliberator[Council Deliberator]
-        Critic[Critic Model]
+        Critic["Critic Model (planned split)"]
         Synthesizer[Master/Synthesis Model]
     end
     
-    API --> Deliberator
+    API --> Router
+    Router --> Deliberator
     Deliberator -- Parallel Calls --> P1[Provider 1]
     Deliberator -- Parallel Calls --> P2[Provider 2]
     Deliberator -- Parallel Calls --> P3[Provider 3]
@@ -47,37 +49,24 @@ graph TD
 
 ---
 
-## 🏛️ How It Works (The Deliberation Pipeline)
-
-The AI Council follows a rigorous deliberation protocol inspired by multi-agent research and collaborative decision-making frameworks:
-
-1.  **The Summoning**: Based on the selected **Council Template** (Technical, Legal, Creative, etc.), the system prepares an array of council members. Each member is assigned a specific **Archetype** (e.g., The Architect focuses on system design, The Contrarian challenges the status quo).
-2.  **Parallel Deliberation**: Council members process the query simultaneously. Our **Universal Provider Adapter** handles the specificities of different AI APIs.
-3.  **State-Aware Streaming**: Opinions are streamed back via SSE. A custom **`<think>` block parser** identifies internal reasoning blocks, stripping them from the user view but preserving the full context for the Master model.
-4.  **The Critic Phase**: In multi-round sessions, the Master model (Gemini 2.5 Flash) reviews all initial opinions as a "Critic," identifying contradictions and providing a "Directive" for the next round.
-5.  **Consensus Detection**: If the Critic detects the council has reached a definitive agreement, it flags `CONSENSUS_REACHED` to terminate the loop early.
-6.  **Master Synthesis**: The deliberation history is fed into the Master model, which synthesizes the diverse viewpoints into a comprehensive, high-fidelity final verdict.
-
----
-
 ## 🧰 Tech Stack
 
 | Component | Technology | Description |
 | :--- | :--- | :--- |
-| **Backend** | Node.js / Express | Robust logic engine with high-concurrency SSE support. |
-| **Frontend** | React / Vite / Tailwind | Premium, glassmorphic UI with dynamic identity generation. |
-| **Orchestration** | TypeScript | Full type-safety across multi-agent workflows. |
+| **Backend** | Node.js / Express / TypeScript | Robust logic engine with high-concurrency SSE support. |
+| **Frontend** | React / Vite / Tailwind | Premium UI with dynamic identity generation and tabbed result panes. |
 | **Database** | PostgreSQL + Prisma | Persistent conversation history, user configs, and metadata. |
 | **Cache** | Redis / Node-Cache | High-speed deliberation state management and session caching. |
-| **Security** | AES-256-GCM | User-provided API keys are encrypted at rest using industry standards. |
-| **Auth** | JWT / Helmet | Hardened authentication with silent-refresh and CSP protection. |
+| **Security** | AES-256 / Helmet / Zod | Encrypted API keys, CSP protection, and strict schema validation. |
+| **Auth** | JWT / bcryptjs | Hardened authentication with silent-refresh. |
+| **Synthesis** | Gemini 2.5 Flash | Fast, efficient master model for final verdict synthesis. |
 
 ---
 
-## 🚀 Getting Started
+## Installation
 
-### 📦 Quick Start (Docker)
-The easiest way to get the Council running is via Docker Compose:
+### 📦 Quick Start (Docker - Recommended)
+The easiest way to get the Council running is via Docker Compose. This ensures all constraints and dependencies are perfectly isolated.
 ```bash
 # Clone the repository
 git clone https://github.com/Yash-Awasthi/ai-council.git
@@ -94,7 +83,7 @@ docker-compose up -d
     cd frontend && npm install && cd ..
     ```
 2.  **Environment Setup**:
-    Copy `.env.example` to `.env` and fill in your API keys (OpenAI, Anthropic, Google).
+    Copy `.env.example` to `.env` and fill in your API keys.
 3.  **Initialize Database**:
     ```bash
     npx prisma generate
@@ -110,10 +99,16 @@ docker-compose up -d
 ## ⚙️ Configuration
 
 ### Model Adapters
-The Universal Provider Adapter supports multiple endpoint types:
--   **OpenAI-Compatible**: Supports NVIDIA NIM, Groq, OpenRouter, and Local LLMs (Ollama/LM Studio).
--   **Native Google**: Optimized for Gemini 2.0 Pro and 1.5 Flash.
--   **Native Anthropic**: Full support for Claude 3.5 Sonnet/Haiku.
+The Universal Provider Adapter supports multiple endpoint types out of the box, with built-in prefixes and fallback support:
+-   **OpenAI-Compatible**: NVIDIA NIM, Groq, OpenRouter, Mistral, Cerebras.
+-   **Native Google**: Gemini models (Gemini 2.5 Flash used as default Master).
+-   **Native Anthropic**: Claude models.
+
+### Council Templates
+Pre-configured templates define the composition of the council:
+- **Debate Council**: Contrarian, Architect, Pragmatist.
+- **Research Council**: Empiricist, Historian, Outsider.
+- **Technical Council**: Architect, Minimalist, Empiricist.
 
 ### Key Environment Variables
 ```env
@@ -127,10 +122,47 @@ ANTHROPIC_API_KEY=...
 
 ---
 
-## 🛡️ Security Layers
-- **AES-256 Encryption**: Every API key provided by the user is encrypted with a unique IV before being stored in the database.
-- **SSRF Protection**: All custom base URLs are validated to prevent internal network scanning.
-- **Rate-Limiting**: Distributed rate-limiting on sensitive endpoints to prevent API abuse.
+## 🏛️ How It Works (The Deliberation Pipeline)
+
+AI Council operates as a decentralized orchestration engine designed to harness the collective intelligence of multiple AI models. By pitting diverse, specialized agents against each other, the system systematically identifies logical gaps, reduces hallucinations, and synthesizes a high-fidelity "Master Verdict." Its primary differentiator is **interactive consensus building** through structured deliberation.
+
+### The Full Working of the Deliberation Pipeline
+
+When a user submits a query, the platform orchestrates a multi-step deliberation process:
+1. **Initial Assessment**: The system determines the nature of the prompt and can eventually route it to the best-suited archetypes.
+2. **Parallel Agent Generation**: Multiple agents (e.g., The Contrarian, The Architect) process the query concurrently, streaming their distinct reasoning and formulated opinions back to the deliberator.
+3. **Peer Review & Feedback**: Agents review the generated opinions from their peers, formulating critiques and identifying blind spots in opposing viewpoints.
+4. **Synthesis**: A Master/Synthesis Model processes the context, integrating valid points from all agents while discarding debunked claims, crafting a comprehensive, nuanced final response.
+5. **Real-Time Streaming**: The entire process is fed back to the client in real-time via Server-Sent Events (SSE), allowing the user to watch the deliberation and synthesis unfold word-by-word.
+
+### The Final Target Pipeline
+1.  **PII Check (planned)**: Pre-flight scan of user prompt for sensitive data.
+2.  **Router (planned)**: Auto-classifies query to select optimal archetype subset.
+3.  **Parallel Agent Responses**: All council members formulate initial positions concurrently.
+4.  **Peer Review + Anonymized Ranking (planned)**: Agents critique and rank anonymized responses.
+5.  **Scoring Engine (planned)**: Deterministic evaluation based on agreement, confidence, and rankings.
+6.  **Multi-Round Refinement**: Repeated debate loops (with a planned Consensus Metric to halt early).
+7.  **Tool Use (planned)**: Agents invoke web search or code execution.
+8.  **Final Synthesis**: The Master Model reviews the entire debate history and constructs a cohesive verdict.
+9.  **Cold Validator / Fresh Eyes (planned)**: A distinct, zero-context model validates the final synthesis for hallucinations or logic gaps.
+10. **Memory Update (planned)**: Session context summarized and stored in pgvector.
+11. **Cost + Audit Log (planned)**: Detailed ledger of tokens used and exact prompts sent.
+
+*(Note: Features marked "planned" are detailed in `ROADMAP.md`)*
+
+### <think>-Block Streaming
+Some models (e.g. DeepSeek, QwQ) emit verbose `<think>` reasoning blocks before their final answer. The backend SSE pipeline features a stateful parser that strips these blocks from the user-facing UI while preserving them for the Master Model's synthesis context.
+
+---
+
+## 🔌 API Reference
+
+| Endpoint | Method | Description |
+| :--- | :--- | :--- |
+| `/api/ask` | `POST` | Execute a council deliberation (synchronous). |
+| `/api/ask/stream` | `POST` | Execute a council deliberation with SSE streaming. |
+| `/api/council/archetypes` | `GET/POST/DELETE` | Manage council archetypes. |
+| `/api/history` | `GET` | Retrieve past conversation history. |
 
 ---
 
@@ -140,9 +172,10 @@ ANTHROPIC_API_KEY=...
 ---
 
 ## 🤝 Contributing
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) to get started with local development and submit a PR.
+We welcome contributions! Please check our community health files in the `.github/` folder:
+- [Security Policy](.github/SECURITY.md)
 
 ---
 
 ## 📜 License
-Built with ❤️ by **Yash Awasthi**. Licensed under the [MIT License](LICENSE).
+Built with ❤️ by **Yash Awasthi**. Licensed under the MIT License.
