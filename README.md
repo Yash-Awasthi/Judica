@@ -1,18 +1,18 @@
+[ 📖 README ](./README.md) | [ 🗺️ ROADMAP ](./ROADMAP.md)
+
 # 🏛️ AI Council: Multi-Agent Deliberation Engine
 
+## Description
+
 **A production-grade orchestration platform for high-fidelity AI reasoning, consensus building, and decentralized deliberation.**
-
----
-
-## 🏛️ Project Overview
 
 AI Council is a state-of-the-art orchestration engine that allows you to pit multiple AI agents against each other in real-time deliberation. Instead of relying on a single model's output, the Council leverages diverse perspectives from specialized archetypes (e.g., The Architect, The Contrarian, The Ethicist) to identify blind spots, reduce hallucinations, and produce a synthesized "Master Verdict" of superior quality.
 
 ### Key Value Propositions
 - **Diverse Perspectives**: 12+ built-in archetypes with unique thinking styles and system prompts.
-- **Real-Time Deliberation**: Multi-round peer feedback loops with consensus-detection logic.
-- **Streaming Architecture**: End-to-end SSE (Server-Sent Events) for word-by-word streaming from multiple models simultaneously.
-- **Provider Agnostic**: Seamlessly integrates with Google Gemini, Anthropic Claude, OpenAI, and NVIDIA NIM (OpenAI-compatible).
+- **True Multi-Round Deliberation**: Unlike side-by-side comparison tools, AI Council enforces interactive peer feedback loops. Agents review each other's claims and refine their positions before final synthesis.
+- **Streaming Architecture**: End-to-end SSE (Server-Sent Events) for word-by-word streaming from multiple models simultaneously, with stateful `<think>`-block parsing.
+- **Universal Provider Adapter**: Seamlessly integrates with Google Gemini, Anthropic Claude, OpenAI-compatible APIs (NVIDIA NIM, Groq, Mistral, Cerebras), and local models.
 
 ---
 
@@ -27,9 +27,9 @@ graph TD
     API -- Node-Cache --> Redis[(Redis)]
     
     subgraph "Orchestration Engine"
-        Router[Router]
+        Router[Router <br/><i>(planned)</i>]
         Deliberator[Council Deliberator]
-        Critic[Critic Model]
+        Critic[Critic Model <br/><i>(planned split)</i>]
         Synthesizer[Master/Synthesis Model]
     end
     
@@ -47,8 +47,6 @@ graph TD
     API -- Real-time Updates --> WebUI
 ```
 
-*(Note: The Router is planned — see ROADMAP.md)*
-
 ---
 
 ## 🧰 Tech Stack
@@ -56,7 +54,7 @@ graph TD
 | Component | Technology | Description |
 | :--- | :--- | :--- |
 | **Backend** | Node.js / Express / TypeScript | Robust logic engine with high-concurrency SSE support. |
-| **Frontend** | React / Vite / Tailwind | Premium UI with dynamic identity generation. |
+| **Frontend** | React / Vite / Tailwind | Premium UI with dynamic identity generation and tabbed result panes. |
 | **Database** | PostgreSQL + Prisma | Persistent conversation history, user configs, and metadata. |
 | **Cache** | Redis / Node-Cache | High-speed deliberation state management and session caching. |
 | **Security** | AES-256 / Helmet / Zod | Encrypted API keys, CSP protection, and strict schema validation. |
@@ -65,10 +63,10 @@ graph TD
 
 ---
 
-## 🚀 Getting Started
+## Installation
 
-### 📦 Quick Start (Docker)
-The easiest way to get the Council running is via Docker Compose:
+### 📦 Quick Start (Docker - Recommended)
+The easiest way to get the Council running is via Docker Compose. This ensures all constraints and dependencies are perfectly isolated.
 ```bash
 # Clone the repository
 git clone https://github.com/Yash-Awasthi/ai-council.git
@@ -102,9 +100,15 @@ docker-compose up -d
 
 ### Model Adapters
 The Universal Provider Adapter supports multiple endpoint types out of the box, with built-in prefixes and fallback support:
--   **OpenAI-Compatible**: NVIDIA NIM, Groq, OpenRouter, Mistral, Local LLMs.
+-   **OpenAI-Compatible**: NVIDIA NIM, Groq, OpenRouter, Mistral, Cerebras.
 -   **Native Google**: Gemini models (Gemini 2.5 Flash used as default Master).
 -   **Native Anthropic**: Claude models.
+
+### Council Templates
+Pre-configured templates define the composition of the council:
+- **Debate Council**: Contrarian, Architect, Pragmatist.
+- **Research Council**: Empiricist, Historian, Outsider.
+- **Technical Council**: Architect, Minimalist, Empiricist.
 
 ### Key Environment Variables
 ```env
@@ -120,20 +124,25 @@ ANTHROPIC_API_KEY=...
 
 ## 🏛️ How It Works (The Deliberation Pipeline)
 
-The AI Council follows a rigorous deliberation protocol inspired by multi-agent research and collaborative decision-making frameworks. Here is the current and planned state of the pipeline:
+AI Council's primary differentiator is **interactive consensus building**.
 
-1.  **The Summoning & Router (Planned)**: The system will classify the query and map it to optimal model archetypes using a dynamic router. Currently, it prepares the council members based on the selected **Council Template** and assigning Archetypes.
-2.  **Parallel Deliberation**: All models in the council are queried simultaneously using our **Universal Provider Adapter**. This step is currently partially parallelized but will be made fully concurrent (see ROADMAP.md).
-3.  **State-Aware Streaming**: Opinions are streamed back via SSE. A custom **`<think>` block parser** identifies internal reasoning blocks, stripping them from the user view but preserving the full context for the Master model.
-4.  **Peer Review + Ranking (Planned)**: Agents will evaluate each other anonymously and rank responses.
-5.  **Scoring (Planned)**: A deterministic scoring engine will evaluate agreement, confidence, and peer rankings to filter responses.
-6.  **The Critic Phase**: In multi-round sessions, the Master model (e.g. Gemini 2.5 Flash) reviews all initial opinions as a "Critic," identifying contradictions and providing a "Directive" for the next round. This will eventually be split into Critic, Scorer, and Controller roles with deterministic consensus tracking (see ROADMAP.md).
-7.  **Tool Use (Planned)**: Agents will be able to execute tools (code, web search) as needed.
-8.  **Final Synthesis**: The deliberation history is fed into the Master model, which synthesizes the diverse viewpoints into a comprehensive, high-fidelity final verdict.
-9.  **Memory Update (Planned)**: The system will update short-term and long-term context memory.
+### The Final Target Pipeline
+1.  **PII Check (planned)**: Pre-flight scan of user prompt for sensitive data.
+2.  **Router (planned)**: Auto-classifies query to select optimal archetype subset.
+3.  **Parallel Agent Responses**: All council members formulate initial positions concurrently.
+4.  **Peer Review + Anonymized Ranking (planned)**: Agents critique and rank anonymized responses.
+5.  **Scoring Engine (planned)**: Deterministic evaluation based on agreement, confidence, and rankings.
+6.  **Multi-Round Refinement**: Repeated debate loops (with a planned Consensus Metric to halt early).
+7.  **Tool Use (planned)**: Agents invoke web search or code execution.
+8.  **Final Synthesis**: The Master Model reviews the entire debate history and constructs a cohesive verdict.
+9.  **Cold Validator / Fresh Eyes (planned)**: A distinct, zero-context model validates the final synthesis for hallucinations or logic gaps.
+10. **Memory Update (planned)**: Session context summarized and stored in pgvector.
+11. **Cost + Audit Log (planned)**: Detailed ledger of tokens used and exact prompts sent.
 
-**FINAL TARGET PIPELINE:**
-User Query → Router → Parallel Responses → Peer Review + Ranking → Scoring → Multi-Round Refinement → Tool Use if needed → Final Synthesis → Memory Update
+*(Note: Features marked "planned" are detailed in `ROADMAP.md`)*
+
+### <think>-Block Streaming
+Some models (e.g. DeepSeek, QwQ) emit verbose `<think>` reasoning blocks before their final answer. The backend SSE pipeline features a stateful parser that strips these blocks from the user-facing UI while preserving them for the Master Model's synthesis context.
 
 ---
 
@@ -154,7 +163,8 @@ User Query → Router → Parallel Responses → Peer Review + Ranking → Scori
 ---
 
 ## 🤝 Contributing
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) to get started with local development and submit a PR.
+We welcome contributions! Please check our community health files in the `.github/` folder:
+- [Security Policy](.github/SECURITY.md)
 
 ---
 
