@@ -1,0 +1,85 @@
+name: Bug Report
+description: Create a report to help us improve AI Council
+title: "[Bug]: "
+labels: ["bug"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report! Please ensure you have read the `SUPPORT.md` checklist before proceeding.
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: A clear and concise description of what the bug is.
+      placeholder: Describe the issue...
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction Steps
+      description: Steps to reproduce the behavior.
+      placeholder: |
+        1. Go to '...'
+        2. Click on '....'
+        3. Scroll down to '....'
+        4. See error
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: A clear and concise description of what you expected to happen.
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: A clear and concise description of what actually happened.
+    validations:
+      required: true
+  - type: input
+    id: node-version
+    attributes:
+      label: Node.js Version
+      description: What version of Node.js are you using?
+      placeholder: e.g., v20.x.x
+    validations:
+      required: true
+  - type: dropdown
+    id: docker
+    attributes:
+      label: Are you using Docker?
+      options:
+        - "Yes (Docker Compose)"
+        - "No (Manual execution)"
+    validations:
+      required: true
+  - type: input
+    id: provider
+    attributes:
+      label: AI Provider Used
+      description: Which provider were you querying when the error occurred?
+      placeholder: e.g., OpenAI, Google Gemini, Anthropic, Custom Base URL
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant Logs or Error Output
+      description: Please paste any relevant logs from the backend or browser console.
+      render: shell
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      description: How critical is this issue?
+      options:
+        - Critical (Crash, data loss, cannot use app)
+        - High (Major feature broken, no workaround)
+        - Medium (Feature broken, but workaround exists)
+        - Low (UI glitch, minor annoyance)
+    validations:
+      required: true

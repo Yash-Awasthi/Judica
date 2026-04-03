@@ -1,74 +1,6 @@
 # 🚀 AI Council Roadmap
 
-This document outlines the 15-phase technical roadmap for the AI Council platform. The goals are prioritized based on implementation complexity and value to the deliberation quality.
-
----
-
-## EXTERNAL REPOSITORY RESEARCH
-
-These enhancement phases are inspired by analyzing current multi-agent and council architectures:
-
-### 1. [Zhaoli2042/AI-Council](https://github.com/Zhaoli2042/AI-Council)
-- **Architectural Ideas:** Chrome extension acting as an overlay on top of existing LLM chat UIs (Claude, ChatGPT, etc.).
-- **Features:** Floating bubble UI, context handoff, automatic chat extraction.
-- **Evaluation/Benchmarking:** None explicitly provided; focuses on manual user comparison.
-- **UI/UX Patterns:** Tabbed popup interface, floating action bubble, keyboard shortcuts.
-- **Clever Prompts:** "Generate Handoff Summary" to pass context between distinct AI platforms.
-- **Phase Mapping:** Partially inspires **Phase 10 (Memory + Context)** by demonstrating how cross-session context passing can work.
-
-### 2. [prijak/Ai-council](https://github.com/prijak/Ai-council)
-- **Architectural Ideas:** React/Express monolith utilizing Firebase auth and Firestore for cloud sync.
-- **Features:** "Managed Providers" abstraction allowing free (no API key) access via backend proxy (Sarvam AI), 40+ built-in personas, Voice AI, WhatsApp integration.
-- **Evaluation/Benchmarking:** None explicitly provided.
-- **UI/UX Patterns:** Responsive side-nav shell, multi-stage tabbed results (Stage I/II/III), searchable comboboxes.
-- **Clever Prompts:** Distinct categories of templates (e.g. "Think Tank", "Corporate") with predefined role assignments.
-- **Phase Mapping:** Implements a less deterministic version of **Phase 5 (Split Roles)** and **Phase 11 (Router/Templates)**, but lacks our planned deterministic consensus.
-
-### 3. [karpathy/llm-council](https://github.com/karpathy/llm-council)
-- **Architectural Ideas:** FastAPI backend with React frontend; simple, stateless sequential rounds via OpenRouter.
-- **Features:** 3-stage process: individual responses -> peer review -> chairman synthesis.
-- **Evaluation/Benchmarking:** Vibe-coded for qualitative evaluation of reading books together with LLMs.
-- **UI/UX Patterns:** Side-by-side tab view of individual model responses.
-- **Clever Prompts:** Anonymized identities during the review phase to prevent models from playing favorites based on brand names.
-- **Phase Mapping:** Directly implements **Phase 3 (Peer Review + Anonymized Ranking)** and the core synthesis concept.
-
-### 4. [TrentPierce/PolyCouncil](https://github.com/TrentPierce/PolyCouncil)
-- **Architectural Ideas:** Python desktop app using PySide6/QML, targeting local models (LM Studio/Ollama) and hosted APIs.
-- **Features:** Deliberation mode vs Discussion mode, provider profiles, file/image attachments.
-- **Evaluation/Benchmarking:** Models are scored via a shared rubric during the run, producing a weighted winner.
-- **UI/UX Patterns:** Desktop-native panes, searchable model lists, live streaming output.
-- **Clever Prompts:** Shared rubric injection into the peer-scoring phase.
-- **Phase Mapping:** Heavily inspires **Phase 4 (Scoring Engine)** by demonstrating rubric-based evaluation.
-
-### 5. [focuslead/ai-council-framework](https://github.com/focuslead/ai-council-framework)
-- **Architectural Ideas:** Methodology/framework (not an app) specifying a strict 6-step protocol (Distribute, Collect, Synthesize, Debate, Verify, Deliver).
-- **Features:** User-controlled consensus depth, Anti-Sycophancy protocol, 3-round hard limit to avoid confidence inflation.
-- **Evaluation/Benchmarking:** Validated against identity hallucination and sycophancy using 7 AI models.
-- **UI/UX Patterns:** N/A (Methodology).
-- **Clever Prompts:** "Fresh Eyes Validation" — a final AI is given the synthesized answer with zero debate context to validate it constructively.
-- **Phase Mapping:** Inspires **Phase 6 (Consensus Metric)**, **Phase 8 (Multi-Round Refinement limit)**, and **Phase 5 (Critic/Validator Separation)**.
-
-### 6. [sshkeda/pi-council](https://github.com/sshkeda/pi-council)
-- **Architectural Ideas:** CLI and `pi` extension using parallel, background RPC processes.
-- **Features:** Tool usage (spawn, followup, cancel), unbiased prompting, independent research environments.
-- **Evaluation/Benchmarking:** N/A.
-- **UI/UX Patterns:** Terminal-based background monitoring, streaming status.
-- **Clever Prompts:** Deliberately stripping the orchestrator's conclusions to avoid leading the council members.
-- **Phase Mapping:** Demonstrates execution models for **Phase 1 (Parallel Execution)** and **Phase 9 (Tool Execution Layer)**.
-
----
-
-## FINAL TARGET PIPELINE
-
-1. **User Query**
-2. **Router** (Phase 11) -> Dynamic archetype/model selection
-3. **Parallel Responses** (Phase 1) -> Concurrent agent execution
-4. **Peer Review + Ranking** (Phase 3) -> Anonymous critique and ranking of responses
-5. **Scoring** (Phase 4) -> Deterministic evaluation (agreement, confidence, ranking)
-6. **Multi-Round Refinement** (Phase 8) -> Repeated debate (max rounds) with Consensus Metric (Phase 6) & Split Critic (Phase 5)
-7. **Tool Use** if needed (Phase 9) -> Web search, sandboxed code
-8. **Final Synthesis** -> Master model aggregates into final verdict
-9. **Memory Update** (Phase 10) -> Short-term session & Long-term DB context
+This document outlines the 15-phase technical roadmap for the AI Council platform, along with Atticus-inspired additions and a concrete UI specification. The goals are prioritized based on implementation complexity and value to the deliberation quality.
 
 ---
 
@@ -80,18 +12,19 @@ These enhancement phases are inspired by analyzing current multi-agent and counc
 
 **IMPLEMENTATION NOTES:**
 - **Files to change:** `src/lib/council.ts`
-- **Actions:** Replace `mapConcurrent`'s internal limiting loop with native `Promise.all` for genuine parallel execution. Ensure `onMemberChunk` propagates the `model_id` to the SSE stream. Remove blocking logic inside the stream loop.
+- **Actions:** Replace `mapConcurrent`'s internal limiting loop with native `Promise.all` for genuine parallel execution. Tag SSE events with `model_id`. Remove blocking shared stream logic.
+- **Validation:** all model responses begin within same timestamp window.
 - **Complexity:** S
 
 ---
 
 ## 🟢 PHASE 2 — INTRODUCE STRUCTURED OUTPUT CONTRACT
 **REQUIREMENTS:**
-- All agents return strict JSON conforming to a schema (answer, reasoning, key_points, assumptions, confidence).
+- All agents return strict JSON conforming to a schema.
 
 **IMPLEMENTATION NOTES:**
 - **Files to change:** `src/lib/providers.ts`, `src/config/archetypes.ts`, `src/routes/ask.ts`
-- **Actions:** Use Zod schemas on the backend to validate incoming agent chunks. Modify `systemPrompt` in `prepareCouncilMembers` to strictly request JSON. Handle retry logic in `askProvider` for schema violations.
+- **Actions:** Enforce via Zod, retry on schema violation, strip free-form outputs. Strict JSON shape: `{ answer, reasoning, key_points, assumptions, confidence (0–1) }`
 - **Complexity:** M
 
 ---
@@ -102,19 +35,19 @@ These enhancement phases are inspired by analyzing current multi-agent and counc
 
 **IMPLEMENTATION NOTES:**
 - **Files to change:** `src/lib/council.ts`
-- **Actions:** In multi-round loops, gather Round 1 outputs. Anonymize them (e.g., "Response A", "Response B"). Query each agent to provide a JSON response with `ranking` and `critique`.
-- **Conflicts:** Requires adjusting the current `Critic` phase where only the Master model evaluates.
+- **Actions:** Collect Round 1 outputs, anonymize ("Response A", "Response B"). Each agent outputs: `{ ranking: [id1,id2,id3], critique: string }`.
+- **Conflicts:** Adjusts current single-model Critic phase.
 - **Complexity:** M
 
 ---
 
 ## 🟡 PHASE 4 — BUILD SCORING ENGINE
 **REQUIREMENTS:**
-- Deterministic evaluation independent of master model based on agreement, confidence, and peer ranking scores.
+- Deterministic evaluation based on agreement, confidence, and peer ranking scores.
 
 **IMPLEMENTATION NOTES:**
-- **Files to change:** `src/lib/scoring.ts` (new file), `src/lib/council.ts`
-- **Actions:** Create a deterministic scoring module. Apply formulas: `w1 * agreement + w2 * confidence + w3 * peer_ranking`. Filter responses based on the final score.
+- **Files to change:** `src/lib/scoring.ts` (new file)
+- **Actions:** Formula: `final_score = w1*agreement + w2*confidence + w3*peer_ranking`. Filter bottom responses, pass top-k to synthesis.
 - **Complexity:** M
 
 ---
@@ -125,18 +58,18 @@ These enhancement phases are inspired by analyzing current multi-agent and counc
 
 **IMPLEMENTATION NOTES:**
 - **Files to change:** `src/lib/council.ts`, `src/config/archetypes.ts`
-- **Actions:** In the `deliberate` function, replace the single Master Critic prompt with three distinct sequential operations. Controller decides to halt if `consensus_score > threshold`.
+- **Actions:** Controller logic: if `consensus_score > threshold` → stop; else → next round.
 - **Complexity:** M
 
 ---
 
 ## 🟡 PHASE 6 — IMPLEMENT CONSENSUS METRIC
 **REQUIREMENTS:**
-- Deterministic convergence: Compute pairwise similarity, stop if consensus > 0.85 or max_rounds reached.
+- Deterministic convergence: Compute pairwise similarity.
 
 **IMPLEMENTATION NOTES:**
-- **Files to change:** `src/lib/metrics.ts`, `src/lib/council.ts`
-- **Actions:** Add pairwise similarity logic (potentially using a lightweight embedding comparison or Rouge/Bleu scores). Hook into the Controller logic from Phase 5.
+- **Files to change:** `src/lib/metrics.ts` (new file)
+- **Actions:** Pairwise similarity between responses (lightweight embedding or ROUGE). Stop: `consensus > 0.85` OR `max_rounds` reached.
 - **Complexity:** M
 
 ---
@@ -147,18 +80,18 @@ These enhancement phases are inspired by analyzing current multi-agent and counc
 
 **IMPLEMENTATION NOTES:**
 - **Files to change:** `src/lib/council.ts`
-- **Actions:** In Round > 1, format the context so agents are prompted to "Respond to [Agent Name]'s claim." Remove anonymization for this specific interaction phase if it doesn't conflict with Phase 3 (Phase 3 is for ranking; Phase 7 is for direct critique).
+- **Actions:** Round > 1: prompt agents to address each other by name (e.g. "Respond to [Agent Name]'s claim about X").
 - **Complexity:** M
 
 ---
 
 ## 🟠 PHASE 8 — ADD MULTI-ROUND REFINEMENT
 **REQUIREMENTS:**
-- At least 2 rounds: R1 (answers) -> R2 (critique + ranking) -> R3 (improved answers).
+- Formalize a staged multi-round loop.
 
 **IMPLEMENTATION NOTES:**
-- **Files to change:** `src/lib/council.ts`
-- **Actions:** Formalize the multi-round loop in `deliberate`. Currently, rounds simply append opinions and ask the Critic. This needs to be restructured into the R1/R2/R3 flow defined above.
+- **Files to change:** `src/lib/council.ts` (restructure `deliberate()` loop)
+- **Actions:** R1 (answers) → R2 (critique + ranking) → R3 (improved answers).
 - **Complexity:** M
 
 ---
@@ -168,8 +101,8 @@ These enhancement phases are inspired by analyzing current multi-agent and counc
 - Agents can call tools (Code execution, Web search, Document parsing).
 
 **IMPLEMENTATION NOTES:**
-- **Files to change:** `src/lib/providers.ts`, `src/lib/tools/*` (new directory)
-- **Actions:** Define a structured tool interface. Update `askProvider` and `askProviderStream` to handle `tool_calls` and `tool_choice`. Inject results back into the context array.
+- **Files to change:** `src/lib/tools/` (new directory)
+- **Actions:** Update `askProvider` and `askProviderStream` for `tool_calls`. Tools include sandboxed code execution, web search, document parsing.
 - **Complexity:** L
 
 ---
@@ -180,7 +113,7 @@ These enhancement phases are inspired by analyzing current multi-agent and counc
 
 **IMPLEMENTATION NOTES:**
 - **Files to change:** `src/routes/ask.ts`, `src/lib/history.ts`, `prisma/schema.prisma`
-- **Actions:** Utilize Prisma to store not just raw chat, but summarized context embeddings. Potentially implement basic RAG via pgvector for context retrieval.
+- **Actions:** Prisma already in stack — add summarized context storage. Optional: pgvector RAG for context retrieval.
 - **Complexity:** L
 
 ---
@@ -191,18 +124,18 @@ These enhancement phases are inspired by analyzing current multi-agent and counc
 
 **IMPLEMENTATION NOTES:**
 - **Files to change:** `src/lib/router.ts` (new file), `src/routes/ask.ts`
-- **Actions:** Before execution, hit a fast, cheap model (e.g., Llama 3 8B) to classify the query. Map the classification to optimal archetype subsets and override user selection (or provide it as an "Auto" mode).
+- **Actions:** Fast cheap model classifies query → maps to optimal archetype subset. "Auto" mode override in `ask.ts`.
 - **Complexity:** L
 
 ---
 
 ## 🟡 PHASE 12 — ADD FAILURE ISOLATION
 **REQUIREMENTS:**
-- System must tolerate model failure (Timeout 8s, Quorum logic).
+- System must tolerate model failure.
 
 **IMPLEMENTATION NOTES:**
 - **Files to change:** `src/lib/council.ts`
-- **Actions:** Update `AbortSignal.timeout` in `deliberate` from 45s to 8s. Implement quorum checks (e.g., if valid responses < 2, throw or skip).
+- **Actions:** Timeout per model: `AbortSignal.timeout` 45s → 8s. Quorum: if valid responses < 2, skip or throw.
 - **Complexity:** S
 
 ---
@@ -213,7 +146,7 @@ These enhancement phases are inspired by analyzing current multi-agent and counc
 
 **IMPLEMENTATION NOTES:**
 - **Files to change:** `src/lib/providers.ts`, `src/lib/metrics.ts`, `prisma/schema.prisma`
-- **Actions:** We already track `tokensUsed`. Add cost estimation logic per model ID (e.g., static cost table). Expose via `GET /api/metrics` and in the UI.
+- **Actions:** `tokensUsed` already tracked — add cost estimation (static cost table per model ID). Expose via `GET /api/metrics` and in UI.
 - **Complexity:** S
 
 ---
@@ -223,17 +156,90 @@ These enhancement phases are inspired by analyzing current multi-agent and counc
 - Measure system performance: Benchmark dataset, metrics.
 
 **IMPLEMENTATION NOTES:**
-- **Files to change:** `tests/benchmarks/*` (new directory)
-- **Actions:** Write an automated test suite that runs a benchmark dataset through the council and measures accuracy against expected outputs, consistency, latency, and cost.
+- **Files to change:** `tests/benchmarks/` (new directory)
+- **Actions:** Benchmark dataset + expected outputs. Metrics: accuracy, consistency, latency, cost.
 - **Complexity:** L
 
 ---
 
 ## 🟡 PHASE 15 — UI ENHANCEMENTS
 **REQUIREMENTS:**
-- Side-by-side comparison, ranking visualization, consensus meter, critique visibility.
+- Implement new React components consuming structured SSE events.
 
 **IMPLEMENTATION NOTES:**
 - **Files to change:** `frontend/src/components/*`
-- **Actions:** Implement new React components that consume the new structured events (e.g., `ranking`, `critique`, `consensus_score`) emitted by the backend via SSE.
+- **Actions:** See §8 Tabbed Pane UI Specification below for full details. New components for ranking, critique, consensus_score.
 - **Complexity:** M
+
+---
+
+## §7 — ATTICUS-INSPIRED ADDITIONS
+
+### A — REAL-TIME COST LEDGER (HIGH priority, S complexity)
+- **Actions:** Per-query: per-model token accounting (input + output), estimated cost, cumulative session total. Collapsible: compact summary (total + tokens + latency) expands to full per-model breakdown. Color tiers: green <$0.01, amber $0.01–$0.10, red >$0.10.
+- **Files:** `src/lib/metrics.ts` (add cost table), `frontend/src/components/CostLedger.tsx` (new)
+
+### B — COLD VALIDATOR / "FRESH EYES" (HIGH priority, M complexity)
+- **Actions:** After final synthesis, route the verdict to a SEPARATE model with ZERO prior council context. That model validates cold: checks for errors, hallucinations, overconfidence. New SSE event type: `validator_result`.
+- **Files:** `src/lib/council.ts` (add post-synthesis step)
+
+### C — PII DETECTION PRE-SEND (MEDIUM priority, S complexity)
+- **Actions:** Before any API call, scan user prompt for PII (email, phone, SSN, credit card, etc.). Surface UI warning with option to anonymize or proceed.
+- **Files:** `src/lib/pii.ts` (new), `frontend/src/components/PiiWarning.tsx` (new)
+
+### D — RUNTIME-EDITABLE ARCHETYPES (MEDIUM priority, M complexity)
+- **Actions:** Expose archetype system prompts as user-editable JSON/YAML via UI, stored in DB per user.
+- **Files:** `prisma/schema.prisma` (new Archetype model), `src/routes/archetypes.ts`, `frontend/src/components/ArchetypeEditor.tsx` (new)
+
+### E — CONVERSATION SEARCH (MEDIUM priority, S complexity)
+- **Actions:** Full-text search across past council sessions: query content, archetype names, verdict keywords. Prisma + PostgreSQL supports full-text search natively.
+- **Files:** `src/routes/history.ts` (add search endpoint), `frontend/src/components/SearchDialog.tsx` (new)
+
+### F — AUDIT LOG (LOW priority, S complexity)
+- **Actions:** Per-request log: full prompt sent to each model, full response received, timing. Viewable in UI alongside cost ledger.
+- **Files:** `src/lib/audit.ts` (new), `prisma/schema.prisma` (new AuditLog model)
+
+---
+
+## §8 — TABBED PANE UI SPECIFICATION
+
+A concrete UI design requirement for Phase 15 and the Atticus-inspired additions. Implement a tabbed results panel in the frontend that organizes the deliberation output into the following tabs:
+
+### TAB 1 — "Council" (default active tab)
+- All agent responses displayed as cards, one per council member
+- Each card shows: agent name + archetype badge, response text (streaming, word-by-word via SSE), confidence score badge, key_points as bullet list, assumptions as collapsible section
+- Cards are arranged in a responsive grid (2-col on desktop, 1-col on mobile)
+- While streaming: show a pulsing indicator on the active card
+- After streaming: show confidence score colored bar (green = high, amber = mid, red = low)
+
+### TAB 2 — "Debate" (visible after Round 2 completes)
+- Per-round timeline: Round 1 → Round 2 → Round 3 (if applicable)
+- For each round: show each agent's critique of the others, with agent attribution
+- Anonymized ranking results: "Response A ranked #1 by 3 agents"
+- Cross-agent reference highlights: if Agent B referenced Agent A's claim, show a visual thread between their cards
+- Consensus meter: horizontal progress bar showing current consensus score (0 → 0.85 target), updated each round
+
+### TAB 3 — "Verdict"
+- Master synthesis output, streaming in real-time
+- Below synthesis: Cold Validator result (§7-B) — shown as a "Validator Note" card with green/amber/red status
+- Scoring breakdown: table showing each agent's final_score components (agreement / confidence / peer_ranking)
+- Which agents were included in synthesis (top-k) vs filtered out
+
+### TAB 4 — "Cost & Audit"
+- Cost Ledger (§7-A): per-model token usage + cost, cumulative total, color-coded tiers
+- Latency breakdown: time-to-first-token and total time per model
+- Audit Log (§7-F): collapsible per-agent sections showing exact prompt sent and raw response received
+- Export button: download full audit log as JSON
+
+### TAB 5 — "Config" (inline, no page nav)
+- Active council template name + members list
+- Per-member: archetype name, model assigned, role, editable system prompt (§7-D)
+- Router classification result (§6 Phase 11): what query type was detected, which archetypes were auto-selected and why
+- PII detection status: clean / warning (§7-C)
+
+**Implementation Notes:**
+- Use React tabs (shadcn/ui Tabs component or simple state-driven tab switcher).
+- Tab bar is sticky at the top of the results panel.
+- Tabs 2, 3, 4 are disabled/grayed until the relevant data is available.
+- Entire tabbed panel is driven by SSE events.
+- Files: `frontend/src/components/tabs/`, `frontend/src/types/events.ts`
