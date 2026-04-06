@@ -4,9 +4,7 @@
 
 ## Description
 
-**A high-fidelity orchestration platform for AI reasoning, consensus building, and multi-agent deliberation.**
-
-AI Council is an orchestration engine that allows you to pit multiple AI agents against each other in real-time deliberation. Instead of relying on a single model's output, Council leverages diverse perspectives from specialized archetypes (e.g., The Architect, The Contrarian, The Ethicist) to identify blind spots, reduce hallucinations, and produce a synthesized "Master Verdict".
+AI Council is a hardened orchestration engine designed to pit multiple AI agents against each other in real-time deliberation. By leveraging diverse architectural perspectives (e.g., The Architect, The Contrarian, The Ethicist), Council eliminates single-model bias, reduces hallucinations, and produces mathematically synthesized "Master Verdicts".
 
 ---
 
@@ -216,6 +214,20 @@ An independent, zero-context model validates the final synthesis for:
 - Logical inconsistencies  
 - Overconfidence or misleading tone
 - Missing critical considerations
+
+---
+
+## 🏛️ Core System Architecture (Technical Summary)
+
+AI Council utilizes a **Stateful Generator Architecture** built on Node.js and TypeScript, designed specifically for high-concurrency multi-agent flows.
+
+### 🛡️ Hardened Scoring Engine
+Unlike traditional LLM aggregators, Council uses a **Deterministic ML Validator**. Every opinion is converted into high-fidelity sentence embeddings using a local **Transformers.js** worker (`all-MiniLM-L6-v2`). 
+- **Pairwise Similarity Analysis**: Agents are mathematically ranked based on how closely their reasoning aligns with the core consensus.
+- **Outlier Rejection**: Responses with a consistency score below **0.5 (Scale 0-1)** are automatically stripped from the final synthesis to prevent low-quality inputs from polluting the verdict.
+
+### 🔄 Anti-Convergence Protocol
+To prevent "groupthink", the system implements a **Round Quality Validation** gate. During debate rounds, if a refinement step results in a lower mathematical consensus score than the previous round, the system immediately reverts to the higher-quality state and halts the deliberation.
 
 ### 9. Real-Time Streaming
 The entire process is fed back to the client via Server-Sent Events (SSE), allowing users to watch deliberation and synthesis unfold word-by-word.
@@ -511,9 +523,11 @@ Real-time cost ledger with color tiers: green (<$0.01), yellow ($0.01–$0.05), 
 
 ---
 
-## 📸 Screenshots
-
-*(Coming soon: Place UI screenshots here)*
+### 🎨 User Interface
+The UI is a premium, high-fidelity React dashboard featuring:
+- **Real-Time Deliberation Tracks**: Watch agents reason line-by-line via SSE.
+- **Cost & Token Transparency**: Real-time ledger tracking usage across 12+ providers.
+- **Audit Logs**: Deep inspection of every deliberation phase, from initial prompt to cold validation results.
 
 ---
 
