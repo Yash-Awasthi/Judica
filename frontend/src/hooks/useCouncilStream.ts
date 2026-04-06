@@ -98,9 +98,10 @@ export function useCouncilStream({ onEvent, onError }: UseCouncilStreamProps) {
                 if (eventData.type === "error" && eventData.message) {
                   setStreamError(eventData.message);
                   if (onError) onError(eventData.message);
-                } else {
-                  onEvent(eventData);
                 }
+
+                // Always call onEvent so the UI can process the event (including errors to append to the chat log)
+                onEvent(eventData);
               } catch (err) {
                 console.error("Failed to parse SSE line", line);
               }
