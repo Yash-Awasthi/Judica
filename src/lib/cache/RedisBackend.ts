@@ -1,12 +1,6 @@
 import redis from "../redis.js";
 import type { CacheBackend, CacheEntry } from "./CacheBackend.js";
 
-/**
- * Redis-backed cache implementation.
- * 
- * Provides fast in-memory caching with Redis persistence.
- * Does NOT support semantic (vector) search - that's delegated to PostgresBackend.
- */
 export class RedisBackend implements CacheBackend {
   private keyPrefix: string;
 
@@ -43,5 +37,4 @@ export class RedisBackend implements CacheBackend {
   }
 }
 
-// Singleton instance for application-wide use
 export const redisBackend = new RedisBackend();

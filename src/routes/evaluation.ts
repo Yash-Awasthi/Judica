@@ -10,7 +10,6 @@ import { AppError } from "../middleware/errorHandler.js";
 
 const router = Router();
 
-// ── POST /api/evaluation/session - Evaluate a council session ───────────────────────
 router.post("/session", requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { 
@@ -45,7 +44,6 @@ router.post("/session", requireAuth, async (req: AuthRequest, res: Response, nex
   }
 });
 
-// ── GET /api/evaluation/metrics - Get user evaluation metrics ────────────────────────
 router.get("/metrics", requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { days = 30 } = req.query;
@@ -60,7 +58,6 @@ router.get("/metrics", requireAuth, async (req: AuthRequest, res: Response, next
   }
 });
 
-// ── GET /api/evaluation/benchmark - Get performance benchmark ───────────────────────
 router.get("/benchmark", requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { councilSize = 3, queryComplexity = 'moderate' } = req.query;
@@ -81,7 +78,6 @@ router.get("/benchmark", requireAuth, async (req: AuthRequest, res: Response, ne
   }
 });
 
-// ── GET /api/evaluation/dashboard - Get evaluation dashboard data ─────────────────────
 router.get("/dashboard", requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { days = 30 } = req.query;

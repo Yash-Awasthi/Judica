@@ -9,10 +9,6 @@ interface OllamaResponse {
   eval_count?: number;
 }
 
-/**
- * Ollama local provider.
- * Implements BaseProvider for uniform interface.
- */
 export class OllamaProvider extends BaseProvider {
   private baseUrl: string;
 

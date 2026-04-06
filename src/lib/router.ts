@@ -18,8 +18,6 @@ interface QueryPattern {
   phraseWeight: number;
 }
 
-// ── Query Classification Patterns ──────────────────────────────────────────
-
 const QUERY_PATTERNS: QueryPattern[] = [
   {
     type: "factual",
@@ -130,8 +128,6 @@ const QUERY_PATTERNS: QueryPattern[] = [
   }
 ];
 
-// ── Scoring and Classification ─────────────────────────────────────────────
-
 interface Scores {
   factual: number;
   analytical: number;
@@ -141,9 +137,6 @@ interface Scores {
   technical: number;
 }
 
-/**
- * Calculate scores for all query types based on keyword/phrase matching.
- */
 function calculateScores(query: string): Scores {
   const lowerQuery = query.toLowerCase();
   const scores: Scores = {
@@ -158,14 +151,12 @@ function calculateScores(query: string): Scores {
   for (const pattern of QUERY_PATTERNS) {
     let score = 0;
 
-    // Keyword matches
     for (const keyword of pattern.keywords) {
       if (lowerQuery.includes(keyword)) {
         score += pattern.keywordWeight;
       }
     }
 
-    // Phrase pattern matches (higher weight)
     for (const phrase of pattern.phrasePatterns) {
       if (lowerQuery.includes(phrase)) {
         score += pattern.phraseWeight;
@@ -178,9 +169,6 @@ function calculateScores(query: string): Scores {
   return scores;
 }
 
-/**
- * Select best query type from scores.
- */
 function selectBestType(scores: Scores): { type: QueryType; score: number; totalScore: number } {
   let maxScore = -1;
   let bestType: QueryType = "analytical";
@@ -198,17 +186,11 @@ function selectBestType(scores: Scores): { type: QueryType; score: number; total
   return { type: bestType, score: maxScore, totalScore };
 }
 
-/**
- * Calculate real confidence: score[top] / sum(all_scores)
- */
 function calculateConfidence(topScore: number, totalScore: number): number {
   if (totalScore === 0 || !isFinite(topScore) || !isFinite(totalScore) || topScore < 0 || totalScore < 0) return 0;
   return Math.min(Math.max(topScore / totalScore, 0), 1);
 }
 
-// ── Archetype Mapping ──────────────────────────────────────────────────────
-
-// Primary archetypes for each type
 const PRIMARY_ARCHETYPES: Record<QueryType, string[]> = {
   factual: ["empiricist", "historian"],
   analytical: ["architect", "strategist"],
@@ -218,7 +200,6 @@ const PRIMARY_ARCHETYPES: Record<QueryType, string[]> = {
   technical: ["architect", "empiricist"]
 };
 
-// Opposing/diversity archetypes to ensure balanced perspective
 const DIVERSITY_ARCHETYPES: Record<QueryType, string[]> = {
   factual: ["contrarian"],
   analytical: ["outsider"],
@@ -228,61 +209,38 @@ const DIVERSITY_ARCHETYPES: Record<QueryType, string[]> = {
   technical: ["futurist"]
 };
 
-/**
- * Build diverse archetype set with 2-4 agents.
- * Always includes primary + diversity archetype for balanced perspective.
- */
 function buildArchetypeSet(type: QueryType, confidence: number): string[] {
   const primary = PRIMARY_ARCHETYPES[type] || ["strategist", "architect"];
   const diversity = DIVERSITY_ARCHETYPES[type] || ["outsider"];
 
-  // Always include at least 2: primary + diversity
   const archetypes = [...primary, diversity[0]];
 
-  // Add second primary if confidence is high enough (3 agents)
   if (confidence >= 0.5 && primary[1]) {
     archetypes.push(primary[1]);
   }
 
-  // Add another diversity if very confident (4 agents max)
   if (confidence >= 0.7 && diversity[1]) {
     archetypes.push(diversity[1]);
   }
 
-  // Remove duplicates while preserving order
   return [...new Set(archetypes)];
 }
-
-// ── Fallback Configuration ────────────────────────────────────────────────
 
 const FALLBACK_ARCHETYPES = ["strategist", "architect", "empiricist", "outsider"];
 const CONFIDENCE_THRESHOLD = 0.4;
 
-// ── Public API ──────────────────────────────────────────────────────────
-
-/**
- * Classify a query and return appropriate archetypes.
- *
- * @param query - The user query string
- * @returns RouterResult with type, archetypes, confidence, reasoning, and fallback flag
- */
 export function classifyQuery(query: string): RouterResult {
   const startTime = Date.now();
 
-  // Calculate scores for all types
   const scores = calculateScores(query);
   const { type, score: topScore, totalScore } = selectBestType(scores);
 
-  // Calculate real confidence: topScore / totalScore
   const confidence = calculateConfidence(topScore, totalScore);
 
-  // Determine if we should use fallback
   const useFallback = confidence < CONFIDENCE_THRESHOLD;
 
-  // Build archetype set (or use fallback)
   const archetypes = useFallback ? FALLBACK_ARCHETYPES : buildArchetypeSet(type, confidence);
 
-  // Build reasoning
   let reasoning: string;
   if (useFallback) {
     reasoning = `Low confidence (${confidence.toFixed(2)}), using balanced fallback council`;
@@ -315,27 +273,14 @@ export function classifyQuery(query: string): RouterResult {
   };
 }
 
-/**
- * Get all available query types.
- */
 export function getQueryTypes(): QueryType[] {
   return ["factual", "analytical", "creative", "strategic", "ethical", "technical"];
 }
 
-/**
- * Check if query classification has sufficient confidence for auto-routing.
- *
- * @param result - RouterResult from classifyQuery
- * @param threshold - Minimum confidence (default: 0.4)
- * @returns boolean indicating if auto-routing should proceed
- */
 export function shouldAutoRoute(result: RouterResult, threshold = CONFIDENCE_THRESHOLD): boolean {
   return result.confidence >= threshold;
 }
 
-/**
- * Format router result for logging/metadata.
- */
 export function formatRouterMetadata(result: RouterResult): Record<string, unknown> {
   return {
     routerType: result.type,
@@ -346,10 +291,6 @@ export function formatRouterMetadata(result: RouterResult): Record<string, unkno
   };
 }
 
-/**
- * Get archetypes for auto mode (ignores user input completely).
- * Returns router-selected archetypes or fallback set.
- */
 export function getAutoArchetypes(query: string): { archetypes: string[]; result: RouterResult } {
   const result = classifyQuery(query);
   return { archetypes: result.archetypes, result };

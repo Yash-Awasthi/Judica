@@ -7,7 +7,6 @@ import { groundingModule } from "./grounding.js";
 import { computeConsensus } from "./metrics.js";
 import { getFallbackProvider } from "../config/fallbacks.js";
 
-// Lazy load scoring to break circular dependency
 let scoreOpinions: any = null;
 async function lazyScoreOpinions(...args: any[]) {
   if (!scoreOpinions) {
@@ -24,8 +23,6 @@ export interface OpinionResult {
   isFallback?: boolean;
 }
 
-// Removed redundant ValidatorResult interface (now in schemas.ts)
-
 interface GatherOpinionsOptions {
   members: Provider[];
   currentMessages: Message[];
@@ -35,9 +32,6 @@ interface GatherOpinionsOptions {
   onMemberChunk?: (name: string, chunk: string) => void;
 }
 
-/**
- * Phase 1: Gather initial opinions from all council members in parallel.
- */
 export async function gatherOpinions(
   options: GatherOpinionsOptions
 ): Promise<{ opinions: OpinionResult[]; totalTokens: number }> {
@@ -50,14 +44,12 @@ export async function gatherOpinions(
     const start = Date.now();
     logger.debug({ member: m.name, start }, "Agent call started");
     
-    // 8s timeout per agent to prevent system stall
     const agentTimeout = AbortSignal.timeout(8000);
     const combinedSignal = abortSignal
       ? AbortSignal.any([abortSignal, agentTimeout])
       : agentTimeout;
 
     try {
-      // Primary attempt
       const response = await askProviderStream(
         { ...m, ...(maxTokens ? { maxTokens } : {}) },
         currentMessages,
@@ -78,7 +70,6 @@ export async function gatherOpinions(
         return { name: m.name, opinion: response.text, structured: parsed };
       }
 
-      // Retry once with JSON reminder
       logger.warn({ member: m.name }, "Agent returned invalid JSON, retrying once...");
       const retryMessages: Message[] = [
         ...currentMessages,
@@ -88,7 +79,6 @@ export async function gatherOpinions(
       const rp = parseAgentOutput(retryRes.text);
       if (rp) return { name: m.name, opinion: retryRes.text, structured: rp };
 
-      // Fallback: wrap raw text
       return { 
         name: m.name, 
         opinion: response.text, 
@@ -96,7 +86,6 @@ export async function gatherOpinions(
       };
 
     } catch (err) {
-      // Phase 7: Model Fallback
       const fallback = getFallbackProvider(m);
       if (fallback) {
         logger.warn({ member: m.name, err: (err as Error).message }, "Agent primary failed, trying fallback...");
@@ -142,18 +131,14 @@ interface ConductPeerReviewOptions {
   maxTokens?: number;
 }
 
-/**
- * Phase 2: Conduct peer review with anonymized ranking
- */
 export async function conductPeerReview(
   options: ConductPeerReviewOptions
 ): Promise<{ reviews: PeerReview[]; scored: ScoredOpinion[]; totalTokens: number; cost: number }> {
   const { members, opinions, currentMessages, round, validatorProvider, skipAdversarial, skipGrounding, abortSignal, maxTokens } = options;
   
   let totalTokens = 0;
-  let cost = 0;
+  const cost = 0;
 
-  // Anonymize responses
   const labels = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   const anonymized = opinions.map((o, i) => ({
     label: `Response ${labels[i]}`,
@@ -163,7 +148,6 @@ export async function conductPeerReview(
 
   const anonymizedBlock = anonymized.map(a => `${a.label}:\n${a.text}`).join("\n\n");
 
-  // Ask each agent to rank and critique anonymized responses
   const reviewPromises = members.map(async (m) => {
     const start = Date.now();
     logger.debug({ reviewer: m.name, start }, "Peer review started");
@@ -220,7 +204,6 @@ Do not include any text outside the JSON object.`;
       if (res.usage) totalTokens += res.usage.totalTokens;
 
       const parsed = parseAgentOutput(res.text);
-      // Try to extract ranking, critique and flaws from raw JSON
       let reviewData: { ranking: string[]; critique: string; identified_flaws: PeerReviewFlaw[] } | null = null;
       try {
         const jsonMatch = res.text.match(/\{[\s\S]*\}/);
@@ -234,7 +217,7 @@ Do not include any text outside the JSON object.`;
             };
           }
         }
-      } catch { /* ignore parse errors */ }
+      } catch (e) { console.error(e); }
 
       if (reviewData) {
         return { 
@@ -258,11 +241,9 @@ Do not include any text outside the JSON object.`;
 
   const reviews = (await Promise.all(reviewPromises)).filter((r): r is PeerReview => r !== null);
 
-  // Stage 3: Perform Parallel Adversarial + Grounding Audits (with adaptive skipping)
   const validatedOpinions = await Promise.all(opinions.map(async (op) => {
     if (!op.structured) return { ...op, adversarial: undefined, grounding: undefined };
     
-    // Performance Optimization: Skip if flags are set (usually due to high consensus/validation)
     const [adversarial, grounding] = await Promise.all([
       !skipAdversarial 
         ? adversarialModule.challenge(op.structured, validatorProvider, abortSignal) 
@@ -282,7 +263,6 @@ Do not include any text outside the JSON object.`;
     };
   }));
 
-  // Score opinions using deterministic scoring engine
   const anonymizedLabels = new Map<string, string>();
   anonymized.forEach(a => anonymizedLabels.set(a.originalName, a.label));
 
@@ -299,8 +279,6 @@ Do not include any text outside the JSON object.`;
     anonymizedLabels
   );
 
-  // Simple cost estimation (since we don't have the full CostConfig here, we'll accumulate tokens)
-  // The actual cost tracking happens in council.ts via trackTokenUsage
   return { reviews, scored, totalTokens, cost: 0 }; // Cost will be calculated by the orchestrator
 }
 
@@ -313,9 +291,6 @@ interface EvaluateConsensusOptions {
   maxTokens?: number;
 }
 
-/**
- * Phase 3: Evaluate consensus with qualitative critic and quantitative scorer
- */
 export async function evaluateConsensus(
   options: EvaluateConsensusOptions
 ): Promise<{
@@ -330,7 +305,6 @@ export async function evaluateConsensus(
   
   let totalTokens = 0;
 
-  // Qualitative Critic
   const criticPrompt = `As a qualitative critic, evaluate the Round ${round} opinions for:
 1. Logical contradictions and inconsistencies
 2. Flawed assumptions or reasoning gaps
@@ -342,7 +316,6 @@ Provide constructive feedback and specific directives for improvement in the nex
   if (criticEvalRes.usage) totalTokens += criticEvalRes.usage.totalTokens;
   const criticEval = criticEvalRes.text;
 
-  // Quantitative Scorer (Analysis only)
   const structuredOutputs = opinions.map(o => o.structured!).filter(Boolean);
   const consensusScore = await computeConsensus(structuredOutputs);
 
@@ -360,8 +333,6 @@ Note: Your recommendation is advisory. The system will halt based on a determini
   if (scorerEvalRes.usage) totalTokens += scorerEvalRes.usage.totalTokens;
   const scorerEval = scorerEvalRes.text;
 
-  // Controller (Deterministic Halt Decision)
-  // Threshold is fixed at 0.85
   const shouldHalt = consensusScore >= 0.85;
   const haltReason = shouldHalt 
     ? `Consensus score ${(consensusScore * 100).toFixed(1)}% >= 85% threshold`
@@ -385,9 +356,6 @@ interface SynthesizeVerdictOptions {
   onVerdictChunk?: (chunk: string) => void;
 }
 
-/**
- * Phase 4: Synthesize final verdict with master and cold validator
- */
 export async function synthesizeVerdict(
   options: SynthesizeVerdictOptions
 ): Promise<{
@@ -422,7 +390,6 @@ export async function synthesizeVerdict(
 
   if (masterRes.usage) totalTokens += masterRes.usage.totalTokens;
 
-  // Cold Validator / "Fresh Eyes"
   let validatorResult: ValidatorResult = {
     valid: false,
     issues: ["CRITICAL: Validator unavailable - answer quality cannot be verified"],
@@ -462,7 +429,6 @@ Return STRICT JSON:
     );
     if (validatorRes.usage) totalTokens += validatorRes.usage.totalTokens;
 
-    // Use validationModule for deterministic truth-awareness check
     const { validationModule } = await import("./validation.js");
     const deterministicResults = await validationModule.validateText(verdict);
     const deterministicErrors = deterministicResults.flatMap(r => r.errors);
@@ -472,7 +438,6 @@ Return STRICT JSON:
       if (jsonMatch) {
         const parsed = JSON.parse(jsonMatch[0]);
         if (typeof parsed.valid === "boolean") {
-          // Phase 7: Truth-Aware Upgrade (Merge LLM + Deterministic)
           const finalValid = parsed.valid && deterministicErrors.length === 0;
           const finalIssues = [...(parsed.issues || []), ...deterministicErrors];
           const finalConfidence = Math.max(0.1, parsed.confidence - (deterministicErrors.length * 0.15));
@@ -485,15 +450,13 @@ Return STRICT JSON:
           };
         }
       }
-    } catch { /* use default */ }
+    } catch (e) { console.error(e); }
   } catch (err) {
     logger.warn({ err: (err as Error).message }, "Cold validator failed, proceeding without validation");
   }
 
   return { verdict, validatorResult, totalTokens };
 }
-
-// ── Debate Round ──────────────────────────────────────────────────────────
 
 interface DebateRoundOptions {
   members: Provider[];
@@ -503,10 +466,6 @@ interface DebateRoundOptions {
   onMemberChunk?: (name: string, chunk: string) => void;
 }
 
-/**
- * Debate Round: Agents refine their answers after seeing other agents' responses
- * Each agent receives their own answer + summarized answers of other agents
- */
 export async function conductDebateRound(
   options: DebateRoundOptions
 ): Promise<{ refinedOpinions: { name: string; opinion: string }[]; totalTokens: number }> {
@@ -514,13 +473,11 @@ export async function conductDebateRound(
 
   let totalTokens = 0;
 
-  // Build CONCISE summary of other agents (1-2 lines + confidence only)
   const buildOthersSummary = (currentAgentName: string): string => {
     const others = opinions.filter(o => o.name !== currentAgentName);
     return others.map(o => {
       const structured = o.structured;
       if (structured) {
-        // Limit to 1-2 lines, include confidence
         const summary = structured.answer.slice(0, 120);
         return `[${o.name}]: ${summary}${structured.answer.length > 120 ? '...' : ''} (confidence: ${structured.confidence})`;
       }
@@ -582,17 +539,14 @@ ${DEBATE_INSTRUCTION}`;
 
       if (response.usage) totalTokens += response.usage.totalTokens;
 
-      // Parse refined output
       const parsed = parseAgentOutput(response.text);
       if (parsed) {
         return { name: m.name, opinion: response.text };
       }
 
-      // If parse fails, use raw response
       return { name: m.name, opinion: response.text };
     } catch (err) {
       logger.error({ member: m.name, err: (err as Error).message }, "Debate round failed for agent");
-      // Fall back to original opinion
       return { name: m.name, opinion: agentOpinion.opinion };
     }
   });

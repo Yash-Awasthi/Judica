@@ -3,16 +3,8 @@ import { Provider } from "./providers.js";
 import { askProvider } from "./providers.js";
 import logger from "./logger.js";
 
-/**
- * Stage 3 - GROUNDING LAYER.
- * Verifies factual claims against cross-agent consensus.
- */
 export class GroundingModule {
-  
-  /**
-   * Identifies ungrounded claims by comparing an agent's response to the council consensus.
-   * Cross-agent grounding (lightweight).
-   */
+
   async verify(output: AgentOutput, context: AgentOutput[], validatorProvider: Provider, abortSignal?: AbortSignal): Promise<GroundingResult> {
     const contextText = context.map((c, i) => `Response ${i+1}: ${c.answer}`).join("\n\n");
     

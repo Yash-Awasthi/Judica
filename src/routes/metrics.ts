@@ -6,7 +6,6 @@ import { AuthRequest } from "../types/index.js";
 
 const router = Router();
 
-// ── Get user's usage metrics ──────────────────────────────────────────────────
 router.get("/usage", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
@@ -16,7 +15,6 @@ router.get("/usage", requireAuth, async (req: AuthRequest, res: Response) => {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - daysNum);
 
-    // Get daily usage
     const dailyUsage = await prisma.dailyUsage.findMany({
       where: {
         userId,
@@ -27,7 +25,6 @@ router.get("/usage", requireAuth, async (req: AuthRequest, res: Response) => {
       orderBy: { date: "asc" },
     });
 
-    // Get total chats
     const totalChats = await prisma.chat.count({
       where: {
         userId,
@@ -37,7 +34,6 @@ router.get("/usage", requireAuth, async (req: AuthRequest, res: Response) => {
       },
     });
 
-    // Get total tokens
     const tokenResult = await prisma.chat.aggregate({
       where: {
         userId,
@@ -50,7 +46,6 @@ router.get("/usage", requireAuth, async (req: AuthRequest, res: Response) => {
       },
     });
 
-    // Get average duration
     const durationResult = await prisma.chat.aggregate({
       where: {
         userId,
@@ -89,29 +84,22 @@ router.get("/usage", requireAuth, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// ── Get system-wide metrics (admin only) ──────────────────────────────────────
 router.get("/system", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    // TODO: Add admin check
     const userId = req.userId!;
 
-    // Get total users
     const totalUsers = await prisma.user.count();
 
-    // Get total conversations
     const totalConversations = await prisma.conversation.count();
 
-    // Get total chats
     const totalChats = await prisma.chat.count();
 
-    // Get total tokens used
     const tokenResult = await prisma.chat.aggregate({
       _sum: {
         tokensUsed: true,
       },
     });
 
-    // Get recent activity (last 24 hours)
     const yesterday = new Date();
     yesterday.setDate(yesterday.getDate() - 1);
 
@@ -138,7 +126,6 @@ router.get("/system", requireAuth, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// ── Get conversation metrics ──────────────────────────────────────────────────
 router.get("/conversation/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;

@@ -5,10 +5,6 @@ import { calculateCost } from "../../cost.js";
 import { validateSafeUrl } from "../../ssrf.js";
 import { getToolDefinitions, callTool } from "../../tools/index.js";
 
-/**
- * Google (Gemini) provider implementation.
- * Handles Gemini API (v1beta) with specific content/parts structure.
- */
 export class GoogleProvider extends BaseProvider {
   constructor(config: ProviderConfig) {
     super(config);
@@ -19,7 +15,6 @@ export class GoogleProvider extends BaseProvider {
     signal?: AbortSignal;
     maxTokens?: number;
   }): Promise<ProviderResponse> {
-    // Note: Google's API key is typically a query param, but we validate the host
     const apiHost = "https://generativelanguage.googleapis.com";
     await validateSafeUrl(apiHost);
 
@@ -66,7 +61,6 @@ export class GoogleProvider extends BaseProvider {
       const candidate = data.candidates?.[0];
       const part = candidate?.content?.parts?.[0];
 
-      // Handle Tool Calls
       if (part?.functionCall) {
         const { name, args } = part.functionCall;
         logger.info({ provider: this.name, toolName: name }, "Processing Google tool call");

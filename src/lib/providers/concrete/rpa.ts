@@ -4,7 +4,6 @@ import { ProviderConfig, ProviderResponse, Message } from "../types.js";
 import fs from "fs";
 import path from "path";
 
-// Lazy-load playwright to avoid startup cost if RPA not used
 let playwright: typeof import("playwright") | null = null;
 
 interface RPATarget {
@@ -152,10 +151,6 @@ async function launchBrowser(): Promise<import("playwright").Browser> {
   });
 }
 
-/**
- * RPA Provider for ChatGPT/Claude web apps via headless Playwright.
- * Implements BaseProvider for uniform interface.
- */
 export class RPAProvider extends BaseProvider {
   private target: RPATarget;
   private sessionDir: string;
@@ -167,11 +162,9 @@ export class RPAProvider extends BaseProvider {
     this.target = RPA_TARGETS[targetName];
     if (!this.target) throw new Error(`Unknown RPA target: ${targetName}`);
     
-    // SAFE DIRECTORY HANDLING: Sanitize userId to prevent traversal
     const safeUserId = String(config.userId || "default").replace(/[^a-zA-Z0-9_-]/g, "");
     this.sessionDir = path.resolve(`./sessions/${safeUserId}`);
     
-    // Ensure directory exists recursively
     if (!fs.existsSync(this.sessionDir)) {
       fs.mkdirSync(this.sessionDir, { recursive: true });
     }
@@ -181,9 +174,6 @@ export class RPAProvider extends BaseProvider {
     return path.join(this.sessionDir, `${this.target.name}.json`);
   }
 
-  /**
-   * Lazy cleanup of stale session files.
-   */
   private lazyCleanup(): void {
     try {
       if (fs.existsSync(this.sessionPath)) {
@@ -251,7 +241,6 @@ export class RPAProvider extends BaseProvider {
       page = await context.newPage();
       await page.goto(this.target.newChatUrl, { waitUntil: "domcontentloaded", timeout: 30000 });
       
-      // Basic login check
       const loginRequired = await this.checkLogin(page);
       if (loginRequired) throw new Error(`Login required for ${this.target.name}`);
 

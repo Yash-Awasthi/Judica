@@ -6,7 +6,6 @@ import { AuthRequest } from "../types/index.js";
 
 const router = Router();
 
-// ── Export conversation as JSON ───────────────────────────────────────────────
 router.get("/conversation/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
@@ -56,7 +55,6 @@ router.get("/conversation/:id", requireAuth, async (req: AuthRequest, res: Respo
   }
 });
 
-// ── Export all user conversations as JSON ──────────────────────────────────────
 router.get("/all", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
@@ -101,7 +99,6 @@ router.get("/all", requireAuth, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// ── Export conversation as Markdown ───────────────────────────────────────────
 router.get("/conversation/:id/markdown", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;

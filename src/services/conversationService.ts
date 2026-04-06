@@ -49,9 +49,6 @@ export interface RelevantContext {
   relevance: number;
 }
 
-/**
- * Create a new conversation
- */
 export async function createConversation(input: CreateConversationInput): Promise<Conversation> {
   try {
     const conversation = await prisma.conversation.create({
@@ -68,9 +65,6 @@ export async function createConversation(input: CreateConversationInput): Promis
   }
 }
 
-/**
- * Find conversation by ID, optionally scoped to user
- */
 export async function findConversationById(id: string, userId?: number): Promise<Conversation | null> {
   try {
     const conversation = await prisma.conversation.findFirst({
@@ -86,20 +80,15 @@ export async function findConversationById(id: string, userId?: number): Promise
   }
 }
 
-/**
- * Create a chat entry with optional embedding (stored as pgvector)
- */
 export async function createChat(input: CreateChatInput, generateEmbedding: boolean = false): Promise<Chat> {
   try {
     let embeddingVector: number[] | null = null;
     
-    // Generate embedding if requested and API key available
     if (generateEmbedding) {
       const chatText = `${input.question} ${input.verdict}`.slice(0, 1000);
       embeddingVector = await getEmbeddingWithLock(chatText);
     }
     
-    // Use raw SQL to insert with vector embedding (Prisma doesn't support vector type)
     if (embeddingVector) {
       const result = await pool.query(`
         INSERT INTO "Chat" ("userId", "conversationId", question, verdict, opinions, "durationMs", "tokensUsed", "cacheHit", embedding, "createdAt")
@@ -120,7 +109,6 @@ export async function createChat(input: CreateChatInput, generateEmbedding: bool
       return result.rows[0] as Chat;
     }
     
-    // No embedding: use standard Prisma create
     const chat = await prisma.chat.create({
       data: {
         userId: input.userId,
@@ -140,9 +128,6 @@ export async function createChat(input: CreateChatInput, generateEmbedding: bool
   }
 }
 
-/**
- * Get recent conversation history as Message array
- */
 export async function getRecentHistory(conversationId: string): Promise<Message[]> {
   try {
     const chats = await prisma.chat.findMany({
@@ -163,9 +148,6 @@ export async function getRecentHistory(conversationId: string): Promise<Message[
   }
 }
 
-/**
- * Get conversation list for a user
- */
 export async function getConversationList(userId: number, limit: number = 50): Promise<Conversation[]> {
   try {
     const conversations = await prisma.conversation.findMany({
@@ -180,9 +162,6 @@ export async function getConversationList(userId: number, limit: number = 50): P
   }
 }
 
-/**
- * Delete a conversation and all associated chats
- */
 export async function deleteConversation(id: string, userId: number): Promise<boolean> {
   try {
     const result = await prisma.conversation.deleteMany({
@@ -198,9 +177,6 @@ export async function deleteConversation(id: string, userId: number): Promise<bo
   }
 }
 
-/**
- * Update conversation title
- */
 export async function updateConversationTitle(id: string, userId: number, title: string): Promise<Conversation | null> {
   try {
     const conversation = await prisma.conversation.updateMany({
@@ -222,9 +198,6 @@ export async function updateConversationTitle(id: string, userId: number, title:
   }
 }
 
-/**
- * Calculate cosine similarity between two vectors
- */
 function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) return 0;
   
@@ -243,9 +216,6 @@ function cosineSimilarity(a: number[], b: number[]): number {
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
-/**
- * Extract keywords from text for keyword-based fallback
- */
 function extractKeywords(text: string): Set<string> {
   return new Set(
     text
@@ -256,9 +226,6 @@ function extractKeywords(text: string): Set<string> {
   );
 }
 
-/**
- * Calculate keyword-based relevance score (fallback)
- */
 function calculateKeywordRelevance(query: string, question: string, verdict: string): number {
   const queryKeywords = extractKeywords(query);
   const contentKeywords = extractKeywords(question + " " + verdict);
@@ -273,23 +240,16 @@ function calculateKeywordRelevance(query: string, question: string, verdict: str
   return matches / queryKeywords.size;
 }
 
-/**
- * Retrieve relevant past context using stored embeddings (1 API call)
- * Falls back to keyword matching if embeddings unavailable
- */
 export async function retrieveRelevantContext(
   conversationId: string,
   query: string,
   maxResults: number = 3
 ): Promise<RelevantContext[]> {
   try {
-    // Generate embedding for query only (1 API call)
     const queryEmbedding = await getEmbeddingWithLock(query);
     
-    // If embeddings available, use DB-level vector search
     if (queryEmbedding) {
       try {
-        // Perform vector similarity search directly in DB
         const result = await pool.query(`
           SELECT id, question, verdict, 
                  embedding <-> $1 as distance
@@ -325,7 +285,6 @@ export async function retrieveRelevantContext(
       }
     }
     
-    // Fallback: keyword-based search (no embeddings needed)
     const chats = await prisma.chat.findMany({
       where: { conversationId },
       orderBy: { createdAt: 'desc' },
@@ -361,10 +320,6 @@ export async function retrieveRelevantContext(
   }
 }
 
-/**
- * Format retrieved context for injection into council input
- * Token-safe: limits total context length
- */
 export function formatContextForInjection(context: RelevantContext[]): string {
   if (context.length === 0) {
     return "";
@@ -379,7 +334,6 @@ export function formatContextForInjection(context: RelevantContext[]): string {
     })
     .join("\n\n");
 
-  // Truncate if too long
   if (formatted.length > MAX_CONTEXT_LENGTH) {
     return formatted.slice(0, MAX_CONTEXT_LENGTH) + "\n... [truncated]";
   }

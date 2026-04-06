@@ -8,12 +8,7 @@ import { RPAProvider } from "./concrete/rpa.js";
 import { decrypt } from "../crypto.js";
 import logger from "../logger.js";
 
-/**
- * Provider Factory - Enforces per-request instantiation to prevent state leakage.
- * Decision: Just-in-time decryption and robust provider matching.
- */
 export function createProvider(config: ProviderConfig): BaseProvider {
-  // Decision: Just-in-time decryption of API keys from storage
   const decryptedConfig = { ...config };
   
   if (decryptedConfig.apiKey && decryptedConfig.apiKey.includes(":")) {
@@ -31,7 +26,6 @@ export function createProvider(config: ProviderConfig): BaseProvider {
     throw new Error("missing required 'type' field");
   }
 
-  // 1. Explicit provider detection (Issue 1 fallback)
   if (decryptedConfig.provider) {
     switch (decryptedConfig.provider) {
       case "openai":    return new OpenAIProvider(decryptedConfig);
@@ -45,7 +39,6 @@ export function createProvider(config: ProviderConfig): BaseProvider {
     }
   }
 
-  // 2. Legacy/Heuristic detection (fallback for older/missing configs)
   const type = (decryptedConfig.type || "").toLowerCase();
 
   if (!["api", "local", "rpa"].includes(type)) {
@@ -54,7 +47,6 @@ export function createProvider(config: ProviderConfig): BaseProvider {
   const lowerName = (decryptedConfig.name || "").toLowerCase();
   const lowerModel = (decryptedConfig.model || "").toLowerCase();
 
-  // If type is a specific provider name, use it
   if (type === "openai" || type === "openai-compat") return new OpenAIProvider(decryptedConfig);
   if (type === "anthropic") return new AnthropicProvider(decryptedConfig);
   if (type === "google")    return new GoogleProvider(decryptedConfig);
@@ -75,7 +67,6 @@ export function createProvider(config: ProviderConfig): BaseProvider {
       return new OllamaProvider(decryptedConfig);
 
     default:
-      // Last resort: try heuristic matching on name/model if type is unknown
       if (lowerName.includes("google") || lowerModel.includes("gemini")) return new GoogleProvider(decryptedConfig);
       if (lowerName.includes("anthropic") || lowerModel.includes("claude")) return new AnthropicProvider(decryptedConfig);
       if (lowerName.includes("openai") || type === "") return new OpenAIProvider(decryptedConfig);

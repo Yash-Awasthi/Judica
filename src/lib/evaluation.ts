@@ -33,9 +33,6 @@ export interface EvaluationMetrics {
   userSatisfaction: number; // 0-5 based on feedback
 }
 
-/**
- * Evaluate a council deliberation session.
- */
 export async function evaluateCouncilSession(
   sessionId: string,
   conversationId: string,
@@ -46,14 +43,12 @@ export async function evaluateCouncilSession(
   userFeedback?: number
 ): Promise<EvaluationResult> {
   try {
-    // Calculate individual criteria
     const coherence = await calculateCoherence(agentOutputs);
     const consensus = await computeConsensus(agentOutputs);
     const diversity = calculateDiversity(agentOutputs);
     const quality = calculateQuality(agentOutputs);
     const efficiency = calculateEfficiency(totalTokens, agentOutputs.length, duration);
     
-    // Calculate overall score (weighted average)
     const weights = { coherence: 0.25, consensus: 0.25, diversity: 0.2, quality: 0.2, efficiency: 0.1 };
     const overallScore = (
       coherence * weights.coherence +
@@ -63,7 +58,6 @@ export async function evaluateCouncilSession(
       efficiency * weights.efficiency
     ) * 100;
     
-    // Generate recommendations
     const recommendations = generateRecommendations({
       coherence,
       consensus,
@@ -72,7 +66,6 @@ export async function evaluateCouncilSession(
       efficiency
     });
     
-    // Identify strengths and weaknesses
     const strengths = identifyStrengths({
       coherence,
       consensus,
@@ -101,7 +94,6 @@ export async function evaluateCouncilSession(
       timestamp: new Date()
     };
     
-    // Store evaluation result
     await storeEvaluationResult(result);
     
     logger.info({
@@ -120,9 +112,6 @@ export async function evaluateCouncilSession(
   }
 }
 
-/**
- * Calculate coherence score based on similarity between responses.
- */
 async function calculateCoherence(outputs: AgentOutput[]): Promise<number> {
   if (outputs.length < 2) return 1;
   
@@ -139,27 +128,20 @@ async function calculateCoherence(outputs: AgentOutput[]): Promise<number> {
   return comparisons > 0 ? totalSimilarity / comparisons : 1;
 }
 
-/**
- * Calculate diversity score based on variance in responses.
- */
 function calculateDiversity(outputs: AgentOutput[]): number {
   if (outputs.length < 2) return 0;
   
-  // Calculate variance in confidence levels
   const confidences = outputs.map(o => o.confidence);
   const meanConfidence = confidences.reduce((sum, c) => sum + c, 0) / confidences.length;
   const variance = confidences.reduce((sum, c) => sum + Math.pow(c - meanConfidence, 2), 0) / confidences.length;
   
-  // Calculate variance in response lengths
   const lengths = outputs.map(o => o.answer.length + o.reasoning.length);
   const meanLength = lengths.reduce((sum, l) => sum + l, 0) / lengths.length;
   const lengthVariance = lengths.reduce((sum, l) => sum + Math.pow(l - meanLength, 2), 0) / lengths.length;
   
-  // Normalize variance scores (0-1 range)
   const confidenceDiversity = Math.min(variance * 4, 1); // Scale variance to 0-1
   const lengthDiversity = Math.min(lengthVariance / 10000, 1); // Scale length variance
   
-  // Check keyword diversity
   const allKeywords = new Set<string>();
   outputs.forEach(o => {
     const keywords = extractKeywords(o.answer + " " + o.reasoning);
@@ -171,16 +153,12 @@ function calculateDiversity(outputs: AgentOutput[]): number {
   return (confidenceDiversity + lengthDiversity + keywordDiversity) / 3;
 }
 
-/**
- * Calculate quality score based on response characteristics.
- */
 function calculateQuality(outputs: AgentOutput[]): number {
   let totalQuality = 0;
   
   for (const output of outputs) {
     let quality = 0;
     
-    // Answer quality (length, completeness)
     const answerLength = output.answer.length;
     if (answerLength > 50 && answerLength < 1000) {
       quality += 0.3;
@@ -188,7 +166,6 @@ function calculateQuality(outputs: AgentOutput[]): number {
       quality += 0.2; // Penalize overly long answers
     }
     
-    // Reasoning quality
     const reasoningLength = output.reasoning.length;
     if (reasoningLength > 100 && reasoningLength < 2000) {
       quality += 0.3;
@@ -196,12 +173,10 @@ function calculateQuality(outputs: AgentOutput[]): number {
       quality += 0.2;
     }
     
-    // Key points quality
     if (output.key_points.length >= 2 && output.key_points.length <= 5) {
       quality += 0.2;
     }
     
-    // Confidence appropriateness
     if (output.confidence >= 0.3 && output.confidence <= 0.9) {
       quality += 0.2;
     }
@@ -212,27 +187,18 @@ function calculateQuality(outputs: AgentOutput[]): number {
   return outputs.length > 0 ? totalQuality / outputs.length : 0;
 }
 
-/**
- * Calculate efficiency score based on token usage.
- */
 function calculateEfficiency(totalTokens: number, agentCount: number, duration: number): number {
-  // Tokens per agent
   const tokensPerAgent = totalTokens / agentCount;
   
-  // Time efficiency (faster is better, but not too fast)
   const optimalDuration = agentCount * 10000; // 10 seconds per agent
   const timeEfficiency = Math.max(0, 1 - Math.abs(duration - optimalDuration) / optimalDuration);
   
-  // Token efficiency (lower is better, but need minimum tokens)
   const optimalTokensPerAgent = 1000;
   const tokenEfficiency = Math.max(0, 1 - Math.abs(tokensPerAgent - optimalTokensPerAgent) / optimalTokensPerAgent);
   
   return (timeEfficiency + tokenEfficiency) / 2;
 }
 
-/**
- * Extract keywords from text for diversity analysis.
- */
 function extractKeywords(text: string): string[] {
   const words = text.toLowerCase()
     .replace(/[^\w\s]/g, ' ')
@@ -248,9 +214,6 @@ function isStopWord(word: string): boolean {
   return stopWords.has(word);
 }
 
-/**
- * Generate recommendations based on evaluation criteria.
- */
 function generateRecommendations(criteria: EvaluationCriteria): string[] {
   const recommendations: string[] = [];
   
@@ -281,9 +244,6 @@ function generateRecommendations(criteria: EvaluationCriteria): string[] {
   return recommendations;
 }
 
-/**
- * Identify strengths based on evaluation criteria.
- */
 function identifyStrengths(criteria: EvaluationCriteria): string[] {
   const strengths: string[] = [];
   
@@ -296,9 +256,6 @@ function identifyStrengths(criteria: EvaluationCriteria): string[] {
   return strengths;
 }
 
-/**
- * Identify weaknesses based on evaluation criteria.
- */
 function identifyWeaknesses(criteria: EvaluationCriteria): string[] {
   const weaknesses: string[] = [];
   
@@ -311,12 +268,8 @@ function identifyWeaknesses(criteria: EvaluationCriteria): string[] {
   return weaknesses;
 }
 
-/**
- * Store evaluation result in database.
- */
 async function storeEvaluationResult(result: EvaluationResult): Promise<void> {
   try {
-    // Store in a dedicated evaluation table (would need to be added to schema)
     await prisma.evaluation.create({
       data: {
         sessionId: result.sessionId,
@@ -339,9 +292,6 @@ async function storeEvaluationResult(result: EvaluationResult): Promise<void> {
   }
 }
 
-/**
- * Get evaluation metrics for a user over time.
- */
 export async function getUserEvaluationMetrics(userId: number, days: number = 30): Promise<EvaluationMetrics> {
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
@@ -371,7 +321,6 @@ export async function getUserEvaluationMetrics(userId: number, days: number = 30
   const averageQuality = evaluations.reduce((sum: number, e: { quality: number }) => sum + e.quality, 0) / evaluations.length;
   const averageEfficiency = evaluations.reduce((sum: number, e: { efficiency: number }) => sum + e.efficiency, 0) / evaluations.length;
   
-  // Calculate improvement trend (compare first half vs second half)
   const midpoint = Math.floor(evaluations.length / 2);
   const firstHalf = evaluations.slice(0, midpoint);
   const secondHalf = evaluations.slice(midpoint);
@@ -392,9 +341,6 @@ export async function getUserEvaluationMetrics(userId: number, days: number = 30
   };
 }
 
-/**
- * Benchmark council performance against standards.
- */
 export async function benchmarkCouncilPerformance(
   userId: number,
   councilSize: number,
@@ -407,7 +353,6 @@ export async function benchmarkCouncilPerformance(
 }> {
   const metrics = await getUserEvaluationMetrics(userId);
   
-  // Get benchmark data for similar councils
   const benchmarks = await prisma.evaluation.aggregate({
     where: {
       timestamp: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
@@ -421,7 +366,6 @@ export async function benchmarkCouncilPerformance(
   const userScore = metrics.averageConsensus * 25 + metrics.averageQuality * 25 + metrics.averageDiversity * 25 + metrics.averageEfficiency * 25;
   const benchmarkScore = (benchmarks._avg.overallScore || 0) * 100;
   
-  // Calculate percentile (simplified)
   const percentile = Math.max(0, Math.min(100, (userScore / benchmarkScore) * 100));
   
   let ranking: 'excellent' | 'good' | 'average' | 'below_average';

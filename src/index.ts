@@ -31,10 +31,8 @@ import { requestContext } from "./lib/context.js";
 
 const app = express();
 
-// ── CSP Nonce (must be before Helmet) ─────────────────────────────────────────
 app.use(cspNonce);
 
-// ── Security headers ──────────────────────────────────────────────────────────
 app.use(helmet({
   contentSecurityPolicy: {
     directives: {
@@ -47,7 +45,6 @@ app.use(helmet({
   },
 }));
 
-// ── Trust proxy (for rate limiter behind nginx/reverse proxy) ─────────────────
 const trustProxyConfig = env.TRUST_PROXY;
 if (trustProxyConfig === "true") {
   app.set("trust proxy", true);
@@ -61,14 +58,12 @@ if (trustProxyConfig === "true") {
   app.set("trust proxy", 1); // Default to 1 hop
 }
 
-// ── CORS — reads ALLOWED_ORIGINS from env, falls back to localhost:3000 ─────
 const allowedOrigins = env.ALLOWED_ORIGINS
   ? env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
   : ["http://localhost:3000", "http://localhost:5173"];
 
 app.use(cors({
   origin: (origin, cb) => {
-    // Allow requests with no origin (e.g. curl, server-to-server)
     if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
     cb(new Error("CORS Policy: Origin not allowed"));
   },
@@ -78,10 +73,8 @@ app.use(cors({
 app.use(compression());
 app.use(express.json({ limit: "200kb" }));
 
-// ── Request ID (attach before logging so it can be threaded through) ──────────
 app.use(requestId);
 
-// ── Request Context (AsyncLocalStorage for request-scoped data) ─────────────
 app.use((req: any, res, next) => {
   requestContext.run({ requestId: req.requestId || res.getHeader('x-request-id') as string }, () => {
     next();
@@ -92,23 +85,20 @@ const publicPath = fs.existsSync(path.join(process.cwd(), "frontend/dist"))
   ? path.join(process.cwd(), "frontend/dist")
   : path.join(process.cwd(), "dist/public");
 
-// Serve static assets (JS, CSS, images) — but NOT index.html (served via nonce route below)
 app.use(express.static(publicPath, { index: false }));
 
-// Serve index.html with injected CSP nonce 
 app.get("/", (req, res) => {
   const indexPath = path.join(publicPath, "index.html");
   try {
     let html = fs.readFileSync(indexPath, "utf8");
     const nonce = res.locals.cspNonce as string;
-    
-    // Inject nonce into script tags (legacy and Vite-generated)
+
     html = html
       .replace(/<script\b([^>]*)>/g, (_match, attrs) => {
         if (attrs.includes('nonce=')) return _match;
         return `<script nonce="${nonce}"${attrs}>`;
       });
-      
+
     res.setHeader("Content-Type", "text/html");
     res.send(html);
   } catch {
@@ -121,10 +111,8 @@ app.use((req: any, res, next) => {
   next();
 });
 
-// ── Per-User Rate/Concurrency Limit ──────────────────────────────────────────
 app.use(perUserLimiter);
 
-// ── Routes ────────────────────────────────────────────────────────────────────
 app.use("/api/auth",      authLimiter, authRouter);
 app.use("/api/ask",       askLimiter,  askRouter);
 app.use("/api/council",   askLimiter,  councilRouter);
@@ -136,12 +124,10 @@ app.use("/api/export",    exportRouter);
 app.use("/api/tts",       askLimiter, ttsRouter);
 app.use("/api/pii",       requireAuth, piiRouter);
 
-// ── Deep Health Check ─────────────────────────────────────────────────────────
 app.get("/health", async (req, res) => {
   const checks: Record<string, string> = {};
   let healthy = true;
 
-  // Check PostgreSQL
   try {
     await prisma.$queryRawUnsafe("SELECT 1");
     checks.database = "ok";
@@ -150,7 +136,6 @@ app.get("/health", async (req, res) => {
     healthy = false;
   }
 
-  // Check Redis
   try {
     await redis.ping();
     checks.redis = "ok";
@@ -163,7 +148,6 @@ app.get("/health", async (req, res) => {
   res.status(healthy ? 200 : 503).json({ status, uptime: process.uptime(), env: env.NODE_ENV, checks });
 });
 
-// ── 404 Handler for all routes ────────────────────────────────────────────────
 app.use((req, res) => {
   if (req.originalUrl.startsWith("/api/")) {
     res.status(404).json({ error: `Not Found: ${req.originalUrl}` });
@@ -174,7 +158,6 @@ app.use((req, res) => {
   }
 });
 
-// ── Centralized error handler (must be last) ──────────────────────────────────
 app.use(errorHandler);
 
 const server = app.listen(Number(env.PORT), () => {
@@ -182,14 +165,11 @@ const server = app.listen(Number(env.PORT), () => {
   startSweepers();
 });
 
-// Initialize WebSockets
 const io = initSocket(server);
 
-// ── Graceful shutdown ─────────────────────────────────────────────────────────
 const shutdown = async (signal: string) => {
   logger.info({ signal }, "Shutdown signal received, shutting down gracefully");
 
-  // Force exit after 5 seconds if cleanup hangs
   const forceTimer = setTimeout(() => {
     logger.error("Graceful shutdown timed out after 5s, forcing exit");
     process.exit(1);

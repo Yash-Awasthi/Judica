@@ -19,8 +19,6 @@ export function validate(schema: ZodSchema) {
   };
 }
 
-// ── Schemas ────────────────────────────────────────────────────────────────────
-
 export const providerSchema = z.object({
   name: z.string().min(1).max(50),
   type: z.string().min(1).max(20).default("api"),
@@ -28,7 +26,6 @@ export const providerSchema = z.object({
   model: z.string().min(1).max(100),
   baseUrl: z.string().url().optional().or(z.literal("")),
   systemPrompt: z.string().max(2000).optional(),
-  // maxTokens: 256–8192, defaults to 1024 in providers.ts if omitted
   maxTokens: z.number().int().min(256).max(8192).optional(),
 });
 

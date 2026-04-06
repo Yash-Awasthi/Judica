@@ -1,6 +1,4 @@
-/**
- * Executes a function with exponential backoff retries.
- */
+
 export async function withRetry<T>(
   fn: () => Promise<T>,
   options: {
@@ -28,8 +26,7 @@ export async function withRetry<T>(
       return await fn();
     } catch (error) {
       attempt++;
-      
-      // Don't retry if it's an AbortError (timeout) or if we hit the limit
+
       if (attempt > maxRetries || (error as Error).name === "AbortError" || (options.shouldRetry && !options.shouldRetry(error))) {
         throw error;
       }
@@ -39,8 +36,7 @@ export async function withRetry<T>(
       }
 
       await new Promise((resolve) => setTimeout(resolve, delay));
-      
-      // Calculate next delay with exponential backoff + tiny jitter
+
       const jitter = Math.random() * 200; // 0-200ms randomized noise
       delay = Math.min(delay * factor + jitter, maxDelay);
     }
