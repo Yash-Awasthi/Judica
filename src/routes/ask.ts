@@ -131,9 +131,9 @@ router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: Auth
       isCacheHit = true;
       logger.info({ question: question.slice(0, 50) }, "Serving from semantic cache");
     } else {
-      logger.info({ question: question.slice(0, 80), memberCount: councilMembers.length, summon: effectiveSummon, rounds: roundsUsed }, "Council ask started");
+      logger.info({ question: question.slice(0, 80), memberCount: councilMembers.length, summon: effectiveSummon, rounds: effectiveRounds }, "Council ask started");
 
-      const councilResponse = await askCouncil(councilMembers, master, currentMessages, maxTokens, roundsUsed);
+      const councilResponse = await askCouncil(councilMembers, master, currentMessages, maxTokens, effectiveRounds);
       verdict = councilResponse.verdict;
       finalOpinions = councilResponse.opinions;
       tokensUsed = councilResponse.metrics?.totalTokens ?? 0;
