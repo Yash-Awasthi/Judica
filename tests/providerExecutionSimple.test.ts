@@ -59,7 +59,7 @@ describe("Provider Execution Tests", () => {
     };
 
     await expect(askProvider(invalidProvider, "Hello"))
-      .rejects.toThrow("missing required 'type' field");
+      .rejects.toThrow(/missing required 'type' field/);
   });
 
   it("should validate provider type is valid", async () => {
@@ -69,7 +69,7 @@ describe("Provider Execution Tests", () => {
     };
 
     await expect(askProvider(invalidProvider, "Hello"))
-      .rejects.toThrow("invalid type 'invalid'. Must be 'api', 'local', or 'rpa'");
+      .rejects.toThrow(/invalid type 'invalid'\. Must be 'api', 'local', or 'rpa'/);
   });
 
   it("should handle provider failure gracefully", async () => {

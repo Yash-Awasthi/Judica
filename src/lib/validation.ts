@@ -93,7 +93,7 @@ export class ValidationModule {
     const combined = output.answer + " " + output.reasoning;
     
     // Look for simple arithmetic: 5 + 5 = 10
-    const mathRegex = /([\d\s\+\-\*\/\(\)\.]+)\s*=\s*([\d\s\+\-\*\/\(\)\.]+)/g;
+    const mathRegex = /([\d\s+\-*/().]+)\s*=\s*([\d\s+\-*/().]+)/g;
     let match;
     
     while ((match = mathRegex.exec(combined)) !== null) {
@@ -102,7 +102,7 @@ export class ValidationModule {
       
       try {
         // Sanitize: only allow numbers and basic math operators
-        if (/^[\d\s\+\-\*\/\(\)\.]+$/.test(expression) && /^[\d\s\+\-\*\/\(\)\.]+$/.test(result)) {
+        if (/^[\d\s+\-*/().]+$/.test(expression) && /^[\d\s+\-*/().]+$/.test(result)) {
           // eslint-disable-next-line no-eval
           const calc = eval(expression);
           // eslint-disable-next-line no-eval

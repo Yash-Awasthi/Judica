@@ -14,7 +14,7 @@ export class GoogleProvider extends BaseProvider {
     super(config);
   }
 
-  async call({ messages, signal, maxTokens }: {
+  async call({ messages, signal, maxTokens, isFallback }: {
     messages: Message[];
     signal?: AbortSignal;
     maxTokens?: number;
@@ -85,7 +85,7 @@ export class GoogleProvider extends BaseProvider {
           { role: "tool", name, content: safeResult } as any
         ];
 
-        return this.call({ messages: nextMessages, signal, maxTokens });
+        return this.call({ messages: nextMessages, signal, maxTokens, isFallback });
       }
 
       const text = part?.text || "";

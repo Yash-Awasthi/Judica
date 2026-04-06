@@ -16,7 +16,7 @@ export class AnthropicProvider extends BaseProvider {
     super(config);
   }
 
-  async call({ messages, signal, maxTokens }: {
+  async call({ messages, signal, maxTokens, isFallback }: {
     messages: Message[];
     signal?: AbortSignal;
     maxTokens?: number;
@@ -96,7 +96,7 @@ export class AnthropicProvider extends BaseProvider {
           } as any);
         }
 
-        return this.call({ messages: nextMessages, signal, maxTokens });
+        return this.call({ messages: nextMessages, signal, maxTokens, isFallback });
       }
 
       const text = content.find((c: any) => c.type === "text")?.text || "";

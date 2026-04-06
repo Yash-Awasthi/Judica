@@ -45,6 +45,7 @@ export async function gatherOpinions(
   
   let totalTokens = 0;
   
+  const errors: string[] = [];
   const opinionsRaw = await Promise.all(members.map(async (m): Promise<OpinionResult | null> => {
     const start = Date.now();
     logger.debug({ member: m.name, start }, "Agent call started");
@@ -105,7 +106,10 @@ export async function gatherOpinions(
           if (parsed) return { name: m.name, opinion: fbRes.text, structured: parsed, isFallback: true };
         } catch (fbErr) {
           logger.error({ member: m.name, err: (fbErr as Error).message }, "Fallback also failed");
+          errors.push(`[${m.name}] fallback failed: ${(fbErr as Error).message}`);
         }
+      } else {
+        errors.push(`[${m.name}] failed: ${(err as Error).message}`);
       }
 
       const duration = Date.now() - start;
@@ -117,6 +121,9 @@ export async function gatherOpinions(
   const opinions = opinionsRaw.filter((o): o is OpinionResult => o !== null);
   
   if (opinions.length === 0) {
+    if (errors.length > 0) {
+      throw new Error("No council members provided valid responses. Errors: " + errors.join(", "));
+    }
     throw new Error("No council members provided valid responses.");
   }
   

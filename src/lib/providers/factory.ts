@@ -27,6 +27,10 @@ export function createProvider(config: ProviderConfig): BaseProvider {
     }
   }
 
+  if (!config.type) {
+    throw new Error("missing required 'type' field");
+  }
+
   // 1. Explicit provider detection (Issue 1 fallback)
   if (decryptedConfig.provider) {
     switch (decryptedConfig.provider) {
@@ -43,6 +47,10 @@ export function createProvider(config: ProviderConfig): BaseProvider {
 
   // 2. Legacy/Heuristic detection (fallback for older/missing configs)
   const type = (decryptedConfig.type || "").toLowerCase();
+
+  if (!["api", "local", "rpa"].includes(type)) {
+    throw new Error(`invalid type '${type}'. Must be 'api', 'local', or 'rpa'`);
+  }
   const lowerName = (decryptedConfig.name || "").toLowerCase();
   const lowerModel = (decryptedConfig.model || "").toLowerCase();
 

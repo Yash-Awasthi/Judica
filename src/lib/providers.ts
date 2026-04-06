@@ -55,6 +55,10 @@ export async function askProvider(
         return askProvider(fallback, messages, true, abortSignal);
       }
     }
+
+    if (err instanceof Error && (err.message.includes("missing required 'type' field") || err.message.includes("invalid type"))) {
+      throw err;
+    }
     
     throw new Error(`${providerConfig.type} provider request failed`, { cause: err });
   }
@@ -87,6 +91,9 @@ export async function askProviderStream(
       const fallback = getFallbackProvider(providerConfig);
       if (fallback) return askProviderStream(fallback, messages, onChunk, true, abortSignal);
     }
-    throw new Error("Provider stream failed", { cause: _err });
+    if (_err instanceof Error && (_err.message.includes("missing required 'type' field") || _err.message.includes("invalid type"))) {
+      throw _err;
+    }
+    throw new Error(`Provider stream failed`, { cause: _err });
   }
 }

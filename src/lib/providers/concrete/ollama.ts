@@ -21,7 +21,7 @@ export class OllamaProvider extends BaseProvider {
     this.baseUrl = config.baseUrl || "http://localhost:11434";
   }
 
-  async call({ prompt, messages, signal }: {
+  async call({ prompt, messages, signal, isFallback }: {
     messages: Message[];
     prompt?: string;
     signal?: AbortSignal;
