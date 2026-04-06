@@ -10,7 +10,6 @@ import { encrypt, decrypt } from "../lib/crypto.js";
 
 const router = Router();
 
-// ── Get user's provider configurations ────────────────────────────────────────
 router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
@@ -23,7 +22,6 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
     const config = user?.councilConfig?.config as any;
     const providers = config?.providers || [];
 
-    // Decrypt API keys for display (masked)
     const maskedProviders = providers.map((p: any) => ({
       ...p,
       apiKey: p.apiKey ? "••••••••" + p.apiKey.slice(-4) : null,
@@ -36,7 +34,6 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// ── Add a new provider configuration ──────────────────────────────────────────
 const addProviderSchema = z.object({
   body: z.object({
     name: z.string().min(1),
@@ -53,10 +50,8 @@ router.post("/", requireAuth, validate(addProviderSchema), async (req: AuthReque
     const userId = req.userId!;
     const { name, type, apiKey, model, baseUrl, provider: providerIdentifier } = req.body;
 
-    // Encrypt the API key
     const encryptedKey = encrypt(apiKey);
 
-    // Get current config
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { councilConfig: true },
@@ -65,7 +60,6 @@ router.post("/", requireAuth, validate(addProviderSchema), async (req: AuthReque
     const currentConfig = (user?.councilConfig?.config as any) || {};
     const providers = currentConfig.providers || [];
 
-    // Add new provider
     const newProvider = {
       id: Date.now().toString(),
       name,
@@ -79,7 +73,6 @@ router.post("/", requireAuth, validate(addProviderSchema), async (req: AuthReque
 
     providers.push(newProvider);
 
-    // Update config
     await prisma.councilConfig.upsert({
       where: { userId },
       update: { config: { ...currentConfig, providers } },
@@ -98,7 +91,6 @@ router.post("/", requireAuth, validate(addProviderSchema), async (req: AuthReque
   }
 });
 
-// ── Test a provider configuration ─────────────────────────────────────────────
 const testProviderSchema = z.object({
   body: z.object({
     type: z.enum(["api", "local", "rpa"]),
@@ -143,13 +135,11 @@ router.post("/test", validate(testProviderSchema), async (req: Request, res: Res
   }
 });
 
-// ── Delete a provider configuration ───────────────────────────────────────────
 router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
     const { id } = req.params;
 
-    // Get current config
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { councilConfig: true },
@@ -158,14 +148,12 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     const currentConfig = (user?.councilConfig?.config as any) || {};
     const providers = currentConfig.providers || [];
 
-    // Remove provider
     const filteredProviders = providers.filter((p: any) => p.id !== id);
 
     if (filteredProviders.length === providers.length) {
       return res.status(404).json({ error: "Provider not found" });
     }
 
-    // Update config
     await prisma.councilConfig.upsert({
       where: { userId },
       update: { config: { ...currentConfig, providers: filteredProviders } },

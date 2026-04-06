@@ -13,7 +13,6 @@ import { AppError } from "../middleware/errorHandler.js";
 
 const router = Router();
 
-// ── Register ────────────────────────────────────────────
 router.post("/register", validate(authSchema), async (req, res: Response, next) => {
   try {
     const { username, password } = req.body;
@@ -40,7 +39,6 @@ router.post("/register", validate(authSchema), async (req, res: Response, next) 
   }
 });
 
-// ── Login ───────────────────────────────────────────────
 router.post("/login", validate(authSchema), async (req, res: Response, next) => {
   try {
     const { username, password } = req.body;
@@ -63,7 +61,6 @@ router.post("/login", validate(authSchema), async (req, res: Response, next) => 
   }
 });
 
-// ── Logout ──────────────────────────────────────────────
 router.post("/logout", requireAuth, async (req: AuthRequest, res: Response, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -71,7 +68,7 @@ router.post("/logout", requireAuth, async (req: AuthRequest, res: Response, next
        const token = authHeader.split(" ")[1];
        const payload = jwt.decode(token) as any;
        const expiresAt = payload?.exp ? new Date(payload.exp * 1000) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-       
+
        const ttlSecs = Math.max(1, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
        await redis.set(`revoked:${token}`, "1", { EX: ttlSecs });
 
@@ -85,7 +82,6 @@ router.post("/logout", requireAuth, async (req: AuthRequest, res: Response, next
   }
 });
 
-// ── Get profile ─────────────────────────────────────────
 router.get("/me", requireAuth, async (req: AuthRequest, res: Response, next) => {
   try {
     const user = await prisma.user.findUnique({
@@ -100,7 +96,6 @@ router.get("/me", requireAuth, async (req: AuthRequest, res: Response, next) => 
   }
 });
 
-// ── Refresh Token ───────────────────────────────────────
 router.post("/refresh", requireAuth, async (req: AuthRequest, res: Response, next) => {
   try {
     const token = jwt.sign(
@@ -116,7 +111,6 @@ router.post("/refresh", requireAuth, async (req: AuthRequest, res: Response, nex
   }
 });
 
-// ── Update custom instructions ──────────────────────────
 router.patch("/me", requireAuth, async (req: AuthRequest, res: Response, next) => {
   try {
     const { custom_instructions } = req.body;
@@ -135,7 +129,6 @@ router.patch("/me", requireAuth, async (req: AuthRequest, res: Response, next) =
   }
 });
 
-// ── Save council config ─────────────────────────────────
 router.post("/config", requireAuth, validate(configSchema), async (req: AuthRequest, res: Response, next) => {
   try {
     const encrypted = encrypt(JSON.stringify(req.body.config));
@@ -152,7 +145,6 @@ router.post("/config", requireAuth, validate(configSchema), async (req: AuthRequ
   }
 });
 
-// ── Load council config ─────────────────────────────────
 router.get("/config", requireAuth, async (req: AuthRequest, res: Response, next) => {
   try {
     const row = await prisma.councilConfig.findUnique({
@@ -167,7 +159,6 @@ router.get("/config", requireAuth, async (req: AuthRequest, res: Response, next)
   }
 });
 
-// ── Rotate council config keys (F3) ──────────────────────
 router.post("/config/rotate", requireAuth, async (req: AuthRequest, res: Response, next) => {
   try {
     const row = await prisma.councilConfig.findUnique({
@@ -178,10 +169,8 @@ router.post("/config/rotate", requireAuth, async (req: AuthRequest, res: Respons
       throw new AppError(404, "No configuration found to rotate");
     }
 
-    // Decrypts using the old/current key logic
     const decrypted = JSON.parse(decrypt(row.config as string));
-    
-    // Re-encrypts forcing the new CURRENT_ENCRYPTION_VERSION
+
     const reEncrypted = encrypt(JSON.stringify(decrypted));
 
     await prisma.councilConfig.update({

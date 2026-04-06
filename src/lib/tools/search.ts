@@ -23,9 +23,6 @@ interface SerpResult {
   snippet: string;
 }
 
-/**
- * Clean snippet text: remove extra whitespace, trim to ~200 chars
- */
 function cleanSnippet(snippet: string): string {
   return snippet
     .replace(/\s+/g, " ") // Collapse multiple spaces/newlines
@@ -33,10 +30,6 @@ function cleanSnippet(snippet: string): string {
     .slice(0, 200); // Limit to ~200 chars
 }
 
-/**
- * SERP API Web Search for AI Council.
- * Returns clean array of results optimized for LLM consumption.
- */
 export async function executeSearch(args: unknown): Promise<string> {
   const parsed = executeSearchSchema.safeParse(args);
   if (!parsed.success) {
@@ -85,7 +78,6 @@ export async function executeSearch(args: unknown): Promise<string> {
 
     const organicResults = data.organic_results || [];
     
-    // Track seen URLs for deduplication
     const seenUrls = new Set<string>();
     
     const results: SerpResult[] = organicResults
@@ -95,10 +87,8 @@ export async function executeSearch(args: unknown): Promise<string> {
         snippet: cleanSnippet(result.snippet || ""),
       }))
       .filter((r) => {
-        // Must have both title and URL
         if (!r.title || !r.url) return false;
         
-        // Skip duplicate URLs
         if (seenUrls.has(r.url)) return false;
         seenUrls.add(r.url);
         

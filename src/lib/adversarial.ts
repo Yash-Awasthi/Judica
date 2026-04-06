@@ -3,15 +3,8 @@ import { Provider, Message } from "./providers.js";
 import { askProvider } from "./providers.js";
 import logger from "./logger.js";
 
-/**
- * Stage 3 - ADVERSARIAL VALIDATION LAYER.
- * Actively challenges responses to ensure robustness.
- */
 export class AdversarialModule {
-  
-  /**
-   * Challenges an opinion by generating counter-arguments and edge cases.
-   */
+
   async challenge(output: AgentOutput, adversaryProvider: Provider, abortSignal?: AbortSignal): Promise<AdversarialResult> {
     const prompt = `You are a professional adversarial auditor.
 Your job is to attempt to BREAK the following response.

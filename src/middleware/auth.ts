@@ -6,13 +6,10 @@ import redis from "../lib/redis.js";
 import logger from "../lib/logger.js";
 import { AuthRequest } from "../types/index.js";
 
-// ── Shared revocation check (DRY) ─────────────────────────────────────────────
 async function isTokenRevoked(token: string): Promise<boolean> {
-  // Fast path: check Redis first
   const revokedInRedis = await redis.get(`revoked:${token}`);
   if (revokedInRedis) return true;
 
-  // Fallback: check DB (in case Redis was flushed)
   const revokedInDB = await prisma.revokedToken.findUnique({ where: { token } });
   return !!revokedInDB;
 }

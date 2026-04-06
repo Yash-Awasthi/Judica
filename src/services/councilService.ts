@@ -12,9 +12,6 @@ import {
 } from "../types/userConfig.js";
 import logger from "../lib/logger.js";
 
-/**
- * Error class for council service operations.
- */
 export class CouncilServiceError extends Error {
   constructor(
     public code: string,
@@ -25,11 +22,6 @@ export class CouncilServiceError extends Error {
   }
 }
 
-/**
- * Provider configuration for council members.
- * All providers are now categorized as "api" type - the specific API format
- * (openai-compat, anthropic, google) is determined at runtime by mapProviderToAPIType.
- */
 export interface CouncilProvider {
   type: "api";
   apiKey: string;
@@ -38,14 +30,6 @@ export interface CouncilProvider {
   baseUrl?: string;
 }
 
-/**
- * Build default council members from server-side env API keys.
- * Falls back to available providers if fewer than requested count.
- * 
- * @param count - Number of council members to create (default: 3)
- * @returns Array of provider configurations
- * @throws CouncilServiceError if no API keys are configured
- */
 export function getDefaultMembers(count = 3): CouncilProvider[] {
   const providers: CouncilProvider[] = [];
   
@@ -103,7 +87,6 @@ export function getDefaultMembers(count = 3): CouncilProvider[] {
     );
   }
   
-  // Duplicate providers to reach requested count
   while (providers.length < count) {
     const providerToClone = providers[providers.length % providers.length];
     providers.push({ ...providerToClone });
@@ -112,13 +95,6 @@ export function getDefaultMembers(count = 3): CouncilProvider[] {
   return providers.slice(0, count);
 }
 
-/**
- * Get default master provider configuration.
- * Priority: OpenAI > Google > Anthropic
- * 
- * @returns Master provider configuration
- * @throws CouncilServiceError if no API keys are configured
- */
 export function getDefaultMaster(): CouncilProvider {
   if (env.MISTRAL_API_KEY) {
     return {
@@ -173,9 +149,6 @@ export function getDefaultMaster(): CouncilProvider {
   );
 }
 
-/**
- * Input for API key resolution.
- */
 export interface ApiKeyResolutionInput {
   type?: string;
   baseUrl?: string;
@@ -184,22 +157,10 @@ export interface ApiKeyResolutionInput {
   name?: string;
 }
 
-/**
- * Resolve API key for a provider using baseUrl and model name heuristics.
- * Checks multiple signals in priority order:
- * 1. Base URL patterns (most reliable)
- * 2. Model name patterns
- * 3. Provider type
- * 4. Default to OpenAI
- * 
- * @param member - Provider configuration with type, baseUrl, and/or model
- * @returns Resolved API key (may be empty string if not found)
- */
 export function resolveApiKey(member: ApiKeyResolutionInput): string {
   const base = (member.baseUrl || "").toLowerCase();
   const model = (member.model || "").toLowerCase();
 
-  // 1. Check baseUrl first (most reliable signal)
   if (base.includes("siliconflow"))   return env.XIAOMI_MIMO_API_KEY || env.OPENAI_API_KEY || "";
   if (base.includes("openrouter"))    return env.OPENROUTER_API_KEY || env.OPENAI_API_KEY || "";
   if (base.includes("groq.com"))      return env.GROQ_API_KEY || env.OPENAI_API_KEY || "";
@@ -207,7 +168,6 @@ export function resolveApiKey(member: ApiKeyResolutionInput): string {
   if (base.includes("cerebras.ai"))   return env.CEREBRAS_API_KEY || env.OPENAI_API_KEY || "";
   if (base.includes("nvidia.com"))    return env.NVIDIA_API_KEY || env.OPENAI_API_KEY || "";
 
-  // 2. Check model name patterns (more specific first)
   if (model.includes("xiaomi") || model.includes("mimo")) return env.XIAOMI_MIMO_API_KEY || env.OPENAI_API_KEY || "";
   if (model.includes("mistral"))      return env.MISTRAL_API_KEY || env.OPENAI_API_KEY || "";
   if (model.includes("gemini") || model.includes("palm")) return env.GOOGLE_API_KEY || env.OPENAI_API_KEY || "";
@@ -217,19 +177,11 @@ export function resolveApiKey(member: ApiKeyResolutionInput): string {
   }
   if (model.includes("/"))            return env.OPENROUTER_API_KEY || env.OPENAI_API_KEY || "";
 
-  // 3. Check provider type (legacy - now all are "api")
   if (member.type === "api")       return env.GOOGLE_API_KEY || env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY || "";
 
-  // 4. Default to OpenAI
   return env.OPENAI_API_KEY || "";
 }
 
-/**
- * Resolve all API keys for a list of council members.
- * 
- * @param members - Array of member configurations (may have missing apiKey fields)
- * @returns Array with all apiKey fields populated
- */
 export function resolveMembersApiKeys(members: ApiKeyResolutionInput[]): CouncilProvider[] {
   return members.map(member => ({
     type: "api",
@@ -239,29 +191,9 @@ export function resolveMembersApiKeys(members: ApiKeyResolutionInput[]): Council
   }));
 }
 
-/**
- * Prepare council members and master using user-controlled configuration.
- * 
- * This function allows users to fully control council composition:
- * - Which AIs participate (API / local / RPA)
- * - Enable/disable providers
- * - Choose master controller
- * - Customize council composition
- * 
- * Safety constraints are enforced:
- * - At least 1 provider required
- * - Max 6 agents
- * - Max 2 RPA agents
- * - Invalid configs rejected gracefully
- * 
- * @param userConfig - User's council configuration
- * @returns Council composition with members and master
- * @throws CouncilServiceError if validation fails or no providers available
- */
 export function composeCouncilFromUserConfig(
   userConfig?: Partial<UserCouncilConfig>
 ): CouncilComposition {
-  // Validate user config
   const validation = validateUserConfig((userConfig as any) ?? null);
   if (!validation.valid) {
     throw new CouncilServiceError(
@@ -270,7 +202,6 @@ export function composeCouncilFromUserConfig(
     );
   }
 
-  // Load system providers
   const systemProviders = loadSystemProviders();
   
   if (systemProviders.length === 0) {
@@ -285,13 +216,10 @@ export function composeCouncilFromUserConfig(
     userConfig
   }, "Preparing council from user config");
 
-  // Resolve active providers (merge system + user config)
   const resolved = resolveActiveProviders(systemProviders, userConfig);
 
-  // Compose council
   const composition = composeCouncil(resolved, userConfig);
 
-  // Log warnings if any
   for (const warning of validation.warnings) {
     logger.warn({ warning }, "Council config warning");
   }
@@ -299,19 +227,10 @@ export function composeCouncilFromUserConfig(
   return composition;
 }
 
-/**
- * Legacy fallback: Prepare council members from defaults or user input.
- * Maintains backward compatibility while supporting new config system.
- * 
- * @param members - Optional explicit member list (legacy)
- * @param userConfig - Optional new user config format
- * @returns Object with members array and master
- */
 export function prepareCouncilMembers(
   members?: CouncilProvider[],
   userConfig?: Partial<UserCouncilConfig>
 ): { members: CouncilProvider[]; master: CouncilProvider } {
-  // If new user config provided, use it
   if (userConfig) {
     const composition = composeCouncilFromUserConfig(userConfig);
     return {
@@ -332,7 +251,6 @@ export function prepareCouncilMembers(
     };
   }
 
-  // Legacy fallback
   const councilMembers = members || getDefaultMembers();
   const master = getDefaultMaster();
 

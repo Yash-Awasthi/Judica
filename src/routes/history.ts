@@ -14,7 +14,6 @@ import { validate, renameConversationSchema, forkSchema } from "../middleware/va
 
 const router = Router();
 
-// ── Pagination helper ─────────────────────────────────────────────────────────
 function parsePagination(query: { page?: string; limit?: string }, defaultLimit = 20, maxLimit = 100) {
   const page = Math.max(1, parseInt(query.page || '1', 10));
   const limit = Math.min(maxLimit, Math.max(1, parseInt(query.limit || defaultLimit.toString(), 10)));
@@ -26,19 +25,17 @@ function paginationMeta(page: number, limit: number, total: number) {
   return { page, limit, total, totalPages: Math.ceil(total / limit) };
 }
 
-// ── GET /history/search — Simple search across chats ─────────────────────────
 router.get("/search", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { q, limit = "10" } = req.query;
-    
-    // Validate query
+
     if (!q || typeof q !== "string" || q.trim().length < 2) {
       return res.json([]);
     }
-    
+
     const searchTerm = q.trim();
     const limitNum = Math.min(Math.max(parseInt(limit as string, 10) || 10, 1), 50);
-    
+
     const results = await prisma.chat.findMany({
       where: {
         userId: req.userId!,
@@ -57,7 +54,7 @@ router.get("/search", requireAuth, async (req: AuthRequest, res: Response) => {
         createdAt: true
       }
     });
-    
+
     res.json(results);
   } catch (err) {
     logger.error({ err, userId: req.userId }, "History search failed");
@@ -65,7 +62,6 @@ router.get("/search", requireAuth, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// ── GET /history — Lists conversations (paginated) ──────────────────────────
 router.get("/", requireAuth, async (req: AuthRequest, res: Response, next) => {
   try {
     const { page, limit, skip } = parsePagination(req.query);
@@ -84,7 +80,6 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response, next) => {
   }
 });
 
-// ── GET /history/:id — Fetches conversation with paginated chats ────────────
 router.get("/:id", requireAuth, async (req: AuthRequest, res: Response, next) => {
   try {
     const { id } = req.params;
@@ -117,7 +112,6 @@ router.get("/:id", requireAuth, async (req: AuthRequest, res: Response, next) =>
   }
 });
 
-// ── PATCH /history/:id — Renames a conversation ─────────────────────────────
 router.patch("/:id", requireAuth, validate(renameConversationSchema), async (req: AuthRequest, res: Response, next) => {
   try {
     const { id } = req.params;
@@ -131,7 +125,6 @@ router.patch("/:id", requireAuth, validate(renameConversationSchema), async (req
   }
 });
 
-// ── DELETE /history/:id — Deletes a conversation ────────────────────────────
 router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response, next) => {
   try {
     const { id } = req.params;
@@ -143,7 +136,6 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response, next)
   }
 });
 
-// ── POST /history/:id/fork — Clones a conversation up to a specific chat ────
 router.post("/:id/fork", requireAuth, validate(forkSchema), async (req: AuthRequest, res: Response, next) => {
   try {
     const { id } = req.params;
@@ -156,7 +148,6 @@ router.post("/:id/fork", requireAuth, validate(forkSchema), async (req: AuthRequ
 
     if (!source) throw new AppError(404, "Source conversation not found");
 
-    // Filter chats up to the requested ID
     const chatsToFork = (source as { chats: Array<{ id: number }> }).chats.filter((c: { id: number }) => c.id <= Number(toChatId));
     if (!chatsToFork.length) throw new AppError(400, "No messages to fork");
 
@@ -183,7 +174,6 @@ router.post("/:id/fork", requireAuth, validate(forkSchema), async (req: AuthRequ
   }
 });
 
-// ── GET /history/shared/:id — Fetches a public conversation without auth ────
 router.get("/shared/:id", async (req: Request, res: Response, next) => {
   try {
     const { id } = req.params;
@@ -202,7 +192,6 @@ router.get("/shared/:id", async (req: Request, res: Response, next) => {
   }
 });
 
-// ── PATCH /history/:id/share — Toggles public visibility ────────────────────
 router.patch("/:id/share", requireAuth, async (req: AuthRequest, res: Response, next) => {
   try {
     const { id } = req.params;

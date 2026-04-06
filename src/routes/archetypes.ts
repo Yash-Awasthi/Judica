@@ -16,13 +16,11 @@ import { AppError } from "../middleware/errorHandler.js";
 
 const router = Router();
 
-// ── GET /api/archetypes - Get user's archetypes ─────────────────────────────
 router.get("/", optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId;
     
     if (!userId) {
-      // Return default archetypes for unauthenticated users
       const { ARCHETYPES } = await import("../config/archetypes.js");
       return res.json({ archetypes: ARCHETYPES, isCustom: false });
     }
@@ -40,7 +38,6 @@ router.get("/", optionalAuth, async (req: AuthRequest, res: Response, next: Next
   }
 });
 
-// ── POST /api/archetypes - Create or update archetype ───────────────────────────
 router.post("/", optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId;
@@ -50,7 +47,6 @@ router.post("/", optionalAuth, async (req: AuthRequest, res: Response, next: Nex
 
     const { archetypeId, ...archetypeData } = req.body;
     
-    // Validate input
     const validation = validateArchetype(archetypeData);
     if (!validation.valid) {
       throw new AppError(400, `Validation failed: ${validation.errors.join(", ")}`);
@@ -67,7 +63,6 @@ router.post("/", optionalAuth, async (req: AuthRequest, res: Response, next: Nex
   }
 });
 
-// ── DELETE /api/archetypes/:id - Delete archetype ───────────────────────────────
 router.delete("/:id", optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId;
@@ -84,7 +79,6 @@ router.delete("/:id", optionalAuth, async (req: AuthRequest, res: Response, next
   }
 });
 
-// ── PATCH /api/archetypes/:id/toggle - Toggle archetype status ───────────────────
 router.patch("/:id/toggle", optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId;
@@ -104,7 +98,6 @@ router.patch("/:id/toggle", optionalAuth, async (req: AuthRequest, res: Response
   }
 });
 
-// ── POST /api/archetypes/:id/clone - Clone default archetype ───────────────────────
 router.post("/:id/clone", optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId;
@@ -115,7 +108,6 @@ router.post("/:id/clone", optionalAuth, async (req: AuthRequest, res: Response, 
     const { id } = req.params;
     const clonedData = cloneDefaultArchetype(id as string);
     
-    // Allow customization of cloned data
     const customizations = req.body;
     const finalData = { ...clonedData, ...customizations };
     
@@ -135,7 +127,6 @@ router.post("/:id/clone", optionalAuth, async (req: AuthRequest, res: Response, 
   }
 });
 
-// ── GET /api/archetypes/export - Export archetypes ─────────────────────────────────
 router.get("/export", optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId;
@@ -153,7 +144,6 @@ router.get("/export", optionalAuth, async (req: AuthRequest, res: Response, next
   }
 });
 
-// ── POST /api/archetypes/import - Import archetypes ─────────────────────────────────
 router.post("/import", optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId;
@@ -185,7 +175,6 @@ router.post("/import", optionalAuth, async (req: AuthRequest, res: Response, nex
   }
 });
 
-// ── GET /api/archetypes/usage - Get archetype usage statistics ───────────────────────
 router.get("/usage", optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const userId = req.userId;

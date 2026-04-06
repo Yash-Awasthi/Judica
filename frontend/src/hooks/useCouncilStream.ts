@@ -1,30 +1,6 @@
 import { useRef, useEffect, useCallback, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-
-export interface PeerReview {
-  reviewer: string;
-  ranking: string[];
-  critique: string;
-}
-
-export interface ScoredOpinion {
-  name: string;
-  opinion: string;
-  scores: {
-    confidence: number;
-    agreement: number;
-    peerRanking: number;
-    final: number;
-  };
-}
-
-export interface ModelCost {
-  model: string;
-  tokensIn: number;
-  tokensOut: number;
-  costUsd: number;
-  latencyMs: number;
-}
+import type { PeerReview, ScoredOpinion, ModelCost } from "../types/index.js";
 
 export type SSEEvent =
   | { type: "member_chunk"; name: string; chunk: string }
@@ -87,22 +63,31 @@ export function useCouncilStream({ onEvent, onError }: UseCouncilStreamProps) {
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
+
           buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-          for (const line of lines) {
-            const trimmed = line.trim();
-            if (trimmed.startsWith("data: ")) {
+
+          let newlineIndex;
+          while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
+            const line = buffer.slice(0, newlineIndex).trim();
+            buffer = buffer.slice(newlineIndex + 1);
+
+            if (line.startsWith("data: ")) {
+              const data = line.slice(6).trim();
+              if (data === "[DONE]") {
+                // Ignore standard SSE done events if sent
+                continue;
+              }
+
               try {
-                const eventData = JSON.parse(trimmed.slice(6)) as SSEEvent;
+                const eventData = JSON.parse(data) as SSEEvent;
                 if (eventData.type === "error" && eventData.message) {
                   setStreamError(eventData.message);
                   if (onError) onError(eventData.message);
-                } else {
-                  onEvent(eventData);
                 }
+
+                onEvent(eventData);
               } catch (err) {
-                console.error("Failed to parse SSE line", line);
+                console.error("Failed to parse SSE line:", line, err);
               }
             }
           }

@@ -19,8 +19,7 @@
     font-family: 'Inter', system-ui, sans-serif;
     letter-spacing: -0.015em;
     selection-color: rgba(94, 234, 212, 0.3);
-    background-image: radial-gradient(circle at 50% 0%, rgba(94, 234, 212, 0.07) 0%, transparent 40%),
-                      radial-gradient(circle at 80% 100%, rgba(15, 118, 110, 0.07) 0%, transparent 40%);
+    background-image: none; /* Removed the radial gradients to match Manus/Deer Flow's cleaner look */
   }
 
   ::selection {
@@ -107,6 +106,20 @@
   .member-avatar {
     @apply w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-black text-black uppercase flex-shrink-0;
     font-feature-settings: "case";
+  }
+}
+
+@layer components {
+  .streaming-cursor::after {
+    content: '▋';
+    display: inline;
+    animation: blink 1s step-end infinite;
+    color: rgba(94, 234, 212, 0.6);
+    font-weight: 200;
+  }
+
+  @keyframes blink {
+    50% { opacity: 0; }
   }
 }
 

@@ -36,7 +36,6 @@ export const readWebpageTool: ToolInstance = {
           signal: AbortSignal.timeout(10000), // 10s timeout
         });
 
-        // Handle redirect
         if (res.status >= 300 && res.status < 400 && res.headers.get("location")) {
           const location = res.headers.get("location");
           currentUrl = new URL(location!, currentUrl).toString();
@@ -61,7 +60,7 @@ export const readWebpageTool: ToolInstance = {
       }
 
       const html = await res.text();
-      
+
       const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
       let content = bodyMatch ? bodyMatch[1] : html;
 

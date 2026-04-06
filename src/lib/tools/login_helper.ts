@@ -3,11 +3,6 @@ import logger from "../logger.js";
 import path from "path";
 import fs from "fs";
 
-/**
- * Utility to help users perform a manual login to RPA targets.
- * Launches a visible browser, waits for user to sign in, 
- * then saves the storage state (session/cookies) to disk.
- */
 export async function runLoginHelper(targetName: "chatgpt" | "claude" | "deepseek" | "gemini") {
   const targets: Record<string, string> = {
     chatgpt: "https://chat.openai.com",
@@ -34,7 +29,6 @@ export async function runLoginHelper(targetName: "chatgpt" | "claude" | "deepsee
     headless: false // MUST be false for user interaction
   });
 
-  // Load existing session if available for session refresh/extension
   const context = fs.existsSync(sessionFile) 
     ? await browser.newContext({ storageState: sessionFile })
     : await browser.newContext();
@@ -50,7 +44,6 @@ export async function runLoginHelper(targetName: "chatgpt" | "claude" | "deepsee
   console.log("3. Return to this terminal and press ENTER to save the session.");
   console.log("---------------------------------------------------------\n");
 
-  // Wait for user input in terminal
   await new Promise((resolve) => process.stdin.once("data", resolve));
 
   logger.info({ sessionFile }, "Saving storage state...");
@@ -61,10 +54,6 @@ export async function runLoginHelper(targetName: "chatgpt" | "claude" | "deepsee
   await browser.close();
 }
 
-/**
- * CLI support for running the helper directly
- * Example: tsx src/lib/tools/login_helper.ts --target chatgpt
- */
 if (process.argv[1]?.includes("login_helper.ts")) {
   const target = process.argv.slice(2).find(arg => !arg.startsWith("--")) as any;
   if (target) {

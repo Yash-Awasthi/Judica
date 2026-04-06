@@ -18,7 +18,7 @@ class MLWorker {
     this.readyPromise = new Promise((resolve, reject) => {
       const pythonPath = process.platform === "win32" 
         ? path.join(process.cwd(), ".venv", "Scripts", "python.exe")
-        : path.join(process.cwd(), ".venv", "bin", "python");
+        : "python3";
 
       const scriptPath = path.join(__dirname, "embeddings.py");
       
@@ -52,7 +52,6 @@ class MLWorker {
 
       this.process.stderr!.on("data", (data) => {
         const msg = data.toString();
-        // Only log actual errors, ignore torch/transformers info logs if possible
         if (msg.toLowerCase().includes("error") || msg.toLowerCase().includes("fatal")) {
           logger.error({ msg }, "ML worker stderr");
         } else {
