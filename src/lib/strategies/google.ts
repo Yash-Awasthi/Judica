@@ -1,9 +1,6 @@
 import type { Message, Provider } from "../providers.js";
 import { getToolDefinitions, callTool } from "../tools/index.js";
 
-/**
- * Google (Gemini) strategy: handles both non-streaming and streaming calls.
- */
 export async function askGoogle(
   provider: Provider,
   normMessages: Message[],
@@ -47,8 +44,8 @@ export async function askGoogle(
     const { name, args } = part.functionCall;
     const result = await callTool({ id: `google-${Date.now()}`, name, arguments: args });
     const safeResult = `[UNTRUSTED TOOL OUTPUT]\n${result}\n[/UNTRUSTED TOOL OUTPUT]`;
-    
-    const nextMessages: Message[] = [...normMessages, 
+
+    const nextMessages: Message[] = [...normMessages,
       { role: "assistant" as const, content: JSON.stringify(part) },
       { role: "tool" as const, name, content: safeResult }
     ];
@@ -102,7 +99,7 @@ export async function streamGoogle(
           const json = JSON.parse(line.slice(6));
           const chunk = json.candidates?.[0]?.content?.parts?.[0]?.text ?? "";
           if (chunk) { fullText += chunk; onChunk(chunk); }
-          
+
           if (json.usageMetadata) {
             usage = {
               promptTokens: json.usageMetadata.promptTokenCount,
@@ -110,7 +107,7 @@ export async function streamGoogle(
               totalTokens: json.usageMetadata.totalTokenCount
             };
           }
-        } catch { /* ignore malformed JSON lines */ }
+        } catch {  }
       }
     }
   }

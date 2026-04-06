@@ -13,7 +13,6 @@ import { AppError } from "../middleware/errorHandler.js";
 
 const router = Router();
 
-// ── GET /api/costs/breakdown - Get user cost breakdown ─────────────────────────────
 router.get("/breakdown", requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { days = 30 } = req.query;
@@ -29,7 +28,6 @@ router.get("/breakdown", requireAuth, async (req: AuthRequest, res: Response, ne
   }
 });
 
-// ── GET /api/costs/limits - Check cost limits ───────────────────────────────────────
 router.get("/limits", requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { dailyLimit, monthlyLimit } = req.query;
@@ -46,7 +44,6 @@ router.get("/limits", requireAuth, async (req: AuthRequest, res: Response, next:
   }
 });
 
-// ── GET /api/costs/efficiency - Get cost efficiency metrics ─────────────────────────
 router.get("/efficiency", requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { days = 30 } = req.query;
@@ -58,7 +55,6 @@ router.get("/efficiency", requireAuth, async (req: AuthRequest, res: Response, n
   }
 });
 
-// ── GET /api/costs/pricing - Get current pricing configuration ────────────────────────
 router.get("/pricing", requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     res.json({
@@ -71,10 +67,8 @@ router.get("/pricing", requireAuth, async (req: AuthRequest, res: Response, next
   }
 });
 
-// ── GET /api/costs/organization - Admin: Get organization cost summary ───────────────
 router.get("/organization", requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
-    // Check if user is admin (you might want to implement proper role checking)
     const user = await prisma.user.findUnique({
       where: { id: req.userId! },
       select: { role: true }
@@ -97,7 +91,6 @@ router.get("/organization", requireAuth, async (req: AuthRequest, res: Response,
   }
 });
 
-// ── GET /api/costs/dashboard - Get dashboard cost data ───────────────────────────────
 router.get("/dashboard", requireAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
   try {
     const { days = 30 } = req.query;

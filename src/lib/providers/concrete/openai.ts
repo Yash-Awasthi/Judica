@@ -5,10 +5,6 @@ import { calculateCost } from "../../cost.js";
 import { validateSafeUrl } from "../../ssrf.js";
 import { getToolDefinitions, callTool } from "../../tools/index.js";
 
-/**
- * OpenAI-compatible provider implementation.
- * Handles standard ChatCompletions API with tool support.
- */
 export class OpenAIProvider extends BaseProvider {
   private defaultBaseUrl = "https://api.openai.com/v1";
 
@@ -16,10 +12,6 @@ export class OpenAIProvider extends BaseProvider {
     super(config);
   }
 
-  /**
-   * Main execution logic for OpenAI-compatible providers.
-   * Supports recursive tool calling.
-   */
   async call({ messages, signal, maxTokens, isFallback }: {
     messages: Message[];
     signal?: AbortSignal;
@@ -66,7 +58,6 @@ export class OpenAIProvider extends BaseProvider {
 
       const msg = data.choices?.[0]?.message;
       
-      // Handle Tool Calls
       if (msg?.tool_calls?.length) {
         logger.info({ 
           provider: this.name, 
@@ -90,12 +81,10 @@ export class OpenAIProvider extends BaseProvider {
           } as any);
         }
 
-        // Recursive call with tool results
         return this.call({ messages: nextMessages, signal, maxTokens, isFallback });
       }
 
       const raw = msg?.content || "";
-      // Strip <think> tags for cleaner synthesis
       const text = raw.replace(/<think>[\s\S]*?<\/think>/g, "").trim();
 
       const usage = {

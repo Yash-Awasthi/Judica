@@ -2,10 +2,6 @@ import type { Message, Provider } from "../providers.js";
 import { getToolDefinitions, callTool } from "../tools/index.js";
 import { validateSafeUrl } from "../ssrf.js";
 
-/**
- * OpenAI-compatible strategy: handles both non-streaming and streaming calls.
- * Supports tool calls and think-tag stripping.
- */
 export async function askOpenAI(
   provider: Provider,
   normMessages: Message[],
@@ -160,7 +156,7 @@ export async function streamOpenAI(
             }
             if (toSend) onChunk(toSend);
           }
-        } catch { /* ignore malformed JSON lines */ }
+        } catch {  }
       }
     }
   }

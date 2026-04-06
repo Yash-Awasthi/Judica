@@ -14,14 +14,8 @@ export interface ProviderRegistryConfig {
   fallbacks?: Record<string, string>;
 }
 
-/**
- * Default provider registry configuration
- * Can be overridden by PROVIDER_REGISTRY_CONFIG env var pointing to a JSON file
- */
 export const DEFAULT_PROVIDER_CONFIG: ProviderRegistryConfig = {
   providers: [
-    // ── Specific model IDs first (avoid substring collisions) ──────────
-    // Groq-hosted models
     {
       pattern: "llama-3.3-70b-versatile",
       baseUrl: "https://api.groq.com/openai/v1",
@@ -37,7 +31,6 @@ export const DEFAULT_PROVIDER_CONFIG: ProviderRegistryConfig = {
       priority: 100
     },
 
-    // OpenRouter-hosted models (contain "/" in model name)
     {
       pattern: "nvidia/",
       baseUrl: "https://openrouter.ai/api/v1",
@@ -60,7 +53,6 @@ export const DEFAULT_PROVIDER_CONFIG: ProviderRegistryConfig = {
       priority: 90
     },
 
-    // ── Mistral ────────────────────────────────────────────────────────
     {
       pattern: "mistral-large-latest",
       baseUrl: "https://api.mistral.ai/v1",
@@ -76,7 +68,6 @@ export const DEFAULT_PROVIDER_CONFIG: ProviderRegistryConfig = {
       priority: 80
     },
 
-    // ── NVIDIA-hosted models (generic; matched last so specifics win) ──
     {
       pattern: "kimi",
       baseUrl: "https://integrate.api.nvidia.com/v1",
@@ -106,7 +97,6 @@ export const DEFAULT_PROVIDER_CONFIG: ProviderRegistryConfig = {
       priority: 70
     },
 
-    // ── Native API providers (no custom base URL needed) ───────────────
     {
       pattern: "gemini",
       type: "google",
@@ -127,9 +117,6 @@ export const DEFAULT_PROVIDER_CONFIG: ProviderRegistryConfig = {
   }
 };
 
-/**
- * Load provider configuration from environment or use defaults
- */
 export async function loadProviderConfig(): Promise<ProviderRegistryConfig> {
   const configPath = process.env.PROVIDER_REGISTRY_CONFIG;
   
@@ -142,7 +129,6 @@ export async function loadProviderConfig(): Promise<ProviderRegistryConfig> {
     const configData = await fs.readFile(configPath, 'utf-8');
     const config = JSON.parse(configData) as ProviderRegistryConfig;
     
-    // Validate config structure
     if (!config.providers || !Array.isArray(config.providers)) {
       throw new Error('Invalid provider config: providers array is required');
     }

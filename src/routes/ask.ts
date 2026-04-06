@@ -37,21 +37,16 @@ function handleCouncilError(err: unknown): never {
 
 const router = Router();
 
-// ── GET /api/ask (Basic Test) ────────────────────────────────────────────────
 router.get("/", (req, res) => {
   res.json({ message: "Council is listening. Use POST to ask." });
 });
 
-// ── POST /api/ask (Main Execution) ───────────────────────────────────────────
 router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: AuthRequest, res: Response, next: NextFunction) => {
   const startTime = Date.now();
   try {
     const { question, conversationId, summon, maxTokens, context, mode, userConfig } = req.body;
     let roundsUsed = req.body.rounds || 1;
 
-    // ── Router: Auto-select council composition if mode === "auto" ───────────
-    // STRICT MODE: When auto mode is active, ignore ALL user input (members/summon)
-    // and use ONLY router-selected archetypes
     let effectiveSummon: QueryType | "default" = summon || "default";
     let effectiveMembers = req.body.members;
     let routerDecision: ReturnType<typeof classifyQuery> | null = null;
@@ -70,23 +65,19 @@ router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: Auth
         strict: true
       }, "Auto-router: strict mode - ignoring user members/summon");
     } else if (mode === "direct") {
-      // BASELINE MODE: Deliberately bypass council and use single master agent
       logger.info({ question: question.slice(0, 50) }, "Baseline Mode: Skipping council deliberation");
       effectiveMembers = []; // Empty members list
       roundsUsed = 0; // Skip rounds
     }
 
-    // Resolve council members and master from service layer
     let resolvedMembers;
     let master;
     try {
-      // Use new user-controlled composition if userConfig provided
       if (userConfig) {
         const composition = prepareCouncilMembers(undefined, userConfig);
         resolvedMembers = composition.members;
         master = composition.master;
       } else {
-        // Legacy path: resolve from explicit members or defaults
         resolvedMembers = (effectiveMembers || getDefaultMembers()).map((m: any) => {
           if (!m.apiKey) m.apiKey = resolveApiKey(m);
           return m;
@@ -104,7 +95,6 @@ router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: Auth
     let effectiveConversationId = conversationId;
     let messages: Message[] = [];
 
-    // 1. Sync or Create Conversation
     if (effectiveConversationId) {
       const convo = await findConversationById(effectiveConversationId, userId ?? undefined);
       if (!convo) {
@@ -115,16 +105,15 @@ router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: Auth
 
     const councilMembers = await prepareCouncilWithArchetypes(resolvedMembers, effectiveSummon as any, userId);
 
-    // Retrieve relevant past context for persistent memory
     let memoryContext = "";
     if (effectiveConversationId) {
       const relevantChats = await retrieveRelevantContext(effectiveConversationId, question, 3);
       memoryContext = formatContextForInjection(relevantChats);
     }
 
-    const questionWithContext = context 
+    const questionWithContext = context
       ? `GROUND TRUTH CONTEXT:\n${context}\n\n---\n\n${memoryContext}QUESTION: ${question}`
-      : memoryContext 
+      : memoryContext
         ? `${memoryContext}QUESTION: ${question}`
         : question;
     const currentMessages = [...messages, { role: "user" as const, content: questionWithContext }];
@@ -191,7 +180,6 @@ router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: Auth
   }
 });
 
-// ── POST /api/ask/stream (SSE) ────────────────────────────────────────────────
 router.post("/stream", optionalAuth, checkQuota, validate(askSchema), async (req: AuthRequest, res: Response, next: NextFunction) => {
   const startTime = Date.now();
   res.setHeader("Content-Type", "text/event-stream");
@@ -202,8 +190,6 @@ router.post("/stream", optionalAuth, checkQuota, validate(askSchema), async (req
   try {
     const { question, conversationId, summon, maxTokens, rounds = 1, context, mode } = req.body;
 
-    // ── Router: Auto-select council composition if mode === "auto" ───────────
-    // STRICT MODE: When auto mode is active, ignore ALL user input (members/summon)
     let effectiveSummon: QueryType | "default" = summon || "default";
     let effectiveMembers = req.body.members;
     let routerDecision: ReturnType<typeof classifyQuery> | null = null;
@@ -223,12 +209,11 @@ router.post("/stream", optionalAuth, checkQuota, validate(askSchema), async (req
       }, "Stream auto-router: strict mode - ignoring user members/summon");
     }
 
-    // Map empty API keys to server-side fallbacks
     const resolvedMembers = (effectiveMembers || getDefaultMembers()).map((m: any) => {
       if (!m.apiKey) m.apiKey = resolveApiKey(m);
       return m;
     });
-    
+
     const inputMaster = req.body.master || getDefaultMaster();
     if (!inputMaster.apiKey) inputMaster.apiKey = resolveApiKey(inputMaster);
     const master = inputMaster;
@@ -247,9 +232,6 @@ router.post("/stream", optionalAuth, checkQuota, validate(askSchema), async (req
       messages = await getRecentHistory(effectiveConversationId);
     }
 
-    // FIX: Pre-create the conversation before streaming starts so we have the
-    // conversationId available to include in the SSE "done" event.
-    // Without this, the frontend never learns the new conversationId from a stream.
     if (userId && !effectiveConversationId) {
       const newConvo = await createConversation({
         userId,
@@ -260,16 +242,15 @@ router.post("/stream", optionalAuth, checkQuota, validate(askSchema), async (req
 
     const councilMembers = await prepareCouncilWithArchetypes(resolvedMembers, effectiveSummon, userId);
 
-    // Retrieve relevant past context for persistent memory
     let memoryContext = "";
     if (effectiveConversationId) {
       const relevantChats = await retrieveRelevantContext(effectiveConversationId, question, 3);
       memoryContext = formatContextForInjection(relevantChats);
     }
 
-    const questionWithContext = context 
+    const questionWithContext = context
       ? `GROUND TRUTH CONTEXT:\n${context}\n\n---\n\n${memoryContext}QUESTION: ${question}`
-      : memoryContext 
+      : memoryContext
         ? `${memoryContext}QUESTION: ${question}`
         : question;
     const currentMessages = [...messages, { role: "user" as const, content: questionWithContext }];
@@ -297,7 +278,6 @@ router.post("/stream", optionalAuth, checkQuota, validate(askSchema), async (req
       isCacheHit = true;
       finalVerdict = cached.verdict;
       finalOpinions = cached.opinions as any;
-      // FIX: include conversationId and router metadata so the frontend can update its state
       res.write(`data: ${JSON.stringify({
         type: "done",
         cached: true,
@@ -312,8 +292,6 @@ router.post("/stream", optionalAuth, checkQuota, validate(askSchema), async (req
 
       const emitEvent = (type: string, data: any) => {
         if (!controller.signal.aborted) {
-          // FIX: for the "done" event, inject conversationId so the frontend
-          // can update activeConvoId and reload the conversation list.
           const payload = type === "done"
             ? { ...data, conversationId: effectiveConversationId ?? null }
             : data;
@@ -339,8 +317,7 @@ router.post("/stream", optionalAuth, checkQuota, validate(askSchema), async (req
 
       res.end();
       await setCachedResponse(question, councilMembers, master, messages, finalVerdict, finalOpinions);
-      
-      // Update conversation context after synthesis (runs once after full response)
+
       if (effectiveConversationId && userId && finalVerdict) {
         await createChat({
           userId,

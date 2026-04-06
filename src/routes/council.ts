@@ -9,7 +9,6 @@ import { AuthRequest } from "../types/index.js";
 
 const router = Router();
 
-// ── Get all archetypes ────────────────────────────────────────────────────────
 router.get("/archetypes", (req: Request, res: Response) => {
   const archetypes = Object.values(ARCHETYPES).map((a) => ({
     id: a.id,
@@ -23,17 +22,14 @@ router.get("/archetypes", (req: Request, res: Response) => {
   res.json({ archetypes });
 });
 
-// ── Get all summon types ──────────────────────────────────────────────────────
 router.get("/summons", (req: Request, res: Response) => {
   res.json({ summons: SUMMONS });
 });
 
-// ── Get all council templates ─────────────────────────────────────────────────
 router.get("/templates", (req: Request, res: Response) => {
   res.json({ templates: COUNCIL_TEMPLATES });
 });
 
-// ── Get user's custom council config ──────────────────────────────────────────
 router.get("/config", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
@@ -47,7 +43,6 @@ router.get("/config", requireAuth, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// ── Update user's custom council config ───────────────────────────────────────
 const updateConfigSchema = z.object({
   body: z.object({
     customArchetypes: z.array(z.object({
@@ -84,7 +79,6 @@ router.put("/config", requireAuth, validate(updateConfigSchema), async (req: Aut
   }
 });
 
-// ── Delete user's custom council config ───────────────────────────────────────
 router.delete("/config", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
@@ -100,7 +94,6 @@ router.delete("/config", requireAuth, async (req: AuthRequest, res: Response) =>
   }
 });
 
-// ── Get single archetype by ID ────────────────────────────────────────────────
 router.get("/archetypes/:id", (req: Request, res: Response) => {
   const id = String(req.params.id);
   const archetype = ARCHETYPES[id];

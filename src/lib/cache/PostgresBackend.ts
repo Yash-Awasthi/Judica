@@ -3,16 +3,8 @@ import prisma from "../db.js";
 import logger from "../logger.js";
 import type { CacheBackend, CacheEntry, SemanticSearchResult } from "./CacheBackend.js";
 
-/**
- * PostgreSQL-backed cache implementation.
- * 
- * Provides persistent caching with optional semantic (vector) search support.
- * Requires pgvector extension for semantic search functionality.
- */
 export class PostgresBackend implements CacheBackend {
-  /**
-   * Get a cached entry by key hash from PostgreSQL.
-   */
+
   async get(key: string): Promise<CacheEntry | null> {
     const hit = await prisma.semanticCache.findUnique({ where: { keyHash: key } });
     
@@ -30,10 +22,6 @@ export class PostgresBackend implements CacheBackend {
     };
   }
 
-  /**
-   * Set a cache entry in PostgreSQL (without embedding).
-   * For semantic storage, use setSemantic() instead.
-   */
   async set(key: string, value: CacheEntry, ttlMs?: number): Promise<void> {
     const expiresAt = new Date(Date.now() + (ttlMs || 24 * 60 * 60 * 1000));
     
@@ -55,17 +43,10 @@ export class PostgresBackend implements CacheBackend {
     });
   }
 
-  /**
-   * Delete a cache entry by key.
-   */
   async delete(key: string): Promise<void> {
     await prisma.semanticCache.delete({ where: { keyHash: key } }).catch(() => {});
   }
 
-  /**
-   * Search by vector embedding for semantic similarity.
-   * Returns the closest match if within threshold distance.
-   */
   async searchSemantic(embedding: number[], threshold = 0.15): Promise<SemanticSearchResult | null> {
     try {
       const result = await pool.query(`
@@ -94,10 +75,6 @@ export class PostgresBackend implements CacheBackend {
     }
   }
 
-  /**
-   * Store entry with embedding for semantic search.
-   * Uses raw SQL for embedding storage (requires pgvector).
-   */
   async setSemantic(
     key: string, 
     prompt: string, 
@@ -108,7 +85,6 @@ export class PostgresBackend implements CacheBackend {
     const expiresAt = new Date(Date.now() + (ttlMs || 24 * 60 * 60 * 1000));
     
     if (embedding) {
-      // Use raw SQL for embedding (pgvector requirement)
       await pool.query(`
         INSERT INTO "SemanticCache" ("keyHash", prompt, verdict, opinions, "expiresAt", embedding)
         VALUES ($1, $2, $3, $4, $5, $6)
@@ -126,15 +102,10 @@ export class PostgresBackend implements CacheBackend {
         `[${embedding.join(',')}]`
       ]);
     } else {
-      // Fall back to standard Prisma upsert (no embedding)
       await this.set(key, value, ttlMs);
     }
   }
 
-  /**
-   * Delete expired entries (cleanup).
-   * Called periodically to reclaim storage.
-   */
   async cleanup(): Promise<void> {
     try {
       const result = await pool.query(
@@ -142,10 +113,8 @@ export class PostgresBackend implements CacheBackend {
       );
       logger.debug({ deleted: result.rowCount }, "Cleaned up expired cache entries");
     } catch {
-      // Ignore cleanup errors
     }
   }
 }
 
-// Singleton instance for application-wide use
 export const postgresBackend = new PostgresBackend();

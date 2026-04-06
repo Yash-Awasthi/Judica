@@ -4,10 +4,6 @@ import logger from "./logger.js";
 
 let redis: RedisClientType;
 
-/**
- * Initialize Redis connection.
- * Falls back to in-memory cache if Redis is unavailable.
- */
 async function initRedis(): Promise<RedisClientType> {
   const client = createClient({
     url: env.REDIS_URL || "redis://localhost:6379",
@@ -43,13 +39,8 @@ async function initRedis(): Promise<RedisClientType> {
   return client as RedisClientType;
 }
 
-// Initialize Redis on module load
 let redisPromise: Promise<RedisClientType> | null = null;
 
-/**
- * Get Redis client instance.
- * Lazily initializes connection on first access.
- */
 async function getRedis(): Promise<RedisClientType> {
   if (!redisPromise) {
     redisPromise = initRedis().catch((err) => {
@@ -61,10 +52,6 @@ async function getRedis(): Promise<RedisClientType> {
   return redisPromise;
 }
 
-/**
- * Redis wrapper with fallback for when Redis is unavailable.
- * Provides a consistent interface regardless of Redis availability.
- */
 const redisWrapper = {
   async get(key: string): Promise<string | null> {
     try {
@@ -115,9 +102,7 @@ const redisWrapper = {
         await client.quit();
         redisPromise = null;
       }
-    } catch {
-      // Ignore quit errors
-    }
+    } catch { /* ignore */ }
   },
 
   async keys(pattern: string): Promise<string[]> {

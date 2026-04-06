@@ -14,10 +14,6 @@ export interface UsageUpdateInput {
   isCacheHit: boolean;
 }
 
-/**
- * Updates daily usage tracking for a user
- * Only updates if not a cache hit and tokens were used
- */
 export async function updateDailyUsage(input: UsageUpdateInput): Promise<void> {
   const { userId, tokensUsed, isCacheHit } = input;
   
@@ -38,9 +34,6 @@ export async function updateDailyUsage(input: UsageUpdateInput): Promise<void> {
   }
 }
 
-/**
- * Gets daily usage for a user within a date range
- */
 export async function getDailyUsage(
   userId: number, 
   startDate?: Date, 
@@ -65,9 +58,6 @@ export async function getDailyUsage(
   }
 }
 
-/**
- * Gets total usage statistics for a user
- */
 export async function getUsageStats(userId: number): Promise<{
   totalTokens: number;
   totalRequests: number;

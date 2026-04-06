@@ -37,10 +37,6 @@ export interface ValidationRule {
   check: (content: string, context: unknown) => ValidationIssue | null;
 }
 
-/**
- * Cold Validator - Fresh eyes validation system.
- * Uses a separate model instance to validate council outputs without context bias.
- */
 export class ColdValidator {
   private config: ValidatorConfig;
   private validationHistory: Map<string, ValidationResult[]> = new Map();
@@ -49,9 +45,6 @@ export class ColdValidator {
     this.config = config;
   }
 
-  /**
-   * Validate council deliberation results with fresh perspective.
-   */
   async validateDeliberation(
     sessionId: string,
     question: string,
@@ -64,34 +57,26 @@ export class ColdValidator {
     try {
       logger.info({ sessionId }, "Starting cold validation");
 
-      // Step 1: Basic format and structure validation
       const formatIssues = this.validateFormat(verdict, agentOutputs);
 
-      // Step 2: Content quality validation
       const contentIssues = await this.validateContent(question, verdict, agentOutputs);
 
-      // Step 3: Consistency check across agent outputs
       const consistencyIssues = this.validateConsistency(agentOutputs);
 
-      // Step 4: Fact checking (if enabled)
       const factCheckIssues = this.config.enableFactChecking 
         ? await this.performFactCheck(question, verdict, agentOutputs)
         : [];
 
-      // Step 5: Bias detection (if enabled)
       const biasIssues = this.config.enableBiasDetection
         ? await this.detectBias(verdict, agentOutputs)
         : [];
 
-      // Step 6: Safety check (if enabled)
       const safetyIssues = this.config.enableSafetyCheck
         ? await this.checkSafety(verdict, agentOutputs)
         : [];
 
-      // Step 7: Custom validation rules
       const customIssues = await this.runCustomRules(question, verdict, agentOutputs);
 
-      // Combine all issues
       const allIssues = [
         ...formatIssues,
         ...contentIssues,
@@ -102,13 +87,10 @@ export class ColdValidator {
         ...customIssues
       ];
 
-      // Calculate overall confidence and validity
       const { isValid, confidence, riskLevel } = this.calculateValidationMetrics(allIssues);
 
-      // Generate recommendations
       const recommendations = this.generateRecommendations(allIssues);
 
-      // Attempt to correct minor issues
       const correctedVerdict = await this.attemptCorrection(verdict, allIssues);
 
       const validationResult: ValidationResult = {
@@ -121,7 +103,6 @@ export class ColdValidator {
         processingTime: Date.now() - startTime
       };
 
-      // Store validation history
       this.storeValidationHistory(sessionId, validationResult);
 
       logger.info({
@@ -153,13 +134,9 @@ export class ColdValidator {
     }
   }
 
-  /**
-   * Validate format and structure of the verdict.
-   */
   private validateFormat(verdict: string, agentOutputs: AgentOutput[]): ValidationIssue[] {
     const issues: ValidationIssue[] = [];
 
-    // Check length
     if (verdict.length < 50) {
       issues.push({
         type: 'incomplete',
@@ -178,7 +155,6 @@ export class ColdValidator {
       });
     }
 
-    // Check for structured elements
     if (!verdict.includes('\n') && verdict.length > 200) {
       issues.push({
         type: 'format',
@@ -188,7 +164,6 @@ export class ColdValidator {
       });
     }
 
-    // Check for agent reference
     const hasAgentReferences = agentOutputs.some(output => 
       output.name && verdict.toLowerCase().includes(output.name.toLowerCase())
     );
@@ -205,9 +180,6 @@ export class ColdValidator {
     return issues;
   }
 
-  /**
-   * Validate content quality and coherence.
-   */
   private async validateContent(
     question: string, 
     verdict: string, 
@@ -266,13 +238,9 @@ Respond with ONLY a JSON object:
     return issues;
   }
 
-  /**
-   * Validate consistency across agent outputs.
-   */
   private validateConsistency(agentOutputs: AgentOutput[]): ValidationIssue[] {
     const issues: ValidationIssue[] = [];
 
-    // Check for contradictory confidence levels
     const confidences = agentOutputs.map(o => o.confidence);
     const avgConfidence = confidences.reduce((sum, c) => sum + c, 0) / confidences.length;
     const variance = confidences.reduce((sum, c) => sum + Math.pow(c - avgConfidence, 2), 0) / confidences.length;
@@ -286,7 +254,6 @@ Respond with ONLY a JSON object:
       });
     }
 
-    // Check for outlier responses
     const answerLengths = agentOutputs.map(o => o.answer.length);
     const avgLength = answerLengths.reduce((sum, l) => sum + l, 0) / answerLengths.length;
     
@@ -306,9 +273,6 @@ Respond with ONLY a JSON object:
     return issues;
   }
 
-  /**
-   * Perform basic fact checking.
-   */
   private async performFactCheck(
     question: string, 
     verdict: string, 
@@ -368,9 +332,6 @@ Respond with ONLY a JSON object:
     return issues;
   }
 
-  /**
-   * Detect potential biases in the response.
-   */
   private async detectBias(verdict: string, agentOutputs: AgentOutput[]): Promise<ValidationIssue[]> {
     const issues: ValidationIssue[] = [];
 
@@ -423,13 +384,9 @@ Respond with ONLY a JSON object:
     return issues;
   }
 
-  /**
-   * Check for safety concerns.
-   */
   private async checkSafety(verdict: string, agentOutputs: AgentOutput[]): Promise<ValidationIssue[]> {
     const issues: ValidationIssue[] = [];
 
-    // Basic safety keyword detection
     const safetyKeywords = [
       'harmful', 'dangerous', 'illegal', 'unethical', 'violent',
       'self-harm', 'suicide', 'terrorism', 'weapons', 'drugs'
@@ -450,9 +407,6 @@ Respond with ONLY a JSON object:
     return issues;
   }
 
-  /**
-   * Run custom validation rules.
-   */
   private async runCustomRules(
     question: string, 
     verdict: string, 
@@ -476,9 +430,6 @@ Respond with ONLY a JSON object:
     return issues;
   }
 
-  /**
-   * Calculate overall validation metrics.
-   */
   private calculateValidationMetrics(issues: ValidationIssue[]): {
     isValid: boolean;
     confidence: number;
@@ -488,17 +439,14 @@ Respond with ONLY a JSON object:
     const mediumSeverityCount = issues.filter(i => i.severity === 'medium').length;
     const totalIssues = issues.length;
 
-    // Calculate confidence based on issue count and severity
     let confidence = 1.0;
     confidence -= (highSeverityCount * 0.3);
     confidence -= (mediumSeverityCount * 0.15);
     confidence -= (totalIssues * 0.05);
     confidence = Math.max(0, confidence);
 
-    // Determine validity
     const isValid = highSeverityCount === 0 && confidence >= 0.7;
 
-    // Determine risk level
     let riskLevel: 'low' | 'medium' | 'high' = 'low';
     if (highSeverityCount > 0 || confidence < 0.5) {
       riskLevel = 'high';
@@ -509,20 +457,15 @@ Respond with ONLY a JSON object:
     return { isValid, confidence, riskLevel };
   }
 
-  /**
-   * Generate recommendations based on issues found.
-   */
   private generateRecommendations(issues: ValidationIssue[]): string[] {
     const recommendations = new Set<string>();
 
-    // Add suggestions from issues
     issues.forEach(issue => {
       if (issue.suggestion) {
         recommendations.add(issue.suggestion);
       }
     });
 
-    // Add general recommendations based on issue types
     const issueTypes = new Set(issues.map(i => i.type));
     
     if (issueTypes.has('inconsistency')) {
@@ -544,9 +487,6 @@ Respond with ONLY a JSON object:
     return Array.from(recommendations);
   }
 
-  /**
-   * Attempt to automatically correct minor issues.
-   */
   private async attemptCorrection(verdict: string, issues: ValidationIssue[]): Promise<string | undefined> {
     const correctableIssues = issues.filter(i => 
       i.severity === 'low' && (i.type === 'format' || i.type === 'incomplete')
@@ -576,14 +516,10 @@ Provide a corrected version that addresses these issues while preserving the cor
     }
   }
 
-  /**
-   * Store validation history for analysis.
-   */
   private storeValidationHistory(sessionId: string, result: ValidationResult): void {
     const history = this.validationHistory.get(sessionId) || [];
     history.push(result);
     
-    // Keep only last 10 validations per session
     if (history.length > 10) {
       history.shift();
     }
@@ -591,9 +527,6 @@ Provide a corrected version that addresses these issues while preserving the cor
     this.validationHistory.set(sessionId, history);
   }
 
-  /**
-   * Get validation statistics.
-   */
   getValidationStats(): {
     totalValidations: number;
     averageConfidence: number;
@@ -626,9 +559,6 @@ Provide a corrected version that addresses these issues while preserving the cor
   }
 }
 
-/**
- * Create a default validator configuration.
- */
 export function createDefaultValidator(provider: Provider): ValidatorConfig {
   return {
     provider,
@@ -647,7 +577,6 @@ export function createDefaultValidator(provider: Provider): ValidatorConfig {
           const question = ctx.question?.toLowerCase() || '';
           const verdict = content.toLowerCase();
           
-          // Simple keyword overlap check
           const questionWords = question.split(' ').filter((w: string) => w.length > 3);
           const overlap = questionWords.filter((word: string) => verdict.includes(word)).length;
           

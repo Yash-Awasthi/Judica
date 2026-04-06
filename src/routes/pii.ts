@@ -20,10 +20,6 @@ interface PiiCheckResponse {
 
 const router = Router();
 
-/**
- * POST /api/pii/check
- * Check text for PII and return anonymized version
- */
 router.post("/check", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { text, enforce = false } = req.body as PiiCheckRequest;
@@ -34,7 +30,6 @@ router.post("/check", requireAuth, async (req: AuthRequest, res: Response) => {
 
     const detection = detectPII(text);
     
-    // Calculate risk score based on PII types found
     const riskWeights: Record<string, number> = {
       email: 30,
       phone: 40,
@@ -59,7 +54,6 @@ router.post("/check", requireAuth, async (req: AuthRequest, res: Response) => {
         : undefined,
     };
 
-    // Log high-risk detections
     if (riskScore >= 70) {
       logger.warn({ 
         userId: req.userId, 
@@ -75,9 +69,6 @@ router.post("/check", requireAuth, async (req: AuthRequest, res: Response) => {
   }
 });
 
-/**
- * Middleware to enforce PII checking on council requests
- */
 export function piiEnforcementMiddleware(
   req: AuthRequest, 
   res: Response, 
@@ -100,7 +91,6 @@ export function piiEnforcementMiddleware(
       return score + (weights[type] || 10);
     }, detection.riskScore);
 
-    // Block high-risk requests
     if (riskScore >= 70) {
       logger.warn({ 
         userId: req.userId, 
@@ -117,7 +107,6 @@ export function piiEnforcementMiddleware(
       });
     }
 
-    // Warn for medium-risk but allow
     if (riskScore >= 30) {
       logger.info({ 
         userId: req.userId, 
@@ -125,7 +114,6 @@ export function piiEnforcementMiddleware(
         riskScore 
       }, "Medium-risk PII detected, allowing with warning");
       
-      // Attach PII info to request for downstream handling
       (req as AuthRequest & { piiWarning?: PIIDetection }).piiWarning = detection;
     }
   }

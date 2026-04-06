@@ -1,12 +1,4 @@
-/**
- * Config Resolver - Merges system provider configuration with user preferences
- * 
- * Rules:
- * 1. Provider must be enabled in BOTH system AND user config to be active
- * 2. User config takes precedence for role and priority settings
- * 3. If user config missing, fallback to system defaults
- * 4. Invalid providers are filtered safely
- */
+
 
 import { Provider } from "./providers.js";
 import logger from "./logger.js";
@@ -20,9 +12,6 @@ import {
 import { env } from "../config/env.js";
 import { CouncilServiceError } from "../services/councilService.js";
 
-/**
- * Validate user council configuration
- */
 export function validateUserConfig(
   config: UserCouncilConfig | null
 ): ConfigValidationResult {
@@ -33,7 +22,6 @@ export function validateUserConfig(
   const errors: string[] = [];
   const warnings: string[] = [];
 
-  // Check maxAgents bounds
   if (config.maxAgents !== undefined) {
     if (config.maxAgents < 1) {
       errors.push("maxAgents must be at least 1");
@@ -42,11 +30,9 @@ export function validateUserConfig(
     }
   }
 
-  // Check providers array
   if (config.providers !== undefined && !Array.isArray(config.providers)) {
     errors.push("providers must be an array");
   } else if (Array.isArray(config.providers)) {
-    // Validate each provider
     config.providers.forEach((provider, index) => {
       if (!provider.name || typeof provider.name !== "string" || provider.name.trim() === "") {
         errors.push(`Provider at index ${index}: name must be a non-empty string`);
@@ -56,13 +42,11 @@ export function validateUserConfig(
       }
     });
 
-    // Count user-specified masters
     const masters = config.providers.filter(p => p.role === "master" && p.enabled);
     if (masters.length > 1) {
       warnings.push(`Multiple masters specified (${masters.length}), will select highest priority`);
     }
 
-    // Check for duplicate provider names
     const names = config.providers.map(p => p.name);
     const duplicates = names.filter((name, index) => names.indexOf(name) !== index);
     if (duplicates.length > 0) {
@@ -77,14 +61,9 @@ export function validateUserConfig(
   };
 }
 
-/**
- * Load system providers from environment/config
- * Returns array of available providers with system-level settings
- */
 export function loadSystemProviders(): Provider[] {
   const providers: Provider[] = [];
 
-  // OpenAI
   if (env.OPENAI_API_KEY) {
     providers.push({
       name: "openai",
@@ -96,7 +75,6 @@ export function loadSystemProviders(): Provider[] {
     });
   }
 
-  // Google
   if (env.GOOGLE_API_KEY) {
     providers.push({
       name: "google",
@@ -107,7 +85,6 @@ export function loadSystemProviders(): Provider[] {
     });
   }
 
-  // Anthropic
   if (env.ANTHROPIC_API_KEY) {
     providers.push({
       name: "anthropic",
@@ -118,7 +95,6 @@ export function loadSystemProviders(): Provider[] {
     });
   }
 
-  // Local Ollama (if available)
   providers.push({
     name: "ollama",
     type: "local",
@@ -131,14 +107,10 @@ export function loadSystemProviders(): Provider[] {
   return providers;
 }
 
-/**
- * Merge system provider with user configuration
- */
 function mergeProviderConfig(
   systemProvider: Provider,
   userConfig?: UserProviderConfig
 ): ResolvedProvider {
-  // Default: enabled if system says so and user hasn't disabled
   const systemEnabled = true; // System providers are enabled by default
   const userEnabled = userConfig?.enabled ?? true; // Default to enabled if no user config
 
@@ -156,18 +128,10 @@ function mergeProviderConfig(
   };
 }
 
-/**
- * Resolve active providers by merging system + user config
- * 
- * @param systemProviders - Providers available from system
- * @param userConfig - User's council configuration preferences
- * @returns Array of resolved providers (filtered and merged)
- */
 export function resolveActiveProviders(
   systemProviders: Provider[],
   userConfig?: Partial<UserCouncilConfig>
 ): ResolvedProvider[] {
-  // Create lookup for user config by provider name
   const userProviderMap = new Map<string, UserProviderConfig>();
   
   if (userConfig?.providers) {
@@ -176,7 +140,6 @@ export function resolveActiveProviders(
     }
   }
 
-  // Merge system providers with user config
   const resolved: ResolvedProvider[] = [];
   
   for (const systemProvider of systemProviders) {
@@ -185,7 +148,6 @@ export function resolveActiveProviders(
     resolved.push(merged);
   }
 
-  // If user specified providers not in system, log warning
   if (userConfig?.providers) {
     const systemNames = new Set(systemProviders.map(p => p.name));
     for (const userProvider of userConfig.providers) {
@@ -201,18 +163,6 @@ export function resolveActiveProviders(
   return resolved;
 }
 
-/**
- * Select master provider from resolved providers
- * 
- * Rules:
- * 1. If user sets role === "master" → use that provider
- * 2. Only ONE master allowed
- * 3. If multiple masters → pick highest priority
- * 4. If no master specified → auto-select best API provider
- * 
- * @param resolved - Resolved providers after merging
- * @returns Selected master provider
- */
 export function selectMaster(resolved: ResolvedProvider[]): ResolvedProvider {
   const enabled = resolved.filter(p => p.enabled);
 
@@ -220,11 +170,9 @@ export function selectMaster(resolved: ResolvedProvider[]): ResolvedProvider {
     throw new CouncilServiceError("NO_PROVIDERS", "No enabled providers available for master selection");
   }
 
-  // Find user-specified masters
   const userMasters = enabled.filter(p => p.role === "master");
 
   if (userMasters.length > 0) {
-    // Sort by priority (highest first)
     userMasters.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
     
     if (userMasters.length > 1) {
@@ -247,11 +195,9 @@ export function selectMaster(resolved: ResolvedProvider[]): ResolvedProvider {
     return { ...userMasters[0], role: "master" };
   }
 
-  // Auto-select: prefer API providers, then by priority
   const apiProviders = enabled.filter(p => p.type === "api");
   const candidates = apiProviders.length > 0 ? apiProviders : enabled;
   
-  // Sort by priority (highest first)
   candidates.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
 
   logger.info(
@@ -268,14 +214,6 @@ export function selectMaster(resolved: ResolvedProvider[]): ResolvedProvider {
   return { ...candidates[0], role: "master" };
 }
 
-/**
- * Enforce safety constraints on council composition
- * 
- * Constraints:
- * - At least 1 provider required
- * - Max 6 agents
- * - Max 2 RPA agents
- */
 function enforceConstraints(
   providers: ResolvedProvider[],
   maxAgents: number
@@ -283,18 +221,15 @@ function enforceConstraints(
   const constraints: string[] = [];
   let valid = [...providers];
 
-  // Must have at least 1
   if (valid.length === 0) {
     throw new CouncilServiceError("NO_PROVIDERS", "At least 1 provider is required");
   }
 
-  // Max 6 agents
   if (valid.length > maxAgents) {
     constraints.push(`Limited to ${maxAgents} agents (had ${valid.length})`);
     valid = valid.slice(0, maxAgents);
   }
 
-  // Max 2 RPA
   const rpaCount = valid.filter(p => p.type === "rpa").length;
   if (rpaCount > 2) {
     constraints.push(`Limited to 2 RPA providers (had ${rpaCount})`);
@@ -317,23 +252,14 @@ function enforceConstraints(
   return { valid, constraints };
 }
 
-/**
- * Compose council from resolved providers
- * 
- * @param resolved - Resolved providers
- * @param userConfig - User configuration for constraints
- * @returns Council composition with members and master
- */
 export function composeCouncil(
   resolved: ResolvedProvider[],
   userConfig?: Partial<UserCouncilConfig>
 ): CouncilComposition {
   const appliedConstraints: string[] = [];
 
-  // Filter to enabled providers
   let enabled = resolved.filter(p => p.enabled);
 
-  // Filter RPA if not allowed
   if (userConfig?.allowRPA === false) {
     const beforeCount = enabled.length;
     enabled = enabled.filter(p => p.type !== "rpa");
@@ -343,26 +269,20 @@ export function composeCouncil(
     }
   }
 
-  // Enforce max agents
   const maxAgents = Math.min(Math.max(userConfig?.maxAgents ?? 4, 1), 6);
   
-  // Sort by priority (highest first)
   enabled.sort((a, b) => (b.priority ?? 0) - (a.priority ?? 0));
 
-  // Select master first (removes from member pool)
   const master = selectMaster(enabled);
   
-  // Remove master from member candidates
   const memberCandidates = enabled.filter(p => p.name !== master.name);
 
-  // Apply constraints to remaining members
   const { valid: members, constraints } = enforceConstraints(
     memberCandidates,
     maxAgents - 1 // Reserve 1 slot for master
   );
   appliedConstraints.push(...constraints);
 
-  // Ensure diversity if requested
   if (userConfig?.preferLocalMix && members.length > 1) {
     const hasLocal = members.some(p => p.type === "local");
     const hasApi = members.some(p => p.type === "api");
