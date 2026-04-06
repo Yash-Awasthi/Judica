@@ -44,7 +44,7 @@ export async function gatherOpinions(
     const start = Date.now();
     logger.debug({ member: m.name, start }, "Agent call started");
     
-    const agentTimeout = AbortSignal.timeout(8000);
+    const agentTimeout = AbortSignal.timeout(60000); // Increased timeout to 60 seconds
     const combinedSignal = abortSignal
       ? AbortSignal.any([abortSignal, agentTimeout])
       : agentTimeout;
@@ -522,7 +522,7 @@ ${othersSummary}
 ${DEBATE_INSTRUCTION}`;
 
     try {
-      const agentTimeout = AbortSignal.timeout(10000);
+      const agentTimeout = AbortSignal.timeout(60000); // Increased timeout to 60 seconds
       const combinedSignal = abortSignal
         ? AbortSignal.any([abortSignal, agentTimeout])
         : agentTimeout;

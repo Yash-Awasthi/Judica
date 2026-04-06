@@ -252,8 +252,8 @@ export function InputArea({
       )}
 
       {/* Input controls */}
-      <div className="flex items-end gap-3 p-4">
-        <div className="flex-1 min-w-0">
+      <div className="p-4 pt-2">
+        <div className="relative group">
           <textarea
             ref={inputRef}
             value={input}
@@ -261,44 +261,47 @@ export function InputArea({
             onKeyDown={handleKeyDown}
             placeholder="Ask the council anything..."
             disabled={isStreaming}
-            className="w-full px-4 py-3 bg-white/[0.03] border border-white/[0.08] rounded-xl text-sm leading-relaxed text-text placeholder-text-dim focus:outline-none focus:border-accent/50 transition-colors resize-none"
+            className="w-full px-5 py-4 pl-5 pr-36 bg-[#0a0a0a] border border-white/[0.08] group-hover:border-white/[0.15] rounded-2xl text-[15px] leading-relaxed text-text placeholder-text-dim focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/10 transition-all resize-none shadow-lg"
             rows={1}
-            style={{ maxHeight: "130px" }}
+            style={{ minHeight: "60px", maxHeight: "200px" }}
           />
-        </div>
 
-        {/* Controls */}
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Stream toggle */}
-          <button
-            onClick={() => setUseStream(!useStream)}
-            className={`p-3 rounded-xl transition-all border ${
-              useStream
-                ? "bg-accent/10 border-accent/20 text-accent"
-                : "border-white/[0.06] text-text-muted hover:border-white/10 hover:text-text"
-            }`}
-            title={useStream ? "Streaming enabled" : "Streaming disabled"}
-          >
-            <span className="material-symbols-outlined text-[18px]">
-              {useStream ? "waves" : "bolt"}
-            </span>
-          </button>
+          {/* Floating Controls Container */}
+          <div className="absolute right-2 bottom-2 flex items-center gap-1.5">
+            {/* Stream toggle */}
+            <button
+              onClick={() => setUseStream(!useStream)}
+              className={`p-2.5 rounded-xl transition-all ${
+                useStream
+                  ? "text-accent bg-accent/5 hover:bg-accent/10"
+                  : "text-text-muted hover:text-text hover:bg-white/[0.06]"
+              }`}
+              title={useStream ? "Streaming enabled" : "Streaming disabled"}
+            >
+              <span className="material-symbols-outlined text-[18px]">
+                {useStream ? "waves" : "bolt"}
+              </span>
+            </button>
 
-          {/* Send button */}
-          <button
-            onClick={handleSend}
-            disabled={!input.trim() || isStreaming}
-            className="px-4 py-3 bg-accent text-white rounded-xl font-medium text-sm hover:bg-accent/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-glow"
-          >
-            {isStreaming ? (
-              <div className="flex items-center gap-2">
-                <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                <span>Thinking</span>
-              </div>
-            ) : (
-              <span>Send</span>
-            )}
-          </button>
+            {/* Send button */}
+            <button
+              onClick={handleSend}
+              disabled={!input.trim() || isStreaming}
+              className={`flex items-center justify-center p-2.5 rounded-xl transition-all duration-300 ${
+                isStreaming || !input.trim()
+                  ? "bg-white/[0.04] text-white/30 cursor-not-allowed"
+                  : "bg-accent text-[#000000] hover:bg-accent/90 hover:scale-105 shadow-glow-sm"
+              }`}
+            >
+              {isStreaming ? (
+                <div className="w-[18px] h-[18px] border-[2px] border-white/20 border-t-white/80 rounded-full animate-spin" />
+              ) : (
+                <span className="material-symbols-outlined text-[20px] font-medium leading-none">
+                  arrow_upward
+                </span>
+              )}
+            </button>
+          </div>
         </div>
       </div>
     </div>
