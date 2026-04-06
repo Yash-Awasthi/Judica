@@ -26,11 +26,11 @@ export async function withRetry<T>(
   while (true) {
     try {
       return await fn();
-    } catch (error: any) {
+    } catch (error) {
       attempt++;
       
       // Don't retry if it's an AbortError (timeout) or if we hit the limit
-      if (attempt > maxRetries || error.name === "AbortError" || (options.shouldRetry && !options.shouldRetry(error))) {
+      if (attempt > maxRetries || (error as Error).name === "AbortError" || (options.shouldRetry && !options.shouldRetry(error))) {
         throw error;
       }
 

@@ -1,111 +1,115 @@
-import { Router, Response } from "express";
+import { Router, Request, Response } from "express";
+import { z } from "zod";
+import { validate } from "../middleware/validate.js";
+import { ARCHETYPES, SUMMONS, COUNCIL_TEMPLATES } from "../config/archetypes.js";
 import prisma from "../lib/db.js";
+import logger from "../lib/logger.js";
 import { requireAuth } from "../middleware/auth.js";
 import { AuthRequest } from "../types/index.js";
-import { validate, archetypeSchema } from "../middleware/validate.js";
-import { ARCHETYPES } from "../config/archetypes.js";
-import { AppError } from "../middleware/errorHandler.js";
 
 const router = Router();
 
-// ── GET /council/archetypes ──────────────────────────────────────────────────
-// Returns all archetypes available to the user (System + Custom)
-router.get("/archetypes", requireAuth, async (req: AuthRequest, res: Response, next) => {
+// ── Get all archetypes ────────────────────────────────────────────────────────
+router.get("/archetypes", (req: Request, res: Response) => {
+  const archetypes = Object.values(ARCHETYPES).map((a) => ({
+    id: a.id,
+    name: a.name,
+    thinkingStyle: a.thinkingStyle,
+    asks: a.asks,
+    blindSpot: a.blindSpot,
+    icon: a.icon,
+    colorBg: a.colorBg,
+  }));
+  res.json({ archetypes });
+});
+
+// ── Get all summon types ──────────────────────────────────────────────────────
+router.get("/summons", (req: Request, res: Response) => {
+  res.json({ summons: SUMMONS });
+});
+
+// ── Get all council templates ─────────────────────────────────────────────────
+router.get("/templates", (req: Request, res: Response) => {
+  res.json({ templates: COUNCIL_TEMPLATES });
+});
+
+// ── Get user's custom council config ──────────────────────────────────────────
+router.get("/config", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
+    const userId = req.userId!;
     const config = await prisma.councilConfig.findUnique({
-      where: { userId: req.userId! }
+      where: { userId },
     });
-
-    const customArchetypes = config ? (config.config as any).customArchetypes || [] : [];
-    const systemArchetypes = Object.values(ARCHETYPES);
-
-    res.json({
-      system: systemArchetypes,
-      custom: customArchetypes
-    });
-  } catch (e) {
-    next(e);
+    res.json({ config: config?.config || null });
+  } catch (err) {
+    logger.error({ err: (err as Error).message }, "Failed to get council config");
+    res.status(500).json({ error: "Failed to get council config" });
   }
 });
 
-// ── POST /council/archetypes ─────────────────────────────────────────────────
-// Creates or updates a custom archetype
-router.post("/archetypes", requireAuth, validate(archetypeSchema), async (req: AuthRequest, res: Response, next) => {
+// ── Update user's custom council config ───────────────────────────────────────
+const updateConfigSchema = z.object({
+  body: z.object({
+    customArchetypes: z.array(z.object({
+      id: z.string(),
+      name: z.string(),
+      thinkingStyle: z.string(),
+      asks: z.string(),
+      blindSpot: z.string(),
+      systemPrompt: z.string(),
+      tools: z.array(z.string()).optional(),
+      icon: z.string().optional(),
+      colorBg: z.string().optional(),
+    })).optional(),
+    defaultSummon: z.string().optional(),
+    defaultRounds: z.number().min(1).max(5).optional(),
+  }),
+});
+
+router.put("/config", requireAuth, validate(updateConfigSchema), async (req: AuthRequest, res: Response) => {
   try {
-    const newArchetype = req.body;
-    
-    const currentConfig = await prisma.councilConfig.findUnique({
-      where: { userId: req.userId! }
+    const userId = req.userId!;
+    const config = req.body;
+
+    const updated = await prisma.councilConfig.upsert({
+      where: { userId },
+      update: { config },
+      create: { userId, config },
     });
 
-    const customArchetypes = currentConfig ? (currentConfig.config as any).customArchetypes || [] : [];
-    
-    // Check if system archetype with same ID exists
-    if (ARCHETYPES[newArchetype.id]) {
-      throw new AppError(400, "Cannot override system archetypes");
-    }
-
-    // Update or Add
-    const existingIdx = customArchetypes.findIndex((a: any) => a.id === newArchetype.id);
-    if (existingIdx > -1) {
-      customArchetypes[existingIdx] = newArchetype;
-    } else {
-      if (customArchetypes.length >= 20) {
-        throw new AppError(400, "Maximum of 20 custom archetypes allowed");
-      }
-      customArchetypes.push(newArchetype);
-    }
-
-    // Preserve existing config keys (like 'members') while updating 'customArchetypes'
-    const updatedConfig = { 
-      ...(currentConfig?.config as any || {}), 
-      customArchetypes 
-    };
-
-    await prisma.councilConfig.upsert({
-      where: { userId: req.userId! },
-      update: { config: updatedConfig },
-      create: { userId: req.userId!, config: updatedConfig }
-    });
-
-    res.json({ success: true, archetype: newArchetype });
-  } catch (e) {
-    next(e);
+    res.json({ config: updated.config });
+  } catch (err) {
+    logger.error({ err: (err as Error).message }, "Failed to update council config");
+    res.status(500).json({ error: "Failed to update council config" });
   }
 });
 
-// ── DELETE /council/archetypes/:id ───────────────────────────────────────────
-router.delete("/archetypes/:id", requireAuth, async (req: AuthRequest, res: Response, next) => {
+// ── Delete user's custom council config ───────────────────────────────────────
+router.delete("/config", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    const { id } = req.params;
-    
-    const currentConfig = await prisma.councilConfig.findUnique({
-      where: { userId: req.userId! }
+    const userId = req.userId!;
+
+    await prisma.councilConfig.deleteMany({
+      where: { userId },
     });
 
-    if (!currentConfig) throw new AppError(404, "No custom archetypes found");
-
-    const customArchetypes = (currentConfig.config as any).customArchetypes || [];
-    const filtered = customArchetypes.filter((a: any) => a.id !== id);
-
-    if (filtered.length === customArchetypes.length) {
-      throw new AppError(404, "Custom archetype not found");
-    }
-
-    const updatedConfig = {
-      ...(currentConfig.config as any || {}),
-      customArchetypes: filtered
-    };
-
-    await prisma.councilConfig.update({
-      where: { userId: req.userId! },
-      data: { config: updatedConfig }
-    });
-
-    res.json({ success: true });
-  } catch (e) {
-    next(e);
+    res.json({ message: "Council config deleted" });
+  } catch (err) {
+    logger.error({ err: (err as Error).message }, "Failed to delete council config");
+    res.status(500).json({ error: "Failed to delete council config" });
   }
+});
+
+// ── Get single archetype by ID ────────────────────────────────────────────────
+router.get("/archetypes/:id", (req: Request, res: Response) => {
+  const id = String(req.params.id);
+  const archetype = ARCHETYPES[id];
+
+  if (!archetype) {
+    return res.status(404).json({ error: "Archetype not found" });
+  }
+
+  res.json({ archetype });
 });
 
 export default router;

@@ -1,7 +1,13 @@
 import { Router, Request, Response } from "express";
 import { requireAuth } from "../middleware/auth.js";
 import { AuthRequest } from "../types/index.js";
+import {
+  getConversationList,
+  deleteConversation,
+  updateConversationTitle
+} from "../services/conversationService.js";
 import prisma from "../lib/db.js";
+import logger from "../lib/logger.js";
 
 import { AppError } from "../middleware/errorHandler.js";
 import { validate, renameConversationSchema, forkSchema } from "../middleware/validate.js";
@@ -9,9 +15,9 @@ import { validate, renameConversationSchema, forkSchema } from "../middleware/va
 const router = Router();
 
 // ── Pagination helper ─────────────────────────────────────────────────────────
-function parsePagination(query: any, defaultLimit = 20, maxLimit = 100) {
-  const page = Math.max(1, parseInt(query.page, 10) || 1);
-  const limit = Math.min(maxLimit, Math.max(1, parseInt(query.limit, 10) || defaultLimit));
+function parsePagination(query: { page?: string; limit?: string }, defaultLimit = 20, maxLimit = 100) {
+  const page = Math.max(1, parseInt(query.page || '1', 10));
+  const limit = Math.min(maxLimit, Math.max(1, parseInt(query.limit || defaultLimit.toString(), 10)));
   const skip = (page - 1) * limit;
   return { page, limit, skip };
 }
@@ -20,19 +26,52 @@ function paginationMeta(page: number, limit: number, total: number) {
   return { page, limit, total, totalPages: Math.ceil(total / limit) };
 }
 
+// ── GET /history/search — Simple search across chats ─────────────────────────
+router.get("/search", requireAuth, async (req: AuthRequest, res: Response) => {
+  try {
+    const { q, limit = "10" } = req.query;
+    
+    // Validate query
+    if (!q || typeof q !== "string" || q.trim().length < 2) {
+      return res.json([]);
+    }
+    
+    const searchTerm = q.trim();
+    const limitNum = Math.min(Math.max(parseInt(limit as string, 10) || 10, 1), 50);
+    
+    const results = await prisma.chat.findMany({
+      where: {
+        userId: req.userId!,
+        OR: [
+          { question: { contains: searchTerm, mode: "insensitive" } },
+          { verdict: { contains: searchTerm, mode: "insensitive" } }
+        ]
+      },
+      orderBy: { createdAt: "desc" },
+      take: limitNum,
+      select: {
+        id: true,
+        conversationId: true,
+        question: true,
+        verdict: true,
+        createdAt: true
+      }
+    });
+    
+    res.json(results);
+  } catch (err) {
+    logger.error({ err, userId: req.userId }, "History search failed");
+    res.json([]);
+  }
+});
+
 // ── GET /history — Lists conversations (paginated) ──────────────────────────
 router.get("/", requireAuth, async (req: AuthRequest, res: Response, next) => {
   try {
     const { page, limit, skip } = parsePagination(req.query);
 
     const [conversations, total] = await Promise.all([
-      prisma.conversation.findMany({
-        where: { userId: req.userId! },
-        orderBy: { updatedAt: "desc" },
-        include: { _count: { select: { chats: true } } },
-        skip,
-        take: limit,
-      }),
+      getConversationList(req.userId!, limit),
       prisma.conversation.count({ where: { userId: req.userId! } })
     ]);
 
@@ -67,7 +106,7 @@ router.get("/:id", requireAuth, async (req: AuthRequest, res: Response, next) =>
       throw new AppError(404, "Conversation not found");
     }
 
-    const totalChats = (conversation as any)._count.chats;
+    const totalChats = (conversation as { _count: { chats: number } })._count.chats;
 
     res.json({
       ...conversation,
@@ -84,12 +123,8 @@ router.patch("/:id", requireAuth, validate(renameConversationSchema), async (req
     const { id } = req.params;
     const { title } = req.body;
 
-    const updated = await prisma.conversation.updateMany({
-      where: { id: id as string, userId: req.userId! },
-      data: { title }
-    });
-
-    if (updated.count === 0) throw new AppError(404, "Conversation not found");
+    const updated = await updateConversationTitle(id as string, req.userId!, title as string);
+    if (!updated) throw new AppError(404, "Conversation not found");
     res.json({ success: true, title });
   } catch (e) {
     next(e);
@@ -100,11 +135,8 @@ router.patch("/:id", requireAuth, validate(renameConversationSchema), async (req
 router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response, next) => {
   try {
     const { id } = req.params;
-    const deleted = await prisma.conversation.deleteMany({
-      where: { id: id as string, userId: req.userId! }
-    });
-
-    if (deleted.count === 0) throw new AppError(404, "Conversation not found");
+    const deleted = await deleteConversation(id as string, req.userId!);
+    if (!deleted) throw new AppError(404, "Conversation not found");
     res.json({ success: true });
   } catch (e) {
     next(e);
@@ -125,7 +157,7 @@ router.post("/:id/fork", requireAuth, validate(forkSchema), async (req: AuthRequ
     if (!source) throw new AppError(404, "Source conversation not found");
 
     // Filter chats up to the requested ID
-    const chatsToFork = (source as any).chats.filter((c: any) => c.id <= toChatId);
+    const chatsToFork = (source as { chats: Array<{ id: number }> }).chats.filter((c: { id: number }) => c.id <= Number(toChatId));
     if (!chatsToFork.length) throw new AppError(400, "No messages to fork");
 
     const fork = await prisma.conversation.create({
@@ -136,12 +168,12 @@ router.post("/:id/fork", requireAuth, validate(forkSchema), async (req: AuthRequ
     });
 
     await prisma.chat.createMany({
-      data: chatsToFork.map((c: any) => ({
+      data: chatsToFork.map((c) => ({
         userId: req.userId!,
         conversationId: fork.id,
-        question: c.question,
-        verdict: c.verdict,
-        opinions: c.opinions,
+        question: (c as any).question,
+        verdict: (c as any).verdict,
+        opinions: (c as any).opinions,
       }))
     });
 

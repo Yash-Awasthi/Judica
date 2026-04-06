@@ -48,7 +48,7 @@ export async function askOpenAI(
   if (msg?.tool_calls?.length) {
     const nextMessages = [...normMessages, msg];
     for (const tc of msg.tool_calls) {
-      const result = await callTool(tc.function.name, JSON.parse(tc.function.arguments));
+      const result = await callTool({ id: tc.id, name: tc.function.name, arguments: JSON.parse(tc.function.arguments) });
       const safeResult = `[UNTRUSTED TOOL OUTPUT]\n${result}\n[/UNTRUSTED TOOL OUTPUT]`;
       nextMessages.push({ role: "tool", tool_call_id: tc.id, name: tc.function.name, content: safeResult });
     }
@@ -160,7 +160,7 @@ export async function streamOpenAI(
             }
             if (toSend) onChunk(toSend);
           }
-        } catch {}
+        } catch { /* ignore malformed JSON lines */ }
       }
     }
   }
@@ -175,8 +175,8 @@ export async function streamOpenAI(
       } as any
     ];
     for (const tc of finalToolCalls) {
-      const result = await callTool(tc.name, JSON.parse(tc.args));
-      const safeResult = `[UNTRUSTED TOOL OUTPUT]\n${result}\n[/UNTRUSTED TOOL OUTPUT]`;
+      const result = await callTool({ id: tc.id, name: tc.name, arguments: JSON.parse(tc.args) });
+      const safeResult = `[UNTRUSTED TOOL OUTPUT]\n${result.result}\n[/UNTRUSTED TOOL OUTPUT]`;
       nextMessages.push({ role: "tool", tool_call_id: tc.id, name: tc.name, content: safeResult });
     }
     return streamFn(provider, nextMessages, onChunk, isFallback);

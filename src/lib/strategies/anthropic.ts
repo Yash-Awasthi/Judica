@@ -39,7 +39,7 @@ export async function askAnthropic(
   if (toolCalls.length > 0) {
     const nextMessages: Message[] = [...normMessages, { role: "assistant" as const, content }];
     for (const tc of toolCalls) {
-      const result = await callTool(tc.name, tc.input);
+      const result = await callTool({ id: tc.id, name: tc.name, arguments: tc.input });
       const safeResult = `[UNTRUSTED TOOL OUTPUT]\n${result}\n[/UNTRUSTED TOOL OUTPUT]`;
       nextMessages.push({
         role: "user" as const,
@@ -111,7 +111,7 @@ export async function streamAnthropic(
           }
           const chunk = json.delta?.text ?? "";
           if (chunk) { fullText += chunk; onChunk(chunk); }
-        } catch {}
+        } catch { /* ignore malformed JSON lines */ }
       }
     }
   }
