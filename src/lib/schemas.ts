@@ -1,9 +1,5 @@
 import { z } from "zod";
 
-/**
- * Structured output contract for all council agents.
- * Every agent must return JSON conforming to this schema.
- */
 export const AgentOutputSchema = z.object({
   name: z.string().optional(), // Agent name for reference
   answer: z.string().min(10, "answer must be at least 10 characters").max(2000, "answer must not exceed 2000 characters"),
@@ -74,21 +70,14 @@ export interface ScoredOpinion {
   grounding?: GroundingResult;
 }
 
-/**
- * Parse and validate raw text from an agent.
- * Attempts to extract JSON from the response (handles markdown code blocks).
- * Returns null if validation fails.
- */
 export function parseAgentOutput(raw: string): AgentOutput | null {
   let jsonStr = raw.trim();
 
-  // Strip markdown code fences if present
   const codeBlockMatch = jsonStr.match(/```(?:json)?\s*\n?([\s\S]*?)\n?\s*```/);
   if (codeBlockMatch) {
     jsonStr = codeBlockMatch[1].trim();
   }
 
-  // Try to find JSON object in the text
   const jsonMatch = jsonStr.match(/\{[\s\S]*\}/);
   if (!jsonMatch) return null;
 
@@ -101,10 +90,6 @@ export function parseAgentOutput(raw: string): AgentOutput | null {
   }
 }
 
-/**
- * Format a validated AgentOutput back into a readable text opinion.
- * Used when we need to display structured data as plain text.
- */
 export function formatAgentOutput(output: AgentOutput): string {
   const parts = [output.answer];
   if (output.key_points.length > 0) {

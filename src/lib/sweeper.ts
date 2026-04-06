@@ -9,9 +9,6 @@ const TOKEN_TTL_DAYS = 90; // 90 days
 
 let sweepTimer: NodeJS.Timeout | null = null;
 
-/**
- * Sweep expired semantic cache entries.
- */
 async function sweepCache(): Promise<number> {
   try {
     const result = await prisma.semanticCache.deleteMany({
@@ -31,9 +28,6 @@ async function sweepCache(): Promise<number> {
   }
 }
 
-/**
- * Sweep old revoked tokens.
- */
 async function sweepRevokedTokens(): Promise<number> {
   try {
     const result = await prisma.revokedToken.deleteMany({
@@ -53,9 +47,6 @@ async function sweepRevokedTokens(): Promise<number> {
   }
 }
 
-/**
- * Sweep old audit logs (keep last 90 days).
- */
 async function sweepAuditLogs(): Promise<number> {
   try {
     const cutoff = new Date();
@@ -78,9 +69,6 @@ async function sweepAuditLogs(): Promise<number> {
   }
 }
 
-/**
- * Sweep old context summaries (keep last 30 days per conversation).
- */
 async function sweepContextSummaries(): Promise<number> {
   try {
     const cutoff = new Date();
@@ -103,9 +91,6 @@ async function sweepContextSummaries(): Promise<number> {
   }
 }
 
-/**
- * Sweep expired Redis keys.
- */
 async function sweepRedisKeys(): Promise<number> {
   try {
     const keys = await redis.keys("cache:*");
@@ -113,7 +98,6 @@ async function sweepRedisKeys(): Promise<number> {
 
     for (const key of keys) {
       const ttl = await redis.ttl(key);
-      // Delete keys that have no TTL set or have expired (ttl <= 0)
       if (ttl === -1 || ttl <= 0) {
         await redis.del(key);
         swept++;
@@ -130,9 +114,6 @@ async function sweepRedisKeys(): Promise<number> {
   }
 }
 
-/**
- * Run all sweep jobs.
- */
 async function runSweep(): Promise<void> {
   logger.info("Starting sweep job");
 
@@ -156,20 +137,14 @@ async function runSweep(): Promise<void> {
   logger.info({ totalSwept, duration }, "Sweep job completed");
 }
 
-/**
- * Start background sweep jobs.
- * Runs immediately and then at regular intervals.
- */
 export function startSweepers(): void {
   if (sweepTimer) {
     logger.warn("Sweepers already running");
     return;
   }
 
-  // Run immediately on startup
   void runSweep();
 
-  // Schedule regular sweeps
   sweepTimer = setInterval(() => {
     void runSweep();
   }, SWEEP_INTERVAL_MS);
@@ -177,9 +152,6 @@ export function startSweepers(): void {
   logger.info({ intervalMs: SWEEP_INTERVAL_MS }, "Sweepers started");
 }
 
-/**
- * Stop background sweep jobs.
- */
 export function stopSweepers(): void {
   if (sweepTimer) {
     clearInterval(sweepTimer);
@@ -188,9 +160,6 @@ export function stopSweepers(): void {
   }
 }
 
-/**
- * Run a single sweep job manually (for testing or admin triggers).
- */
 export async function runManualSweep(): Promise<void> {
   await runSweep();
 }

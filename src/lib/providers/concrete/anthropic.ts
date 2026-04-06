@@ -5,10 +5,6 @@ import { calculateCost } from "../../cost.js";
 import { validateSafeUrl } from "../../ssrf.js";
 import { getToolDefinitions, callTool } from "../../tools/index.js";
 
-/**
- * Anthropic (Claude) provider implementation.
- * Handles Messages API with specific tool block structure.
- */
 export class AnthropicProvider extends BaseProvider {
   private defaultBaseUrl = "https://api.anthropic.com/v1/messages";
 
@@ -16,7 +12,7 @@ export class AnthropicProvider extends BaseProvider {
     super(config);
   }
 
-  async call({ messages, signal, maxTokens }: {
+  async call({ messages, signal, maxTokens, isFallback }: {
     messages: Message[];
     signal?: AbortSignal;
     maxTokens?: number;
@@ -63,7 +59,6 @@ export class AnthropicProvider extends BaseProvider {
       const content = data.content || [];
       const toolCalls = content.filter((c: any) => c.type === "tool_use");
 
-      // Handle Recursive Tool Calls
       if (toolCalls.length > 0) {
         logger.info({ 
           provider: this.name, 
@@ -96,7 +91,7 @@ export class AnthropicProvider extends BaseProvider {
           } as any);
         }
 
-        return this.call({ messages: nextMessages, signal, maxTokens });
+        return this.call({ messages: nextMessages, signal, maxTokens, isFallback });
       }
 
       const text = content.find((c: any) => c.type === "text")?.text || "";

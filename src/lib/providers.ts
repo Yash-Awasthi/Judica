@@ -9,13 +9,8 @@ import {
   ProviderConfig as Provider 
 } from "./providers/types.js";
 
-// Re-export types for backward compatibility
 export type { Message, ProviderResponse, ProviderUsage, Provider };
 
-/**
- * Main provider dispatcher - uses the unified BaseProvider abstraction.
- * Enforces per-request instantiation to prevent state leakage.
- */
 export async function askProvider(
   providerConfig: Provider,
   messages: Message[] | string,
@@ -31,7 +26,6 @@ export async function askProvider(
     : messages.map(m => typeof m.content === "string" ? m.content : JSON.stringify(m.content)).join("\n");
 
   try {
-    // FACTORY: Create a fresh, stateless provider instance for this request
     const provider = createProvider(providerConfig);
     
     return await provider.call({
@@ -55,16 +49,15 @@ export async function askProvider(
         return askProvider(fallback, messages, true, abortSignal);
       }
     }
+
+    if (err instanceof Error && (err.message.includes("missing required 'type' field") || err.message.includes("invalid type"))) {
+      throw err;
+    }
     
     throw new Error(`${providerConfig.type} provider request failed`, { cause: err });
   }
 }
 
-/**
- * Streaming provider dispatcher.
- * Currently uses standard call for local/rpa, and streaming (if implemented) for API.
- * Note: Full unified streaming support is planned for Phase 4.
- */
 export async function askProviderStream(
   providerConfig: Provider,
   messages: Message[] | string,
@@ -72,8 +65,6 @@ export async function askProviderStream(
   isFallback = false,
   abortSignal?: AbortSignal
 ): Promise<ProviderResponse> {
-  // Legacy support for streamOpenAI/streamAnthropic/streamGoogle would go here
-  // But to harden the interface, we'll use the unified call with retry logic
   try {
     return await withRetry(async () => {
       return await askProvider(providerConfig, messages, isFallback, abortSignal);
@@ -87,6 +78,9 @@ export async function askProviderStream(
       const fallback = getFallbackProvider(providerConfig);
       if (fallback) return askProviderStream(fallback, messages, onChunk, true, abortSignal);
     }
-    throw new Error("Provider stream failed", { cause: _err });
+    if (_err instanceof Error && (_err.message.includes("missing required 'type' field") || _err.message.includes("invalid type"))) {
+      throw _err;
+    }
+    throw new Error(`Provider stream failed`, { cause: _err });
   }
 }

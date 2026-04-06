@@ -3,8 +3,8 @@ import { askProvider, Provider } from "../src/lib/providers.js";
 import { getFallbackProvider } from "../src/config/fallbacks.js";
 
 // Mock dependencies
-vi.mock("../src/lib/connectors/index.js", () => {
-  const mockCreateConnector = vi.fn((baseUrl: string, apiKey: string, model: string) => {
+vi.mock("../src/lib/providers/concrete/rpa.js", () => {
+  const mockCreateConnector = vi.fn(async (baseUrl: string, apiKey: string, model: string) => {
     if (baseUrl?.startsWith("rpa://")) {
       const target = baseUrl.replace("rpa://", "");
       if (target === "chatgpt" || target === "claude") {
@@ -53,7 +53,7 @@ describe("RPA Provider Tests", () => {
   beforeEach(async () => {
     vi.clearAllMocks();
     // Restore the createConnector mock after clearing
-    const { createConnector } = vi.mocked(await import("../src/lib/connectors/index.js"));
+    const { createConnector } = vi.mocked(await import("../src/lib/providers/concrete/rpa.js"));
     createConnector.mockImplementation((baseUrl: string, apiKey: string, model: string) => {
       if (baseUrl?.startsWith("rpa://")) {
         const target = baseUrl.replace("rpa://", "");
@@ -159,7 +159,7 @@ describe("RPA Provider Tests", () => {
   // TEST 4: FALLBACK TEST
   describe("FALLBACK TEST", () => {
     it("should fallback to API provider when RPA fails", async () => {
-      const { createConnector } = await import("../src/lib/connectors/index.js");
+      const { createConnector } = await import("../src/lib/providers/concrete/rpa.js");
       
       // Mock failing RPA connector
       const MockFailingConnector = class {
@@ -192,7 +192,7 @@ describe("RPA Provider Tests", () => {
     });
 
     it("should not fallback if already in fallback mode", async () => {
-      const { createConnector } = await import("../src/lib/connectors/index.js");
+      const { createConnector } = await import("../src/lib/providers/concrete/rpa.js");
       
       const MockFailingConnector = class {
         async generate(): Promise<string> {
@@ -221,7 +221,7 @@ describe("RPA Provider Tests", () => {
   // SAFETY RULES TESTS
   describe("SAFETY RULES", () => {
     it.skip("should always return string format", async () => {
-      const { createConnector } = await import("../src/lib/connectors/index.js");
+      const { createConnector } = await import("../src/lib/providers/concrete/rpa.js");
       
       const MockRPAConnector = class {
         async generate(): Promise<string> {
@@ -237,7 +237,7 @@ describe("RPA Provider Tests", () => {
     });
 
     it("should catch and log all errors", async () => {
-      const { createConnector } = await import("../src/lib/connectors/index.js");
+      const { createConnector } = await import("../src/lib/providers/concrete/rpa.js");
       const logger = await import("../src/lib/logger.js");
       
       const MockFailingConnector = class {
@@ -257,7 +257,7 @@ describe("RPA Provider Tests", () => {
     });
 
     it("should never crash the council - errors are always caught", async () => {
-      const { createConnector } = await import("../src/lib/connectors/index.js");
+      const { createConnector } = await import("../src/lib/providers/concrete/rpa.js");
       
       const MockCrashConnector = class {
         async generate(): Promise<string> {
@@ -308,7 +308,7 @@ describe("RPA Provider Tests", () => {
 
 describe("RPA Integration Tests", () => {
   it.skip("should handle message array input", async () => {
-    const { createConnector } = await import("../src/lib/connectors/index.js");
+    const { createConnector } = await import("../src/lib/providers/concrete/rpa.js");
     
     const mockGenerate = vi.fn().mockResolvedValue("Response to messages");
     const MockRPAConnector = class {
@@ -340,7 +340,7 @@ describe("RPA Integration Tests", () => {
   });
 
   it.skip("should handle string input", async () => {
-    const { createConnector } = await import("../src/lib/connectors/index.js");
+    const { createConnector } = await import("../src/lib/providers/concrete/rpa.js");
     
     const mockGenerate = vi.fn().mockResolvedValue("Response");
     const MockRPAConnector = class {

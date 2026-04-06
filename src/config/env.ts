@@ -39,7 +39,6 @@ if (!parsed.success) {
 
 export const env = parsed.data;
 
-// Warn at startup if no AI provider key is set
 if (!parsed.data.OPENAI_API_KEY && !parsed.data.ANTHROPIC_API_KEY && !parsed.data.GOOGLE_API_KEY) {
   console.warn("⚠️  No AI provider API keys found (OPENAI_API_KEY / ANTHROPIC_API_KEY / GOOGLE_API_KEY). All council requests will fail at runtime.");
 }

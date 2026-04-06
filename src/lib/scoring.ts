@@ -3,10 +3,6 @@ import { mlWorker } from "./ml/ml_worker.js";
 import { validationModule } from "./validation.js";
 import logger from "./logger.js";
 
-/**
- * High-fidelity semantic similarity using local HuggingFace embeddings.
- * Strict ML enforcement.
- */
 async function computeSemanticSimilarityML(a: string, b: string): Promise<number> {
   try {
     return await mlWorker.computeSimilarity(a, b);
@@ -17,7 +13,6 @@ async function computeSemanticSimilarityML(a: string, b: string): Promise<number
 }
 
 async function computeAgreement(a: AgentOutput, b: AgentOutput): Promise<number> {
-  // Purely ML-based agreement on the final answer
   return await computeSemanticSimilarityML(a.answer, b.answer);
 }
 
@@ -34,10 +29,6 @@ async function averageAgreement(index: number, outputs: AgentOutput[]): Promise<
   return count > 0 ? total / count : 1.0;
 }
 
-/**
- * Normalized Peer Ranking Score based on Borda-style aggregation.
- * Higher rank (closer to index 0) = higher score.
- */
 function computePeerRankingScore(agentName: string, anonymizedLabels: Map<string, string>, reviews: PeerReview[]): number {
   if (reviews.length === 0) return 0.5;
   const label = anonymizedLabels.get(agentName);

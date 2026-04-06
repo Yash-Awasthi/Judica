@@ -52,7 +52,6 @@ class MLWorker {
 
       this.process.stderr!.on("data", (data) => {
         const msg = data.toString();
-        // Only log actual errors, ignore torch/transformers info logs if possible
         if (msg.toLowerCase().includes("error") || msg.toLowerCase().includes("fatal")) {
           logger.error({ msg }, "ML worker stderr");
         } else {

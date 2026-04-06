@@ -22,8 +22,7 @@ export const executeCodeTool: ToolInstance = {
     try {
       const context = await isolate.createContext();
       const jail = context.global;
-      // standard globals (Math, Date, JSON, etc.) are already in the isolate
-      
+
       const script = await isolate.compileScript(code);
       const result = await script.run(context, { timeout: 1000 });
 

@@ -12,10 +12,6 @@ import { calculateCost } from "./cost.js";
 
 export type { PeerReview, ValidatorResult };
 
-/**
- * Typed input shape for council member configuration.
- * Matches what the API receives before archetype assignment.
- */
 export interface CouncilMemberInput {
   name?: string;
   type: "api" | "local" | "rpa";
@@ -25,7 +21,7 @@ export interface CouncilMemberInput {
   systemPrompt?: string;
   maxTokens?: number;
   tools?: string[];
-  /** UI-level fields (role/tone/customBehaviour) passed through transparently */
+
   [key: string]: unknown;
 }
 
@@ -84,7 +80,6 @@ export async function prepareCouncilMembers(members: CouncilMemberInput[], summo
     const archetypeId = archetypeOrder[index % archetypeOrder.length];
     const archetype = allArchetypes[archetypeId] || ARCHETYPES.architect;
 
-    // Assign tools based on archetype
     let tools = archetype.tools || [];
     if (archetypeId === "researcher") tools = ["web_search"];
 
@@ -122,8 +117,6 @@ IMPORTANT: Respond with ONLY the JSON object. No markdown, no explanations, no c
   });
 }
 
-// ── Deliberation Event Types ──────────────────────────────────────────────────
-
 export type DeliberationEvent =
   | { type: "status"; round: number; message: string }
   | { type: "opinion"; name: string; text: string; round: number }
@@ -133,7 +126,6 @@ export type DeliberationEvent =
   | { type: "validator_result"; result: ValidatorResult }
   | { type: "metrics"; metrics: { totalTokens: number; totalCost: number; hallucinationCount: number; consensusScore: number } }
   | { type: "done"; verdict: string; opinions: { name: string; opinion: string }[]; metrics?: { totalTokens: number; totalCost: number; hallucinationCount: number } };
-
 
 export async function* deliberate(
   members: Provider[],
@@ -166,7 +158,6 @@ export async function* deliberate(
     });
     totalTokens += opinionTokens;
 
-    // Quorum check
     const minRequired = Math.max(2, Math.ceil(members.length * 0.5));
     if (opinions.length < minRequired) {
       yield { type: "status", round: r, message: `Quorum not met (${opinions.length}/${members.length} responses). Aborting.` };
@@ -179,7 +170,6 @@ export async function* deliberate(
       yield { type: "opinion", name: op.name, text: op.opinion, round: r };
     }
 
-    // Debate Round (Round 1 only)
     if (r === 1 && rounds >= 2 && opinions.length >= 2) {
       yield { type: "status", round: r, message: "Debate round: Agents refining answers..." };
 
@@ -207,14 +197,11 @@ export async function* deliberate(
       }
     }
 
-    // Peer Review Phase
     let reviews: PeerReview[] = [];
     let currentScored: ScoredOpinion[] = [];
     if (opinions.length >= 2) {
       yield { type: "status", round: r, message: `Peer review phase for Round ${r}...` };
 
-      // Performance Optimization: Skip audits if high confidence
-      // Based on Phase 5 directives
       const lastConsensus = r > 1 ? (controller as any)['previousMaxScore'] : 0; 
       const skipAdversarial = lastConsensus > 0.92;
       const skipGrounding = lastConsensus > 0.95;
@@ -234,15 +221,12 @@ export async function* deliberate(
       currentScored = reviewRes.scored;
       totalTokens += reviewRes.totalTokens;
 
-      // Phase 4: Round Quality Validation
-      // If this isn't the first round, check if we actually improved.
       if (r > 1) {
         const accepted = controller.shouldAcceptRound(currentScored);
         if (!accepted) {
           yield { type: "status", round: r, message: "Round discarded: No improvement in quality/consensus. Reverting to previous best." };
         }
       } else {
-        // Initialize the controller with the first round's quality
         controller.shouldAcceptRound(currentScored);
       }
 
@@ -257,7 +241,6 @@ export async function* deliberate(
     const roundContext = opinions.map(o => `${o.name}: ${o.opinion}`).join("\n\n");
 
     if (r < rounds) {
-      // Evaluate Consensus (Metrics)
       const {
         criticEval,
         scorerEval,
@@ -276,7 +259,6 @@ export async function* deliberate(
       yield { type: "opinion", name: "Qualitative Critic", text: criticEval, round: r };
       yield { type: "opinion", name: "Quantitative Scorer", text: scorerEval, round: r };
 
-      // Phase 3 Proof: Send metrics for tracking
       yield { 
         type: "metrics", 
         metrics: { 
@@ -287,14 +269,12 @@ export async function* deliberate(
         } 
       };
 
-      // Controller Decision (Phase 1 MATH)
       const decision = controller.decide(r, rounds, consensusScore);
       if (decision.shouldHalt) {
         yield { type: "status", round: r, message: `Controller: ${decision.reason} Halting.` };
         break;
       }
 
-      // Inject peer review flaws into next round prompt (Phase 3 & 6)
       const peerFlaws = reviews.map(rev => {
         const flaws = rev.identified_flaws.map(f => 
           `- [${f.target}]: "${f.claim}" is incorrect because ${f.issue}. Correction: ${f.correction}`
@@ -311,7 +291,6 @@ export async function* deliberate(
 
   yield { type: "status", round: rounds, message: "Master synthesis started" };
 
-  // Final Synthesis
   const { verdict, validatorResult, totalTokens: verdictTokens } = await synthesizeVerdict({
     master,
     currentMessages,
@@ -322,7 +301,6 @@ export async function* deliberate(
   totalTokens += verdictTokens;
 
   yield { type: "validator_result", result: validatorResult };
-  // Phase 6 Proof: Final Metrics
   yield { 
     type: "done", 
     verdict, 

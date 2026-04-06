@@ -27,26 +27,19 @@ export interface CostBreakdown {
   byTimeframe: Record<string, { cost: number; tokens: number; requests: number }>;
 }
 
-// Default pricing configuration (can be overridden by environment)
 export const DEFAULT_COST_CONFIG: CostConfig[] = [
-  // OpenAI pricing
   { provider: "openai", model: "gpt-4", inputTokenPrice: 0.03, outputTokenPrice: 0.06, currency: "USD" },
   { provider: "openai", model: "gpt-4-turbo", inputTokenPrice: 0.01, outputTokenPrice: 0.03, currency: "USD" },
   { provider: "openai", model: "gpt-3.5-turbo", inputTokenPrice: 0.0015, outputTokenPrice: 0.002, currency: "USD" },
   
-  // Anthropic pricing
   { provider: "anthropic", model: "claude-3-opus", inputTokenPrice: 0.015, outputTokenPrice: 0.075, currency: "USD" },
   { provider: "anthropic", model: "claude-3-sonnet", inputTokenPrice: 0.003, outputTokenPrice: 0.015, currency: "USD" },
   { provider: "anthropic", model: "claude-3-haiku", inputTokenPrice: 0.00025, outputTokenPrice: 0.00125, currency: "USD" },
   
-  // Google pricing
   { provider: "google", model: "gemini-pro", inputTokenPrice: 0.0005, outputTokenPrice: 0.0015, currency: "USD" },
   { provider: "google", model: "gemini-pro-vision", inputTokenPrice: 0.0025, outputTokenPrice: 0.0075, currency: "USD" },
 ];
 
-/**
- * Calculate cost based on token usage and pricing config.
- */
 export function calculateCost(
   provider: string,
   model: string,
@@ -59,7 +52,6 @@ export function calculateCost(
   
   if (!pricing) {
     logger.warn({ provider, model }, "No pricing config found, using default rates");
-    // Default fallback pricing
     return (inputTokens * 0.001 + outputTokens * 0.002) / 1000;
   }
   
@@ -69,9 +61,6 @@ export function calculateCost(
   return inputCost + outputCost;
 }
 
-/**
- * Track token usage and cost for a user request.
- */
 export async function trackTokenUsage(
   userId: number,
   conversationId: string,
@@ -85,7 +74,6 @@ export async function trackTokenUsage(
     const totalTokens = inputTokens + outputTokens;
     const cost = calculateCost(provider, model, inputTokens, outputTokens);
     
-    // Update daily usage
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     
@@ -108,7 +96,6 @@ export async function trackTokenUsage(
       }
     });
     
-    // Log detailed usage for analytics
     logger.info({
       userId,
       conversationId,
@@ -126,9 +113,6 @@ export async function trackTokenUsage(
   }
 }
 
-/**
- * Get cost breakdown for a user.
- */
 export async function getUserCostBreakdown(
   userId: number,
   days: number = 30
@@ -155,13 +139,11 @@ export async function getUserCostBreakdown(
   for (const record of usage) {
     const dateKey = record.date.toISOString().split('T')[0];
     
-    // Estimate cost based on average token pricing
     const estimatedCost = estimateCostFromTokens(record.tokens);
     
     breakdown.totalCost += estimatedCost;
     breakdown.totalTokens += record.tokens;
     
-    // Timeframe breakdown
     if (!breakdown.byTimeframe[dateKey]) {
       breakdown.byTimeframe[dateKey] = { cost: 0, tokens: 0, requests: 0 };
     }
@@ -173,18 +155,11 @@ export async function getUserCostBreakdown(
   return breakdown;
 }
 
-/**
- * Estimate cost from total tokens (when detailed breakdown isn't available).
- */
 function estimateCostFromTokens(tokens: number): number {
-  // Use average pricing across all providers
   const avgCostPerToken = 0.00002; // ~$0.02 per 1K tokens
   return tokens * avgCostPerToken;
 }
 
-/**
- * Get organization-wide cost summary (for admin users).
- */
 export async function getOrganizationCostSummary(days: number = 30): Promise<{
   totalCost: number;
   totalTokens: number;
@@ -222,7 +197,6 @@ export async function getOrganizationCostSummary(days: number = 30): Promise<{
     totalTokens += record.tokens;
     totalRequests += record.requests;
     
-    // User breakdown
     const current = userBreakdown.get(record.userId) || { cost: 0, tokens: 0, requests: 0 };
     userBreakdown.set(record.userId, {
       cost: current.cost + estimatedCost,
@@ -230,7 +204,6 @@ export async function getOrganizationCostSummary(days: number = 30): Promise<{
       requests: current.requests + record.requests
     });
     
-    // Daily trend
     const daily = dailyTrend.get(dateKey) || { cost: 0, tokens: 0, requests: 0 };
     dailyTrend.set(dateKey, {
       cost: daily.cost + estimatedCost,
@@ -248,9 +221,6 @@ export async function getOrganizationCostSummary(days: number = 30): Promise<{
   };
 }
 
-/**
- * Check if user is within cost limits.
- */
 export async function checkUserCostLimits(
   userId: number,
   dailyLimit?: number,
@@ -305,9 +275,6 @@ export async function checkUserCostLimits(
   };
 }
 
-/**
- * Get cost efficiency metrics.
- */
 export async function getCostEfficiencyMetrics(userId: number, days: number = 30): Promise<{
   avgCostPerRequest: number;
   avgTokensPerRequest: number;
@@ -336,8 +303,6 @@ export async function getCostEfficiencyMetrics(userId: number, days: number = 30
   const avgCostPerRequest = breakdown.totalCost / totalRequests;
   const avgTokensPerRequest = breakdown.totalTokens / totalRequests;
   
-  // Calculate efficiency score based on cost vs output quality
-  // Lower cost per request with reasonable token usage is better
   const costScore = Math.max(0, 100 - (avgCostPerRequest * 100)); // Penalize high cost
   const tokenScore = Math.min(100, (avgTokensPerRequest / 1000) * 10); // Reward reasonable token usage
   

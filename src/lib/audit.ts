@@ -20,24 +20,17 @@ export interface AuditEntry {
   piiDetection?: PIIDetection;
 }
 
-/**
- * Enhanced audit logging with PII detection and comprehensive tracking.
- */
 export async function logAudit(entry: AuditEntry): Promise<void> {
   try {
-    // Detect PII in both prompt and response
     const promptPII = detectPII(entry.prompt);
     const responsePII = detectPII(entry.response);
-    
-    // Determine if content is safe to store
+
     const isPromptSafe = promptPII.riskScore < 50;
     const isResponseSafe = responsePII.riskScore < 50;
-    
-    // Sanitize content for storage
+
     const sanitizedPrompt = isPromptSafe ? entry.prompt : promptPII.anonymized;
     const sanitizedResponse = isResponseSafe ? entry.response : responsePII.anonymized;
-    
-    // Create audit entry
+
     await prisma.auditLog.create({
       data: {
         userId: entry.userId,
@@ -48,7 +41,6 @@ export async function logAudit(entry: AuditEntry): Promise<void> {
         tokensIn: entry.tokensIn,
         tokensOut: entry.tokensOut,
         latencyMs: entry.latencyMs,
-        // Store metadata as JSON
         metadata: {
           sessionId: entry.sessionId,
           requestType: entry.requestType,
@@ -67,26 +59,22 @@ export async function logAudit(entry: AuditEntry): Promise<void> {
         }
       }
     });
-    
-    // Log high-risk PII detections
+
     if (promptPII.riskScore >= 70 || responsePII.riskScore >= 70) {
-      logger.warn({ 
-        userId: entry.userId, 
+      logger.warn({
+        userId: entry.userId,
         conversationId: entry.conversationId,
         promptRisk: promptPII.riskScore,
         responseRisk: responsePII.riskScore,
         types: [...new Set([...promptPII.types, ...responsePII.types])]
       }, "High-risk PII detected in audit log");
     }
-    
+
   } catch (err: unknown) {
     logger.error({ err: err instanceof Error ? err.message : String(err) }, "Failed to write audit log");
   }
 }
 
-/**
- * Log council deliberation events.
- */
 export async function logCouncilDeliberation(
   userId: number,
   conversationId: string,
@@ -121,9 +109,6 @@ export async function logCouncilDeliberation(
   });
 }
 
-/**
- * Log router decisions.
- */
 export async function logRouterDecision(
   userId: number,
   conversationId: string,
@@ -150,9 +135,6 @@ export async function logRouterDecision(
   });
 }
 
-/**
- * Log tool execution events.
- */
 export async function logToolExecution(
   userId: number,
   conversationId: string,
@@ -185,11 +167,8 @@ export async function logToolExecution(
   });
 }
 
-/**
- * Fetch audit logs for a user with filtering options.
- */
 export async function getUserAuditLogs(
-  userId: number, 
+  userId: number,
   options: {
     limit?: number;
     offset?: number;
@@ -200,22 +179,22 @@ export async function getUserAuditLogs(
   } = {}
 ) {
   const { limit = 50, offset = 0, requestType, dateFrom, dateTo, successOnly } = options;
-  
+
   const whereClause: Record<string, unknown> = { userId };
-  
+
   if (requestType) {
     whereClause.metadata = {
       path: ['requestType'],
       equals: requestType
     };
   }
-  
+
   if (dateFrom || dateTo) {
     whereClause.createdAt = {} as Record<string, unknown>;
     if (dateFrom) (whereClause.createdAt as Record<string, unknown>).gte = dateFrom;
     if (dateTo) (whereClause.createdAt as Record<string, unknown>).lte = dateTo;
   }
-  
+
   if (successOnly) {
     whereClause.metadata = {
       ...whereClause.metadata as Record<string, unknown>,
@@ -223,7 +202,7 @@ export async function getUserAuditLogs(
       equals: true
     };
   }
-  
+
   return prisma.auditLog.findMany({
     where: whereClause,
     orderBy: { createdAt: "desc" },
@@ -232,11 +211,8 @@ export async function getUserAuditLogs(
   });
 }
 
-/**
- * Fetch audit logs for a conversation.
- */
 export async function getConversationAuditLogs(
-  conversationId: string, 
+  conversationId: string,
   limit = 100
 ) {
   return prisma.auditLog.findMany({
@@ -246,20 +222,17 @@ export async function getConversationAuditLogs(
   });
 }
 
-/**
- * Get audit statistics for a user.
- */
 export async function getUserAuditStats(userId: number, days = 30) {
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
-  
+
   const logs = await prisma.auditLog.findMany({
     where: {
       userId,
       createdAt: { gte: startDate }
     }
   }) as { id: number; userId: number | null; createdAt: Date; conversationId: string | null; prompt: string; modelName: string; response: string; tokensIn: number; tokensOut: number; latencyMs: number; metadata?: { success?: boolean; requestType?: string; piiDetected?: { prompt?: { found: boolean }; response?: { found: boolean } } } }[];
-  
+
   const stats = {
     totalRequests: logs.length,
     successfulRequests: logs.filter((log: { metadata?: { success?: boolean } }) => log.metadata?.success !== false).length,
@@ -269,36 +242,33 @@ export async function getUserAuditStats(userId: number, days = 30) {
     models: {} as Record<string, number>,
     piiDetections: 0
   };
-  
+
   for (const log of logs) {
     const requestType = log.metadata?.requestType || 'unknown';
     stats.requestTypes[requestType] = (stats.requestTypes[requestType] || 0) + 1;
-    
+
     const model = log.modelName || 'unknown';
     stats.models[model] = (stats.models[model] || 0) + 1;
-    
+
     if (log.metadata?.piiDetected?.prompt?.found || log.metadata?.piiDetected?.response?.found) {
       stats.piiDetections++;
     }
   }
-  
+
   return stats;
 }
 
-/**
- * Clean up old audit logs (maintenance task).
- */
 export async function cleanupOldAuditLogs(daysToKeep = 90) {
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
-  
+
   const result = await prisma.auditLog.deleteMany({
     where: {
       createdAt: { lt: cutoffDate }
     }
   });
-  
+
   logger.info({ deletedCount: result.count, cutoffDate }, "Cleaned up old audit logs");
-  
+
   return result.count;
 }

@@ -14,7 +14,7 @@ vi.mock("../src/lib/strategies/openai.js", () => ({
   askOpenAI: vi.fn()
 }));
 
-vi.mock("../src/lib/connectors/index.js", () => ({
+vi.mock("../src/lib/providers/concrete/rpa.js", () => ({
   createConnector: vi.fn(),
   OllamaConnector: vi.fn(),
   RPAConnector: vi.fn()
@@ -134,7 +134,7 @@ describe("Mixed Provider Test", () => {
       }
 
       if (provider.type === "local") {
-        const { createConnector } = await import("../src/lib/connectors/index.js");
+        const { createConnector } = await import("../src/lib/providers/concrete/rpa.js");
         const mockConnector = {
           healthCheck: vi.fn().mockResolvedValue(true),
           generate: vi.fn().mockResolvedValue(`${provider.name} response`)
@@ -147,7 +147,7 @@ describe("Mixed Provider Test", () => {
       }
 
       if (provider.type === "rpa") {
-        const { createConnector, RPAConnector } = await import("../src/lib/connectors/index.js");
+        const { createConnector, RPAConnector } = await import("../src/lib/providers/concrete/rpa.js");
         const mockConnector = {
           generate: vi.fn().mockResolvedValue(`${provider.name} response`)
         };
@@ -191,7 +191,7 @@ describe("Mixed Provider Test", () => {
     expect(apiResult.usage?.totalTokens).toBe(40);
 
     // Test local provider
-    const { createConnector } = await import("../src/lib/connectors/index.js");
+    const { createConnector } = await import("../src/lib/providers/concrete/rpa.js");
     const mockConnector = {
       healthCheck: vi.fn().mockResolvedValue(true),
       generate: vi.fn().mockResolvedValue("Local mixed response")

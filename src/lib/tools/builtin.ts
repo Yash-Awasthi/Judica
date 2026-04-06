@@ -1,7 +1,6 @@
 import { registerTool } from "./index.js";
 import { executeCodeTool } from "./execute_code.js";
 
-// ── Web Search Tool ──────────────────────────────────────────────────────────
 registerTool(
   {
     name: "web_search",
@@ -16,12 +15,10 @@ registerTool(
   },
   async (args) => {
     const query = args.query as string;
-    // Placeholder: In production, integrate with a search API (e.g., SerpAPI, Bing, Google)
     return `Search results for "${query}": [Web search is not yet configured. Set up a search API provider to enable this tool.]`;
   }
 );
 
-// ── Code Execution Tool ──────────────────────────────────────────────────────
 registerTool(
   {
     name: "execute_code",
@@ -39,7 +36,6 @@ registerTool(
   }
 );
 
-// ── Read Webpage Tool ────────────────────────────────────────────────────────
 registerTool(
   {
     name: "read_webpage",
@@ -57,7 +53,6 @@ registerTool(
     try {
       const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
       const text = await response.text();
-      // Strip HTML tags for plain text extraction
       const plain = text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
       return plain.slice(0, 5000); // Limit to 5000 chars
     } catch (err) {

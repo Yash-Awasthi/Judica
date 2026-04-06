@@ -1,9 +1,6 @@
 import type { Message, Provider } from "../providers.js";
 import { getToolDefinitions, callTool } from "../tools/index.js";
 
-/**
- * Anthropic (Claude) strategy: handles both non-streaming and streaming calls.
- */
 export async function askAnthropic(
   provider: Provider,
   normMessages: Message[],
@@ -111,7 +108,7 @@ export async function streamAnthropic(
           }
           const chunk = json.delta?.text ?? "";
           if (chunk) { fullText += chunk; onChunk(chunk); }
-        } catch { /* ignore malformed JSON lines */ }
+        } catch {  }
       }
     }
   }

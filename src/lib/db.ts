@@ -9,16 +9,15 @@ const dbUrl = new URL(env.DATABASE_URL);
 const connectionLimitStr = dbUrl.searchParams.get("connection_limit");
 const maxConnections = connectionLimitStr ? parseInt(connectionLimitStr, 10) : 20;
 
-export const pool = new pg.Pool({ 
+export const pool = new pg.Pool({
   connectionString: env.DATABASE_URL,
-  max: maxConnections 
+  max: maxConnections
 });
 
 pool.on("error", (err) => {
   logger.error({ err }, "Unexpected error on idle database client");
 });
 
-// Monitor pool for exhaustion warnings
 pool.on("acquire", () => {
   logger.debug({ total: pool.totalCount, idle: pool.idleCount }, "DB connection acquired");
 });

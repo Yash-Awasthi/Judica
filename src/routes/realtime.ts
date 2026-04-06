@@ -6,14 +6,12 @@ import { createServer } from "http";
 import { Server as SocketIOServer, Socket } from "socket.io";
 import logger from "../lib/logger.js";
 
-// Extend Socket type to include userId
 interface SocketWithUserId extends Socket {
   userId?: number;
 }
 
 const router = Router();
 
-// Create Socket.IO server for real-time updates
 const httpServer = createServer();
 const io = new SocketIOServer(httpServer, {
   cors: {
@@ -22,28 +20,22 @@ const io = new SocketIOServer(httpServer, {
   }
 });
 
-// Store connected users
 const connectedUsers = new Map<number, string>();
 
-// WebSocket connection handling
 io.on('connection', (socket) => {
   logger.info("User connected to real-time cost tracking");
 
   const socketWithId = socket as SocketWithUserId;
 
   socket.on('authenticate', (data: { userId: number, token: string }) => {
-    // Here you would validate the token
-    // For now, we'll assume it's valid
     connectedUsers.set(data.userId, socket.id);
     socketWithId.userId = data.userId;
     
-    // Send current cost data
     const costData = realTimeCostTracker.getRealTimeData(data.userId);
     if (costData) {
       socket.emit('cost-update', costData);
     }
 
-    // Register for alerts
     realTimeCostTracker.onAlert(data.userId, (alerts) => {
       socket.emit('cost-alert', { alerts, timestamp: new Date() });
     });
@@ -75,7 +67,6 @@ io.on('connection', (socket) => {
   });
 });
 
-// ── POST /api/realtime/session/start - Start cost tracking session ─────────────────────
 router.post("/session/start", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { sessionId, conversationId } = req.body;
@@ -96,7 +87,6 @@ router.post("/session/start", requireAuth, async (req: AuthRequest, res: Respons
   }
 });
 
-// ── POST /api/realtime/session/end - End cost tracking session ───────────────────────
 router.post("/session/end", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { sessionId } = req.body;
@@ -119,7 +109,6 @@ router.post("/session/end", requireAuth, async (req: AuthRequest, res: Response)
   }
 });
 
-// ── GET /api/realtime/ledger - Get current cost ledger ───────────────────────────────
 router.get("/ledger", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const ledger = realTimeCostTracker.getLedger(req.userId!);
@@ -137,7 +126,6 @@ router.get("/ledger", requireAuth, async (req: AuthRequest, res: Response) => {
   }
 });
 
-// ── GET /api/realtime/statistics - Get cost statistics ───────────────────────────────
 router.get("/statistics", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { hours = 24 } = req.query;
@@ -153,7 +141,6 @@ router.get("/statistics", requireAuth, async (req: AuthRequest, res: Response) =
   }
 });
 
-// Export the Socket.IO server for use in the main app
 export { io, httpServer };
 
 export default router;

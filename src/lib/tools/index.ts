@@ -30,7 +30,6 @@ export interface ToolResult {
   error?: string;
 }
 
-// Tool handler now receives (input, context) for request-scoped execution
 export type ToolExecutor = (args: Record<string, unknown>, context?: ToolExecutionContext) => Promise<string>;
 
 export interface ToolInstance {
@@ -38,7 +37,6 @@ export interface ToolInstance {
   execute: ToolExecutor;
 }
 
-// Global tool registry - tool definitions are shared, execution is context-scoped
 const toolRegistry = new Map<string, { definition: ToolDefinition; execute: ToolExecutor }>();
 
 export function registerTool(definition: ToolDefinition, execute: ToolExecutor) {
@@ -57,11 +55,7 @@ export function getToolDefinition(name: string): ToolDefinition | undefined {
   return toolRegistry.get(name)?.definition;
 }
 
-/**
- * Validate and sanitize tool results before returning to agents
- */
 export function validateToolResult(result: string): string {
-  // Check for JSON error objects safely
   try {
     const parsed = JSON.parse(result);
     if (parsed && typeof parsed === "object" && "error" in parsed) {
@@ -72,7 +66,6 @@ export function validateToolResult(result: string): string {
     return "[Tool execution failed - please try again]";
   }
 
-  // Only reject malformed JSON when it's EXPECTED to be JSON
   const trimmedResult = result.trim();
   if (trimmedResult.startsWith("{") || trimmedResult.startsWith("[")) {
     try {
@@ -95,11 +88,6 @@ export function validateToolResult(result: string): string {
   return result;
 }
 
-/**
- * Execute a tool with optional request context.
- * Context allows tools to access request-scoped data (userId, conversationId, etc.)
- * without breaking existing tools that don't use context.
- */
 export async function executeTool(call: ToolCall, context?: ToolExecutionContext): Promise<ToolResult> {
   const entry = toolRegistry.get(call.name);
   if (!entry) {
@@ -114,7 +102,6 @@ export async function executeTool(call: ToolCall, context?: ToolExecutionContext
   }
 }
 
-// Alias for backward compatibility - accepts optional context
 export const callTool = executeTool;
 
 export function formatToolResults(results: ToolResult[]): string {

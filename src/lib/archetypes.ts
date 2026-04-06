@@ -15,9 +15,6 @@ export interface UserArchetypeInput {
   isActive?: boolean;
 }
 
-/**
- * Get user's custom archetypes with fallback to defaults.
- */
 export async function getUserArchetypes(userId: number): Promise<Record<string, Archetype>> {
   const userArchetypes = await prisma.userArchetype.findMany({
     where: { userId, isActive: true },
@@ -40,13 +37,9 @@ export async function getUserArchetypes(userId: number): Promise<Record<string, 
     };
   }
 
-  // Merge with default archetypes (custom ones take precedence)
   return { ...ARCHETYPES, ...customArchetypes };
 }
 
-/**
- * Create or update a user archetype.
- */
 export async function upsertUserArchetype(
   userId: number,
   archetype: UserArchetypeInput,
@@ -90,9 +83,6 @@ export async function upsertUserArchetype(
   };
 }
 
-/**
- * Delete a user archetype.
- */
 export async function deleteUserArchetype(userId: number, archetypeId: string): Promise<void> {
   await prisma.userArchetype.delete({
     where: {
@@ -101,9 +91,6 @@ export async function deleteUserArchetype(userId: number, archetypeId: string): 
   });
 }
 
-/**
- * Toggle archetype active status.
- */
 export async function toggleArchetypeStatus(userId: number, archetypeId: string): Promise<boolean> {
   const archetype = await prisma.userArchetype.findUnique({
     where: { userId_archetypeId: { userId, archetypeId } }
@@ -119,9 +106,6 @@ export async function toggleArchetypeStatus(userId: number, archetypeId: string)
   return updated.isActive;
 }
 
-/**
- * Validate archetype data before saving.
- */
 export function validateArchetype(data: UserArchetypeInput): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
@@ -153,7 +137,6 @@ export function validateArchetype(data: UserArchetypeInput): { valid: boolean; e
     errors.push("System prompt must be less than 5000 characters");
   }
 
-  // Validate tools array
   if (data.tools && Array.isArray(data.tools)) {
     const validTools = ["web_search", "execute_code", "read_webpage"];
     const invalidTools = data.tools.filter(tool => !validTools.includes(tool));
@@ -168,9 +151,6 @@ export function validateArchetype(data: UserArchetypeInput): { valid: boolean; e
   };
 }
 
-/**
- * Get archetype usage statistics.
- */
 export async function getArchetypeUsage(userId: number): Promise<Record<string, number>> {
   const chats = await prisma.chat.findMany({
     where: { userId },
@@ -190,9 +170,6 @@ export async function getArchetypeUsage(userId: number): Promise<Record<string, 
   return usage;
 }
 
-/**
- * Clone a default archetype for customization.
- */
 export function cloneDefaultArchetype(archetypeId: string): UserArchetypeInput {
   const defaultArchetype = ARCHETYPES[archetypeId];
   if (!defaultArchetype) {
@@ -211,9 +188,6 @@ export function cloneDefaultArchetype(archetypeId: string): UserArchetypeInput {
   };
 }
 
-/**
- * Export user archetypes as JSON.
- */
 export async function exportUserArchetypes(userId: number): Promise<string> {
   const archetypes = await prisma.userArchetype.findMany({
     where: { userId },
@@ -223,9 +197,6 @@ export async function exportUserArchetypes(userId: number): Promise<string> {
   return JSON.stringify(archetypes, null, 2);
 }
 
-/**
- * Import archetypes from JSON.
- */
 export async function importArchetypes(userId: number, jsonData: string): Promise<{ imported: number; errors: string[] }> {
   const errors: string[] = [];
   let imported = 0;

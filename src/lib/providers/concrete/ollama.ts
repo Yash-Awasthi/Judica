@@ -9,10 +9,6 @@ interface OllamaResponse {
   eval_count?: number;
 }
 
-/**
- * Ollama local provider.
- * Implements BaseProvider for uniform interface.
- */
 export class OllamaProvider extends BaseProvider {
   private baseUrl: string;
 
@@ -21,7 +17,7 @@ export class OllamaProvider extends BaseProvider {
     this.baseUrl = config.baseUrl || "http://localhost:11434";
   }
 
-  async call({ prompt, messages, signal }: {
+  async call({ prompt, messages, signal, isFallback }: {
     messages: Message[];
     prompt?: string;
     signal?: AbortSignal;

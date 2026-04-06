@@ -6,7 +6,6 @@ import { dirname, join } from "path";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
-// New config-driven types
 export type ProviderType = "api" | "local" | "rpa";
 export type ApiType = "openai-compat" | "anthropic" | "google";
 
@@ -35,18 +34,15 @@ export interface ProviderRegistry {
   };
 }
 
-// Legacy interface for backward compatibility
 interface ResolvedProvider {
   type: "openai-compat" | "anthropic" | "google";
   resolvedBaseUrl: string | undefined;
   maxTokens: number;
 }
 
-// Caches
 let cachedConfig: ProviderConfig[] | null = null;
 let cachedRegistry: ProviderRegistry | null = null;
 
-// Default registry for fallback
 const DEFAULT_REGISTRY: ProviderRegistry = {
   providers: [
     {
@@ -94,7 +90,6 @@ const DEFAULT_REGISTRY: ProviderRegistry = {
 async function getProviderConfig(): Promise<ProviderConfig[]> {
   if (!cachedConfig) {
     const config = await loadProviderConfig();
-    // Sort by priority (descending) and filter enabled providers
     cachedConfig = config.providers
       .filter(provider => provider.enabled !== false)
       .sort((a, b) => (b.priority || 0) - (a.priority || 0));
@@ -119,7 +114,6 @@ export async function resolveProvider(provider: {
   const model = provider.model?.toLowerCase() || "";
   const configs = await getProviderConfig();
   
-  // Find first matching config based on pattern
   const matchingConfig = configs.find(config => model.includes(config.pattern));
 
   if (matchingConfig) {
@@ -137,9 +131,6 @@ export async function resolveProvider(provider: {
   return { type, resolvedBaseUrl, maxTokens };
 }
 
-/**
- * New: Load provider registry from JSON config file
- */
 export async function loadProviderRegistry(): Promise<ProviderRegistry> {
   if (cachedRegistry) {
     return cachedRegistry;
@@ -151,7 +142,6 @@ export async function loadProviderRegistry(): Promise<ProviderRegistry> {
     const data = await fs.readFile(configPath, "utf-8");
     const parsed = JSON.parse(data) as ProviderRegistry;
     
-    // Validate structure
     if (!validateRegistry(parsed)) {
       logger.warn("Invalid provider registry structure, using defaults");
       cachedRegistry = DEFAULT_REGISTRY;
@@ -168,19 +158,14 @@ export async function loadProviderRegistry(): Promise<ProviderRegistry> {
   }
 }
 
-/**
- * Validate registry structure
- */
 function validateRegistry(registry: unknown): registry is ProviderRegistry {
   if (!registry || typeof registry !== "object") return false;
   
   const r = registry as Record<string, unknown>;
   
-  // Check providers array
   if (!Array.isArray(r.providers)) return false;
   if (r.providers.length === 0) return false;
   
-  // Validate each provider
   for (const p of r.providers) {
     if (!validateProvider(p)) {
       logger.warn({ provider: p }, "Invalid provider definition");
@@ -188,21 +173,16 @@ function validateRegistry(registry: unknown): registry is ProviderRegistry {
     }
   }
   
-  // Check fallbacks
   if (!r.fallbacks || typeof r.fallbacks !== "object") return false;
   
   return true;
 }
 
-/**
- * Validate single provider definition
- */
 function validateProvider(p: unknown): p is ProviderDefinition {
   if (!p || typeof p !== "object") return false;
   
   const provider = p as Record<string, unknown>;
   
-  // Required fields
   if (typeof provider.name !== "string" || provider.name.length === 0) return false;
   if (!["api", "local", "rpa"].includes(provider.type as string)) return false;
   if (typeof provider.baseUrl !== "string" || provider.baseUrl.length === 0) return false;
@@ -210,7 +190,6 @@ function validateProvider(p: unknown): p is ProviderDefinition {
   if (typeof provider.priority !== "number") return false;
   if (typeof provider.enabled !== "boolean") return false;
   
-  // Optional fields validation
   if (provider.timeoutMs !== undefined && (typeof provider.timeoutMs !== "number" || provider.timeoutMs < 0)) return false;
   if (provider.maxConcurrency !== undefined && (typeof provider.maxConcurrency !== "number" || provider.maxConcurrency < 1)) return false;
   if (provider.autoDetect !== undefined && typeof provider.autoDetect !== "boolean") return false;
@@ -219,42 +198,27 @@ function validateProvider(p: unknown): p is ProviderDefinition {
   return true;
 }
 
-/**
- * New: Get all providers
- */
 export async function getProviders(): Promise<ProviderDefinition[]> {
   const registry = await loadProviderRegistry();
   return registry.providers.filter(p => p.enabled);
 }
 
-/**
- * New: Get provider by name
- */
 export async function getProviderByName(name: string): Promise<ProviderDefinition | null> {
   const registry = await loadProviderRegistry();
   const provider = registry.providers.find(p => p.name === name && p.enabled);
   return provider || null;
 }
 
-/**
- * New: Get providers by type
- */
 export async function getProvidersByType(type: ProviderType): Promise<ProviderDefinition[]> {
   const registry = await loadProviderRegistry();
   return registry.providers.filter(p => p.type === type && p.enabled);
 }
 
-/**
- * New: Get fallback provider name for a type
- */
 export async function getFallbackProvider(type: ProviderType): Promise<string | null> {
   const registry = await loadProviderRegistry();
   return registry.fallbacks[type] || null;
 }
 
-/**
- * Check if provider limit reached
- */
 export async function isProviderLimitReached(type: ProviderType): Promise<boolean> {
   const registry = await loadProviderRegistry();
   const activeCount = registry.providers.filter(p => p.type === type && p.enabled).length;
@@ -271,9 +235,6 @@ export async function isProviderLimitReached(type: ProviderType): Promise<boolea
   }
 }
 
-/**
- * Get default values for optional provider fields
- */
 export function getProviderDefaults(provider: ProviderDefinition): Required<Pick<ProviderDefinition, 'timeoutMs' | 'maxConcurrency'>> {
   return {
     timeoutMs: provider.timeoutMs ?? 60000, // 60 seconds default
@@ -281,17 +242,11 @@ export function getProviderDefaults(provider: ProviderDefinition): Required<Pick
   };
 }
 
-/**
- * Clear caches (useful for testing or hot-reload)
- */
 export function clearProviderCache(): void {
   cachedConfig = null;
   cachedRegistry = null;
 }
 
-/**
- * Map provider type to connector type
- */
 export function getConnectorType(providerType: ProviderType): "api" | "local" | "rpa" {
   return providerType;
 }
