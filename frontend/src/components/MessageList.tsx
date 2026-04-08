@@ -1,50 +1,7 @@
 import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-
-export interface Opinion {
-  name: string;
-  archetype: string;
-  opinion: string;
-}
-
-export interface PeerReview {
-  reviewer: string;
-  ranking: string[];
-  critique: string;
-}
-
-export interface ScoredOpinion {
-  name: string;
-  opinion: string;
-  scores: {
-    confidence: number;
-    agreement: number;
-    peerRanking: number;
-    final: number;
-  };
-}
-
-export interface ModelCost {
-  model: string;
-  tokensIn: number;
-  tokensOut: number;
-  costUsd: number;
-  latencyMs: number;
-}
-
-export interface ChatMessage {
-  id: string;
-  question: string;
-  verdict?: string;
-  opinions?: Opinion[];
-  peerReviews?: PeerReview[];
-  scored?: ScoredOpinion[];
-  costs?: ModelCost[];
-  totalCostUsd?: number;
-  durationMs?: number;
-  cacheHit?: boolean;
-}
+import type { ChatMessage } from "../types/index.js";
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -98,16 +55,31 @@ export function MessageList({
 }: MessageListProps) {
   if (messages.length === 0) {
     return (
-      <div className="h-full flex flex-col items-center justify-center text-center px-4 animate-fade-in opacity-80 mt-10">
-        <div className="w-16 h-16 bg-white/[0.02] border border-white/[0.05] rounded-full flex items-center justify-center mb-6 shadow-glow">
-          <span className="material-symbols-outlined text-[28px] text-accent/80">
-            forum
-          </span>
+      <div className="h-full flex flex-col items-center justify-center text-center px-4 pt-20">
+        <div className="w-20 h-20 bg-white/[0.02] border border-white/[0.05] rounded-2xl flex items-center justify-center mb-6">
+          <span className="material-symbols-outlined text-[32px] text-accent/60">forum</span>
         </div>
-        <h2 className="text-xl font-medium text-text mb-2 tracking-tight">How can the council help you today?</h2>
-        <p className="text-sm text-text-muted max-w-sm leading-relaxed">
-          Ask a question, and the council members will deliberate to provide a comprehensive, multi-perspective answer.
+        <h2 className="text-2xl font-semibold text-white/90 mb-3 tracking-tight">
+          Ask the Council
+        </h2>
+        <p className="text-sm text-white/30 max-w-md leading-relaxed mb-8">
+          Multiple AI agents will deliberate, debate, and reach mathematical consensus
+          on your question.
         </p>
+        <div className="flex flex-wrap justify-center gap-2 max-w-lg">
+          {[
+            "What are the trade-offs of microservices vs monoliths?",
+            "Should startups prioritize speed or code quality?",
+            "Analyze the future of open-source AI models",
+          ].map((suggestion) => (
+            <button
+              key={suggestion}
+              className="px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs text-white/40 hover:text-white/70 hover:border-white/[0.12] hover:bg-white/[0.05] transition-all duration-200"
+            >
+              {suggestion}
+            </button>
+          ))}
+        </div>
       </div>
     );
   }
@@ -167,7 +139,7 @@ export function MessageList({
                     </div>
 
                     {/* Opinion content */}
-                    <div className="glass-panel p-4 rounded-xl border border-white/[0.04]">
+                    <div className={`glass-panel p-4 rounded-xl border border-white/[0.04] ${i === msg.opinions.length - 1 && !msg.verdict ? 'streaming-cursor' : ''}`}>
                       <ReactMarkdown 
                         remarkPlugins={[remarkGfm]}
                         components={mdComponents}

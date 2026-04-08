@@ -18,7 +18,7 @@ class MLWorker {
     this.readyPromise = new Promise((resolve, reject) => {
       const pythonPath = process.platform === "win32" 
         ? path.join(process.cwd(), ".venv", "Scripts", "python.exe")
-        : path.join(process.cwd(), ".venv", "bin", "python");
+        : "python3";
 
       const scriptPath = path.join(__dirname, "embeddings.py");
       

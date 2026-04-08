@@ -17,10 +17,12 @@ export class OllamaProvider extends BaseProvider {
     this.baseUrl = config.baseUrl || "http://localhost:11434";
   }
 
-  async call({ prompt, messages, signal, isFallback }: {
+  async call({ prompt, messages, signal, isFallback, onChunk }: {
     messages: Message[];
     prompt?: string;
     signal?: AbortSignal;
+    isFallback?: boolean;
+    onChunk?: (chunk: string) => void;
   }): Promise<ProviderResponse> {
     const finalPrompt = prompt || messages[messages.length - 1].content;
     const model = this.config.model || "llama3";
@@ -41,7 +43,7 @@ export class OllamaProvider extends BaseProvider {
           model,
           prompt: finalPrompt,
           system: this.config.systemPrompt,
-          stream: false
+          stream: !!onChunk
         }),
         signal: controller.signal
       });
@@ -50,6 +52,47 @@ export class OllamaProvider extends BaseProvider {
 
       if (!response.ok) {
         throw new Error(`Ollama error: ${response.status} ${response.statusText}`);
+      }
+
+      if (onChunk && response.body) {
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let text = "";
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          let newlineIndex;
+          while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
+            const line = buffer.slice(0, newlineIndex).trim();
+            buffer = buffer.slice(newlineIndex + 1);
+
+            if (!line) continue;
+
+            try {
+              const parsed = JSON.parse(line) as OllamaResponse;
+              if (parsed.response) {
+                text += parsed.response;
+                onChunk(parsed.response);
+              }
+            } catch (e) {
+              // ignore unparseable chunk
+            }
+          }
+        }
+
+        return {
+          text: text.trim(),
+          usage: {
+            promptTokens: 0,
+            completionTokens: 0,
+            totalTokens: 0
+          },
+          cost: 0 // Local is free
+        };
       }
 
       const data = await response.json() as OllamaResponse;

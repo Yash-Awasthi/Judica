@@ -12,11 +12,12 @@ export class OpenAIProvider extends BaseProvider {
     super(config);
   }
 
-  async call({ messages, signal, maxTokens, isFallback }: {
+  async call({ messages, signal, maxTokens, isFallback, onChunk }: {
     messages: Message[];
     signal?: AbortSignal;
     maxTokens?: number;
     isFallback?: boolean;
+    onChunk?: (chunk: string) => void;
   }): Promise<ProviderResponse> {
     const url = (this.config.baseUrl || this.defaultBaseUrl).replace(/\/$/, "");
     await validateSafeUrl(url);
@@ -43,6 +44,7 @@ export class OpenAIProvider extends BaseProvider {
         body: JSON.stringify({
           model: this.config.model,
           max_tokens: maxTokens || this.config.maxTokens,
+          stream: !!onChunk,
           messages: [
             ...(this.config.systemPrompt ? [{ role: "system", content: this.config.systemPrompt }] : []),
             ...messages,
@@ -51,11 +53,63 @@ export class OpenAIProvider extends BaseProvider {
         }),
       });
 
-      const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error?.message ?? `OpenAI API error: ${res.status}`);
+        let errorData: any = {};
+        try { errorData = await res.json(); } catch { /* ignore */ }
+        throw new Error(errorData?.error?.message ?? `OpenAI API error: ${res.status}`);
       }
 
+      if (onChunk && res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let text = "";
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          let newlineIndex;
+          while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
+            const line = buffer.slice(0, newlineIndex).trim();
+            buffer = buffer.slice(newlineIndex + 1);
+
+            if (line.startsWith("data: ")) {
+              const dataStr = line.slice(6).trim();
+              if (dataStr === "[DONE]") continue;
+
+              try {
+                const parsed = JSON.parse(dataStr);
+                const content = parsed.choices?.[0]?.delta?.content;
+                if (content) {
+                  text += content;
+                  onChunk(content);
+                }
+              } catch (e) {
+                // ignore unparseable chunk
+              }
+            }
+          }
+        }
+
+        const usage = {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0
+        };
+
+        const cost = calculateCost(
+          this.config.type === "api" ? "openai" : this.config.type,
+          this.config.model,
+          0,
+          0
+        );
+
+        return { text: text.trim(), usage, cost, raw: { stream: true } };
+      }
+
+      const data = await res.json();
       const msg = data.choices?.[0]?.message;
       
       if (msg?.tool_calls?.length) {
@@ -81,7 +135,7 @@ export class OpenAIProvider extends BaseProvider {
           } as any);
         }
 
-        return this.call({ messages: nextMessages, signal, maxTokens, isFallback });
+        return this.call({ messages: nextMessages, signal, maxTokens, isFallback, onChunk });
       }
 
       const raw = msg?.content || "";

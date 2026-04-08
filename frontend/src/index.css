@@ -109,6 +109,20 @@
   }
 }
 
+@layer components {
+  .streaming-cursor::after {
+    content: '▋';
+    display: inline;
+    animation: blink 1s step-end infinite;
+    color: rgba(94, 234, 212, 0.6);
+    font-weight: 200;
+  }
+
+  @keyframes blink {
+    50% { opacity: 0; }
+  }
+}
+
 @layer utilities {
   /* Scrollbar */
   .scrollbar-custom {
