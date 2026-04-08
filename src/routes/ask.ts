@@ -44,12 +44,12 @@ router.get("/", (req, res) => {
 router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: AuthRequest, res: Response, next: NextFunction) => {
   const startTime = Date.now();
   try {
-    const { question, conversationId, summon, maxTokens, context, mode, userConfig } = req.body;
-    let roundsUsed = req.body.rounds || 1;
+    const { question, conversationId, summon, maxTokens, rounds = 1, context, mode } = req.body;
 
     let effectiveSummon: QueryType | "default" = summon || "default";
     let effectiveMembers = req.body.members;
     let routerDecision: ReturnType<typeof classifyQuery> | null = null;
+    let effectiveRounds = rounds;
 
     if (mode === "auto") {
       const { archetypes, result } = getAutoArchetypes(question);
@@ -67,7 +67,7 @@ router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: Auth
     } else if (mode === "direct") {
       logger.info({ question: question.slice(0, 50) }, "Baseline Mode: Skipping council deliberation");
       effectiveMembers = []; // Empty members list
-      roundsUsed = 0; // Skip rounds
+      effectiveRounds = 0; // Skip rounds
     }
 
     let resolvedMembers;
@@ -131,9 +131,9 @@ router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: Auth
       isCacheHit = true;
       logger.info({ question: question.slice(0, 50) }, "Serving from semantic cache");
     } else {
-      logger.info({ question: question.slice(0, 80), memberCount: councilMembers.length, summon: effectiveSummon, rounds: roundsUsed }, "Council ask started");
+      logger.info({ question: question.slice(0, 80), memberCount: councilMembers.length, summon: effectiveSummon, rounds: effectiveRounds }, "Council ask started");
 
-      const councilResponse = await askCouncil(councilMembers, master, currentMessages, maxTokens, roundsUsed);
+      const councilResponse = await askCouncil(councilMembers, master, currentMessages, maxTokens, effectiveRounds);
       verdict = councilResponse.verdict;
       finalOpinions = councilResponse.opinions;
       tokensUsed = councilResponse.metrics?.totalTokens ?? 0;
@@ -193,6 +193,7 @@ router.post("/stream", optionalAuth, checkQuota, validate(askSchema), async (req
     let effectiveSummon: QueryType | "default" = summon || "default";
     let effectiveMembers = req.body.members;
     let routerDecision: ReturnType<typeof classifyQuery> | null = null;
+    let effectiveRounds = rounds;
 
     if (mode === "auto") {
       const { archetypes, result } = getAutoArchetypes(question);
@@ -207,6 +208,10 @@ router.post("/stream", optionalAuth, checkQuota, validate(askSchema), async (req
         routerFallback: result.fallback,
         strict: true
       }, "Stream auto-router: strict mode - ignoring user members/summon");
+    } else if (mode === "direct") {
+      logger.info({ question: question.slice(0, 50) }, "Stream Baseline Mode: Skipping council deliberation");
+      effectiveMembers = []; // Empty members list
+      effectiveRounds = 0; // Skip rounds
     }
 
     const resolvedMembers = (effectiveMembers || getDefaultMembers()).map((m: any) => {
@@ -288,7 +293,7 @@ router.post("/stream", optionalAuth, checkQuota, validate(askSchema), async (req
       })}\n\n`);
       res.end();
     } else {
-      logger.info({ question: question.slice(0, 80), memberCount: councilMembers.length, summon: effectiveSummon, rounds }, "Council SSE stream started");
+      logger.info({ question: question.slice(0, 80), memberCount: councilMembers.length, summon: effectiveSummon, rounds: effectiveRounds }, "Council SSE stream started");
 
       const emitEvent = (type: string, data: any) => {
         if (!controller.signal.aborted) {
@@ -311,7 +316,7 @@ router.post("/stream", optionalAuth, checkQuota, validate(askSchema), async (req
           emitEvent(event, data);
         },
         maxTokens,
-        rounds,
+        effectiveRounds,
         controller.signal
       );
 

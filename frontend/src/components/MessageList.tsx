@@ -96,6 +96,22 @@ export function MessageList({
   visibleKeyIds,
   setVisibleKeyIds
 }: MessageListProps) {
+  if (messages.length === 0) {
+    return (
+      <div className="h-full flex flex-col items-center justify-center text-center px-4 animate-fade-in opacity-80 mt-10">
+        <div className="w-16 h-16 bg-white/[0.02] border border-white/[0.05] rounded-full flex items-center justify-center mb-6 shadow-glow">
+          <span className="material-symbols-outlined text-[28px] text-accent/80">
+            forum
+          </span>
+        </div>
+        <h2 className="text-xl font-medium text-text mb-2 tracking-tight">How can the council help you today?</h2>
+        <p className="text-sm text-text-muted max-w-sm leading-relaxed">
+          Ask a question, and the council members will deliberate to provide a comprehensive, multi-perspective answer.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-10">
       {messages.map((msg, idx) => (
@@ -103,41 +119,45 @@ export function MessageList({
 
           {/* User question bubble */}
           <div className="flex justify-end">
-            <div className="glass-panel px-5 py-3.5 rounded-2xl rounded-tr-sm max-w-[85%] md:max-w-[75%] text-sm leading-relaxed shadow-2xl text-text border border-white/[0.06]">
+            <div className="bg-[#1f1f1f] text-[#ececec] px-5 py-3.5 rounded-[24px] rounded-br-[4px] max-w-[85%] md:max-w-[70%] text-[15px] leading-[1.6] shadow-sm border border-white/[0.05]">
               {msg.question}
             </div>
           </div>
 
           {/* Opinions */}
           {(msg.opinions?.length ?? 0) > 0 && (
-            <div className="space-y-5">
+            <div className="space-y-8 mt-6">
               {msg.opinions?.map((op, i) => {
                 const color = getMemberColor(op.name);
                 return (
                   <div
                     key={i}
-                    className="animate-slide-up"
+                    className="animate-slide-up group"
                     style={{ animationDelay: `${i * 100}ms` }}
                   >
                     {/* Member header */}
-                    <div className="flex items-center gap-3 mb-2">
+                    <div className="flex items-center gap-3 mb-3">
                       <div
-                        className="member-avatar"
-                        style={{
-                          backgroundColor: color.bg,
-                          boxShadow: `0 0 12px -3px ${color.shadow}`
-                        }}
+                        className="w-8 h-8 rounded-full flex items-center justify-center border border-white/10"
+                        style={{ backgroundColor: `${color.bg}20` }}
                       >
-                        <span className="text-[10px] font-black">{op.name.charAt(0).toUpperCase()}</span>
+                        <span className="text-xs font-semibold" style={{ color: color.bg }}>
+                          {op.name.charAt(0).toUpperCase()}
+                        </span>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-xs font-black text-text-dim uppercase tracking-[0.2em]">
-                          {op.name} • {op.archetype}
-                        </div>
+                      <div className="flex-1 min-w-0 flex items-center gap-2">
+                        <span className="font-medium text-[14px] text-text">
+                          {op.name}
+                        </span>
+                        {op.archetype && (
+                          <span className="text-[10px] uppercase tracking-wider text-text-muted">
+                            • {op.archetype}
+                          </span>
+                        )}
                       </div>
                       <button
                         onClick={() => onPlayTTS(`${msg.id}-${op.name}`, op.opinion)}
-                        className="p-1.5 text-text-dim hover:text-text hover:bg-white/5 rounded-lg transition-colors"
+                        className="p-1.5 text-text-dim hover:text-text hover:bg-white/5 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                         title="Play TTS"
                       >
                         <span className="material-symbols-outlined text-[14px]">
@@ -163,53 +183,55 @@ export function MessageList({
 
           {/* Verdict */}
           {msg.verdict && (
-            <div className="animate-slide-up" style={{ animationDelay: "300ms" }}>
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-8 h-8 bg-gradient-to-br from-accent to-purple-500 rounded-xl flex items-center justify-center shadow-glow">
-                  <span className="material-symbols-outlined text-[14px] text-white">gavel</span>
+            <div className="animate-slide-up mt-8" style={{ animationDelay: "300ms" }}>
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-8 h-8 bg-[#1f1f1f] border border-white/10 rounded-full flex items-center justify-center shadow-sm">
+                  <span className="material-symbols-outlined text-[16px] text-accent">gavel</span>
                 </div>
-                <div className="text-xs font-black text-text-dim uppercase tracking-[0.2em]">
-                  Council Verdict
+                <div className="text-[14px] font-medium text-text flex items-center">
+                  Final Response
                   {msg.cacheHit && (
-                    <span className="ml-2 px-2 py-0.5 bg-green-500/20 text-green-400 rounded-full text-[9px]">
-                      CACHE HIT
+                    <span className="ml-3 px-2 py-0.5 bg-green-500/10 text-green-400 rounded-md text-[10px] uppercase font-bold tracking-wider">
+                      Cache Hit
                     </span>
                   )}
                 </div>
                 <button
                   onClick={() => msg.verdict && onPlayTTS(msg.id, msg.verdict)}
-                  className="p-1.5 text-text-dim hover:text-text hover:bg-white/5 rounded-lg transition-colors ml-auto"
+                  className="p-1.5 text-text-muted hover:text-text hover:bg-white/5 rounded-lg transition-colors ml-auto"
                   title="Play TTS"
                 >
-                  <span className="material-symbols-outlined text-[14px]">
+                  <span className="material-symbols-outlined text-[16px]">
                     {playingAudioId === msg.id ? "pause" : "play_arrow"}
                   </span>
                 </button>
               </div>
 
-              <div className="glass-panel p-5 rounded-xl border border-white/[0.06] shadow-2xl">
-                <ReactMarkdown 
-                  remarkPlugins={[remarkGfm]}
-                  components={mdComponents}
-                >
-                  {msg.verdict}
-                </ReactMarkdown>
+              <div className="pl-11 pr-4">
+                <div className="text-[15px] leading-[1.7] text-text whitespace-pre-wrap">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm]}
+                    components={mdComponents}
+                  >
+                    {msg.verdict}
+                  </ReactMarkdown>
+                </div>
               </div>
 
               {/* Cost breakdown */}
               {msg.costs && msg.costs.length > 0 && (
-                <div className="mt-4 flex flex-wrap gap-2">
+                <div className="pl-11 mt-4 flex flex-wrap gap-2">
                   {msg.costs.map((cost, i) => (
                     <div
                       key={i}
-                      className="px-2 py-1 bg-white/[0.03] border border-white/[0.08] rounded-lg text-[10px] font-mono text-text-dim"
+                      className="px-2.5 py-1 bg-[#1f1f1f] border border-white/5 rounded-md text-[11px] font-mono text-text-muted"
                       title={`Tokens: ${cost.tokensIn}→${cost.tokensOut} • Latency: ${cost.latencyMs}ms`}
                     >
                       {cost.model}: ${cost.costUsd.toFixed(4)}
                     </div>
                   ))}
                   {msg.totalCostUsd && (
-                    <div className="px-2 py-1 bg-accent/10 border border-accent/20 rounded-lg text-[10px] font-mono text-accent font-bold">
+                    <div className="px-2.5 py-1 bg-accent/10 border border-accent/10 rounded-md text-[11px] font-mono text-accent font-medium">
                       Total: ${msg.totalCostUsd.toFixed(4)}
                     </div>
                   )}
@@ -218,7 +240,8 @@ export function MessageList({
 
               {/* Duration */}
               {msg.durationMs && (
-                <div className="mt-3 text-xs text-text-dim">
+                <div className="pl-11 mt-2 text-[12px] text-text-dim flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[14px]">timer</span>
                   Completed in {(msg.durationMs / 1000).toFixed(1)}s
                 </div>
               )}
