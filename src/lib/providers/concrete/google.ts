@@ -10,10 +10,12 @@ export class GoogleProvider extends BaseProvider {
     super(config);
   }
 
-  async call({ messages, signal, maxTokens, isFallback }: {
+  async call({ messages, signal, maxTokens, isFallback, onChunk }: {
     messages: Message[];
     signal?: AbortSignal;
     maxTokens?: number;
+    isFallback?: boolean;
+    onChunk?: (chunk: string) => void;
   }): Promise<ProviderResponse> {
     const apiHost = "https://generativelanguage.googleapis.com";
     await validateSafeUrl(apiHost);
@@ -30,8 +32,9 @@ export class GoogleProvider extends BaseProvider {
     }));
 
     try {
+      const endpoint = onChunk ? "streamGenerateContent?alt=sse&" : "generateContent?";
       const res = await fetch(
-        `${apiHost}/v1beta/models/${this.config.model || "gemini-2.0-flash"}:generateContent?key=${this.config.apiKey}`,
+        `${apiHost}/v1beta/models/${this.config.model || "gemini-2.0-flash"}:${endpoint}key=${this.config.apiKey}`,
         {
           method: "POST",
           signal: controller.signal,
@@ -53,11 +56,64 @@ export class GoogleProvider extends BaseProvider {
         }
       );
 
-      const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error?.message ?? `Google API error: ${res.status}`);
+        let errorData: any = {};
+        try { errorData = await res.json(); } catch { /* ignore */ }
+        throw new Error(errorData?.error?.message ?? `Google API error: ${res.status}`);
       }
 
+      if (onChunk && res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let text = "";
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          let newlineIndex;
+          while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
+            const line = buffer.slice(0, newlineIndex).trim();
+            buffer = buffer.slice(newlineIndex + 1);
+
+            if (line.startsWith("data: ")) {
+              const dataStr = line.slice(6).trim();
+              if (!dataStr) continue;
+
+              try {
+                const parsed = JSON.parse(dataStr);
+                const candidate = parsed.candidates?.[0];
+                const content = candidate?.content?.parts?.[0]?.text;
+                if (content) {
+                  text += content;
+                  onChunk(content);
+                }
+              } catch (e) {
+                // ignore unparseable chunk
+              }
+            }
+          }
+        }
+
+        const usage = {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0
+        };
+
+        const cost = calculateCost(
+          "google",
+          this.config.model,
+          0,
+          0
+        );
+
+        return { text: text.trim(), usage, cost, raw: { stream: true } };
+      }
+
+      const data = await res.json();
       const candidate = data.candidates?.[0];
       const part = candidate?.content?.parts?.[0];
 
@@ -79,7 +135,7 @@ export class GoogleProvider extends BaseProvider {
           { role: "tool", name, content: safeResult } as any
         ];
 
-        return this.call({ messages: nextMessages, signal, maxTokens, isFallback });
+        return this.call({ messages: nextMessages, signal, maxTokens, isFallback, onChunk });
       }
 
       const text = part?.text || "";

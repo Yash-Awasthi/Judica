@@ -15,7 +15,8 @@ export async function askProvider(
   providerConfig: Provider,
   messages: Message[] | string,
   isFallback = false,
-  abortSignal?: AbortSignal
+  abortSignal?: AbortSignal,
+  onChunk?: (chunk: string) => void
 ): Promise<ProviderResponse> {
   const normMessages: Message[] = typeof messages === "string"
     ? [{ role: "user", content: messages }]
@@ -32,7 +33,8 @@ export async function askProvider(
       messages: normMessages,
       prompt,
       signal: abortSignal,
-      isFallback
+      isFallback,
+      onChunk
     });
 
   } catch (err) {
@@ -46,7 +48,7 @@ export async function askProvider(
     if (!isFallback) {
       const fallback = getFallbackProvider(providerConfig);
       if (fallback) {
-        return askProvider(fallback, messages, true, abortSignal);
+        return askProvider(fallback, messages, true, abortSignal, onChunk);
       }
     }
 
@@ -67,7 +69,7 @@ export async function askProviderStream(
 ): Promise<ProviderResponse> {
   try {
     return await withRetry(async () => {
-      return await askProvider(providerConfig, messages, isFallback, abortSignal);
+      return await askProvider(providerConfig, messages, isFallback, abortSignal, onChunk);
     }, {
       onRetry: (err: unknown, attempt: number) => {
         logger.warn({ attempt, error: (err as Error).message }, "Retry initiated for provider call");
