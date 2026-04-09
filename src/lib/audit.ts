@@ -1,4 +1,6 @@
-import prisma from "./db.js";
+import { db } from "./drizzle.js";
+import { eq, and, lt, gte, lte, desc, asc, sql } from "drizzle-orm";
+import { auditLogs } from "../db/schema/conversations.js";
 import logger from "./logger.js";
 import { detectPII, PIIDetection } from "./pii.js";
 
@@ -31,32 +33,30 @@ export async function logAudit(entry: AuditEntry): Promise<void> {
     const sanitizedPrompt = isPromptSafe ? entry.prompt : promptPII.anonymized;
     const sanitizedResponse = isResponseSafe ? entry.response : responsePII.anonymized;
 
-    await prisma.auditLog.create({
-      data: {
-        userId: entry.userId,
-        conversationId: entry.conversationId,
-        modelName: entry.modelName,
-        prompt: sanitizedPrompt.slice(0, 10000), // Truncate to prevent DB bloat
-        response: sanitizedResponse.slice(0, 10000),
-        tokensIn: entry.tokensIn,
-        tokensOut: entry.tokensOut,
-        latencyMs: entry.latencyMs,
-        metadata: {
-          sessionId: entry.sessionId,
-          requestType: entry.requestType,
-          success: entry.success,
-          errorCode: entry.errorCode,
-          errorMessage: entry.errorMessage,
-          piiDetected: {
-            prompt: { found: promptPII.found, riskScore: promptPII.riskScore, types: promptPII.types },
-            response: { found: responsePII.found, riskScore: responsePII.riskScore, types: responsePII.types }
-          },
-          originalLengths: {
-            prompt: entry.prompt.length,
-            response: entry.response.length
-          },
-          ...entry.metadata
-        }
+    await db.insert(auditLogs).values({
+      userId: entry.userId,
+      conversationId: entry.conversationId,
+      modelName: entry.modelName,
+      prompt: sanitizedPrompt.slice(0, 10000), // Truncate to prevent DB bloat
+      response: sanitizedResponse.slice(0, 10000),
+      tokensIn: entry.tokensIn,
+      tokensOut: entry.tokensOut,
+      latencyMs: entry.latencyMs,
+      metadata: {
+        sessionId: entry.sessionId,
+        requestType: entry.requestType,
+        success: entry.success,
+        errorCode: entry.errorCode,
+        errorMessage: entry.errorMessage,
+        piiDetected: {
+          prompt: { found: promptPII.found, riskScore: promptPII.riskScore, types: promptPII.types },
+          response: { found: responsePII.found, riskScore: responsePII.riskScore, types: responsePII.types }
+        },
+        originalLengths: {
+          prompt: entry.prompt.length,
+          response: entry.response.length
+        },
+        ...entry.metadata
       }
     });
 
@@ -180,58 +180,62 @@ export async function getUserAuditLogs(
 ) {
   const { limit = 50, offset = 0, requestType, dateFrom, dateTo, successOnly } = options;
 
-  const whereClause: Record<string, unknown> = { userId };
+  const conditions = [eq(auditLogs.userId, userId)];
 
   if (requestType) {
-    whereClause.metadata = {
-      path: ['requestType'],
-      equals: requestType
-    };
+    conditions.push(
+      sql`${auditLogs.metadata}->>'requestType' = ${requestType}`
+    );
   }
 
-  if (dateFrom || dateTo) {
-    whereClause.createdAt = {} as Record<string, unknown>;
-    if (dateFrom) (whereClause.createdAt as Record<string, unknown>).gte = dateFrom;
-    if (dateTo) (whereClause.createdAt as Record<string, unknown>).lte = dateTo;
+  if (dateFrom) {
+    conditions.push(gte(auditLogs.createdAt, dateFrom));
+  }
+
+  if (dateTo) {
+    conditions.push(lte(auditLogs.createdAt, dateTo));
   }
 
   if (successOnly) {
-    whereClause.metadata = {
-      ...whereClause.metadata as Record<string, unknown>,
-      path: ['success'],
-      equals: true
-    };
+    conditions.push(
+      sql`(${auditLogs.metadata}->>'success')::boolean = true`
+    );
   }
 
-  return prisma.auditLog.findMany({
-    where: whereClause,
-    orderBy: { createdAt: "desc" },
-    take: limit,
-    skip: offset,
-  });
+  return db
+    .select()
+    .from(auditLogs)
+    .where(and(...conditions))
+    .orderBy(desc(auditLogs.createdAt))
+    .limit(limit)
+    .offset(offset);
 }
 
 export async function getConversationAuditLogs(
   conversationId: string,
   limit = 100
 ) {
-  return prisma.auditLog.findMany({
-    where: { conversationId },
-    orderBy: { createdAt: "asc" },
-    take: limit,
-  });
+  return db
+    .select()
+    .from(auditLogs)
+    .where(eq(auditLogs.conversationId, conversationId))
+    .orderBy(asc(auditLogs.createdAt))
+    .limit(limit);
 }
 
 export async function getUserAuditStats(userId: number, days = 30) {
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
 
-  const logs = await prisma.auditLog.findMany({
-    where: {
-      userId,
-      createdAt: { gte: startDate }
-    }
-  }) as { id: number; userId: number | null; createdAt: Date; conversationId: string | null; prompt: string; modelName: string; response: string; tokensIn: number; tokensOut: number; latencyMs: number; metadata?: { success?: boolean; requestType?: string; piiDetected?: { prompt?: { found: boolean }; response?: { found: boolean } } } }[];
+  const logs = await db
+    .select()
+    .from(auditLogs)
+    .where(
+      and(
+        eq(auditLogs.userId, userId),
+        gte(auditLogs.createdAt, startDate)
+      )
+    ) as { id: number; userId: number | null; createdAt: Date; conversationId: string | null; prompt: string; modelName: string; response: string; tokensIn: number; tokensOut: number; latencyMs: number; metadata?: { success?: boolean; requestType?: string; piiDetected?: { prompt?: { found: boolean }; response?: { found: boolean } } } }[];
 
   const stats = {
     totalRequests: logs.length,
@@ -262,13 +266,12 @@ export async function cleanupOldAuditLogs(daysToKeep = 90) {
   const cutoffDate = new Date();
   cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
 
-  const result = await prisma.auditLog.deleteMany({
-    where: {
-      createdAt: { lt: cutoffDate }
-    }
-  });
+  const result = await db
+    .delete(auditLogs)
+    .where(lt(auditLogs.createdAt, cutoffDate));
+  const deletedCount = result.rowCount ?? 0;
 
-  logger.info({ deletedCount: result.count, cutoffDate }, "Cleaned up old audit logs");
+  logger.info({ deletedCount, cutoffDate }, "Cleaned up old audit logs");
 
-  return result.count;
+  return deletedCount;
 }

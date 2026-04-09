@@ -1,4 +1,7 @@
-import prisma from "./db.js";
+import { db } from "./drizzle.js";
+import { userArchetypes } from "../db/schema/users.js";
+import { chats } from "../db/schema/conversations.js";
+import { eq, and, asc } from "drizzle-orm";
 import { ARCHETYPES } from "../config/archetypes.js";
 import { Archetype } from "../config/archetypes.js";
 
@@ -16,14 +19,13 @@ export interface UserArchetypeInput {
 }
 
 export async function getUserArchetypes(userId: number): Promise<Record<string, Archetype>> {
-  const userArchetypes = await prisma.userArchetype.findMany({
-    where: { userId, isActive: true },
-    orderBy: { createdAt: "asc" }
-  });
+  const rows = await db.select().from(userArchetypes)
+    .where(and(eq(userArchetypes.userId, userId), eq(userArchetypes.isActive, true)))
+    .orderBy(asc(userArchetypes.createdAt));
 
   const customArchetypes: Record<string, Archetype> = {};
-  
-  for (const ua of userArchetypes) {
+
+  for (const ua of rows) {
     customArchetypes[ua.archetypeId || `custom_${ua.id}`] = {
       id: ua.archetypeId || `custom_${ua.id}`,
       name: ua.name,
@@ -45,9 +47,10 @@ export async function upsertUserArchetype(
   archetype: UserArchetypeInput,
   archetypeId?: string
 ): Promise<Archetype> {
+  const aid = archetypeId || `custom_${Date.now()}`;
   const data = {
     userId,
-    archetypeId: archetypeId || `custom_${Date.now()}`,
+    archetypeId: aid,
     name: archetype.name,
     thinkingStyle: archetype.thinkingStyle,
     asks: archetype.asks,
@@ -56,19 +59,17 @@ export async function upsertUserArchetype(
     tools: archetype.tools || [],
     icon: archetype.icon,
     colorBg: archetype.colorBg,
-    isActive: archetype.isActive !== false
+    isActive: archetype.isActive !== false,
+    updatedAt: new Date()
   };
 
-  const result = await prisma.userArchetype.upsert({
-    where: {
-      userId_archetypeId: {
-        userId,
-        archetypeId: archetypeId || `custom_${Date.now()}`
-      }
-    },
-    update: data,
-    create: data
-  });
+  const [result] = await db.insert(userArchetypes)
+    .values({ ...data, createdAt: new Date() })
+    .onConflictDoUpdate({
+      target: [userArchetypes.userId, userArchetypes.archetypeId],
+      set: data
+    })
+    .returning();
 
   return {
     id: result.archetypeId,
@@ -84,24 +85,21 @@ export async function upsertUserArchetype(
 }
 
 export async function deleteUserArchetype(userId: number, archetypeId: string): Promise<void> {
-  await prisma.userArchetype.delete({
-    where: {
-      userId_archetypeId: { userId, archetypeId }
-    }
-  });
+  await db.delete(userArchetypes)
+    .where(and(eq(userArchetypes.userId, userId), eq(userArchetypes.archetypeId, archetypeId)));
 }
 
 export async function toggleArchetypeStatus(userId: number, archetypeId: string): Promise<boolean> {
-  const archetype = await prisma.userArchetype.findUnique({
-    where: { userId_archetypeId: { userId, archetypeId } }
-  });
+  const [archetype] = await db.select().from(userArchetypes)
+    .where(and(eq(userArchetypes.userId, userId), eq(userArchetypes.archetypeId, archetypeId)))
+    .limit(1);
 
   if (!archetype) return false;
 
-  const updated = await prisma.userArchetype.update({
-    where: { userId_archetypeId: { userId, archetypeId } },
-    data: { isActive: !archetype.isActive }
-  });
+  const [updated] = await db.update(userArchetypes)
+    .set({ isActive: !archetype.isActive })
+    .where(and(eq(userArchetypes.userId, userId), eq(userArchetypes.archetypeId, archetypeId)))
+    .returning();
 
   return updated.isActive;
 }
@@ -152,14 +150,13 @@ export function validateArchetype(data: UserArchetypeInput): { valid: boolean; e
 }
 
 export async function getArchetypeUsage(userId: number): Promise<Record<string, number>> {
-  const chats = await prisma.chat.findMany({
-    where: { userId },
-    select: { opinions: true }
-  });
+  const rows = await db.select({ opinions: chats.opinions })
+    .from(chats)
+    .where(eq(chats.userId, userId));
 
   const usage: Record<string, number> = {};
 
-  for (const chat of chats) {
+  for (const chat of rows) {
     const opinions = chat.opinions as { name: string }[] || [];
     for (const opinion of opinions) {
       const name = opinion.name;
@@ -189,10 +186,9 @@ export function cloneDefaultArchetype(archetypeId: string): UserArchetypeInput {
 }
 
 export async function exportUserArchetypes(userId: number): Promise<string> {
-  const archetypes = await prisma.userArchetype.findMany({
-    where: { userId },
-    orderBy: { createdAt: "asc" }
-  });
+  const archetypes = await db.select().from(userArchetypes)
+    .where(eq(userArchetypes.userId, userId))
+    .orderBy(asc(userArchetypes.createdAt));
 
   return JSON.stringify(archetypes, null, 2);
 }
@@ -203,7 +199,7 @@ export async function importArchetypes(userId: number, jsonData: string): Promis
 
   try {
     const data = JSON.parse(jsonData);
-    
+
     if (!Array.isArray(data)) {
       errors.push("Invalid format: expected array of archetypes");
       return { imported, errors };

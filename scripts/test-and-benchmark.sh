@@ -65,19 +65,10 @@ check_prerequisites() {
 # Setup database
 setup_database() {
     print_status "Setting up database..."
-    
-    # Check if database exists
-    if ! npx prisma db pull --force &> /dev/null; then
-        print_status "Database not found, creating..."
-        npx prisma migrate deploy
-    else
-        print_status "Database exists, applying migrations..."
-        npx prisma migrate deploy
-    fi
-    
-    # Generate Prisma client
-    npx prisma generate
-    
+
+    # Apply schema with Drizzle
+    npx drizzle-kit push
+
     print_success "Database setup completed"
 }
 
@@ -164,7 +155,7 @@ run_database_tests() {
     print_status "Running database performance tests..."
     
     # Test connection pool
-    npx prisma db seed --preview-feature || print_warning "Database seeding failed"
+    node -e "const { Pool } = require('pg'); const pool = new Pool({connectionString: process.env.DATABASE_URL}); pool.query('SELECT 1').then(() => { console.log('DB connection OK'); pool.end(); }).catch(e => { console.error(e); process.exit(1); })" || print_warning "Database connection test failed"
     
     # Test query performance
     node scripts/db-performance-test.js || print_warning "Database performance test failed"

@@ -1,12 +1,13 @@
 import crypto from "crypto";
 import logger from "./logger.js";
+import { env } from "../config/env.js";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
 const TAG_LENGTH = 16;
 
 function getMasterKey(): Buffer {
-  const keyStr = process.env.MASTER_ENCRYPTION_KEY;
+  const keyStr = env.MASTER_ENCRYPTION_KEY;
   if (!keyStr) {
     throw new Error("CRITICAL: MASTER_ENCRYPTION_KEY environment variable is not set");
   }
@@ -28,7 +29,7 @@ export function encrypt(text: string): string {
     return `${iv.toString("hex")}:${tag}:${encrypted}`;
   } catch (err) {
     logger.error({ err: (err as Error).message }, "Encryption failed");
-    throw new Error("Failed to encrypt sensitive data");
+    throw new Error("Failed to encrypt sensitive data", { cause: err });
   }
 }
 
@@ -52,7 +53,7 @@ export function decrypt(encryptedText: string): string {
     return decrypted;
   } catch (err) {
     logger.error({ err: (err as Error).message }, "Decryption failed");
-    throw new Error("Failed to decrypt sensitive data - check MASTER_ENCRYPTION_KEY");
+    throw new Error("Failed to decrypt sensitive data - check MASTER_ENCRYPTION_KEY", { cause: err });
   }
 }
 

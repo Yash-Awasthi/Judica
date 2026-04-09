@@ -1,159 +1,197 @@
-import { useState } from "react";
+import { useState, useCallback, FormEvent } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { Eye, EyeOff, Mail, Lock, User, ArrowRight } from "lucide-react";
+import { useAuth } from "../context/AuthContext";
 
-interface AuthProps {
-  onLogin: (token: string, username: string) => void;
-}
-
-export function AuthScreen({ onLogin }: AuthProps) {
-  const [isLogin, setIsLogin] = useState(true);
-  const [username, setUsername] = useState("");
+export function AuthScreen() {
+  const { login, register } = useAuth();
+  const [mode, setMode] = useState<"login" | "register">("login");
+  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
+  const [showPw, setShowPw] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = useCallback(async (e: FormEvent) => {
     e.preventDefault();
     setError("");
     setLoading(true);
-
     try {
-      const endpoint = isLogin ? "/api/auth/login" : "/api/auth/register";
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username, password }),
-      });
-
-      const data = await res.json() as { token?: string; username?: string; message?: string; error?: string };
-
-      if (!res.ok) {
-        throw new Error(data.message || data.error || "Authentication failed");
+      if (mode === "login") {
+        await login(email, password);
+      } else {
+        await register(username, email, password);
       }
-
-      onLogin(data.token!, data.username!);
-    } catch (err: unknown) {
-      setError(err instanceof Error ? err.message : "Failed to authenticate");
+    } catch (err: any) {
+      setError(err?.message || "Authentication failed");
     } finally {
       setLoading(false);
     }
-  };
+  }, [mode, email, password, username, login, register]);
 
   return (
-    <div className="flex h-screen items-center justify-center bg-bg relative overflow-hidden font-sans">
-      {/* Animated background orbs */}
-      <div className="absolute top-1/4 left-1/4 w-[600px] h-[600px] bg-accent/4 rounded-full blur-[130px] pointer-events-none animate-glow-pulse" />
-      <div className="absolute bottom-1/4 right-1/4 w-[400px] h-[400px] bg-accent-3/5 rounded-full blur-[100px] pointer-events-none animate-glow-pulse" style={{ animationDelay: '1.5s' }} />
+    <div className="min-h-screen flex items-center justify-center bg-[var(--bg)] relative overflow-hidden px-4">
+      {/* Background ambient orbs */}
+      <div className="absolute w-[600px] h-[600px] rounded-full top-[-20%] left-[-10%] blur-[120px] opacity-[0.04] bg-[var(--accent-mint)] animate-drift pointer-events-none" />
+      <div className="absolute w-[500px] h-[500px] rounded-full bottom-[-15%] right-[-10%] blur-[120px] opacity-[0.04] bg-[var(--accent-blue)] animate-drift-slow pointer-events-none" />
+      <div className="absolute w-[400px] h-[400px] rounded-full top-[30%] right-[20%] blur-[120px] opacity-[0.03] bg-[var(--accent-gold)] animate-drift pointer-events-none" />
 
-      <div className="w-full max-w-sm px-10 py-10 relative z-10 mx-4">
-        {/* Glassmorphism card */}
-        <div className="relative border border-white/[0.07] bg-white/[0.02] backdrop-blur-2xl rounded-2xl shadow-2xl overflow-hidden p-8">
-          {/* Top glow line */}
-          <div className="absolute top-0 left-1/4 right-1/4 h-px bg-gradient-to-r from-transparent via-accent/40 to-transparent" />
-
-          {/* Brand */}
-          <div className="flex flex-col items-center mb-10">
-            <div className="w-14 h-14 rounded-2xl bg-accent/8 border border-accent/15 flex items-center justify-center shadow-glow mb-6 relative">
-              <span
-                className="material-symbols-outlined text-accent text-3xl"
-                style={{ fontVariationSettings: "'FILL' 1" }}
-              >
-                gavel
-              </span>
-              <div className="absolute inset-0 rounded-2xl bg-accent/5 blur-sm" />
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.4, ease: "easeOut" }}
+        className="w-full max-w-[420px]"
+      >
+        <div className="surface-card p-8 rounded-modal">
+          {/* Logo */}
+          <div className="text-center mb-8">
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[var(--accent-mint)] to-emerald-500 flex items-center justify-center mx-auto mb-4 shadow-glow">
+              <span className="text-black text-xl font-black">A</span>
             </div>
-            <h1 className="text-2xl font-black tracking-tight text-text mb-1.5">
-              AI <span className="gradient-text">COUNCIL</span>
+            <h1 className="text-2xl font-bold tracking-tight text-[var(--text-primary)]">
+              AIBY<span className="text-[var(--accent-mint)]">AI</span>
             </h1>
-            <p className="text-[10px] text-text-muted uppercase tracking-[0.25em] font-bold">
-              {isLogin ? "Magistrate Login" : "Create Identity"}
+            <p className="text-sm text-[var(--text-muted)] mt-1.5">
+              Multimodal Multi-Agent Deliberative Intelligence
             </p>
           </div>
 
-          {/* Tab switcher */}
-          <div className="flex mb-6 p-0.5 bg-white/[0.03] rounded-lg border border-white/5">
-            {["Login", "Register"].map((tab) => {
-              const active = (tab === "Login") === isLogin;
-              return (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => { setIsLogin(tab === "Login"); setError(""); }}
-                  className={`flex-1 py-2 text-xs font-bold rounded transition-all duration-200 ${
-                    active
-                      ? "bg-accent/10 text-accent border border-accent/15 shadow-glow-sm"
-                      : "text-text-muted hover:text-text"
-                  }`}
-                >
-                  {tab}
-                </button>
-              );
-            })}
+          {/* Mode Tabs */}
+          <div className="relative flex bg-[var(--glass-bg)] rounded-pill p-1 mb-6 border border-[var(--glass-border)]">
+            <motion.div
+              className="absolute inset-y-1 rounded-pill bg-[var(--bg-surface-1)] shadow-sm"
+              animate={{
+                left: mode === "login" ? "4px" : "50%",
+                right: mode === "login" ? "50%" : "4px",
+              }}
+              transition={{ type: "spring", stiffness: 500, damping: 30 }}
+            />
+            <button
+              onClick={() => setMode("login")}
+              className={`relative z-10 flex-1 py-2 text-sm font-semibold rounded-pill transition-colors ${
+                mode === "login" ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"
+              }`}
+            >
+              Sign In
+            </button>
+            <button
+              onClick={() => setMode("register")}
+              className={`relative z-10 flex-1 py-2 text-sm font-semibold rounded-pill transition-colors ${
+                mode === "register" ? "text-[var(--text-primary)]" : "text-[var(--text-muted)]"
+              }`}
+            >
+              Sign Up
+            </button>
           </div>
 
+          {/* Error */}
+          <AnimatePresence>
+            {error && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="mb-4 px-4 py-3 rounded-button bg-[var(--accent-coral)]/8 border border-[var(--accent-coral)]/15 text-[var(--accent-coral)] text-sm"
+              >
+                {error}
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-1.5">
-              <label className="text-[9px] font-black uppercase tracking-[0.2em] text-text-dim ml-1">
-                Username
-              </label>
+            <AnimatePresence mode="wait">
+              {mode === "register" && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className="relative mb-4">
+                    <User size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
+                    <input
+                      type="text"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      placeholder="Username"
+                      className="input-base pl-11"
+                      required
+                    />
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <div className="relative">
+              <Mail size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
               <input
-                id="auth-username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="case identity..."
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Email address"
+                className="input-base pl-11"
                 required
-                autoComplete="username"
-                className="input-base"
               />
             </div>
 
-            <div className="space-y-1.5">
-              <label className="text-[9px] font-black uppercase tracking-[0.2em] text-text-dim ml-1">
-                Password
-              </label>
+            <div className="relative">
+              <Lock size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
               <input
-                id="auth-password"
-                type="password"
+                type={showPw ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="secure protocol..."
+                placeholder="Password"
+                className="input-base pl-11 pr-11"
                 required
-                autoComplete={isLogin ? "current-password" : "new-password"}
-                className="input-base"
               />
+              <button
+                type="button"
+                onClick={() => setShowPw(!showPw)}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+                tabIndex={-1}
+              >
+                {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+              </button>
             </div>
 
-            {error && (
-              <div className="flex items-center gap-2 p-3 bg-danger/8 border border-danger/20 rounded-xl text-danger text-[11px] font-bold animate-fade-in">
-                <span className="material-symbols-outlined text-sm flex-shrink-0">error</span>
-                {error}
-              </div>
-            )}
-
             <button
-              id="auth-submit"
               type="submit"
               disabled={loading}
-              className="w-full relative overflow-hidden bg-accent hover:brightness-110 text-black font-black uppercase tracking-widest py-3.5 rounded-xl transition-all duration-200 active:scale-[0.98] disabled:opacity-40 disabled:cursor-not-allowed shadow-glow text-xs mt-2"
+              className="btn-pill-primary w-full justify-center text-base py-3 disabled:opacity-40 disabled:transform-none"
             >
               {loading ? (
-                <span className="flex items-center justify-center gap-2">
-                  <span className="w-3.5 h-3.5 border-2 border-black/20 border-t-black/80 rounded-full animate-spin" />
-                  Authenticating...
+                <span className="flex items-center gap-2">
+                  <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+                  {mode === "login" ? "Signing in..." : "Creating account..."}
                 </span>
               ) : (
-                isLogin ? "Enter Council" : "Create Identity"
+                <span className="flex items-center gap-2">
+                  {mode === "login" ? "Sign In" : "Create Account"}
+                  <ArrowRight size={16} />
+                </span>
               )}
             </button>
           </form>
+
+          {/* Footer */}
+          <p className="text-center text-xs text-[var(--text-muted)] mt-6">
+            {mode === "login" ? "Don't have an account?" : "Already have an account?"}
+            <button
+              onClick={() => { setMode(mode === "login" ? "register" : "login"); setError(""); }}
+              className="ml-1 text-[var(--accent-mint)] font-semibold hover:underline"
+            >
+              {mode === "login" ? "Sign up" : "Sign in"}
+            </button>
+          </p>
         </div>
 
-        {/* Footer */}
-        <div className="mt-6 text-center">
-          <span className="text-[9px] font-bold text-white/15 uppercase tracking-[0.4em] select-none">
-            Magistrate Protocol — v1.0
-          </span>
-        </div>
-      </div>
+        {/* Trust badge */}
+        <p className="text-center text-[10px] text-[var(--text-muted)] mt-6 tracking-wider uppercase">
+          Multi-Agent Consensus Intelligence Platform
+        </p>
+      </motion.div>
     </div>
   );
 }

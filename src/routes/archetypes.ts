@@ -1,8 +1,8 @@
-import { Router, Response, NextFunction } from "express";
-import { 
-  getUserArchetypes, 
-  upsertUserArchetype, 
-  deleteUserArchetype, 
+import { FastifyPluginAsync } from "fastify";
+import {
+  getUserArchetypes,
+  upsertUserArchetype,
+  deleteUserArchetype,
   toggleArchetypeStatus,
   validateArchetype,
   cloneDefaultArchetype,
@@ -10,184 +10,152 @@ import {
   importArchetypes,
   getArchetypeUsage
 } from "../lib/archetypes.js";
-import { optionalAuth } from "../middleware/auth.js";
-import { AuthRequest } from "../types/index.js";
+import { fastifyOptionalAuth } from "../middleware/fastifyAuth.js";
 import { AppError } from "../middleware/errorHandler.js";
 
-const router = Router();
+const archetypesPlugin: FastifyPluginAsync = async (fastify) => {
+  fastify.get("/", { preHandler: fastifyOptionalAuth }, async (request, reply) => {
+    const userId = request.userId;
 
-router.get("/", optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const userId = req.userId;
-    
     if (!userId) {
       const { ARCHETYPES } = await import("../config/archetypes.js");
-      return res.json({ archetypes: ARCHETYPES, isCustom: false });
+      return { archetypes: ARCHETYPES, isCustom: false };
     }
 
     const archetypes = await getUserArchetypes(userId);
     const usage = await getArchetypeUsage(userId);
-    
-    res.json({ 
-      archetypes, 
-      usage,
-      isCustom: true 
-    });
-  } catch (err) {
-    next(err);
-  }
-});
 
-router.post("/", optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const userId = req.userId;
+    return {
+      archetypes,
+      usage,
+      isCustom: true
+    };
+  });
+
+  fastify.post("/", { preHandler: fastifyOptionalAuth }, async (request, reply) => {
+    const userId = request.userId;
     if (!userId) {
       throw new AppError(401, "Authentication required for custom archetypes");
     }
 
-    const { archetypeId, ...archetypeData } = req.body;
-    
+    const { archetypeId, ...archetypeData } = request.body as any;
+
     const validation = validateArchetype(archetypeData);
     if (!validation.valid) {
       throw new AppError(400, `Validation failed: ${validation.errors.join(", ")}`);
     }
 
     const archetype = await upsertUserArchetype(userId, archetypeData, archetypeId);
-    
-    res.json({ 
+
+    return {
       message: archetypeId ? "Archetype updated successfully" : "Archetype created successfully",
-      archetype 
-    });
-  } catch (err) {
-    next(err);
-  }
-});
+      archetype
+    };
+  });
 
-router.delete("/:id", optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const userId = req.userId;
+  fastify.delete("/:id", { preHandler: fastifyOptionalAuth }, async (request, reply) => {
+    const userId = request.userId;
     if (!userId) {
       throw new AppError(401, "Authentication required");
     }
 
-    const { id } = req.params;
+    const { id } = request.params as any;
     await deleteUserArchetype(userId, id as string);
-    
-    res.json({ message: "Archetype deleted successfully" });
-  } catch (err) {
-    next(err);
-  }
-});
 
-router.patch("/:id/toggle", optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const userId = req.userId;
+    return { message: "Archetype deleted successfully" };
+  });
+
+  fastify.patch("/:id/toggle", { preHandler: fastifyOptionalAuth }, async (request, reply) => {
+    const userId = request.userId;
     if (!userId) {
       throw new AppError(401, "Authentication required");
     }
 
-    const { id } = req.params;
+    const { id } = request.params as any;
     const isActive = await toggleArchetypeStatus(userId, id as string);
-    
-    res.json({ 
-      message: `Archetype ${isActive ? "activated" : "deactivated"} successfully`,
-      isActive 
-    });
-  } catch (err) {
-    next(err);
-  }
-});
 
-router.post("/:id/clone", optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const userId = req.userId;
+    return {
+      message: `Archetype ${isActive ? "activated" : "deactivated"} successfully`,
+      isActive
+    };
+  });
+
+  fastify.post("/:id/clone", { preHandler: fastifyOptionalAuth }, async (request, reply) => {
+    const userId = request.userId;
     if (!userId) {
       throw new AppError(401, "Authentication required");
     }
 
-    const { id } = req.params;
+    const { id } = request.params as any;
     const clonedData = cloneDefaultArchetype(id as string);
-    
-    const customizations = req.body;
+
+    const customizations = request.body as any;
     const finalData = { ...clonedData, ...customizations };
-    
+
     const validation = validateArchetype(finalData);
     if (!validation.valid) {
       throw new AppError(400, `Validation failed: ${validation.errors.join(", ")}`);
     }
 
     const archetype = await upsertUserArchetype(userId, finalData);
-    
-    res.json({ 
-      message: "Archetype cloned successfully",
-      archetype 
-    });
-  } catch (err) {
-    next(err);
-  }
-});
 
-router.get("/export", optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const userId = req.userId;
+    return {
+      message: "Archetype cloned successfully",
+      archetype
+    };
+  });
+
+  fastify.get("/export", { preHandler: fastifyOptionalAuth }, async (request, reply) => {
+    const userId = request.userId;
     if (!userId) {
       throw new AppError(401, "Authentication required");
     }
 
     const exportData = await exportUserArchetypes(userId);
-    
-    res.setHeader('Content-Type', 'application/json');
-    res.setHeader('Content-Disposition', 'attachment; filename="archetypes.json"');
-    res.send(exportData);
-  } catch (err) {
-    next(err);
-  }
-});
 
-router.post("/import", optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const userId = req.userId;
+    reply.header('Content-Type', 'application/json');
+    reply.header('Content-Disposition', 'attachment; filename="archetypes.json"');
+    return reply.send(exportData);
+  });
+
+  fastify.post("/import", { preHandler: fastifyOptionalAuth }, async (request, reply) => {
+    const userId = request.userId;
     if (!userId) {
       throw new AppError(401, "Authentication required");
     }
 
-    const { jsonData } = req.body;
+    const { jsonData } = request.body as any;
     if (!jsonData) {
       throw new AppError(400, "JSON data is required");
     }
 
     const result = await importArchetypes(userId, jsonData);
-    
+
     if (result.errors.length > 0) {
-      res.status(207).json({ // 207 Multi-Status
+      reply.code(207);
+      return {
         message: `Imported ${result.imported} archetypes with ${result.errors.length} errors`,
         imported: result.imported,
         errors: result.errors
-      });
+      };
     } else {
-      res.json({ 
+      return {
         message: `Successfully imported ${result.imported} archetypes`,
         imported: result.imported
-      });
+      };
     }
-  } catch (err) {
-    next(err);
-  }
-});
+  });
 
-router.get("/usage", optionalAuth, async (req: AuthRequest, res: Response, next: NextFunction) => {
-  try {
-    const userId = req.userId;
+  fastify.get("/usage", { preHandler: fastifyOptionalAuth }, async (request, reply) => {
+    const userId = request.userId;
     if (!userId) {
       throw new AppError(401, "Authentication required");
     }
 
     const usage = await getArchetypeUsage(userId);
-    
-    res.json({ usage });
-  } catch (err) {
-    next(err);
-  }
-});
 
-export default router;
+    return { usage };
+  });
+};
+
+export default archetypesPlugin;

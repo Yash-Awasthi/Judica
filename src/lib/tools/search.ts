@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { env } from "../../config/env.js";
 import logger from "../logger.js";
 
 export const executeSearchSchema = z.object({
@@ -38,7 +39,7 @@ export async function executeSearch(args: unknown): Promise<string> {
   }
 
   const query = parsed.data.query;
-  const apiKey = process.env.SERP_API_KEY;
+  const apiKey = env.SERP_API_KEY;
 
   if (!apiKey) {
     logger.warn("SERP_API_KEY not configured");

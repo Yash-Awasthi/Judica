@@ -1,6 +1,9 @@
 import { useState, useEffect } from "react";
+import { motion } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
 import { useNavigate } from "react-router-dom";
+import { X, BarChart3, MessageSquare, Zap, Clock, Database } from "lucide-react";
+import { AnimatedCounter } from "../components/AnimatedCounter";
 import type { UserMetrics } from "../types/index.js";
 
 export function MetricsView() {
@@ -24,71 +27,120 @@ export function MetricsView() {
   }, [fetchWithAuth]);
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-4 bg-bg h-full overflow-y-auto">
-      <div className="relative w-full max-w-lg glass-panel rounded-2xl shadow-2xl overflow-hidden animate-slide-up">
-        <div className="px-6 py-4 border-b border-white/5 flex items-center justify-between">
+    <div className="flex-1 flex flex-col items-center justify-center p-4 bg-[var(--bg)] h-full overflow-y-auto scrollbar-custom">
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.97 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.35, ease: "easeOut" }}
+        className="w-full max-w-lg surface-card rounded-modal shadow-2xl overflow-hidden"
+      >
+        {/* Header */}
+        <div className="px-6 py-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-accent/10 border border-accent/20 flex items-center justify-center">
-              <span className="material-symbols-outlined text-accent text-base" style={{ fontVariationSettings: "'FILL' 1" }}>bar_chart</span>
+            <div className="w-9 h-9 rounded-xl bg-[rgba(110,231,183,0.08)] border border-[rgba(110,231,183,0.12)] flex items-center justify-center text-[var(--accent-mint)]">
+              <BarChart3 size={18} />
             </div>
             <div>
-              <h3 className="text-sm font-bold tracking-tight text-text">Usage Statistics</h3>
-              <p className="text-[10px] text-text-muted uppercase tracking-widest font-bold">Council Analytics</p>
+              <h3 className="text-sm font-bold tracking-tight text-[var(--text-primary)]">Usage Statistics</h3>
+              <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest font-semibold">Council Analytics</p>
             </div>
           </div>
           <button
             onClick={() => navigate('/')}
-            className="w-8 h-8 rounded-lg flex items-center justify-center hover:bg-white/5 transition-colors text-text-muted hover:text-text"
+            className="p-2 rounded-lg flex items-center justify-center hover:bg-[var(--glass-bg-hover)] transition-colors text-[var(--text-muted)] hover:text-[var(--text-primary)]"
           >
-            <span className="material-symbols-outlined text-sm">close</span>
+            <X size={16} />
           </button>
         </div>
 
+        {/* Body */}
         <div className="p-6 space-y-4">
           {!metrics ? (
-            <div className="py-12 flex flex-col items-center justify-center gap-4 text-text-muted">
-              <span className="material-symbols-outlined animate-spin text-4xl text-accent">cycle</span>
+            <div className="py-12 flex flex-col items-center justify-center gap-4 text-[var(--text-muted)]">
+              <span className="w-8 h-8 border-2 border-[var(--accent-mint)] border-t-transparent rounded-full animate-spin" />
               <span className="text-xs uppercase tracking-widest font-bold">Retrieving Data...</span>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3">
+            <motion.div
+              initial="initial"
+              animate="animate"
+              variants={{ animate: { transition: { staggerChildren: 0.06 } } }}
+              className="grid grid-cols-2 gap-3"
+            >
               {[
-                { label: "Total Requests", value: metrics.totalRequests || 0, color: "text-text" },
-                { label: "Conversations", value: metrics.totalConversations || 0, color: "text-text" },
-              ].map(({ label, value, color }) => (
-                <div key={label} className="glass-panel p-5 rounded-xl border border-white/5">
-                  <p className="text-[9px] text-text-muted uppercase font-black tracking-widest mb-1">{label}</p>
-                  <p className={`text-3xl font-black ${color}`}>{value.toLocaleString()}</p>
-                </div>
+                { icon: <MessageSquare size={14} />, label: "Total Requests", value: metrics.totalRequests || 0 },
+                { icon: <MessageSquare size={14} />, label: "Conversations", value: metrics.totalConversations || 0 },
+              ].map(({ icon, label, value }) => (
+                <motion.div
+                  key={label}
+                  variants={{ initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 } }}
+                  className="glass-panel p-5 rounded-card"
+                >
+                  <div className="flex items-center gap-1.5 mb-2 text-[var(--accent-mint)]">
+                    {icon}
+                  </div>
+                  <p className="text-[9px] text-[var(--text-muted)] uppercase font-bold tracking-widest mb-1">{label}</p>
+                  <p className="text-3xl font-bold text-[var(--text-primary)]">
+                    <AnimatedCounter value={value} />
+                  </p>
+                </motion.div>
               ))}
-              <div className="glass-panel p-5 rounded-xl border border-white/5">
-                <p className="text-[9px] text-text-muted uppercase font-black tracking-widest mb-1">Cache Hit Rate</p>
-                <div className="flex items-baseline gap-2">
-                  <p className="text-3xl font-black text-accent">{metrics.cache?.hitRatePercentage || 0}%</p>
-                  <p className="text-[10px] text-text-muted font-bold">({metrics.cache?.hits || 0} hits)</p>
+
+              <motion.div
+                variants={{ initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 } }}
+                className="glass-panel p-5 rounded-card"
+              >
+                <div className="flex items-center gap-1.5 mb-2 text-[var(--accent-mint)]">
+                  <Zap size={14} />
                 </div>
-              </div>
-              <div className="glass-panel p-5 rounded-xl border border-white/5">
-                <p className="text-[9px] text-text-muted uppercase font-black tracking-widest mb-1">Avg Latency</p>
-                <p className="text-3xl font-black text-text">{((metrics.performance?.averageLatencyMs || 0) / 1000).toFixed(1)}s</p>
-              </div>
-              <div className="col-span-2 p-5 rounded-xl border border-accent/20 bg-accent/5">
-                <p className="text-[9px] text-accent uppercase font-black tracking-widest mb-1">Total Tokens Consumed</p>
-                <p className="text-4xl font-black text-text">{(metrics.performance?.totalTokensUsed || 0).toLocaleString()}</p>
-              </div>
-            </div>
+                <p className="text-[9px] text-[var(--text-muted)] uppercase font-bold tracking-widest mb-1">Cache Hit Rate</p>
+                <div className="flex items-baseline gap-2">
+                  <p className="text-3xl font-bold text-[var(--accent-mint)]">
+                    <AnimatedCounter value={metrics.cache?.hitRatePercentage || 0} suffix="%" />
+                  </p>
+                  <p className="text-[10px] text-[var(--text-muted)] font-mono">({metrics.cache?.hits || 0} hits)</p>
+                </div>
+              </motion.div>
+
+              <motion.div
+                variants={{ initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 } }}
+                className="glass-panel p-5 rounded-card"
+              >
+                <div className="flex items-center gap-1.5 mb-2 text-[var(--accent-blue)]">
+                  <Clock size={14} />
+                </div>
+                <p className="text-[9px] text-[var(--text-muted)] uppercase font-bold tracking-widest mb-1">Avg Latency</p>
+                <p className="text-3xl font-bold text-[var(--text-primary)]">
+                  {((metrics.performance?.averageLatencyMs || 0) / 1000).toFixed(1)}s
+                </p>
+              </motion.div>
+
+              <motion.div
+                variants={{ initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 } }}
+                className="col-span-2 p-5 rounded-card border border-[rgba(110,231,183,0.15)] bg-[rgba(110,231,183,0.04)]"
+              >
+                <div className="flex items-center gap-1.5 mb-2 text-[var(--accent-mint)]">
+                  <Database size={14} />
+                </div>
+                <p className="text-[9px] text-[var(--accent-mint)] uppercase font-bold tracking-widest mb-1">Total Tokens Consumed</p>
+                <p className="text-4xl font-bold text-[var(--text-primary)]">
+                  <AnimatedCounter value={metrics.performance?.totalTokensUsed || 0} />
+                </p>
+              </motion.div>
+            </motion.div>
           )}
         </div>
 
-        <div className="px-6 py-4 bg-white/[0.02] border-t border-white/5 flex justify-end">
+        {/* Footer */}
+        <div className="px-6 py-4 bg-[var(--glass-bg)] border-t border-[var(--border-subtle)] flex justify-end">
           <button
             onClick={() => navigate('/')}
-            className="px-6 py-2 bg-accent text-black text-xs font-black uppercase tracking-widest rounded-lg transition-all hover:brightness-110"
+            className="btn-pill-primary text-xs px-6 py-2"
           >
             Close
           </button>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }

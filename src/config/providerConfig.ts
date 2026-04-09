@@ -1,4 +1,5 @@
 import logger from "../lib/logger.js";
+import { env } from "./env.js";
 
 export interface ProviderConfig {
   pattern: string;
@@ -118,7 +119,7 @@ export const DEFAULT_PROVIDER_CONFIG: ProviderRegistryConfig = {
 };
 
 export async function loadProviderConfig(): Promise<ProviderRegistryConfig> {
-  const configPath = process.env.PROVIDER_REGISTRY_CONFIG;
+  const configPath = env.PROVIDER_REGISTRY_CONFIG;
   
   if (!configPath) {
     return DEFAULT_PROVIDER_CONFIG;

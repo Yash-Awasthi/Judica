@@ -1,257 +1,414 @@
-[ 📖 README ](./README.md) | [ 🗺️ ROADMAP ](./ROADMAP.md)
+<div align="center">
 
-> Agent instruction: Implement phases sequentially from 1 to 22. Each phase depends on the previous. Do not skip, reorder, or ask for clarification — all required context is contained within each phase block.
+# AIBYAI Roadmap
 
-# 🚀 AI Council Roadmap
+### What's Next
 
-This document outlines the 22-phase technical roadmap for AI Council platform. The goals are prioritized based on implementation complexity and value to the deliberation quality.
+[![Status](https://img.shields.io/badge/Core_Platform-Complete-22C55E?style=for-the-badge)](./README.md)
+[![Status](https://img.shields.io/badge/Migration-Complete-22C55E?style=for-the-badge)](#-completed-migrations)
+[![Status](https://img.shields.io/badge/Next_Phase-Quality_%26_Scale-3B82F6?style=for-the-badge)](#-testing--quality-assurance)
 
----
-
-## Current State vs Target State
-
-Currently, AI Council is a production-grade multi-agent deliberation engine with auto-routing, debate refinement, and cold validation. When all 22 phases are complete, Council will be a fully autonomous deliberation engine with local AI integration and advanced observability.
+</div>
 
 ---
 
-## Actual System Architecture
+All 22 original roadmap phases, all 12 Master Execution Plan tiers, and the 10-task tech migration are **complete**. This document tracks future work — quality improvements, new capabilities, and scaling targets.
+
+---
+
+## Completed Migrations
+
+The following infrastructure upgrades have been completed on the `sidecamel` branch:
+
+| Migration | From | To | Status |
+|---|---|---|---|
+| Runtime | Node.js 20 | Node.js 22 LTS | Done |
+| Vector indexes | IVFFlat (default) | HNSW (m=16, ef=64) | Done |
+| Password hashing | bcrypt | argon2id (with legacy fallback) | Done |
+| Token security | Static JWT | Short-lived access + rotating refresh tokens | Done |
+| Metrics | Internal JSON only | Prometheus (prom-client) + histograms | Done |
+| Sandbox | No resource caps | isolated-vm 128MB + Python ulimit | Done |
+| WebSocket | Socket.IO | Native ws | Done |
+| Charts | Recharts | Apache ECharts | Done |
+| HTTP framework | Express 5.2 | Fastify 5 (33 native plugins) | Done |
+| ORM | Prisma 7.6 | Drizzle ORM (zero Prisma imports) | Done |
+
+---
+
+## Current Architecture
 
 ```mermaid
 flowchart LR
-    A[Router P12] --> B[Parallel Agents P1]
-    B --> C[Debate Round P9]
-    C --> D[Synthesis]
-    D --> E[Cold Validator P21]
-    E --> F[Memory Update P11]
-    F --> G[Audit & Cost Tracking P17/P20]
-    G --> H[Response]
-    
-    subgraph "Tool System"
-        B --> Tools[Tool Execution P10]
+    subgraph COMPLETE["Implemented"]
+        direction TB
+        A["Multi-Agent Deliberation\n4+ agents, peer review, debate"]
+        B["9 LLM Providers\nOpenAI, Anthropic, Gemini, Groq, Ollama..."]
+        C["RAG Pipeline\npgvector HNSW, hybrid search, KB management"]
+        D["Workflow Engine\n10+ node types, visual canvas"]
+        E["Research Mode\nMulti-step web research"]
+        F["Code Sandbox\nisolated-vm + Python (hardened)"]
+        G["Marketplace\nPrompts, workflows, personas, tools"]
+        H["Observability\nPrometheus, LangFuse, reliability scoring"]
+        I["Auth + Security\nargon2id, JWT rotation, OAuth2, RBAC"]
+        J["Infrastructure\nFastify 5, Drizzle, Node 22, Docker, CI"]
     end
+
+    style COMPLETE fill:#022c22,stroke:#22c55e,color:#bbf7d0
 ```
 
 ---
 
-## Progress Tracker
+## Future Roadmap
 
-| Phase | Name | Milestone | Complexity | Status |
-| :--- | :--- | :--- | :--- | :--- |
-| 1 | Fix Parallel Execution | 1 | S | ✅ Completed |
-| 2 | Introduce Structured Output Contract | 1 | M | ✅ Completed |
-| 3 | Add Failure Isolation | 1 | S | ✅ Completed |
-| 4 | Add Peer Review + Anonymized Ranking | 2 | M | ✅ Completed |
-| 5 | Build Scoring Engine | 2 | M | ✅ Completed |
-| 6 | Split Critic Into Multiple Roles | 2 | M | ✅ Completed |
-| 7 | Implement Consensus Metric | 2 | M | ✅ Completed |
-| 8 | Enable Cross-Agent Interaction | 2 | M | ✅ Completed |
-| 9 | Add Multi-Round Refinement | 2 | M | ✅ Completed |
-| 10 | Add Tool Execution Layer | 3 | L | 🔴 Planned |
-| 11 | Add Memory + Context System | 3 | L | 🔴 Planned |
-| 12 | Implement Router (Auto-Council) | 3 | L | ✅ Completed |
-| 13 | PII Detection Pre-Send | 3 | S | ✅ Completed |
-| 14 | Runtime-Editable Archetypes | 3 | M | 🔴 Planned |
-| 15 | Conversation Search | 3 | S | 🔴 Planned |
-| 16 | Audit Log | 3 | S | ✅ Completed |
-| 17 | Add Token + Cost Tracking | 4 | S | ✅ Completed |
-| 18 | Build Evaluation Framework | 4 | L | ✅ Completed |
-| 19 | UI Enhancements | 4 | M | 🟡 In Progress |
-| 20 | Real-Time Cost Ledger | 4 | S | 🟡 In Progress |
-| 21 | Cold Validator / "Fresh Eyes" | 4 | M | ✅ Completed |
-| 22 | Local AI & Desktop App Connectors | 4 | L | ✅ Completed |
-
----
-
-## Completed Enhancements (Stabilization v0.9.5)
-
-### 🧠 Deterministic Deliberation Engine (Phases 4-9)
-- **Mathematical Purification**: Removed all LLM-based halt heuristics. Consensus is now `0.85 (85%)` avg pairwise cosine similarity.
-- **High-Fidelity Scoring**: Final scores = `(0.6 * Agreement) + (0.4 * PeerRanking)`.
-- **Logic Auditframework**: Structured peer review {target, claim, issue, correction} for precise refinement.
-- **Round Quality Validation**: "Bloom Gate" prevents round degradation.
-
-### 🧠 Multi-Round Debate Refinement
-- **Implemented**: Agents refine answers through iterative debate rounds
-- **Features**: Anti-convergence safeguards, confidence-based updates, concise peer summaries
-- **Files**: `src/lib/deliberationPhases.ts:conductDebateRound()`
-
-### 🧠 Router Scoring System
-- **Implemented**: Keyword and heuristic-based classification with confidence calculation
-- **Features**: Strict auto-mode override, diverse archetype selection, fallback handling
-- **Files**: `src/lib/router.ts:classifyQuery()`, `getAutoArchetypes()`
-
-### 🛠️ Tool Validation Layer
-- **Implemented**: Automatic tool decision logic with web search integration
-- **Features**: Tool decision prompts, failure handling, result injection
-- **Files**: `src/lib/providers.ts`, `src/lib/tools/*`
-
-### 🧠 Semantic Memory Optimization
-- **Implemented**: pgvector integration with conversation storage and retrieval
-- **Features**: Vector embeddings, similarity search, context management
-- **Files**: `src/services/conversationService.ts`, `prisma/schema.prisma`
+```mermaid
+timeline
+    title AIBYAI Development Timeline
+    section Quality
+        Testing Suite : Unit tests (80% coverage) : Integration tests (Fastify inject + real DB) : E2E tests (Playwright)
+        Grafana Dashboards : Wire Prometheus to Grafana : Alert rules for latency and errors
+    section Intelligence
+        Agentic Memory v2 : Cross-conversation learning : Topic clustering : Automatic forgetting : Episodic memory
+        Agent Specialization : Domain-specific agents : Self-improving personas : Confidence calibration
+        Advanced RAG : Cohere reranking : Parent-child chunking : HyDE query expansion : Multi-index search
+    section Autonomy
+        Autonomous Agents : Goal decomposition : Tool chains : Long-running tasks : Human-in-the-loop gates
+        Code Generation : Full-stack scaffolding : PR review agent : Test generation : Refactoring assistant
+        Multi-Modal Council : Image analysis agents : Audio/video understanding : Visual output generation
+    section Platform
+        MCP Integration : MCP server mode : MCP client mode : Tool marketplace federation
+        Real-time Collaboration : Multi-user deliberation : Live cursors : Shared councils
+        Plugin SDK : Third-party tools : Custom workflow nodes : Webhook triggers : Middleware hooks
+        Mobile App : React Native : Push notifications : Voice-first : Haptic feedback
+    section Scale
+        Kubernetes : Horizontal auto-scaling : Multi-region : Health-based routing
+        Multi-Tenant Enterprise : Workspace isolation : SSO (SAML/OIDC) : Audit compliance : Data residency
+        Marketplace v2 : Revenue sharing : Verified publishers : Usage analytics : Dependency resolution
+```
 
 ---
 
-## Next Priorities
+## Testing & Quality Assurance
 
-### 📊 Scoring Engine Enhancement
-- **Goal**: Deterministic ranking with weighted agreement metrics
-- **Impact**: Better consensus detection, improved synthesis quality
-- **Files**: `src/lib/scoring.ts` (enhancement)
+> **Priority: High** — Test suite exists (7 test files, 97 passing tests) but coverage needs expansion for the new Fastify + Drizzle codebase.
 
-### 🧪 Evaluation Harness
-- **Goal**: Automated benchmarking and performance measurement
-- **Impact**: Quality assurance, regression testing
-- **Files**: `tests/benchmarks/*` (expansion)
+### Unit Tests
 
-### 🎨 UI/Dashboard
-- **Goal**: Deliberation visualization and real-time metrics
-- **Impact**: User experience, system transparency
-- **Files**: `frontend/src/components/*` (enhancement)
+Target **80% statement coverage** across all services.
 
-### 🏠 Local AI Integration
-- **Goal**: Native connectors for Ollama and local models
-- **Impact**: Cost reduction, privacy, offline capability
-- **Files**: `src/lib/connectors/*` (completion)
+| Area | Files | Framework |
+|---|---|---|
+| Services | `src/services/*.ts` | vitest + mocked Drizzle |
+| Adapters | `src/adapters/*.ts` | vitest + nock (HTTP mocking) |
+| Middleware | `src/middleware/*.ts` | vitest |
+| Workflow nodes | `src/workflow/nodes/*.ts` | vitest |
+| Lib utilities | `src/lib/*.ts` | vitest |
 
----
+### Integration Tests
 
-## Milestone 4 — Observability & Production
-*Make the system transparent, measurable, and production-ready.*
+Every API route: happy path + 401 + invalid input = minimum 3 tests per route.
 
-## 🟡 PHASE 17 — ADD TOKEN + COST TRACKING
-**REQUIREMENTS:**
-- Per-request accounting and cost estimation.
+| Area | Approach |
+|---|---|
+| 35 API routes | `inject()` against Fastify instance |
+| Database operations | Drizzle against real PostgreSQL |
+| Queue processing | BullMQ job lifecycle testing |
+| SSE streaming | Event stream validation |
 
-**IMPLEMENTATION NOTES:**
-- **Files to change:** `src/lib/providers.ts`, `src/lib/metrics.ts`, `prisma/schema.prisma`
-- **Actions:** We already track `tokensUsed`. Add cost estimation logic per model ID (e.g., static cost table). Expose via `GET /api/metrics` and in the UI.
-- **Complexity:** S
+### E2E Tests
 
----
+Critical user flows with Playwright.
 
-## 🔴 PHASE 18 — BUILD EVALUATION FRAMEWORK
-**REQUIREMENTS:**
-- Measure system performance: Benchmark dataset, metrics.
-
-**IMPLEMENTATION NOTES:**
-- **Files to change:** `tests/benchmarks/*` (new directory)
-- **Actions:** Write an automated test suite that runs a benchmark dataset through the council and measures accuracy against expected outputs, consistency, latency, and cost.
-- **Complexity:** L
+| Flow | Description |
+|---|---|
+| Authentication | Sign up, login, token refresh, OAuth redirect |
+| Council deliberation | Ask question, receive streamed debate + verdict |
+| Knowledge base | Create KB, upload document, query with RAG |
+| Workflow builder | Create workflow, add nodes, execute |
+| Marketplace | Browse, install item, verify in account |
 
 ---
 
-## 🟡 PHASE 19 — UI ENHANCEMENTS
-**REQUIREMENTS:**
-- Side-by-side comparison, ranking visualization, consensus meter, critique visibility.
+## Grafana Dashboards
 
-**IMPLEMENTATION NOTES:**
-- **Files to change:** `frontend/src/components/*`
-- **Actions:** Implement new React components that consume the new structured events (e.g., `ranking`, `critique`, `consensus_score`) emitted by the backend via SSE.
-- **Complexity:** M
+> **Priority: High** — Prometheus metrics are exported but no visualization layer yet.
 
----
+### Goals
 
-## 🟠 PHASE 20 — REAL-TIME COST LEDGER
-**REQUIREMENTS:**
-- Per-query: per-model token accounting (input + output), estimated cost, cumulative session total. Collapsible: compact summary (total + tokens + latency) expands to full per-model breakdown. Color tiers: green <$0.01, amber $0.01–$0.10, red >$0.10.
-
-**IMPLEMENTATION NOTES:**
-- **Files to change:** `src/lib/metrics.ts` (add cost table), `frontend/src/components/CostLedger.tsx` (new)
-- **Actions:** Implement real-time token tracking and UI ledger.
-- **Complexity:** S
+- Wire `prom-client` metrics to Grafana via Prometheus scraping
+- Create dashboards: request latency (p50/p95/p99), provider call duration, queue depth, active SSE connections, token usage per model
+- Set up alert rules: error rate spike, latency degradation, queue backlog
+- Add `docker-compose` services for Prometheus + Grafana (dev profile)
 
 ---
 
-## 🔴 PHASE 21 — COLD VALIDATOR / "FRESH EYES"
-**REQUIREMENTS:**
-- After final synthesis, route the verdict to a SEPARATE model with ZERO prior council context. That model validates cold: checks for errors, hallucinations, overconfidence. New SSE event type: `validator_result`.
+## Agentic Memory v2
 
-**IMPLEMENTATION NOTES:**
-- **Files to change:** `src/lib/council.ts` (add post-synthesis step)
-- **Actions:** Add an independent validation step post-synthesis using a fresh model instance.
-- **Complexity:** M
+> **Priority: Medium** — Current memory works but doesn't learn across conversations.
 
----
+```mermaid
+flowchart TB
+    subgraph CURRENT["Current (Implemented)"]
+        direction LR
+        L1["Layer 1\nActive Context\nLast N messages"]
+        L2["Layer 2\nSession Summary\nAuto-generated"]
+        L3["Layer 3\nLong-term\npgvector + compaction"]
+    end
 
-## 🏠 PHASE 22 — LOCAL AI & DESKTOP APP CONNECTORS
-**STATUS:** ✅ **COMPLETED**
+    subgraph FUTURE["Future (Planned)"]
+        direction LR
+        F1["Cross-conversation\nTopic linking"]
+        F2["Automatic forgetting\nDecay + relevance"]
+        F3["User preference\nlearning"]
+        F4["Contradiction\nresolution memory"]
+    end
 
-**REQUIREMENTS:**
-- ✅ Connect to local AI models natively (Ollama) without API requirement
-- ✅ Integrate with OpenAI-compatible local endpoints
-- ✅ Automatic fallback to remote providers when local fails
-- ❌ OS-level desktop app automation (not implemented - out of scope)
+    CURRENT --> FUTURE
 
-**IMPLEMENTATION:**
-- **Files created:** `src/lib/connectors/baseConnector.ts`, `ollamaConnector.ts`, `openaiCompatibleConnector.ts`, `index.ts`
-- **Integration:** `src/lib/providers.ts` detects local providers by baseUrl and routes through connectors
-- **Usage:** Set `baseUrl` to `http://localhost:11434` for Ollama or any local OpenAI-compatible endpoint
-- **Fallback:** On connector failure, automatically falls back to standard remote providers
-- **Usage:** Set `baseUrl` to `http://localhost:11434` for Ollama or any local OpenAI-compatible endpoint
-- **Fallback:** On connector failure, automatically falls back to standard remote providers
+    style CURRENT fill:#022c22,stroke:#22c55e,color:#bbf7d0
+    style FUTURE fill:#1e1b4b,stroke:#818cf8,color:#c7d2fe
+```
 
----
+### Goals
 
-## 📈 Milestone 5 — Scale & Hardening (Future)
-*Optimize the system for high-concurrency, multi-instance, and enterprise environments.*
-
-### SESSION STORAGE MIGRATION
-**REQUIREMENTS:**
-- Transition from filesystem-based session storage to Redis or S3/Blob storage.
-- **Impact:** Enables horizontal scaling across multiple backend instances where local filesystem is inconsistent.
-
-### LIMITER PERSISTENCE
-**REQUIREMENTS:**
-- Move from in-memory concurrency/rate limiting to a Redis-backed implementation.
-- **Impact:** Prevents limit resets on server restart and enforces global limits across a cluster.
-
-### KEY ROTATION & MANAGEMENT
-**REQUIREMENTS:**
-- Implement scheduled encryption key rotation and integration with AWS KMS or HashiCorp Vault.
-- **Impact:** Production-grade security and compliance for sensitive credential management.
+- **Cross-conversation learning**: Link related topics across separate conversations. When a user discusses "React performance" in one chat and "frontend optimization" in another, the system should connect these.
+- **Automatic forgetting**: Implement decay functions so stale memories lose relevance over time. Frequently accessed memories persist; one-off facts fade.
+- **Preference learning**: Track which agent archetypes the user prefers, which response styles they engage with, and adapt council composition over time.
+- **Contradiction resolution**: When new information contradicts stored memory, create a resolution record rather than silently overwriting.
 
 ---
 
-## §8 — TABBED PANE UI SPECIFICATION
+## Advanced Reranking
 
-A concrete UI design requirement for Phase 19 and the Platform Enhancements additions. Implement a tabbed results panel in the frontend that organizes the deliberation output into the following tabs:
+> **Priority: Medium** — Currently using RRF (Reciprocal Rank Fusion) only.
 
-### TAB 1 — "Council" (default active tab)
-- All agent responses displayed as cards, one per council member
-- Each card shows: agent name + archetype badge, response text (streaming, word-by-word via SSE), confidence score badge, key_points as bullet list, assumptions as collapsible section
-- Cards are arranged in a responsive grid (2-col on desktop, 1-col on mobile)
-- While streaming: show a pulsing indicator on the active card
-- After streaming: show confidence score colored bar (green = high, amber = mid, red = low)
+### Goals
 
-### TAB 2 — "Debate" (visible after Round 2 completes)
-- Per-round timeline: Round 1 → Round 2 → Round 3 (if applicable)
-- For each round: show each agent's critique of the others, with agent attribution
-- Anonymized ranking results: "Response A ranked #1 by 3 agents"
-- Cross-agent reference highlights: if Agent B referenced Agent A's claim, show a visual thread between their cards
-- Consensus meter: horizontal progress bar showing current consensus score (0 → 0.85 target), updated each round
+- **Cohere rerank**: Integration with `rerank-english-v3.0` for hybrid search results
+- **Cross-encoder reranking**: Fine-tuned model for domain-specific relevance scoring
+- **Dynamic k selection**: Automatically choose how many chunks to retrieve based on query complexity
+- **Parent-child chunking**: Retrieve parent context when child chunk matches for better context windows
+- **Query expansion**: Automatic query rewriting and HyDE (Hypothetical Document Embeddings) for improved recall
+- **Multi-index search**: Search across knowledge bases, code repos, and conversation history simultaneously
 
-### TAB 3 — "Verdict"
-- Master synthesis output, streaming in real-time
-- Below synthesis: Cold Validator result (§7-B) — shown as a "Validator Note" card with green/amber/red status
-- Scoring breakdown: table showing each agent's final_score components (agreement / confidence / peer_ranking)
-- Which agents were included in synthesis (top-k) vs filtered out
+---
 
-### TAB 4 — "Cost & Audit"
-- Cost Ledger (§7-A): per-model token usage + cost, cumulative total, color-coded tiers
-- Latency breakdown: time-to-first-token and total time per model
-- Audit Log (§7-F): collapsible per-agent sections showing exact prompt sent and raw response received
-- Export button: download full audit log as JSON
+## Agent Specialization & Self-Improvement
 
-### TAB 5 — "Config" (inline, no page nav)
-- Active council template name + members list
-- Per-member: archetype name, model assigned, role, editable system prompt (§7-D)
-- Router classification result (§6 Phase 12): what query type was detected, which archetypes were auto-selected and why
-- PII detection status: clean / warning (§7-C)
+> **Priority: High** — Agents use static archetypes today.
 
-**Implementation Notes:**
-- Use React tabs (shadcn/ui Tabs component or simple state-driven tab switcher).
-- Tab bar is sticky at the top of the results panel.
-- Tabs 2, 3, 4 are disabled/grayed until the relevant data is available.
-- Entire tabbed panel is driven by SSE events.
-- Files: `frontend/src/components/tabs/`, `frontend/src/types/events.ts`
+- **Domain-specific agents**: Pre-trained archetypes for legal, medical, financial, and engineering domains with specialized vocabulary and reasoning patterns
+- **Self-improving personas**: Agents track their own accuracy over time and adjust reasoning strategies based on past performance
+- **Agent collaboration protocols**: Agents can delegate sub-tasks to other agents, forming dynamic chains
+- **Confidence calibration**: Agents learn to produce well-calibrated confidence scores through feedback loops
+- **Archetype evolution**: User interaction patterns gradually shift archetype weights and behavior
+
+---
+
+## Autonomous Agent Mode
+
+> **Priority: High** — Currently agents only respond to single queries.
+
+```mermaid
+flowchart TB
+    USER["User Goal"] --> PLAN["Planning Agent\nDecompose into subtasks"]
+    PLAN --> T1["Task 1\nResearch"]
+    PLAN --> T2["Task 2\nCode Generation"]
+    PLAN --> T3["Task 3\nValidation"]
+    T1 --> TOOLS1["Web Search\nRAG Query\nRepo Analysis"]
+    T2 --> TOOLS2["Sandbox\nFile System\nGit Operations"]
+    T3 --> TOOLS3["Test Runner\nCode Review\nBenchmark"]
+    T1 --> MERGE["Merge & Report"]
+    T2 --> MERGE
+    T3 --> MERGE
+    MERGE --> USER
+
+    style USER fill:#1e293b,stroke:#f59e0b,color:#e2e8f0
+    style PLAN fill:#1e293b,stroke:#3b82f6,color:#e2e8f0
+    style MERGE fill:#1e293b,stroke:#22c55e,color:#e2e8f0
+```
+
+- **Goal decomposition**: User provides a high-level goal; planning agent breaks it into executable subtasks
+- **Tool chains**: Agents can sequence tools (search, analyze, code, test, deploy) without user intervention
+- **Long-running tasks**: Background agents that work for hours on complex research or code generation
+- **Human-in-the-loop checkpoints**: Configurable approval gates before irreversible actions
+- **Progress streaming**: Real-time task progress via SSE with intermediate artifacts
+
+---
+
+## Multi-Modal Council
+
+> **Priority: Medium** — Currently text-only deliberation.
+
+- **Image analysis agents**: Council members that can analyze images, charts, diagrams, and screenshots
+- **Audio/video understanding**: Process audio transcripts and video frames as council input
+- **Document OCR**: Extract and reason over scanned documents, handwritten notes, whiteboards
+- **Visual output generation**: Agents can produce diagrams, charts, and visual explanations as part of their responses
+- **Cross-modal reasoning**: Agents reference visual evidence when debating text-based claims
+
+---
+
+## MCP Integration (Model Context Protocol)
+
+> **Priority: Medium** — Enables AIBYAI as a tool server for external agents.
+
+- **MCP server mode**: Expose AIBYAI's deliberation engine as an MCP tool — any MCP-compatible client can invoke a council
+- **MCP client mode**: AIBYAI agents can call external MCP servers for specialized capabilities (databases, APIs, file systems)
+- **Tool marketplace federation**: Browse and install tools from the MCP ecosystem directly into AIBYAI workflows
+- **Dynamic tool discovery**: Agents automatically discover and use available MCP tools based on task requirements
+
+---
+
+## Code Generation & Review
+
+> **Priority: Medium** — Sandbox exists but no autonomous code generation.
+
+- **Full-stack scaffolding**: Describe an app in natural language and council generates project structure, components, API routes, database schema
+- **PR review agent**: Automated code review with multi-perspective analysis (security agent, performance agent, style agent)
+- **Test generation**: Given a function or module, generate comprehensive test suites with edge cases
+- **Refactoring assistant**: Council analyzes codebase and suggests refactoring with before/after diffs
+- **Documentation generation**: Produce API docs, architecture diagrams, and inline documentation from code analysis
+
+---
+
+## Real-time Collaboration
+
+> **Priority: Medium** — Currently single-user per session.
+
+```mermaid
+flowchart LR
+    U1["User A"] --> WS["WebSocket Hub\nNative ws"]
+    U2["User B"] --> WS
+    U3["User C"] --> WS
+    WS --> COUNCIL["Shared Council\nSession"]
+    COUNCIL --> STREAM["Shared SSE\nStream"]
+    STREAM --> U1
+    STREAM --> U2
+    STREAM --> U3
+
+    style WS fill:#1e293b,stroke:#f59e0b,color:#e2e8f0
+    style COUNCIL fill:#1e293b,stroke:#3b82f6,color:#e2e8f0
+```
+
+- Multiple users join a shared deliberation session
+- Live cursors showing who's viewing what
+- Shared council configuration (collaborative archetype selection)
+- Per-user annotations on agent responses
+- Voting on which synthesis direction to take
+
+---
+
+## Plugin SDK
+
+> **Priority: Low** — For third-party extensibility.
+
+### Goals
+
+- **Custom tool types**: NPM package that registers new tools in the tool registry
+- **Custom workflow nodes**: Third-party node handlers with UI components
+- **Webhook triggers**: Fire webhooks on deliberation events (verdict, conflict, etc.)
+- **Provider plugins**: Package-based provider adapters (beyond current EMOF UI approach)
+- **Middleware hooks**: Plugin into the deliberation pipeline (pre-process, post-process, custom scoring)
+
+---
+
+## Mobile App
+
+> **Priority: Low** — PWA covers basic mobile usage.
+
+### Goals
+
+- React Native client with shared API
+- Push notifications for research job completion, workflow results, background agent updates
+- Voice-first interaction mode (STT input, TTS output by default)
+- Offline mode with syncing (extending current IndexedDB approach)
+- Haptic feedback for deliberation milestones
+
+---
+
+## Kubernetes & Multi-Region
+
+> **Priority: Low** — Docker Compose covers current scale.
+
+```mermaid
+flowchart TB
+    LB["Load Balancer"] --> N1["Node 1\nUS-East"]
+    LB --> N2["Node 2\nEU-West"]
+    LB --> N3["Node 3\nAP-South"]
+
+    N1 --> PG1["PostgreSQL\nPrimary"]
+    N2 --> PG2["PostgreSQL\nReplica"]
+    N3 --> PG3["PostgreSQL\nReplica"]
+
+    PG1 --> PG2
+    PG1 --> PG3
+
+    N1 --> RD["Redis Cluster"]
+    N2 --> RD
+    N3 --> RD
+
+    style LB fill:#1e293b,stroke:#f59e0b,color:#e2e8f0
+    style N1 fill:#1e293b,stroke:#3b82f6,color:#e2e8f0
+    style N2 fill:#1e293b,stroke:#3b82f6,color:#e2e8f0
+    style N3 fill:#1e293b,stroke:#3b82f6,color:#e2e8f0
+    style PG1 fill:#1e293b,stroke:#22c55e,color:#e2e8f0
+    style RD fill:#1e293b,stroke:#ef4444,color:#e2e8f0
+```
+
+### Goals
+
+- Helm charts for Kubernetes deployment
+- Horizontal pod auto-scaling based on queue depth and request latency
+- Multi-region PostgreSQL with read replicas
+- Redis Cluster for distributed caching and rate limiting
+- Health-based routing (route away from degraded regions)
+
+---
+
+## Multi-Tenant & Enterprise
+
+> **Priority: Low** — Single-tenant architecture is sufficient for current use.
+
+### Goals
+
+- **Workspace isolation**: Separate data, configs, and billing per tenant
+- **Per-tenant quotas**: Token limits, storage limits, concurrent deliberation limits
+- **SSO**: SAML 2.0 and OpenID Connect for enterprise identity providers
+- **Audit compliance**: SOC 2 logging format, data retention policies, GDPR data export
+- **Data residency**: Ensure data stays in specific geographic regions
+- **SLA monitoring**: Uptime tracking, latency SLOs, automated alerting
+
+---
+
+## Marketplace v2
+
+> **Priority: Low** — Current marketplace is functional but basic.
+
+### Goals
+
+- **Revenue sharing**: Creators earn from paid marketplace items
+- **Verified publishers**: Trust badges for vetted creators
+- **Usage analytics**: Track installs, active usage, retention per item
+- **Collections & categories**: Curated bundles (e.g. "Legal Pack", "Code Review Kit")
+- **Versioning with changelogs**: Semantic versioning, automatic update notifications
+- **Dependency resolution**: Marketplace items that depend on other items auto-install dependencies
+
+---
+
+## Remaining Express Routes
+
+> **Priority: Low** — Two routes remain on the Express compatibility layer.
+
+| Route | Reason | Path Forward |
+|---|---|---|
+| `ask.ts` | Complex SSE streaming + multiple middleware (optionalAuth, checkQuota, validate) | Convert to Fastify with `reply.raw` SSE pattern |
+| `uploads.ts` | Multer file upload middleware | Convert to `@fastify/multipart` |
+
+Both routes work correctly through `@fastify/express` — conversion is a cleanup task, not a functional requirement.
+
+---
+
+<div align="center">
+
+**[Back to README](./README.md)**
+
+</div>

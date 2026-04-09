@@ -26,9 +26,13 @@ export const PiiWarning: React.FC<PiiWarningProps> = ({
   useEffect(() => {
     const checkPii = async () => {
       try {
+        const token = localStorage.getItem("council_token");
         const response = await fetch('/api/pii/check', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
           body: JSON.stringify({ text }),
         });
 
@@ -59,8 +63,14 @@ export const PiiWarning: React.FC<PiiWarningProps> = ({
     );
   }
 
+  // Auto-proceed when no PII is detected (must be in useEffect, not during render)
+  useEffect(() => {
+    if (!loading && !detection?.found) {
+      onProceed();
+    }
+  }, [loading, detection, onProceed]);
+
   if (!detection?.found) {
-    onProceed();
     return null;
   }
 

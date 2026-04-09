@@ -1,170 +1,237 @@
-import { Router, Request, Response } from "express";
+import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { validate } from "../middleware/validate.js";
 import { askProvider, Message, Provider } from "../lib/providers.js";
-import prisma from "../lib/db.js";
+import { db } from "../lib/drizzle.js";
+import { councilConfigs } from "../db/schema/auth.js";
+import { eq } from "drizzle-orm";
 import logger from "../lib/logger.js";
-import { requireAuth } from "../middleware/auth.js";
-import { AuthRequest } from "../types/index.js";
-import { encrypt, decrypt } from "../lib/crypto.js";
+import { encrypt } from "../lib/crypto.js";
+import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 
-const router = Router();
-
-router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
-  try {
-    const userId = req.userId!;
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { councilConfig: true },
-    });
-
-    const config = user?.councilConfig?.config as any;
-    const providers = config?.providers || [];
-
-    const maskedProviders = providers.map((p: any) => ({
-      ...p,
-      apiKey: p.apiKey ? "••••••••" + p.apiKey.slice(-4) : null,
-    }));
-
-    res.json({ providers: maskedProviders });
-  } catch (err) {
-    logger.error({ err: (err as Error).message }, "Failed to get providers");
-    res.status(500).json({ error: "Failed to get providers" });
-  }
+const addProviderBody = z.object({
+  name: z.string().min(1),
+  type: z.enum(["api", "local", "rpa"]),
+  apiKey: z.string().min(1),
+  model: z.string().min(1),
+  provider: z.enum(["openai", "anthropic", "google", "ollama", "chatgpt", "claude", "deepseek", "gemini"]).optional(),
+  baseUrl: z.string().url().optional(),
 });
 
-const addProviderSchema = z.object({
-  body: z.object({
-    name: z.string().min(1),
-    type: z.enum(["api", "local", "rpa"]),
-    apiKey: z.string().min(1),
-    model: z.string().min(1),
-    provider: z.enum(["openai", "anthropic", "google", "ollama", "chatgpt", "claude", "deepseek", "gemini"]).optional(),
-    baseUrl: z.string().url().optional(),
-  }),
+const testProviderBody = z.object({
+  type: z.enum(["api", "local", "rpa"]),
+  apiKey: z.string().min(1),
+  model: z.string().min(1),
+  baseUrl: z.string().url().optional(),
 });
 
-router.post("/", requireAuth, validate(addProviderSchema), async (req: AuthRequest, res: Response) => {
-  try {
-    const userId = req.userId!;
-    const { name, type, apiKey, model, baseUrl, provider: providerIdentifier } = req.body;
+/**
+ * @openapi
+ * /api/providers:
+ *   get:
+ *     tags:
+ *       - Providers
+ *     summary: List configured providers (API keys masked)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of providers with masked API keys
+ *       401:
+ *         description: Unauthorized
+ */
+const providersPlugin: FastifyPluginAsync = async (fastify) => {
+  fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    try {
+      const userId = request.userId!;
 
-    const encryptedKey = encrypt(apiKey);
+      const rows = await db
+        .select({ config: councilConfigs.config })
+        .from(councilConfigs)
+        .where(eq(councilConfigs.userId, userId))
+        .limit(1);
 
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { councilConfig: true },
-    });
+      const config = (rows[0]?.config as any) || {};
+      const providers = config.providers || [];
 
-    const currentConfig = (user?.councilConfig?.config as any) || {};
-    const providers = currentConfig.providers || [];
+      const maskedProviders = providers.map((p: any) => ({
+        ...p,
+        apiKey: p.apiKey ? "••••••••" + p.apiKey.slice(-4) : null,
+      }));
 
-    const newProvider = {
-      id: Date.now().toString(),
-      name,
-      type,
-      provider: providerIdentifier,
-      apiKey: encryptedKey,
-      model,
-      baseUrl,
-      createdAt: new Date().toISOString(),
-    };
+      return { providers: maskedProviders };
+    } catch (err) {
+      logger.error({ err: (err as Error).message }, "Failed to get providers");
+      reply.code(500);
+      return { error: "Failed to get providers", code: "PROVIDER_FETCH_FAILED" };
+    }
+  });
 
-    providers.push(newProvider);
-
-    await prisma.councilConfig.upsert({
-      where: { userId },
-      update: { config: { ...currentConfig, providers } },
-      create: { userId, config: { ...currentConfig, providers } },
-    });
-
-    res.status(201).json({
-      provider: {
-        ...newProvider,
-        apiKey: "••••••••" + apiKey.slice(-4),
-      },
-    });
-  } catch (err) {
-    logger.error({ err: (err as Error).message }, "Failed to add provider");
-    res.status(500).json({ error: "Failed to add provider" });
-  }
-});
-
-const testProviderSchema = z.object({
-  body: z.object({
-    type: z.enum(["api", "local", "rpa"]),
-    apiKey: z.string().min(1),
-    model: z.string().min(1),
-    baseUrl: z.string().url().optional(),
-  }),
-});
-
-router.post("/test", validate(testProviderSchema), async (req: Request, res: Response) => {
-  try {
-    const { type, apiKey, model, baseUrl } = req.body;
-
-    const provider: Provider = {
-      name: "Test Provider",
-      type,
-      apiKey,
-      model,
-      baseUrl,
-    };
-
-    const messages: Message[] = [
-      { role: "user", content: "Say 'Hello, I am working!' in exactly 5 words." },
-    ];
-
-    const startTime = Date.now();
-    const response = await askProvider(provider, messages, false);
-    const latency = Date.now() - startTime;
-
-    res.json({
-      success: true,
-      response: response.text,
-      usage: response.usage,
-      latencyMs: latency,
-    });
-  } catch (err) {
-    logger.error({ err: (err as Error).message }, "Provider test failed");
-    res.status(400).json({
-      success: false,
-      error: (err as Error).message,
-    });
-  }
-});
-
-router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
-  try {
-    const userId = req.userId!;
-    const { id } = req.params;
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { councilConfig: true },
-    });
-
-    const currentConfig = (user?.councilConfig?.config as any) || {};
-    const providers = currentConfig.providers || [];
-
-    const filteredProviders = providers.filter((p: any) => p.id !== id);
-
-    if (filteredProviders.length === providers.length) {
-      return res.status(404).json({ error: "Provider not found" });
+  /**
+   * @openapi
+   * /api/providers:
+   *   post:
+   *     tags:
+   *       - Providers
+   *     summary: Add a new provider
+   *     security:
+   *       - bearerAuth: []
+   */
+  fastify.post("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    const parsed = addProviderBody.safeParse(request.body);
+    if (!parsed.success) {
+      reply.code(400);
+      return {
+        error: "Validation failed",
+        details: parsed.error.issues.map((e) => ({ field: e.path.join("."), message: e.message })),
+      };
     }
 
-    await prisma.councilConfig.upsert({
-      where: { userId },
-      update: { config: { ...currentConfig, providers: filteredProviders } },
-      create: { userId, config: { ...currentConfig, providers: filteredProviders } },
-    });
+    try {
+      const userId = request.userId!;
+      const { name, type, apiKey, model, baseUrl, provider: providerIdentifier } = parsed.data;
 
-    res.json({ message: "Provider deleted" });
-  } catch (err) {
-    logger.error({ err: (err as Error).message }, "Failed to delete provider");
-    res.status(500).json({ error: "Failed to delete provider" });
-  }
-});
+      const encryptedKey = encrypt(apiKey);
 
-export default router;
+      const rows = await db
+        .select({ config: councilConfigs.config })
+        .from(councilConfigs)
+        .where(eq(councilConfigs.userId, userId))
+        .limit(1);
+
+      const currentConfig = (rows[0]?.config as any) || {};
+      const providers = currentConfig.providers || [];
+
+      const newProvider = {
+        id: Date.now().toString(),
+        name,
+        type,
+        provider: providerIdentifier,
+        apiKey: encryptedKey,
+        model,
+        baseUrl,
+        createdAt: new Date().toISOString(),
+      };
+
+      providers.push(newProvider);
+
+      await db
+        .insert(councilConfigs)
+        .values({ userId, config: { ...currentConfig, providers }, updatedAt: new Date() })
+        .onConflictDoUpdate({
+          target: councilConfigs.userId,
+          set: { config: { ...currentConfig, providers }, updatedAt: new Date() },
+        });
+
+      reply.code(201);
+      return {
+        provider: {
+          ...newProvider,
+          apiKey: "••••••••" + apiKey.slice(-4),
+        },
+      };
+    } catch (err) {
+      logger.error({ err: (err as Error).message }, "Failed to add provider");
+      reply.code(500);
+      return { error: "Failed to add provider", code: "PROVIDER_CREATE_FAILED" };
+    }
+  });
+
+  /**
+   * @openapi
+   * /api/providers/test:
+   *   post:
+   *     tags:
+   *       - Providers
+   *     summary: Test a provider connection
+   */
+  fastify.post("/test", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    const parsed = testProviderBody.safeParse(request.body);
+    if (!parsed.success) {
+      reply.code(400);
+      return {
+        error: "Validation failed",
+        details: parsed.error.issues.map((e) => ({ field: e.path.join("."), message: e.message })),
+      };
+    }
+
+    try {
+      const { type, apiKey, model, baseUrl } = parsed.data;
+
+      const provider: Provider = {
+        name: "Test Provider",
+        type,
+        apiKey,
+        model,
+        baseUrl,
+      };
+
+      const messages: Message[] = [
+        { role: "user", content: "Say 'Hello, I am working!' in exactly 5 words." },
+      ];
+
+      const startTime = Date.now();
+      const response = await askProvider(provider, messages, false);
+      const latency = Date.now() - startTime;
+
+      return {
+        success: true,
+        response: response.text,
+        usage: response.usage,
+        latencyMs: latency,
+      };
+    } catch (err) {
+      logger.error({ err: (err as Error).message }, "Provider test failed");
+      reply.code(400);
+      return { success: false, error: (err as Error).message };
+    }
+  });
+
+  /**
+   * @openapi
+   * /api/providers/{id}:
+   *   delete:
+   *     tags:
+   *       - Providers
+   *     summary: Delete a provider
+   *     security:
+   *       - bearerAuth: []
+   */
+  fastify.delete<{ Params: { id: string } }>("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    try {
+      const userId = request.userId!;
+      const { id } = request.params;
+
+      const rows = await db
+        .select({ config: councilConfigs.config })
+        .from(councilConfigs)
+        .where(eq(councilConfigs.userId, userId))
+        .limit(1);
+
+      const currentConfig = (rows[0]?.config as any) || {};
+      const providers = currentConfig.providers || [];
+
+      const filteredProviders = providers.filter((p: any) => p.id !== id);
+
+      if (filteredProviders.length === providers.length) {
+        reply.code(404);
+        return { error: "Provider not found" };
+      }
+
+      await db
+        .insert(councilConfigs)
+        .values({ userId, config: { ...currentConfig, providers: filteredProviders }, updatedAt: new Date() })
+        .onConflictDoUpdate({
+          target: councilConfigs.userId,
+          set: { config: { ...currentConfig, providers: filteredProviders }, updatedAt: new Date() },
+        });
+
+      return { message: "Provider deleted" };
+    } catch (err) {
+      logger.error({ err: (err as Error).message }, "Failed to delete provider");
+      reply.code(500);
+      return { error: "Failed to delete provider", code: "PROVIDER_DELETE_FAILED" };
+    }
+  });
+};
+
+export default providersPlugin;

@@ -1,10 +1,10 @@
 import React, { useState, useCallback } from 'react';
-import { ChatArea, type ChatMessage } from '../ChatArea';
+import { ChatArea } from '../ChatArea';
+import type { ChatMessage, CouncilMember } from '../../types/index.js';
 import { EnhancedSearch } from '../EnhancedSearch';
 import { CostTracker } from '../CostTracker';
 import { AuditLogs } from '../AuditLogs';
 import { Settings } from '../Settings';
-import type { CouncilMember } from '../../App';
 import { useCouncilStream, type SSEEvent } from '../../hooks/useCouncilStream';
 
 type TabId = 'ask' | 'history' | 'cost' | 'audit' | 'settings';

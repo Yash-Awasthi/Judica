@@ -1,4 +1,7 @@
-import prisma from "./db.js";
+import { db } from "./drizzle.js";
+import { lt } from "drizzle-orm";
+import { semanticCache, auditLogs, contextSummaries } from "../db/schema/conversations.js";
+import { revokedTokens } from "../db/schema/auth.js";
 import redis from "./redis.js";
 import logger from "./logger.js";
 import { env } from "../config/env.js";
@@ -11,17 +14,14 @@ let sweepTimer: NodeJS.Timeout | null = null;
 
 async function sweepCache(): Promise<number> {
   try {
-    const result = await prisma.semanticCache.deleteMany({
-      where: {
-        expiresAt: {
-          lt: new Date(),
-        },
-      },
-    });
-    if (result.count > 0) {
-      logger.info({ count: result.count }, "Swept expired cache entries");
+    const result = await db
+      .delete(semanticCache)
+      .where(lt(semanticCache.expiresAt, new Date()));
+    const count = result.rowCount ?? 0;
+    if (count > 0) {
+      logger.info({ count }, "Swept expired cache entries");
     }
-    return result.count;
+    return count;
   } catch (err) {
     logger.error({ err: (err as Error).message }, "Failed to sweep cache");
     return 0;
@@ -30,17 +30,14 @@ async function sweepCache(): Promise<number> {
 
 async function sweepRevokedTokens(): Promise<number> {
   try {
-    const result = await prisma.revokedToken.deleteMany({
-      where: {
-        expiresAt: {
-          lt: new Date(),
-        },
-      },
-    });
-    if (result.count > 0) {
-      logger.info({ count: result.count }, "Swept expired revoked tokens");
+    const result = await db
+      .delete(revokedTokens)
+      .where(lt(revokedTokens.expiresAt, new Date()));
+    const count = result.rowCount ?? 0;
+    if (count > 0) {
+      logger.info({ count }, "Swept expired revoked tokens");
     }
-    return result.count;
+    return count;
   } catch (err) {
     logger.error({ err: (err as Error).message }, "Failed to sweep revoked tokens");
     return 0;
@@ -52,17 +49,14 @@ async function sweepAuditLogs(): Promise<number> {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - TOKEN_TTL_DAYS);
 
-    const result = await prisma.auditLog.deleteMany({
-      where: {
-        createdAt: {
-          lt: cutoff,
-        },
-      },
-    });
-    if (result.count > 0) {
-      logger.info({ count: result.count }, "Swept old audit logs");
+    const result = await db
+      .delete(auditLogs)
+      .where(lt(auditLogs.createdAt, cutoff));
+    const count = result.rowCount ?? 0;
+    if (count > 0) {
+      logger.info({ count }, "Swept old audit logs");
     }
-    return result.count;
+    return count;
   } catch (err) {
     logger.error({ err: (err as Error).message }, "Failed to sweep audit logs");
     return 0;
@@ -74,17 +68,14 @@ async function sweepContextSummaries(): Promise<number> {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - 30);
 
-    const result = await prisma.contextSummary.deleteMany({
-      where: {
-        createdAt: {
-          lt: cutoff,
-        },
-      },
-    });
-    if (result.count > 0) {
-      logger.info({ count: result.count }, "Swept old context summaries");
+    const result = await db
+      .delete(contextSummaries)
+      .where(lt(contextSummaries.createdAt, cutoff));
+    const count = result.rowCount ?? 0;
+    if (count > 0) {
+      logger.info({ count }, "Swept old context summaries");
     }
-    return result.count;
+    return count;
   } catch (err) {
     logger.error({ err: (err as Error).message }, "Failed to sweep context summaries");
     return 0;

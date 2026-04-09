@@ -10,13 +10,17 @@ export class GoogleProvider extends BaseProvider {
     super(config);
   }
 
-  async call({ messages, signal, maxTokens, isFallback, onChunk }: {
+  async call({ messages, signal, maxTokens, isFallback, onChunk, _depth = 0 }: {
     messages: Message[];
     signal?: AbortSignal;
     maxTokens?: number;
     isFallback?: boolean;
     onChunk?: (chunk: string) => void;
+    _depth?: number;
   }): Promise<ProviderResponse> {
+    if (_depth >= 5) {
+      throw new Error("Tool call depth limit exceeded (max 5 recursive rounds)");
+    }
     const apiHost = "https://generativelanguage.googleapis.com";
     await validateSafeUrl(apiHost);
 
@@ -32,13 +36,16 @@ export class GoogleProvider extends BaseProvider {
     }));
 
     try {
-      const endpoint = onChunk ? "streamGenerateContent?alt=sse&" : "generateContent?";
+      const endpoint = onChunk ? "streamGenerateContent?alt=sse" : "generateContent";
       const res = await fetch(
-        `${apiHost}/v1beta/models/${this.config.model || "gemini-2.0-flash"}:${endpoint}key=${this.config.apiKey}`,
+        `${apiHost}/v1beta/models/${this.config.model || "gemini-2.0-flash"}:${endpoint}`,
         {
           method: "POST",
           signal: controller.signal,
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": this.config.apiKey,
+          },
           body: JSON.stringify({
             ...(this.config.systemPrompt
               ? { systemInstruction: { parts: [{ text: this.config.systemPrompt }] } }
@@ -67,6 +74,7 @@ export class GoogleProvider extends BaseProvider {
         const decoder = new TextDecoder();
         let text = "";
         let buffer = "";
+        let streamUsage: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number } | null = null;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -90,6 +98,10 @@ export class GoogleProvider extends BaseProvider {
                   text += content;
                   onChunk(content);
                 }
+                // Capture usage metadata from Gemini response
+                if (parsed.usageMetadata) {
+                  streamUsage = parsed.usageMetadata;
+                }
               } catch (e) {
                 // ignore unparseable chunk
               }
@@ -97,17 +109,18 @@ export class GoogleProvider extends BaseProvider {
           }
         }
 
+        const estimatedCompletion = Math.ceil(text.length / 4);
         const usage = {
-          promptTokens: 0,
-          completionTokens: 0,
-          totalTokens: 0
+          promptTokens: streamUsage?.promptTokenCount || 0,
+          completionTokens: streamUsage?.candidatesTokenCount || estimatedCompletion,
+          totalTokens: streamUsage?.totalTokenCount || estimatedCompletion,
         };
 
         const cost = calculateCost(
           "google",
           this.config.model,
-          0,
-          0
+          usage.promptTokens,
+          usage.completionTokens
         );
 
         return { text: text.trim(), usage, cost, raw: { stream: true } };
@@ -135,7 +148,7 @@ export class GoogleProvider extends BaseProvider {
           { role: "tool", name, content: safeResult } as any
         ];
 
-        return this.call({ messages: nextMessages, signal, maxTokens, isFallback, onChunk });
+        return this.call({ messages: nextMessages, signal, maxTokens, isFallback, onChunk, _depth: _depth + 1 });
       }
 
       const text = part?.text || "";

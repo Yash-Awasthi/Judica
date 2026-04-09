@@ -1,86 +1,302 @@
-# AIbyAI — Multi-Agent AI Deliberation Engine
+<div align="center">
 
-**AIbyAI** is an open-source platform where multiple AI agents debate, critique, and synthesize answers through a structured deliberation pipeline. Unlike single-model chatbots, AIbyAI produces mathematically validated consensus by pitting diverse AI perspectives against each other in real-time.
+# AIBYAI
 
-## Why AIbyAI?
+### Multimodal Multi-Agent Deliberative Intelligence Platform
 
-| Single-Model Chat | AIbyAI Council |
-|---|---|
-| One perspective | 4+ agents with distinct archetypes |
-| Trust the model blindly | Peer review + Cold Validation |
-| No quality signal | Deterministic ML scoring (cosine similarity) |
-| Groupthink by default | Anti-convergence protocol (Bloom Gate) |
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-18.3-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![Fastify](https://img.shields.io/badge/Fastify-5-000000?style=for-the-badge&logo=fastify&logoColor=white)](https://fastify.dev/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
+[![License](https://img.shields.io/badge/License-ISC-22C55E?style=for-the-badge)](./LICENSE)
+
+<br />
+
+**4+ AI agents debate, critique, and synthesize answers through structured deliberation — producing mathematically validated consensus instead of single-model guesswork.**
+
+[Quick Start](#-quick-start) · [How It Works](#-how-it-works) · [Features](#-features) · [Documentation](./docs/DOCUMENTATION.md) · [Roadmap](./ROADMAP.md)
+
+</div>
+
+---
+
+## Why AIBYAI?
+
+Single-model AI gives you one perspective. AIBYAI gives you a **council**.
+
+| | Single Model | AIBYAI Council |
+|---|---|---|
+| **Perspectives** | 1 | 4+ concurrent agents |
+| **Quality Check** | None | Peer review + cold validation |
+| **Scoring** | Trust the output | Deterministic ML scoring |
+| **Bias Detection** | Hope for the best | Cross-agent contradiction detection |
+| **Confidence** | Unknown | Mathematical consensus metric |
+
+---
+
+## How It Works
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant R as Router
+    participant A1 as Agent 1
+    participant A2 as Agent 2
+    participant A3 as Agent 3
+    participant CD as Conflict Detector
+    participant S as Synthesizer
+    participant V as Cold Validator
+
+    U->>R: Query
+    R->>R: Classify + Select Archetypes
+
+    par Parallel Generation
+        R->>A1: Generate (Empiricist)
+        R->>A2: Generate (Strategist)
+        R->>A3: Generate (Historian)
+    end
+
+    A1-->>CD: Response
+    A2-->>CD: Response
+    A3-->>CD: Response
+
+    CD->>CD: Detect Contradictions
+
+    alt Conflicts Found
+        CD->>A1: Debate Round
+        CD->>A2: Debate Round
+        A1-->>S: Refined Response
+        A2-->>S: Refined Response
+    end
+
+    A3-->>S: Response
+    S->>S: Reliability-Weighted Synthesis
+    S->>V: Verdict
+    V->>V: Hallucination Check
+    V-->>U: Final Verdict + Confidence Score
+```
+
+The pipeline scores each agent using `0.6 * Agreement + 0.4 * PeerRanking`, targets `>= 0.85` consensus (cosine similarity), and weights synthesis by model reliability scores tracked across sessions.
+
+---
+
+## Architecture
+
+```mermaid
+flowchart TB
+    subgraph CLIENT["Frontend — React 18 + Vite"]
+        direction LR
+        UI["Chat UI"]
+        WF["Workflow Canvas"]
+        DB_UI["Debate Dashboard"]
+        MK["Marketplace"]
+    end
+
+    subgraph API["Fastify 5 API Layer"]
+        direction LR
+        AUTH["Auth\nJWT + Refresh Tokens"]
+        RATE["Rate Limiter\nRedis-backed"]
+        ROUTES["35 Route\nPlugins"]
+    end
+
+    subgraph ENGINE["Deliberation Engine"]
+        direction TB
+        ROUTER["Query Router\nAuto-classify"]
+        PARALLEL["Parallel Agents\n4+ concurrent"]
+        DEBATE["Debate Rounds\nPeer Review"]
+        CONFLICT["Conflict\nDetector"]
+        SYNTH["Synthesis\nReliability-weighted"]
+        COLD["Cold Validator\nFresh Eyes"]
+    end
+
+    subgraph PROVIDERS["Provider Adapters"]
+        direction LR
+        OAI["OpenAI"]
+        ANT["Anthropic"]
+        GEM["Gemini"]
+        GRQ["Groq"]
+        OLL["Ollama"]
+        OR["OpenRouter"]
+        CUSTOM["Custom\nProviders"]
+    end
+
+    subgraph DATA["Data Layer"]
+        direction LR
+        PG["PostgreSQL 16\npgvector + HNSW"]
+        RD["Redis 7\nCache + Queues"]
+        BQ["BullMQ\nAsync Jobs"]
+    end
+
+    CLIENT --> API
+    API --> ENGINE
+    ENGINE --> PROVIDERS
+    ENGINE --> DATA
+    BQ --> DATA
+
+    style CLIENT fill:#1e293b,stroke:#3b82f6,color:#e2e8f0
+    style API fill:#1e293b,stroke:#8b5cf6,color:#e2e8f0
+    style ENGINE fill:#1e293b,stroke:#f59e0b,color:#e2e8f0
+    style PROVIDERS fill:#1e293b,stroke:#10b981,color:#e2e8f0
+    style DATA fill:#1e293b,stroke:#ef4444,color:#e2e8f0
+```
+
+---
+
+## Features
+
+### Multi-Agent Deliberation
+4+ AI agents with distinct archetypes (Empiricist, Strategist, Historian, Architect, Skeptic) debate in structured rounds with peer review, adversarial critique, and deterministic consensus scoring. A cold validator independently checks the final verdict for hallucinations.
+
+### 9 LLM Provider Adapters
+Unified interface for OpenAI, Anthropic, Gemini, Groq, Ollama (local), OpenRouter, Mistral, Cerebras, and NVIDIA NIM. Add custom providers via UI — zero code changes.
+
+### RAG Knowledge Bases
+pgvector embeddings with HNSW indexes, hybrid search (vector + BM25), document chunking, and multi-format ingestion (PDF, DOCX, XLSX, CSV, TXT, images). Attach knowledge bases to conversations for grounded responses.
+
+### Visual Workflow Engine
+Drag-and-drop builder with React Flow — 10+ node types (LLM, Tool, Condition, Loop, HTTP, Code, Human Gate). Server-side execution with real-time streaming.
+
+### Deep Research Mode
+Autonomous multi-step research: breaks queries into sub-questions, searches the web, scrapes sources, synthesizes answers, and produces cited reports. Async via BullMQ.
+
+### Code Sandbox
+Isolated execution — JavaScript in `isolated-vm` (V8 isolate, 128MB memory cap), Python in subprocess with ulimit constraints (256MB memory, 10s CPU, 32 process limit). Artifacts auto-detected from AI responses.
+
+### Community Marketplace
+Publish and install prompts, workflows, personas, and tools. Star ratings, reviews, download tracking, one-click import.
+
+### User Skills Framework
+Write Python functions that become tools during council deliberation. Sandboxed execution, dynamic registration.
+
+### Observability + LLMOps
+Prometheus metrics (latency histograms, provider call duration, queue depth, token usage), execution tracing with LangFuse export, model reliability scoring, analytics dashboard, per-query cost tracking with color-coded tiers.
+
+### API Documentation
+Interactive Swagger UI at `/api/docs` with OpenAPI 3.0 spec. All 35 routes annotated with request/response schemas, auth requirements, and examples.
+
+### Voice & Text-to-Speech
+Multi-provider TTS with automatic fallback (Xiaomi MiMo → CosyVoice → OpenAI). Speech-to-text input support.
+
+### PII Detection & Redaction
+Server-side PII scanning. Detects emails, phone numbers, SSNs, credit cards, API keys. Risk scoring with configurable enforcement.
+
+### GitHub Intelligence
+Index repositories into the vector store. Code snippets are injected into council context for code-aware conversations.
+
+### 3-Layer Memory
+Active context, auto-generated session summaries, and long-term vector memory with compaction. Pluggable backends (pgvector, Qdrant, GetZep).
+
+### Auth + Security
+JWT access tokens (15 min) with rotating refresh tokens (httpOnly cookie), argon2id password hashing (OWASP-recommended), OAuth2 (Google, GitHub), role-based access control, shareable conversations with expiry, admin dashboard.
+
+### PWA + Offline
+Workbox service worker, IndexedDB conversation caching, NetworkFirst API strategy.
+
+---
+
+## Tech Stack
+
+| Layer | Technology | Purpose |
+|---|---|---|
+| **Runtime** | Node.js 22 LTS, TypeScript 5.9 | Server + type safety |
+| **API** | Fastify 5 | HTTP layer, 35 native route plugins |
+| **Frontend** | React 18, Vite 6, Tailwind CSS | SPA with hot reload |
+| **Database** | PostgreSQL 16 + pgvector (HNSW) | Relational data + vector embeddings |
+| **Cache / Queues** | Redis 7, BullMQ | Semantic cache, rate limiting, async jobs |
+| **ORM** | Drizzle ORM | Type-safe SQL query builder, full SQL control |
+| **Realtime** | ws (native WebSocket) | WebSocket streaming for deliberation events |
+| **Auth** | JWT + rotating refresh tokens, Passport (Google, GitHub OAuth2) | Authentication + session management |
+| **Encryption** | AES-256-GCM, argon2id | API key vault, password hashing (OWASP-compliant) |
+| **Observability** | Pino, Prometheus (prom-client), LangFuse (optional) | Structured logging, metrics, LLM tracing |
+| **Workflow UI** | XYFlow (React Flow) | Visual drag-and-drop workflow builder |
+| **Code Editor** | Monaco Editor | In-browser prompt and code editing |
+| **Charts** | Apache ECharts | Analytics and evaluation dashboards |
+| **Sandbox** | isolated-vm (128MB cap), Python subprocess (ulimit) | Secure code execution (JS + Python) |
+| **Infrastructure** | Docker, GitHub Actions CI | Containerized deployment, automated testing |
+
+### Supported LLM Providers
+
+| Provider | Type | Adapter |
+|---|---|---|
+| OpenAI (GPT-4o, o1, o3) | API | Native |
+| Anthropic (Claude 3) | API | Native |
+| Google (Gemini) | API | Native |
+| Groq (LLaMA, Mixtral) | API | Native |
+| Ollama | Local | Native |
+| OpenRouter | API | Native |
+| Mistral | API | OpenAI-compatible |
+| Cerebras | API | OpenAI-compatible |
+| NVIDIA NIM | API | OpenAI-compatible |
+| Custom providers | API | Configurable via UI (EMOF) |
+
+---
 
 ## Quick Start
 
 ```bash
-# Clone & install
 git clone https://github.com/Yash-Awasthi/aibyai.git
-cd aibyai && npm install
+cd aibyai
+
+npm install
 cd frontend && npm install && cd ..
 
-# Configure (copy .env.example → .env and add your API keys)
 cp .env.example .env
+# Add DATABASE_URL, JWT_SECRET, MASTER_ENCRYPTION_KEY, and at least one AI provider key
 
-# Initialize database
-npx prisma generate && npx prisma migrate dev --name init
-
-# Run
+npx drizzle-kit push
 npm run dev:all
 ```
 
-Open [http://localhost:5173](http://localhost:5173)
+Open **http://localhost:5173**
 
-## How Deliberation Works
-
-`Query → Auto-Routing → Parallel Agents → Peer Review → Debate Rounds → Deterministic Scoring → Synthesis → Cold Validation → Verdict`
-
-1. **Auto-Routing**: Classifies query type, selects optimal archetypes
-2. **Parallel Generation**: 4+ agents process the query concurrently
-3. **Peer Review**: Structured critiques `{target, claim, issue, correction}`
-4. **Multi-Round Debate**: Iterative refinement with anti-convergence guard
-5. **Scoring**: `final = 0.6 × Agreement + 0.4 × PeerRanking` (pure ML, zero LLM influence)
-6. **Bloom Gate**: Halts if refinement degrades quality below previous round
-7. **Synthesis**: Master model constructs final verdict from debate history
-8. **Cold Validation**: Independent zero-context model checks for hallucinations
-
-## Supported Providers
-
-- **OpenAI** (GPT-4o, GPT-5.x) — via API
-- **Anthropic** (Claude 3.5/4) — via API
-- **Google** (Gemini 2.x) — via API
-- **Ollama** (Llama, Mistral, etc.) — local models
-- **OpenAI-Compatible** (Groq, Mistral API, NVIDIA NIM, Cerebras)
-
-## Architecture
-
-`Frontend (React + Vite) → Express API → Council Engine → Provider Adapters → ML Scoring (Transformers.js) → PostgreSQL + pgvector → Redis (cache + sessions)`
-
-The project has been refactored into a clear, modular structure:
-- `frontend/`: The React + Vite SPA using `react-router-dom` for mode navigation.
-- `src/api/`: Express routes and middleware.
-- `src/core/`: The multi-agent deliberation engine, deterministic scoring, and validation.
-- `src/providers/`: The Universal Provider Adapter with real-time SSE streaming.
-- `src/streaming/`: Dedicated SSE handling for the frontend connection.
-- `src/services/`: Database and history services.
-- `src/lib/`: Shared utilities, cache, and logger.
-
-## API
+### Or with Docker
 
 ```bash
-# Streaming deliberation
-POST /api/ask/stream
-Content-Type: application/json
-
-{
-  "question": "What are the trade-offs of microservices?",
-  "mode": "auto"
-}
-# Returns: SSE stream with opinion, peer_review, scored, verdict events
+docker compose up -d
+# → http://localhost:3000
 ```
 
-See `ARCHITECTURE.md` for full API reference.
+> **Full setup guide, all environment variables, and API reference:** [docs/DOCUMENTATION.md](./docs/DOCUMENTATION.md)
+
+---
+
+## Example
+
+```bash
+curl -X POST http://localhost:3000/api/ask \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <token>" \
+  -d '{"question": "Microservices vs monolith?", "mode": "auto", "rounds": 2}'
+```
+
+Returns an SSE stream: `opinion` → `peer_review` → `scored` → `done` (verdict + confidence score)
+
+> **Full API reference with all 35 endpoints:** [docs/DOCUMENTATION.md](./docs/DOCUMENTATION.md#api-reference) | **Interactive docs:** `/api/docs`
+
+---
+
+## Documentation
+
+| Document | Description |
+|---|---|
+| **[Documentation](./docs/DOCUMENTATION.md)** | Setup, env vars, API reference, project structure, deployment, security |
+| **[Roadmap](./ROADMAP.md)** | Future plans — testing, collaboration, plugins, scaling |
+| **Interactive API Docs** | Available at `/api/docs` when the server is running |
+
+---
 
 ## License
 
-MIT
+[ISC](./LICENSE) — Yash Awasthi
+
+---
+
+<div align="center">
+
+**Built with deliberation, not hallucination.**
+
+[Report a Bug](https://github.com/Yash-Awasthi/aibyai/issues) · [Request a Feature](https://github.com/Yash-Awasthi/aibyai/issues)
+
+</div>
