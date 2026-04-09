@@ -1,5 +1,6 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Sidebar } from "../components/Sidebar";
+import { AuthScreen } from "../components/AuthScreen";
 import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import type { Conversation, UserMetrics } from "../types/index.js";
@@ -80,6 +81,20 @@ export function RootLayout() {
     navigate('/metrics');
     setIsSidebarOpen(false);
   };
+
+  const handleLogin = (newToken: string) => {
+    // The AuthContext probably needs to be updated with the token.
+    // AuthContext uses localStorage, so we'll just set it and let context pick it up, or maybe it sets it.
+    // Actually the AuthScreen itself does:
+    // localStorage.setItem("council_token", data.token);
+    // onLogin(data.token);
+    // Since AuthContext might need to re-render, we can just reload the page.
+    window.location.reload();
+  };
+
+  if (!token) {
+    return <AuthScreen onLogin={handleLogin} />;
+  }
 
   return (
     <div

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { MessageList } from "./MessageList.js";
 import { InputArea } from "./InputArea.js";
 import { StreamingStatus } from "./StreamingStatus.js";
+import { CouncilConfigPanel } from "./CouncilConfigPanel.js";
 import type { ChatMessage, CouncilMember } from "../types/index.js";
 
 interface ChatAreaProps {
@@ -134,6 +135,14 @@ export function ChatArea({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setShowMemberConfig(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold text-accent/80 hover:text-accent hover:bg-accent/10 rounded-xl transition-all uppercase tracking-widest border border-accent/20 hover:border-accent/40"
+          >
+            <span className="material-symbols-outlined text-[16px]">groups</span>
+            <span className="hidden sm:inline">Council Settings</span>
+          </button>
+
           {/* Export */}
           <div className="relative">
             <button
@@ -186,6 +195,18 @@ export function ChatArea({
 
       {/* Input stays at bottom naturally */}
       <div className="shrink-0 mb-4 flex justify-center w-full">
+        <CouncilConfigPanel
+          isOpen={showMemberConfig}
+          onClose={() => setShowMemberConfig(false)}
+          summon={summon}
+          onSummonChange={setSummon}
+          rounds={rounds}
+          onRoundsChange={setRounds}
+          members={members}
+          onAddMember={() => onUpdateMembers([...members, { id: Date.now().toString(), name: "New Member", type: "openai-compat", role: "Default", tone: "Concise" }])}
+          onRemoveMember={(id) => onUpdateMembers(members.filter(m => m.id !== id))}
+          onUpdateMember={(id, field, value) => onUpdateMembers(members.map(m => m.id === id ? { ...m, [field]: value } : m))}
+        />
         <InputArea
           input={input}
           setInput={setInput}
