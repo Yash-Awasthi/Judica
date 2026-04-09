@@ -2,52 +2,8 @@ import { useState, useRef, useEffect } from "react";
 import { MessageList } from "./MessageList.js";
 import { InputArea } from "./InputArea.js";
 import { StreamingStatus } from "./StreamingStatus.js";
-
-export interface Opinion {
-  name: string;
-  archetype: string;
-  opinion: string;
-}
-
-export interface PeerReview {
-  reviewer: string;
-  ranking: string[];
-  critique: string;
-}
-
-export interface ScoredOpinion {
-  name: string;
-  opinion: string;
-  scores: {
-    confidence: number;
-    agreement: number;
-    peerRanking: number;
-    final: number;
-  };
-}
-
-export interface ModelCost {
-  model: string;
-  tokensIn: number;
-  tokensOut: number;
-  costUsd: number;
-  latencyMs: number;
-}
-
-export interface ChatMessage {
-  id: string;
-  question: string;
-  verdict?: string;
-  opinions?: Opinion[];
-  peerReviews?: PeerReview[];
-  scored?: ScoredOpinion[];
-  costs?: ModelCost[];
-  totalCostUsd?: number;
-  durationMs?: number;
-  cacheHit?: boolean;
-}
-
-import type { CouncilMember } from "../App";
+import { CouncilConfigPanel } from "./CouncilConfigPanel.js";
+import type { ChatMessage, CouncilMember } from "../types/index.js";
 
 interface ChatAreaProps {
   messages: ChatMessage[];
@@ -179,6 +135,14 @@ export function ChatArea({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setShowMemberConfig(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-bold text-accent/80 hover:text-accent hover:bg-accent/10 rounded-xl transition-all uppercase tracking-widest border border-accent/20 hover:border-accent/40"
+          >
+            <span className="material-symbols-outlined text-[16px]">groups</span>
+            <span className="hidden sm:inline">Council Settings</span>
+          </button>
+
           {/* Export */}
           <div className="relative">
             <button
@@ -211,21 +175,6 @@ export function ChatArea({
               </>
             )}
           </div>
-
-          <div className="w-px h-4 bg-white/10 hidden sm:block" />
-
-          {/* Council config toggle */}
-          <button
-            onClick={() => setShowMemberConfig(!showMemberConfig)}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl transition-all text-[10px] font-black uppercase tracking-widest border ${
-              showMemberConfig
-                ? "bg-accent/8 border-accent/20 text-accent"
-                : "border-white/[0.06] text-text-muted hover:border-white/10 hover:text-text"
-            }`}
-          >
-            <span className="material-symbols-outlined text-[16px]">groups</span>
-            <span className="hidden sm:inline">Council</span>
-          </button>
         </div>
       </header>
 
@@ -233,7 +182,7 @@ export function ChatArea({
       <StreamingStatus isLoading={isLoading} isStreaming={false} />
 
       {/* Messages */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto pt-20 pb-52 px-4 md:px-8">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto pt-20 pb-32 px-4 md:px-8 scrollbar-custom">
         <MessageList
           messages={messages}
           playingAudioId={playingAudioId}
@@ -244,24 +193,30 @@ export function ChatArea({
         />
       </div>
 
-      {/* Input Area */}
-      <InputArea
-        input={input}
-        setInput={setInput}
-        summon={summon}
-        setSummon={setSummon}
-        rounds={rounds}
-        setRounds={setRounds}
-        useStream={useStream}
-        setUseStream={setUseStream}
-        isStreaming={isStreaming}
-        onSendMessage={handleSend}
-        defaultSummon={defaultSummon}
-        members={members}
-        onUpdateMembers={onUpdateMembers}
-        showMemberConfig={showMemberConfig}
-        setShowMemberConfig={setShowMemberConfig}
-      />
+      {/* Input stays at bottom naturally */}
+      <div className="shrink-0 mb-4 flex justify-center w-full">
+        <CouncilConfigPanel
+          isOpen={showMemberConfig}
+          onClose={() => setShowMemberConfig(false)}
+          summon={summon}
+          onSummonChange={setSummon}
+          rounds={rounds}
+          onRoundsChange={setRounds}
+          members={members}
+          onAddMember={() => onUpdateMembers([...members, { id: Date.now().toString(), name: "New Member", type: "openai-compat", role: "Default", tone: "Concise" }])}
+          onRemoveMember={(id) => onUpdateMembers(members.filter(m => m.id !== id))}
+          onUpdateMember={(id, field, value) => onUpdateMembers(members.map(m => m.id === id ? { ...m, [field]: value } : m))}
+        />
+        <InputArea
+          input={input}
+          setInput={setInput}
+          useStream={useStream}
+          setUseStream={setUseStream}
+          isStreaming={isStreaming}
+          onSend={handleSend}
+          placeholder="Ask the council anything..."
+        />
+      </div>
 
       {/* BG decoration */}
       <div className="fixed inset-0 pointer-events-none -z-10 bg-black">

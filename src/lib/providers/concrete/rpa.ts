@@ -189,11 +189,13 @@ export class RPAProvider extends BaseProvider {
     }
   }
 
-  async call({ prompt, messages, signal, maxTokens, isFallback }: {
+  async call({ prompt, messages, signal, maxTokens, isFallback, onChunk }: {
     messages: Message[];
     prompt?: string;
     signal?: AbortSignal;
     maxTokens?: number;
+    isFallback?: boolean;
+    onChunk?: (chunk: string) => void;
   }): Promise<ProviderResponse> {
     const lastMessage = messages[messages.length - 1];
     const lastContent = lastMessage.content;
@@ -203,7 +205,7 @@ export class RPAProvider extends BaseProvider {
 
     for (let attempt = 1; attempt <= 2; attempt++) {
       try {
-        const text = await this.generateOnce(finalPrompt, maxTokens || 60000, signal);
+        const text = await this.generateOnce(finalPrompt, maxTokens || 60000, signal, onChunk);
         const usage = {
           promptTokens: Math.ceil(finalPrompt.length / 4),
           completionTokens: Math.ceil(text.length / 4),
@@ -219,7 +221,7 @@ export class RPAProvider extends BaseProvider {
     throw new Error("RPA failed unexpectedly");
   }
 
-  private async generateOnce(prompt: string, timeoutMs: number, externalSignal?: AbortSignal): Promise<string> {
+  private async generateOnce(prompt: string, timeoutMs: number, externalSignal?: AbortSignal, onChunk?: (chunk: string) => void): Promise<string> {
     const controller = new AbortController();
     const abortTimeout = setTimeout(() => controller.abort(), timeoutMs);
     const abortSignal = controller.signal;
@@ -248,7 +250,7 @@ export class RPAProvider extends BaseProvider {
       await input.fill(prompt);
       await input.press("Enter");
 
-      const response = await this.waitForResponse(page, abortSignal, timeoutMs - 15000);
+      const response = await this.waitForResponse(page, abortSignal, timeoutMs - 15000, onChunk);
       await context.storageState({ path: this.sessionPath }); // Save session
       return response;
     } finally {
@@ -276,7 +278,7 @@ export class RPAProvider extends BaseProvider {
     throw new Error("Input not found");
   }
 
-  private async waitForResponse(page: import("playwright").Page, abortSignal: AbortSignal, timeout: number): Promise<string> {
+  private async waitForResponse(page: import("playwright").Page, abortSignal: AbortSignal, timeout: number, onChunk?: (chunk: string) => void): Promise<string> {
     const start = Date.now();
     let last = "";
     let stable = 0;
@@ -287,6 +289,13 @@ export class RPAProvider extends BaseProvider {
         const text = await page.locator(sel).last().textContent().catch(() => "");
         if (text && text.trim().length > current.length) current = text.trim();
       }
+
+      if (current !== last && current.length > last.length) {
+        if (onChunk) {
+          onChunk(current.slice(last.length));
+        }
+      }
+
       if (current && current === last) stable++; else stable = 0;
       if (stable >= 4) return current;
       last = current;

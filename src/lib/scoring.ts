@@ -1,5 +1,5 @@
 import { AgentOutput, ScoredOpinion, AdversarialResult, GroundingResult, PeerReview } from "./schemas.js";
-import { mlWorker } from "./ml/ml_worker.js";
+import { mlWorker } from "../lib/ml/ml_worker.js";
 import { validationModule } from "./validation.js";
 import logger from "./logger.js";
 

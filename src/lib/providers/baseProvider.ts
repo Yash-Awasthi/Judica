@@ -15,6 +15,7 @@ export abstract class BaseProvider {
     signal?: AbortSignal;
     maxTokens?: number;
     isFallback?: boolean;
+    onChunk?: (chunk: string) => void;
   }): Promise<ProviderResponse>;
 
   protected maskConfig() {

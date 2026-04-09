@@ -12,10 +12,12 @@ export class AnthropicProvider extends BaseProvider {
     super(config);
   }
 
-  async call({ messages, signal, maxTokens, isFallback }: {
+  async call({ messages, signal, maxTokens, isFallback, onChunk }: {
     messages: Message[];
     signal?: AbortSignal;
     maxTokens?: number;
+    isFallback?: boolean;
+    onChunk?: (chunk: string) => void;
   }): Promise<ProviderResponse> {
     const url = this.config.baseUrl || this.defaultBaseUrl;
     await validateSafeUrl(url);
@@ -38,6 +40,7 @@ export class AnthropicProvider extends BaseProvider {
         body: JSON.stringify({
           model: this.config.model || "claude-3-5-sonnet-20241022",
           max_tokens: maxTokens || this.config.maxTokens || 4096,
+          stream: !!onChunk,
           ...(this.config.systemPrompt ? { system: this.config.systemPrompt } : {}),
           messages: messages.map(m => ({
             role: m.role === "system" ? "user" : (m.role === "tool" ? "user" : m.role),
@@ -51,11 +54,63 @@ export class AnthropicProvider extends BaseProvider {
         }),
       });
 
-      const data = await res.json();
       if (!res.ok) {
-        throw new Error(data.error?.message ?? `Anthropic API error: ${res.status}`);
+        let errorData: any = {};
+        try { errorData = await res.json(); } catch { /* ignore */ }
+        throw new Error(errorData?.error?.message ?? `Anthropic API error: ${res.status}`);
       }
 
+      if (onChunk && res.body) {
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let text = "";
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          let newlineIndex;
+          while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
+            const line = buffer.slice(0, newlineIndex).trim();
+            buffer = buffer.slice(newlineIndex + 1);
+
+            if (line.startsWith("data: ")) {
+              const dataStr = line.slice(6).trim();
+              if (!dataStr) continue;
+
+              try {
+                const parsed = JSON.parse(dataStr);
+                if (parsed.type === "content_block_delta" && parsed.delta?.text) {
+                  const content = parsed.delta.text;
+                  text += content;
+                  onChunk(content);
+                }
+              } catch (e) {
+                // ignore unparseable chunk
+              }
+            }
+          }
+        }
+
+        const usage = {
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0
+        };
+
+        const cost = calculateCost(
+          "anthropic",
+          this.config.model,
+          0,
+          0
+        );
+
+        return { text: text.trim(), usage, cost, raw: { stream: true } };
+      }
+
+      const data = await res.json();
       const content = data.content || [];
       const toolCalls = content.filter((c: any) => c.type === "tool_use");
 
@@ -91,7 +146,7 @@ export class AnthropicProvider extends BaseProvider {
           } as any);
         }
 
-        return this.call({ messages: nextMessages, signal, maxTokens, isFallback });
+        return this.call({ messages: nextMessages, signal, maxTokens, isFallback, onChunk });
       }
 
       const text = content.find((c: any) => c.type === "text")?.text || "";

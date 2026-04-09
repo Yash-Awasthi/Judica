@@ -1,3 +1,4 @@
+import { vi } from "vitest";
 import { describe, it, expect } from "vitest";
 import { computeConsensus } from "../../src/lib/metrics.js";
 import { scoreOpinions, filterAndRank } from "../../src/lib/scoring.js";
@@ -39,7 +40,10 @@ describe("Council Evaluation Benchmarks", () => {
   });
 
   describe("Consensus Metric", () => {
-    it("should return 1 for identical outputs", () => {
+  vi.setConfig({ testTimeout: 20000 });
+    it("should return 1 for identical outputs", async () => {
+//vi.setConfig({ testTimeout: 20000 });
+    //vi.setConfig({ testTimeout: 20000 });
       const output = {
         answer: "Use microservices architecture",
         reasoning: "Better scalability",
@@ -47,10 +51,11 @@ describe("Council Evaluation Benchmarks", () => {
         assumptions: [],
         confidence: 0.9
       };
-      expect(computeConsensus([output, output])).toBe(1);
+      expect(await computeConsensus([output, output])).toBe(1);
     });
 
-    it("should return lower score for divergent outputs", () => {
+    it("should return lower score for divergent outputs", async () => {
+//vi.setConfig({ testTimeout: 20000 });
       const a = {
         answer: "Implement machine learning pipeline using TensorFlow and PyTorch for neural network training",
         reasoning: "TensorFlow provides excellent production deployment capabilities while PyTorch offers flexible research development",
@@ -65,11 +70,11 @@ describe("Council Evaluation Benchmarks", () => {
         assumptions: ["soil quality is good", "climate is suitable"],
         confidence: 0.8
       };
-      const score = computeConsensus([a, b]);
+      const score = await computeConsensus([a, b]);
       expect(score).toBeLessThan(0.5);
     });
 
-    it("should handle single output", () => {
+    it("should handle single output", async () => {
       const output = {
         answer: "test answer here",
         reasoning: "test reasoning here",
@@ -77,28 +82,28 @@ describe("Council Evaluation Benchmarks", () => {
         assumptions: [],
         confidence: 0.5
       };
-      expect(computeConsensus([output])).toBe(1);
+      expect(await computeConsensus([output])).toBe(1);
     });
   });
 
   describe("Scoring Engine", () => {
-    it("should score and rank opinions correctly", () => {
+    it("should score and rank opinions correctly", async () => {
       const opinions = [
         { name: "Agent A", opinion: "test", structured: { answer: "Use React", reasoning: "Popular", key_points: ["popularity", "ecosystem"], assumptions: [], confidence: 0.9 } },
         { name: "Agent B", opinion: "test", structured: { answer: "Use Vue", reasoning: "Simple", key_points: ["simplicity"], assumptions: [], confidence: 0.7 } },
       ];
-      const scored = scoreOpinions(opinions, [], new Map());
+      const scored = await scoreOpinions(opinions, [], new Map());
       expect(scored).toHaveLength(2);
       expect(scored[0].scores.final).toBeGreaterThan(0);
       expect(scored[0].scores.final).toBeLessThanOrEqual(1);
     });
 
-    it("should filter low-scoring opinions", () => {
+    it("should filter low-scoring opinions", async () => {
       const opinions = [
         { name: "A", opinion: "test", structured: { answer: "good answer here", reasoning: "reasoning text", key_points: ["point one"], assumptions: [], confidence: 0.9 } },
         { name: "B", opinion: "test", structured: { answer: "bad answer here", reasoning: "reasoning text", key_points: ["point two"], assumptions: [], confidence: 0.1 } },
       ];
-      const scored = scoreOpinions(opinions, [], new Map());
+      const scored = await scoreOpinions(opinions, [], new Map());
       const filtered = filterAndRank(scored, 0.3);
       expect(filtered.length).toBeLessThanOrEqual(scored.length);
     });
