@@ -1,30 +1,6 @@
 import { useRef, useEffect, useCallback, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-
-export interface PeerReview {
-  reviewer: string;
-  ranking: string[];
-  critique: string;
-}
-
-export interface ScoredOpinion {
-  name: string;
-  opinion: string;
-  scores: {
-    confidence: number;
-    agreement: number;
-    peerRanking: number;
-    final: number;
-  };
-}
-
-export interface ModelCost {
-  model: string;
-  tokensIn: number;
-  tokensOut: number;
-  costUsd: number;
-  latencyMs: number;
-}
+import type { PeerReview, ScoredOpinion, ModelCost } from "../types/index.js";
 
 export type SSEEvent =
   | { type: "member_chunk"; name: string; chunk: string }

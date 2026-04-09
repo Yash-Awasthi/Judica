@@ -1,8 +1,4 @@
-export interface Conversation {
-  id: string;
-  title: string;
-  updatedAt?: string;
-}
+import type { Conversation } from "../types/index.js";
 
 interface SidebarProps {
   conversations: Conversation[];

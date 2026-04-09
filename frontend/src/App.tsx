@@ -1,95 +1,22 @@
-import React, { useState, useEffect, useCallback, useRef, Component, type ErrorInfo, type ReactNode } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import { useCouncilStream, type SSEEvent } from "./hooks/useCouncilStream";
 import { AuthScreen } from "./components/AuthScreen";
-import { Sidebar, type Conversation } from "./components/Sidebar";
-import { ChatArea, type ChatMessage } from "./components/ChatArea";
+import { Sidebar } from "./components/Sidebar";
+import { ChatArea } from "./components/ChatArea";
 import { Dashboard } from "./components/Dashboard";
-import { v4 as uuidv4 } from "uuid";
-
-interface ErrorBoundaryProps {
-  children: ReactNode;
-}
-
-interface ErrorBoundaryState {
-  hasError: boolean;
-  error?: Error;
-}
-
-class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
-  constructor(props: ErrorBoundaryProps) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("Uncaught error:", error, errorInfo);
-  }
-
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div className="flex flex-col items-center justify-center h-screen bg-bg text-text p-8 text-center font-sans">
-          <div className="w-16 h-16 rounded-2xl bg-danger/10 border border-danger/20 flex items-center justify-center mb-6">
-            <span className="material-symbols-outlined text-danger text-3xl">error</span>
-          </div>
-          <h1 className="text-xl font-black tracking-tight text-text mb-3">Neural Link Severed</h1>
-          <p className="text-text-muted mb-8 max-w-sm text-sm leading-relaxed">
-            The interface encountered an unexpected disconnect. {this.state.error?.message}
-          </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-2.5 bg-accent/10 border border-accent/20 rounded-xl hover:bg-accent/20 transition-all text-accent text-xs font-bold uppercase tracking-widest"
-          >
-            Re-initialize Uplink
-          </button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
-
-interface UserMetrics {
-  totalRequests: number;
-  totalConversations: number;
-  cache: {
-    hits: number;
-    hitRatePercentage: number;
-  };
-  performance: {
-    averageLatencyMs: number;
-    totalTokensUsed: number;
-  };
-}
-
-export interface CouncilMember {
-  id: string;
-  name: string;
-  type: "openai-compat" | "anthropic" | "google";
-  apiKey: string;
-  model: string;
-  baseUrl?: string;
-  active: boolean;
-  role: string;
-  tone: string;
-  customBehaviour: string;
-}
+import type { UserMetrics, Conversation } from "./types/index.js";
+import { ErrorBoundary } from "./components/ErrorBoundary";
+import { useCouncilMembers } from "./hooks/useCouncilMembers";
+import { useDeliberation } from "./hooks/useDeliberation";
 
 function AppContent() {
   const { token, user: username, login, logout, fetchWithAuth } = useAuth();
 
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvoId, setActiveConvoId] = useState<string | null>(null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [currentSummon, setCurrentSummon] = useState<string>("default");
 
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isStreaming, setIsStreaming] = useState(false);
   const [isInChat, setIsInChat] = useState(false);
   const [showMetrics, setShowMetrics] = useState(false);
   const [metrics, setMetrics] = useState<UserMetrics | null>(null);
@@ -99,94 +26,31 @@ function AppContent() {
     return saved ? parseInt(saved, 10) : 264;
   });
 
-  const activeMsgIdRef = useRef<string | null>(null);
+  const { members, setMembers } = useCouncilMembers();
 
-  const { startStream } = useCouncilStream({
-    onEvent: (event) => {
-      if (activeMsgIdRef.current) {
-        updateMessageFromStream.current(activeMsgIdRef.current, event);
+  const loadConversations = useCallback(async () => {
+    try {
+      const res = await fetchWithAuth("/api/history?limit=50");
+      if (res.ok) {
+        const data = await res.json() as { data: Conversation[] };
+        setConversations(data.data || []);
       }
-    },
-    onError: (msg) => {
-      console.error("Stream error in App:", msg);
+    } catch (err) {
+      console.error("Failed to load conversations", err);
     }
-  });
+  }, [fetchWithAuth]);
 
-  const [members, setMembers] = useState<CouncilMember[]>(() => {
-    const saved = localStorage.getItem("council_members");
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        // Clean up invalid cached models
-        return parsed.map((m: any) => ({
-          ...m,
-          model: m.model === "gemini-2.5-flash" || m.model === "gemini-2.0-flash" ? "mistral-large-latest" : 
-                 m.model === "gpt-4o" ? "llama-3.3-70b-versatile" :
-                 m.model === "claude-sonnet-4-20250514" ? "claude-3-5-sonnet-20241022" : 
-                 m.model,
-          baseUrl: m.model === "gpt-4o" ? "https://api.groq.com/openai/v1" : 
-                   m.model === "gemini-2.0-flash" ? "https://api.mistral.ai/v1" :
-                   m.baseUrl
-        }));
-      } catch (err) {
-        console.error("Failed to parse cached council members", err);
-      }
-    }
-    return [
-      {
-        id: "1",
-        name: "The Architect",
-        type: "openai-compat" as const,
-        apiKey: "",
-        model: "mistral-large-latest",
-        baseUrl: "https://api.mistral.ai/v1",
-        active: true,
-        role: "Expert",
-        tone: "Academic",
-        customBehaviour: ""
-      },
-      {
-        id: "2",
-        name: "The Contrarian",
-        type: "openai-compat" as const,
-        apiKey: "",
-        model: "llama-3.3-70b-versatile",
-        baseUrl: "https://api.groq.com/openai/v1",
-        active: true,
-        role: "Devil's Advocate",
-        tone: "Blunt",
-        customBehaviour: ""
-      },
-      {
-        id: "3",
-        name: "The Pragmatist",
-        type: "openai-compat" as const,
-        apiKey: "",
-        model: "mistral-small-latest",
-        baseUrl: "https://api.mistral.ai/v1",
-        active: true,
-        role: "Pragmatist",
-        tone: "Concise",
-        customBehaviour: ""
-      },
-      {
-        id: "4",
-        name: "The Summarizer",
-        type: "openai-compat" as const,
-        apiKey: "",
-        model: "llama-3.3-70b-versatile",
-        baseUrl: "https://api.groq.com/openai/v1",
-        active: true,
-        role: "Critic",
-        tone: "Concise",
-        customBehaviour: "You are an Unbiased Summarizer. Provide a completely neutral, objective summary of the debate using your large context window. Do not invent new arguments."
-      }
-    ];
-  });
+  const onConversationCreated = useCallback((id: string) => {
+    setActiveConvoId(id);
+    loadConversations();
+  }, [loadConversations]);
 
-  useEffect(() => {
-    localStorage.setItem("council_members", JSON.stringify(members));
-  }, [members]);
+  const { messages, setMessages, isStreaming, sendMessage } = useDeliberation({
+    members,
+    conversationId: activeConvoId,
+    fetchWithAuth,
+    onConversationCreated,
+  });
 
   useEffect(() => {
     localStorage.setItem("council_sidebar_width", sidebarWidth.toString());
@@ -196,7 +60,7 @@ function AppContent() {
     await logout();
     setActiveConvoId(null);
     setMessages([]);
-  }, [logout]);
+  }, [logout, setMessages]);
 
   const checkProfile = useCallback(async () => {
     if (!token) return;
@@ -226,18 +90,6 @@ function AppContent() {
     }
   }, [token, handleLogout, fetchWithAuth, login]);
 
-  const loadConversations = useCallback(async () => {
-    try {
-      const res = await fetchWithAuth("/api/history?limit=50");
-      if (res.ok) {
-        const data = await res.json() as { data: Conversation[] };
-        setConversations(data.data || []);
-      }
-    } catch (err) {
-      console.error("Failed to load conversations", err);
-    }
-  }, [fetchWithAuth]);
-
   useEffect(() => {
     if (token) {
       checkProfile();
@@ -253,7 +105,7 @@ function AppContent() {
     try {
       const res = await fetchWithAuth(`/api/history/${id}?limit=100`);
       if (res.ok) {
-        const data = await res.json() as { chats: ChatMessage[] };
+        const data = await res.json() as { chats: any[] };
         setMessages(data.chats || []);
       }
     } catch (err) {
@@ -328,124 +180,6 @@ function AppContent() {
     }
   };
 
-  const updateMessageFromStream = useRef((msgId: string, event: SSEEvent) => {
-    setMessages(prev => prev.map(m => {
-      if (m.id !== msgId) return m;
-      const newMsg = { ...m };
-      if (!newMsg.opinions) newMsg.opinions = [];
-
-      const cleanContent = (content: string) =>
-        content
-          .replace(/<think>[\s\S]*?<\/think>/g, "")
-          .replace(/<think>[\s\S]*/g, "")
-          .trim();
-
-      switch (event.type) {
-        case "member_chunk": {
-          const idx = newMsg.opinions.findIndex(o => o.name === event.name);
-          const rawOpinion = idx === -1 ? event.chunk : newMsg.opinions[idx].opinion + event.chunk;
-          const cleanOpinion = cleanContent(rawOpinion);
-          if (idx === -1) {
-            newMsg.opinions = [...newMsg.opinions, { name: event.name, archetype: "", opinion: cleanOpinion }];
-          } else {
-            newMsg.opinions = newMsg.opinions.map((o, i) =>
-              i === idx ? { ...o, opinion: cleanOpinion } : o
-            );
-          }
-          break;
-        }
-        case "opinion": {
-          const idx = newMsg.opinions.findIndex(o => o.name === event.name);
-          const cleanOpinion = cleanContent(event.opinion);
-          if (idx === -1) {
-            newMsg.opinions = [...newMsg.opinions, { name: event.name, archetype: event.archetype, opinion: cleanOpinion }];
-          } else {
-            newMsg.opinions = newMsg.opinions.map((o, i) =>
-              i === idx ? { ...o, archetype: event.archetype, opinion: cleanOpinion } : o
-            );
-          }
-          break;
-        }
-        case "verdict": {
-          newMsg.verdict = cleanContent(event.verdict);
-          break;
-        }
-        case "verdict_chunk": {
-          newMsg.verdict = cleanContent((newMsg.verdict || "") + event.chunk);
-          break;
-        }
-        case "done": {
-          if (event.verdict) newMsg.verdict = cleanContent(event.verdict);
-          if (event.conversationId) {
-            setTimeout(() => {
-              setActiveConvoId(event.conversationId!);
-              loadConversations();
-            }, 0);
-          }
-          break;
-        }
-      }
-      return newMsg;
-    }));
-  });
-
-  const handleSendMessage = async (text: string, summon: string, useStream: boolean, rounds: number) => {
-    setIsStreaming(true);
-    const msgId = uuidv4();
-    activeMsgIdRef.current = msgId;
-
-    const newMsg: ChatMessage = { id: msgId, question: text, opinions: [], verdict: "" };
-    setMessages(prev => [...prev, newMsg]);
-
-    const body = {
-      question: text,
-      summon: summon || undefined,
-      rounds: rounds || undefined,
-      conversationId: activeConvoId || undefined,
-      members: members
-        .filter(m => m.active)
-        .map(m => ({ ...m, systemPrompt: m.customBehaviour || undefined }))
-    };
-
-    try {
-      if (useStream) {
-        await startStream(body);
-      } else {
-        const res = await fetchWithAuth("/api/ask", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body)
-        });
-
-        if (!res.ok) throw new Error("Request failed");
-        const data = await res.json() as {
-          opinions: Array<{ name: string; archetype: string; opinion: string }>;
-          verdict: string;
-          latency: number;
-          cacheHit: boolean;
-          conversationId?: string;
-        };
-
-        setMessages(prev => prev.map(m => m.id === msgId ? {
-          ...m,
-          opinions: data.opinions,
-          verdict: data.verdict,
-          durationMs: data.latency,
-          cacheHit: data.cacheHit
-        } : m));
-
-        if (!activeConvoId && data.conversationId) {
-          setActiveConvoId(data.conversationId);
-          loadConversations();
-        }
-      }
-    } catch (err) {
-      console.error("Chat error", err);
-    } finally {
-      setIsStreaming(false);
-    }
-  };
-
   if (!token) {
     return <AuthScreen onLogin={login} />;
   }
@@ -488,7 +222,7 @@ function AppContent() {
             <ChatArea
               messages={messages}
               isStreaming={isStreaming}
-              onSendMessage={handleSendMessage}
+              onSendMessage={sendMessage}
               onToggleSidebar={() => setIsSidebarOpen(true)}
               activeTitle={activeTitle}
               defaultSummon={currentSummon}

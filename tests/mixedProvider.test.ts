@@ -15,7 +15,7 @@ vi.mock("../src/lib/strategies/openai.js", () => ({
 }));
 
 vi.mock("../src/lib/providers/concrete/rpa.js", () => ({
-  createConnector: vi.fn(),
+  RPAProvider: vi.fn(),
   OllamaConnector: vi.fn(),
   RPAConnector: vi.fn()
 }));
@@ -134,27 +134,27 @@ describe("Mixed Provider Test", () => {
       }
 
       if (provider.type === "local") {
-        const { createConnector } = await import("../src/lib/providers/concrete/rpa.js");
+        const { RPAProvider } = await import("../src/lib/providers/concrete/rpa.js");
         const mockConnector = {
           healthCheck: vi.fn().mockResolvedValue(true),
           generate: vi.fn().mockResolvedValue(`${provider.name} response`)
         };
 
-        (createConnector as any).mockReturnValue(mockConnector);
+        (RPAProvider as any).mockReturnValue(mockConnector);
 
         const result = await askProvider(provider, "Test");
         expect(result.text).toBe(`${provider.name} response`);
       }
 
       if (provider.type === "rpa") {
-        const { createConnector, RPAConnector } = await import("../src/lib/providers/concrete/rpa.js");
+        const { RPAProvider, RPAConnector } = await import("../src/lib/providers/concrete/rpa.js");
         const mockConnector = {
           generate: vi.fn().mockResolvedValue(`${provider.name} response`)
         };
 
         // Make the mock connector an instance of RPAConnector
         Object.setPrototypeOf(mockConnector, RPAConnector.prototype);
-        (createConnector as any).mockReturnValue(mockConnector);
+        (RPAProvider as any).mockReturnValue(mockConnector);
 
         const result = await askProvider(provider, "Test");
         expect(result.text).toBe(`${provider.name} response`);
@@ -191,13 +191,13 @@ describe("Mixed Provider Test", () => {
     expect(apiResult.usage?.totalTokens).toBe(40);
 
     // Test local provider
-    const { createConnector } = await import("../src/lib/providers/concrete/rpa.js");
+    const { RPAProvider } = await import("../src/lib/providers/concrete/rpa.js");
     const mockConnector = {
       healthCheck: vi.fn().mockResolvedValue(true),
       generate: vi.fn().mockResolvedValue("Local mixed response")
     };
 
-    (createConnector as any).mockReturnValue(mockConnector);
+    (RPAProvider as any).mockReturnValue(mockConnector);
 
     const localResult = await askProvider(localProvider, "Mixed test");
     expect(localResult.text).toBe("Local mixed response");

@@ -1,5 +1,5 @@
 import { AgentOutput } from "./schemas.js";
-import { mlWorker } from "./ml/ml_worker.js";
+import { mlWorker } from "../lib/ml/ml_worker.js";
 import logger from "./logger.js";
 
 function tokenSimilarity(a: string, b: string): number {
