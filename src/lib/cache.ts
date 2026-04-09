@@ -44,7 +44,7 @@ export function generateCacheKey(prompt: string, members: any[], master?: any, h
 }
 
 async function getEmbedding(text: string): Promise<number[] | null> {
-  const apiKey = env.OPENAI_API_KEY || process.env.OPENAI_API_KEY;
+  const apiKey = env.OPENAI_API_KEY;
   if (!apiKey) return null;
 
   try {

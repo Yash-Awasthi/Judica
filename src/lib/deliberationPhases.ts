@@ -217,7 +217,7 @@ Do not include any text outside the JSON object.`;
             };
           }
         }
-      } catch (e) { console.error(e); }
+      } catch (e) { logger.error({ err: (e as Error).message }, "Failed to parse peer review"); }
 
       if (reviewData) {
         return { 
@@ -450,7 +450,7 @@ Return STRICT JSON:
           };
         }
       }
-    } catch (e) { console.error(e); }
+    } catch (e) { logger.error({ err: (e as Error).message }, "Failed to parse cold validation result"); }
   } catch (err) {
     logger.warn({ err: (err as Error).message }, "Cold validator failed, proceeding without validation");
   }

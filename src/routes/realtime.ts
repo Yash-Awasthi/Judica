@@ -1,146 +1,180 @@
-import { Router, Response } from "express";
-import { requireAuth } from "../middleware/auth.js";
-import { AuthRequest } from "../types/index.js";
+import { FastifyPluginAsync } from "fastify";
+import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { realTimeCostTracker } from "../lib/realtimeCost.js";
+import { env } from "../config/env.js";
+import { WebSocketServer, WebSocket } from "ws";
 import { createServer } from "http";
-import { Server as SocketIOServer, Socket } from "socket.io";
 import logger from "../lib/logger.js";
+import { AppError } from "../middleware/errorHandler.js";
+import jwt from "jsonwebtoken";
 
-interface SocketWithUserId extends Socket {
+interface CostSocket extends WebSocket {
   userId?: number;
 }
 
-const router = Router();
-
 const httpServer = createServer();
-const io = new SocketIOServer(httpServer, {
-  cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
-    methods: ["GET", "POST"]
-  }
-});
+const wss = new WebSocketServer({ server: httpServer });
 
 const connectedUsers = new Map<number, string>();
 
-io.on('connection', (socket) => {
+wss.on('connection', (ws: CostSocket) => {
   logger.info("User connected to real-time cost tracking");
 
-  const socketWithId = socket as SocketWithUserId;
+  ws.on('message', (raw) => {
+    try {
+      const msg = JSON.parse(raw.toString());
 
-  socket.on('authenticate', (data: { userId: number, token: string }) => {
-    connectedUsers.set(data.userId, socket.id);
-    socketWithId.userId = data.userId;
-    
-    const costData = realTimeCostTracker.getRealTimeData(data.userId);
-    if (costData) {
-      socket.emit('cost-update', costData);
+      if (msg.type === 'authenticate') {
+        // Verify JWT token instead of trusting client-provided userId
+        if (!msg.token) {
+          ws.send(JSON.stringify({ event: 'error', data: { message: 'Authentication token required' } }));
+          return;
+        }
+        try {
+          const payload = jwt.verify(msg.token, env.JWT_SECRET) as any;
+          const userId = payload.userId || payload.id || payload.sub;
+          if (!userId) {
+            ws.send(JSON.stringify({ event: 'error', data: { message: 'Invalid token: no userId' } }));
+            return;
+          }
+          connectedUsers.set(userId, '');
+          ws.userId = userId;
+
+          const costData = realTimeCostTracker.getRealTimeData(userId);
+          if (costData) {
+            ws.send(JSON.stringify({ event: 'cost-update', data: costData }));
+          }
+
+          realTimeCostTracker.onAlert(userId, (alerts) => {
+            if (ws.readyState === WebSocket.OPEN) {
+              ws.send(JSON.stringify({ event: 'cost-alert', data: { alerts, timestamp: new Date() } }));
+            }
+          });
+
+          logger.info({ userId }, "User authenticated for real-time updates");
+        } catch (err) {
+          ws.send(JSON.stringify({ event: 'error', data: { message: 'Invalid or expired token' } }));
+        }
+      } else if (msg.type === 'request-cost-data' && ws.userId) {
+        const costData = realTimeCostTracker.getRealTimeData(ws.userId);
+        if (costData) {
+          ws.send(JSON.stringify({ event: 'cost-update', data: costData }));
+        }
+      } else if (msg.type === 'set-limits' && ws.userId) {
+        realTimeCostTracker.setLimits(ws.userId, msg.dailyLimit, msg.monthlyLimit);
+      } else if (msg.type === 'get-statistics' && ws.userId) {
+        const stats = realTimeCostTracker.getStatistics(ws.userId, msg.hours);
+        ws.send(JSON.stringify({ event: 'statistics-update', data: stats }));
+      }
+    } catch {
+      // Ignore invalid messages
     }
-
-    realTimeCostTracker.onAlert(data.userId, (alerts) => {
-      socket.emit('cost-alert', { alerts, timestamp: new Date() });
-    });
-
-    logger.info({ userId: data.userId }, "User authenticated for real-time updates");
   });
 
-  socket.on('disconnect', () => {
-    if (socketWithId.userId) {
-      connectedUsers.delete(socketWithId.userId);
-      logger.info({ userId: socketWithId.userId }, "User disconnected from real-time updates");
+  ws.on('close', () => {
+    if (ws.userId) {
+      connectedUsers.delete(ws.userId);
+      logger.info({ userId: ws.userId }, "User disconnected from real-time updates");
     }
-  });
-
-  socket.on('request-cost-data', (userId: number) => {
-    const costData = realTimeCostTracker.getRealTimeData(userId);
-    if (costData) {
-      socket.emit('cost-update', costData);
-    }
-  });
-
-  socket.on('set-limits', (data: { userId: number; dailyLimit?: number; monthlyLimit?: number }) => {
-    realTimeCostTracker.setLimits(data.userId, data.dailyLimit, data.monthlyLimit);
-  });
-
-  socket.on('get-statistics', (data: { userId: number; hours?: number }) => {
-    const stats = realTimeCostTracker.getStatistics(data.userId, data.hours);
-    socket.emit('statistics-update', stats);
   });
 });
 
-router.post("/session/start", requireAuth, async (req: AuthRequest, res: Response) => {
-  try {
-    const { sessionId, conversationId } = req.body;
-    
-    if (!sessionId || !conversationId) {
-      return res.status(400).json({ error: "sessionId and conversationId are required" });
+const realtimePlugin: FastifyPluginAsync = async (fastify) => {
+  fastify.post("/session/start", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    try {
+      const { sessionId, conversationId } = request.body as { sessionId?: string; conversationId?: string };
+
+      if (!sessionId || !conversationId) {
+        return reply.code(400).send({ error: "sessionId and conversationId are required" });
+      }
+
+      realTimeCostTracker.startSession(request.userId!, sessionId, conversationId);
+
+      return {
+        success: true,
+        sessionId,
+        message: "Cost tracking started"
+      };
+    } catch (err) {
+      throw new AppError(500, (err as Error).message, "COST_SESSION_START_FAILED");
     }
+  });
 
-    realTimeCostTracker.startSession(req.userId!, sessionId, conversationId);
-    
-    res.json({
-      success: true,
-      sessionId,
-      message: "Cost tracking started"
-    });
-  } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
-  }
-});
+  fastify.post("/session/end", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    try {
+      const { sessionId } = request.body as { sessionId?: string };
 
-router.post("/session/end", requireAuth, async (req: AuthRequest, res: Response) => {
-  try {
-    const { sessionId } = req.body;
-    
-    if (!sessionId) {
-      return res.status(400).json({ error: "sessionId is required" });
+      if (!sessionId) {
+        return reply.code(400).send({ error: "sessionId is required" });
+      }
+
+      const entries = realTimeCostTracker.endSession(sessionId);
+
+      return {
+        success: true,
+        sessionId,
+        totalCost: entries.reduce((sum, entry) => sum + entry.cost, 0),
+        totalTokens: entries.reduce((sum, entry) => sum + entry.inputTokens + entry.outputTokens, 0),
+        requestCount: entries.length
+      };
+    } catch (err) {
+      throw new AppError(500, (err as Error).message, "COST_SESSION_END_FAILED");
     }
+  });
 
-    const entries = realTimeCostTracker.endSession(sessionId);
-    
-    res.json({
-      success: true,
-      sessionId,
-      totalCost: entries.reduce((sum, entry) => sum + entry.cost, 0),
-      totalTokens: entries.reduce((sum, entry) => sum + entry.inputTokens + entry.outputTokens, 0),
-      requestCount: entries.length
-    });
-  } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
-  }
-});
+  fastify.get("/ledger", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    try {
+      const ledger = realTimeCostTracker.getLedger(request.userId!);
 
-router.get("/ledger", requireAuth, async (req: AuthRequest, res: Response) => {
-  try {
-    const ledger = realTimeCostTracker.getLedger(req.userId!);
-    
-    if (!ledger) {
-      return res.status(404).json({ error: "No active cost tracking session" });
+      if (!ledger) {
+        return reply.code(404).send({ error: "No active cost tracking session" });
+      }
+
+      return {
+        success: true,
+        ledger
+      };
+    } catch (err) {
+      throw new AppError(500, (err as Error).message, "COST_LEDGER_FETCH_FAILED");
     }
+  });
 
-    res.json({
-      success: true,
-      ledger
-    });
-  } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
-  }
-});
+  /**
+   * @openapi
+   * /api/realtime/statistics:
+   *   get:
+   *     tags:
+   *       - Realtime
+   *     summary: Get real-time cost statistics
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: query
+   *         name: hours
+   *         schema:
+   *           type: integer
+   *           default: 24
+   *         description: Number of hours for statistics
+   *     responses:
+   *       200:
+   *         description: Cost statistics
+   */
+  fastify.get("/statistics", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    try {
+      const { hours = 24 } = request.query as { hours?: string };
 
-router.get("/statistics", requireAuth, async (req: AuthRequest, res: Response) => {
-  try {
-    const { hours = 24 } = req.query;
-    
-    const stats = realTimeCostTracker.getStatistics(req.userId!, parseInt(hours as string));
-    
-    res.json({
-      success: true,
-      statistics: stats
-    });
-  } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
-  }
-});
+      const stats = realTimeCostTracker.getStatistics(request.userId!, parseInt(hours as string));
 
-export { io, httpServer };
+      return {
+        success: true,
+        statistics: stats
+      };
+    } catch (err) {
+      throw new AppError(500, (err as Error).message, "COST_STATISTICS_FETCH_FAILED");
+    }
+  });
+};
 
-export default router;
+export { wss, httpServer };
+
+export default realtimePlugin;

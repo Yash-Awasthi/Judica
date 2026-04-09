@@ -75,16 +75,10 @@ install_dependencies() {
 # Setup test database
 setup_test_database() {
     print_status "Setting up test database..."
-    
-    # Check if test database exists
-    if ! npx prisma db pull --force &> /dev/null; then
-        print_status "Creating test database..."
-        npx prisma migrate deploy
-    fi
-    
-    # Generate Prisma client
-    npx prisma generate
-    
+
+    # Apply schema with Drizzle
+    npx drizzle-kit push
+
     print_success "Test database setup completed"
 }
 

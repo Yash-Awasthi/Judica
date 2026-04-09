@@ -242,11 +242,3 @@ export function getProviderDefaults(provider: ProviderDefinition): Required<Pick
   };
 }
 
-export function clearProviderCache(): void {
-  cachedConfig = null;
-  cachedRegistry = null;
-}
-
-export function getConnectorType(providerType: ProviderType): "api" | "local" | "rpa" {
-  return providerType;
-}

@@ -1,25 +1,61 @@
-import { Router } from "express";
+import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { env } from "../config/env.js";
-
-const router = Router();
+import { fastifyOptionalAuth } from "../middleware/fastifyAuth.js";
+import logger from "../lib/logger.js";
 
 const ttsSchema = z.object({
   input: z.string().min(1).max(4000)
 });
 
-router.post("/", async (req, res, next) => {
-  try {
-    const rawInput = req.body.text || req.body.input;
-    if (!rawInput) return res.status(400).json({ error: "Missing text/input" });
-    
+const ttsPlugin: FastifyPluginAsync = async (fastify) => {
+  /**
+   * @openapi
+   * /api/tts:
+   *   post:
+   *     tags:
+   *       - Council
+   *     summary: Convert text to speech audio
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               text:
+   *                 type: string
+   *                 description: Text to synthesize (alias for input)
+   *               input:
+   *                 type: string
+   *                 description: Text to synthesize (1-4000 chars)
+   *     responses:
+   *       200:
+   *         description: Audio file
+   *         content:
+   *           audio/mpeg:
+   *             schema:
+   *               type: string
+   *               format: binary
+   *       400:
+   *         description: Missing or invalid text input
+   */
+  fastify.post("/", { preHandler: fastifyOptionalAuth }, async (request, reply) => {
+    const body = request.body as any;
+    const rawInput = body.text || body.input;
+    if (!rawInput) {
+      reply.code(400);
+      return { error: "Missing text/input" };
+    }
+
     const parsed = ttsSchema.safeParse({ input: rawInput });
     if (!parsed.success) {
-      return res.status(400).json({ error: "Invalid payload length" });
+      reply.code(400);
+      return { error: "Invalid payload length" };
     }
 
     const API_KEY = env.XIAOMI_MIMO_API_KEY || env.OPENAI_API_KEY;
-    
+
     const attemptTTS = async (url: string, payload: any) => {
       const response = await fetch(url, {
         method: "POST",
@@ -36,7 +72,7 @@ router.post("/", async (req, res, next) => {
     };
 
     let audioBuffer: ArrayBuffer;
-    
+
     try {
       audioBuffer = await attemptTTS("https://api.siliconflow.cn/v1/audio/speech", {
         model: "xiaomi/MiMo-TTS-v2",
@@ -44,7 +80,7 @@ router.post("/", async (req, res, next) => {
         voice: "random"
       });
     } catch (e1: any) {
-      console.warn("TTS Attempt 1 (xiaomi/MiMo-TTS-v2) failed:", e1.message);
+      logger.warn({ err: e1.message }, "TTS Attempt 1 (xiaomi/MiMo-TTS-v2) failed");
       try {
         audioBuffer = await attemptTTS("https://api.siliconflow.cn/v1/audio/speech", {
           model: "FunAudioLLM/CosyVoice2-0.5B",
@@ -52,7 +88,7 @@ router.post("/", async (req, res, next) => {
           voice: "alex"
         });
       } catch (e2: any) {
-        console.warn("TTS Attempt 2 (CosyVoice) failed:", e2.message);
+        logger.warn({ err: e2.message }, "TTS Attempt 2 (CosyVoice) failed");
         audioBuffer = await attemptTTS("https://api.chatanywhere.tech/v1/audio/speech", {
           model: "tts-1",
           input: parsed.data.input,
@@ -61,11 +97,9 @@ router.post("/", async (req, res, next) => {
       }
     }
 
-    res.setHeader("Content-Type", "audio/mpeg");
-    res.send(Buffer.from(audioBuffer));
-  } catch (err) {
-    next(err);
-  }
-});
+    reply.header("Content-Type", "audio/mpeg");
+    return reply.send(Buffer.from(audioBuffer));
+  });
+};
 
-export default router;
+export default ttsPlugin;

@@ -406,9 +406,6 @@ RUN npm ci --only=development
 # Copy source code
 COPY . .
 
-# Generate Prisma client
-RUN npx prisma generate
-
 # Create logs directory
 RUN mkdir -p logs
 
@@ -501,10 +498,9 @@ wait_for_services() {
 # Run database migrations in Docker
 run_migrations() {
     print_status "Running database migrations in Docker..."
-    
-    docker-compose -f docker-compose.dev.yml exec -T app npx prisma migrate deploy
-    docker-compose -f docker-compose.dev.yml exec -T app npx prisma generate
-    
+
+    docker-compose -f docker-compose.dev.yml exec -T app npx drizzle-kit push
+
     print_success "Database migrations completed"
 }
 

@@ -8,21 +8,24 @@ export function StreamingStatus({ isLoading, isStreaming }: StreamingStatusProps
     <>
       {/* Loading overlay */}
       {isLoading && (
-        <div className="absolute inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+        <div className="absolute inset-0 z-50 flex items-center justify-center bg-[var(--bg)]/80 backdrop-blur-sm">
           <div className="flex flex-col items-center gap-4">
-            <div className="w-12 h-12 border-4 border-accent/15 border-t-accent rounded-full animate-spin shadow-glow" />
-            <span className="text-xs text-accent font-black uppercase tracking-[0.2em] animate-pulse">
+            <div className="w-12 h-12 border-4 border-[rgba(110,231,183,0.15)] border-t-[var(--accent-mint)] rounded-full animate-spin shadow-glow-sm" />
+            <span className="text-xs text-[var(--accent-mint)] font-bold uppercase tracking-[0.2em] animate-pulse">
               Syncing Neural Link...
             </span>
           </div>
         </div>
       )}
 
-      {/* Streaming indicator in header */}
+      {/* Streaming indicator */}
       {isStreaming && !isLoading && (
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white/[0.03] border border-white/8 text-[9px] font-black uppercase tracking-[0.2em] text-text-dim shrink-0">
-          <span className="status-dot bg-accent text-accent animate-pulse" />
-          Live Bridge
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-pill bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[9px] font-bold uppercase tracking-[0.15em] text-[var(--text-muted)] shrink-0">
+          <span
+            className="w-1.5 h-1.5 rounded-full bg-[var(--accent-mint)] animate-pulse"
+            style={{ boxShadow: '0 0 6px var(--accent-mint)' }}
+          />
+          Live
         </div>
       )}
     </>

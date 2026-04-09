@@ -12,13 +12,17 @@ export class OpenAIProvider extends BaseProvider {
     super(config);
   }
 
-  async call({ messages, signal, maxTokens, isFallback, onChunk }: {
+  async call({ messages, signal, maxTokens, isFallback, onChunk, _depth = 0 }: {
     messages: Message[];
     signal?: AbortSignal;
     maxTokens?: number;
     isFallback?: boolean;
     onChunk?: (chunk: string) => void;
+    _depth?: number;
   }): Promise<ProviderResponse> {
+    if (_depth >= 5) {
+      throw new Error("Tool call depth limit exceeded (max 5 recursive rounds)");
+    }
     const url = (this.config.baseUrl || this.defaultBaseUrl).replace(/\/$/, "");
     await validateSafeUrl(url);
 
@@ -64,6 +68,7 @@ export class OpenAIProvider extends BaseProvider {
         const decoder = new TextDecoder();
         let text = "";
         let buffer = "";
+        let streamUsage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null = null;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -86,6 +91,10 @@ export class OpenAIProvider extends BaseProvider {
                   text += content;
                   onChunk(content);
                 }
+                // Capture usage from final chunk if available
+                if (parsed.usage) {
+                  streamUsage = parsed.usage;
+                }
               } catch (e) {
                 // ignore unparseable chunk
               }
@@ -93,17 +102,19 @@ export class OpenAIProvider extends BaseProvider {
           }
         }
 
+        // Use actual usage from stream if available, otherwise estimate from text
+        const estimatedCompletion = Math.ceil(text.length / 4);
         const usage = {
-          promptTokens: 0,
-          completionTokens: 0,
-          totalTokens: 0
+          promptTokens: streamUsage?.prompt_tokens || 0,
+          completionTokens: streamUsage?.completion_tokens || estimatedCompletion,
+          totalTokens: streamUsage?.total_tokens || estimatedCompletion,
         };
 
         const cost = calculateCost(
           this.config.type === "api" ? "openai" : this.config.type,
           this.config.model,
-          0,
-          0
+          usage.promptTokens,
+          usage.completionTokens
         );
 
         return { text: text.trim(), usage, cost, raw: { stream: true } };
@@ -135,7 +146,7 @@ export class OpenAIProvider extends BaseProvider {
           } as any);
         }
 
-        return this.call({ messages: nextMessages, signal, maxTokens, isFallback, onChunk });
+        return this.call({ messages: nextMessages, signal, maxTokens, isFallback, onChunk, _depth: _depth + 1 });
       }
 
       const raw = msg?.content || "";

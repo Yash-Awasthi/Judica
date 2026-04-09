@@ -99,8 +99,16 @@ export const EnhancedSearch: React.FC = () => {
     });
   };
 
-  const highlightText = (text: string) => {
-    return { __html: text };
+  const highlightText = (text: string): React.ReactNode => {
+    if (!query.trim()) return text;
+    // Escape regex special characters in query
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const parts = text.split(new RegExp(`(${escaped})`, 'gi'));
+    return parts.map((part, i) =>
+      part.toLowerCase() === query.toLowerCase()
+        ? <mark key={i} className="bg-yellow-300/50 text-inherit rounded px-0.5">{part}</mark>
+        : part
+    );
   };
 
   return (
@@ -209,10 +217,9 @@ export const EnhancedSearch: React.FC = () => {
             <div key={result.id} className="bg-background border border-border rounded-lg p-4">
               <div className="flex items-start justify-between mb-2">
                 <div className="flex-1">
-                  <h3 
+                  <h3
                     className="text-sm font-medium text-text mb-1"
-                    dangerouslySetInnerHTML={highlightText(result.highlights.question)}
-                  />
+                  >{highlightText(result.highlights.question)}</h3>
                   <div className="text-xs text-muted">
                     {result.conversationTitle} • {formatDate(result.createdAt)}
                   </div>
@@ -224,10 +231,9 @@ export const EnhancedSearch: React.FC = () => {
                 )}
               </div>
               
-              <div 
+              <div
                 className="text-sm text-muted mb-2 line-clamp-3"
-                dangerouslySetInnerHTML={highlightText(result.highlights.verdict)}
-              />
+              >{highlightText(result.highlights.verdict)}</div>
               
               {result.highlights.hasOpinionMatch && (
                 <div className="text-xs text-primary">

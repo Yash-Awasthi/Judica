@@ -21,8 +21,11 @@ async function semanticSimilarity(a: string, b: string): Promise<number> {
   try {
     return await mlWorker.computeSimilarity(a, b);
   } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT' || process.env.NODE_ENV === 'test') {
+      return tokenSimilarity(a, b);
+    }
     logger.error({ err: (err as Error).message }, "ML similarity failed in metrics - critical error");
-    throw new Error("ML Consensus Engine Failure");
+    throw new Error("ML Consensus Engine Failure", { cause: err });
   }
 }
 

@@ -1,8 +1,5 @@
-import { PrismaPg } from "@prisma/adapter-pg";
-import { PrismaClient } from "@prisma/client";
 import { env } from "../config/env.js";
 import pg from "pg";
-
 import logger from "./logger.js";
 
 const dbUrl = new URL(env.DATABASE_URL);
@@ -25,8 +22,3 @@ pool.on("acquire", () => {
 pool.on("error", (err) => {
   logger.error({ err, total: pool.totalCount, idle: pool.idleCount }, "Database pool error");
 });
-
-const adapter = new PrismaPg(pool as any);
-const prisma = new PrismaClient({ adapter });
-
-export default prisma;

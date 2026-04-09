@@ -1,4 +1,6 @@
-import prisma from "./db.js";
+import { db } from "./drizzle.js";
+import { evaluations } from "../db/schema/users.js";
+import { eq, gte, and, avg, count, asc } from "drizzle-orm";
 import logger from "./logger.js";
 import { computeConsensus, pairwiseSimilarity } from "./metrics.js";
 import { AgentOutput } from "./schemas.js";
@@ -48,7 +50,7 @@ export async function evaluateCouncilSession(
     const diversity = calculateDiversity(agentOutputs);
     const quality = calculateQuality(agentOutputs);
     const efficiency = calculateEfficiency(totalTokens, agentOutputs.length, duration);
-    
+
     const weights = { coherence: 0.25, consensus: 0.25, diversity: 0.2, quality: 0.2, efficiency: 0.1 };
     const overallScore = (
       coherence * weights.coherence +
@@ -57,7 +59,7 @@ export async function evaluateCouncilSession(
       quality * weights.quality +
       efficiency * weights.efficiency
     ) * 100;
-    
+
     const recommendations = generateRecommendations({
       coherence,
       consensus,
@@ -65,7 +67,7 @@ export async function evaluateCouncilSession(
       quality,
       efficiency
     });
-    
+
     const strengths = identifyStrengths({
       coherence,
       consensus,
@@ -73,7 +75,7 @@ export async function evaluateCouncilSession(
       quality,
       efficiency
     });
-    
+
     const weaknesses = identifyWeaknesses({
       coherence,
       consensus,
@@ -81,7 +83,7 @@ export async function evaluateCouncilSession(
       quality,
       efficiency
     });
-    
+
     const result: EvaluationResult = {
       sessionId,
       conversationId,
@@ -93,9 +95,9 @@ export async function evaluateCouncilSession(
       weaknesses,
       timestamp: new Date()
     };
-    
+
     await storeEvaluationResult(result);
-    
+
     logger.info({
       sessionId,
       userId,
@@ -103,9 +105,9 @@ export async function evaluateCouncilSession(
       consensus,
       quality
     }, "Council evaluation completed");
-    
+
     return result;
-    
+
   } catch (err) {
     logger.error({ err: (err as Error).message, sessionId }, "Failed to evaluate council session");
     throw err;
@@ -114,88 +116,88 @@ export async function evaluateCouncilSession(
 
 async function calculateCoherence(outputs: AgentOutput[]): Promise<number> {
   if (outputs.length < 2) return 1;
-  
+
   let totalSimilarity = 0;
   let comparisons = 0;
-  
+
   for (let i = 0; i < outputs.length; i++) {
     for (let j = i + 1; j < outputs.length; j++) {
       totalSimilarity += await pairwiseSimilarity(outputs[i], outputs[j]);
       comparisons++;
     }
   }
-  
+
   return comparisons > 0 ? totalSimilarity / comparisons : 1;
 }
 
 function calculateDiversity(outputs: AgentOutput[]): number {
   if (outputs.length < 2) return 0;
-  
+
   const confidences = outputs.map(o => o.confidence);
   const meanConfidence = confidences.reduce((sum, c) => sum + c, 0) / confidences.length;
   const variance = confidences.reduce((sum, c) => sum + Math.pow(c - meanConfidence, 2), 0) / confidences.length;
-  
+
   const lengths = outputs.map(o => o.answer.length + o.reasoning.length);
   const meanLength = lengths.reduce((sum, l) => sum + l, 0) / lengths.length;
   const lengthVariance = lengths.reduce((sum, l) => sum + Math.pow(l - meanLength, 2), 0) / lengths.length;
-  
+
   const confidenceDiversity = Math.min(variance * 4, 1); // Scale variance to 0-1
   const lengthDiversity = Math.min(lengthVariance / 10000, 1); // Scale length variance
-  
+
   const allKeywords = new Set<string>();
   outputs.forEach(o => {
     const keywords = extractKeywords(o.answer + " " + o.reasoning);
     keywords.forEach(k => allKeywords.add(k));
   });
-  
+
   const keywordDiversity = Math.min(allKeywords.size / (outputs.length * 10), 1);
-  
+
   return (confidenceDiversity + lengthDiversity + keywordDiversity) / 3;
 }
 
 function calculateQuality(outputs: AgentOutput[]): number {
   let totalQuality = 0;
-  
+
   for (const output of outputs) {
     let quality = 0;
-    
+
     const answerLength = output.answer.length;
     if (answerLength > 50 && answerLength < 1000) {
       quality += 0.3;
     } else if (answerLength >= 1000) {
       quality += 0.2; // Penalize overly long answers
     }
-    
+
     const reasoningLength = output.reasoning.length;
     if (reasoningLength > 100 && reasoningLength < 2000) {
       quality += 0.3;
     } else if (reasoningLength >= 2000) {
       quality += 0.2;
     }
-    
+
     if (output.key_points.length >= 2 && output.key_points.length <= 5) {
       quality += 0.2;
     }
-    
+
     if (output.confidence >= 0.3 && output.confidence <= 0.9) {
       quality += 0.2;
     }
-    
+
     totalQuality += quality;
   }
-  
+
   return outputs.length > 0 ? totalQuality / outputs.length : 0;
 }
 
 function calculateEfficiency(totalTokens: number, agentCount: number, duration: number): number {
   const tokensPerAgent = totalTokens / agentCount;
-  
+
   const optimalDuration = agentCount * 10000; // 10 seconds per agent
   const timeEfficiency = Math.max(0, 1 - Math.abs(duration - optimalDuration) / optimalDuration);
-  
+
   const optimalTokensPerAgent = 1000;
   const tokenEfficiency = Math.max(0, 1 - Math.abs(tokensPerAgent - optimalTokensPerAgent) / optimalTokensPerAgent);
-  
+
   return (timeEfficiency + tokenEfficiency) / 2;
 }
 
@@ -205,7 +207,7 @@ function extractKeywords(text: string): string[] {
     .split(/\s+/)
     .filter(word => word.length > 3)
     .filter(word => !isStopWord(word));
-  
+
   return [...new Set(words)].slice(0, 20);
 }
 
@@ -216,76 +218,74 @@ function isStopWord(word: string): boolean {
 
 function generateRecommendations(criteria: EvaluationCriteria): string[] {
   const recommendations: string[] = [];
-  
+
   if (criteria.coherence < 0.6) {
     recommendations.push("Improve prompt clarity to increase response coherence");
   }
-  
+
   if (criteria.consensus < 0.5) {
     recommendations.push("Consider using fewer agents or more focused questions to improve consensus");
   }
-  
+
   if (criteria.diversity < 0.4) {
     recommendations.push("Add more diverse archetypes to get varied perspectives");
   }
-  
+
   if (criteria.quality < 0.6) {
     recommendations.push("Refine system prompts to improve response quality");
   }
-  
+
   if (criteria.efficiency < 0.5) {
     recommendations.push("Optimize token usage or adjust timeout settings for better efficiency");
   }
-  
+
   if (criteria.coherence > 0.8 && criteria.consensus > 0.8) {
     recommendations.push("Excellent performance achieved - consider increasing complexity for more challenging queries");
   }
-  
+
   return recommendations;
 }
 
 function identifyStrengths(criteria: EvaluationCriteria): string[] {
   const strengths: string[] = [];
-  
+
   if (criteria.coherence > 0.8) strengths.push("High response coherence");
   if (criteria.consensus > 0.8) strengths.push("Strong consensus building");
   if (criteria.diversity > 0.7) strengths.push("Excellent perspective diversity");
   if (criteria.quality > 0.8) strengths.push("High-quality responses");
   if (criteria.efficiency > 0.8) strengths.push("Optimal resource efficiency");
-  
+
   return strengths;
 }
 
 function identifyWeaknesses(criteria: EvaluationCriteria): string[] {
   const weaknesses: string[] = [];
-  
+
   if (criteria.coherence < 0.4) weaknesses.push("Low response coherence");
   if (criteria.consensus < 0.4) weaknesses.push("Poor consensus achievement");
   if (criteria.diversity < 0.3) weaknesses.push("Limited perspective diversity");
   if (criteria.quality < 0.4) weaknesses.push("Low response quality");
   if (criteria.efficiency < 0.4) weaknesses.push("Poor resource efficiency");
-  
+
   return weaknesses;
 }
 
 async function storeEvaluationResult(result: EvaluationResult): Promise<void> {
   try {
-    await prisma.evaluation.create({
-      data: {
-        sessionId: result.sessionId,
-        conversationId: result.conversationId,
-        userId: result.userId,
-        coherence: result.criteria.coherence,
-        consensus: result.criteria.consensus,
-        diversity: result.criteria.diversity,
-        quality: result.criteria.quality,
-        efficiency: result.criteria.efficiency,
-        overallScore: result.overallScore,
-        recommendations: result.recommendations,
-        strengths: result.strengths,
-        weaknesses: result.weaknesses,
-        timestamp: result.timestamp
-      }
+    await db.insert(evaluations).values({
+      sessionId: result.sessionId,
+      conversationId: result.conversationId,
+      userId: result.userId,
+      coherence: result.criteria.coherence,
+      consensus: result.criteria.consensus,
+      diversity: result.criteria.diversity,
+      quality: result.criteria.quality,
+      efficiency: result.criteria.efficiency,
+      overallScore: result.overallScore,
+      recommendations: result.recommendations,
+      strengths: result.strengths,
+      weaknesses: result.weaknesses,
+      timestamp: result.timestamp
     });
   } catch (err) {
     logger.error({ err: (err as Error).message }, "Failed to store evaluation result");
@@ -295,16 +295,19 @@ async function storeEvaluationResult(result: EvaluationResult): Promise<void> {
 export async function getUserEvaluationMetrics(userId: number, days: number = 30): Promise<EvaluationMetrics> {
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
-  
-  const evaluations = await prisma.evaluation.findMany({
-    where: {
-      userId,
-      timestamp: { gte: startDate }
-    },
-    orderBy: { timestamp: "asc" }
-  });
-  
-  if (evaluations.length === 0) {
+
+  const results = await db
+    .select()
+    .from(evaluations)
+    .where(
+      and(
+        eq(evaluations.userId, userId),
+        gte(evaluations.timestamp, startDate)
+      )
+    )
+    .orderBy(asc(evaluations.timestamp));
+
+  if (results.length === 0) {
     return {
       averageConsensus: 0,
       averageDiversity: 0,
@@ -315,29 +318,29 @@ export async function getUserEvaluationMetrics(userId: number, days: number = 30
       userSatisfaction: 0
     };
   }
-  
-  const averageConsensus = evaluations.reduce((sum: number, e: { consensus: number }) => sum + e.consensus, 0) / evaluations.length;
-  const averageDiversity = evaluations.reduce((sum: number, e: { diversity: number }) => sum + e.diversity, 0) / evaluations.length;
-  const averageQuality = evaluations.reduce((sum: number, e: { quality: number }) => sum + e.quality, 0) / evaluations.length;
-  const averageEfficiency = evaluations.reduce((sum: number, e: { efficiency: number }) => sum + e.efficiency, 0) / evaluations.length;
-  
-  const midpoint = Math.floor(evaluations.length / 2);
-  const firstHalf = evaluations.slice(0, midpoint);
-  const secondHalf = evaluations.slice(midpoint);
-  
-  const firstHalfAvg = firstHalf.length > 0 ? firstHalf.reduce((sum: number, e: { overallScore: number }) => sum + e.overallScore, 0) / firstHalf.length : 0;
-  const secondHalfAvg = secondHalf.length > 0 ? secondHalf.reduce((sum: number, e: { overallScore: number }) => sum + e.overallScore, 0) / secondHalf.length : 0;
-  
+
+  const averageConsensus = results.reduce((sum, e) => sum + e.consensus, 0) / results.length;
+  const averageDiversity = results.reduce((sum, e) => sum + e.diversity, 0) / results.length;
+  const averageQuality = results.reduce((sum, e) => sum + e.quality, 0) / results.length;
+  const averageEfficiency = results.reduce((sum, e) => sum + e.efficiency, 0) / results.length;
+
+  const midpoint = Math.floor(results.length / 2);
+  const firstHalf = results.slice(0, midpoint);
+  const secondHalf = results.slice(midpoint);
+
+  const firstHalfAvg = firstHalf.length > 0 ? firstHalf.reduce((sum, e) => sum + e.overallScore, 0) / firstHalf.length : 0;
+  const secondHalfAvg = secondHalf.length > 0 ? secondHalf.reduce((sum, e) => sum + e.overallScore, 0) / secondHalf.length : 0;
+
   const improvementTrend = secondHalfAvg - firstHalfAvg;
-  
+
   return {
     averageConsensus,
     averageDiversity,
     averageQuality,
     averageEfficiency,
-    totalEvaluations: evaluations.length,
+    totalEvaluations: results.length,
     improvementTrend,
-    userSatisfaction: 0 // Would be calculated from user feedback
+    userSatisfaction: 0
   };
 }
 
@@ -352,28 +355,27 @@ export async function benchmarkCouncilPerformance(
   ranking: 'excellent' | 'good' | 'average' | 'below_average';
 }> {
   const metrics = await getUserEvaluationMetrics(userId);
-  
-  const benchmarks = await prisma.evaluation.aggregate({
-    where: {
-      timestamp: { gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000) }
-    },
-    _avg: {
-      overallScore: true
-    },
-    _count: true
-  });
-  
+
+  const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+  const [benchmarks] = await db
+    .select({
+      avgOverallScore: avg(evaluations.overallScore),
+      total: count(),
+    })
+    .from(evaluations)
+    .where(gte(evaluations.timestamp, thirtyDaysAgo));
+
   const userScore = metrics.averageConsensus * 25 + metrics.averageQuality * 25 + metrics.averageDiversity * 25 + metrics.averageEfficiency * 25;
-  const benchmarkScore = (benchmarks._avg.overallScore || 0) * 100;
-  
+  const benchmarkScore = (Number(benchmarks?.avgOverallScore) || 0) * 100;
+
   const percentile = Math.max(0, Math.min(100, (userScore / benchmarkScore) * 100));
-  
+
   let ranking: 'excellent' | 'good' | 'average' | 'below_average';
   if (percentile >= 90) ranking = 'excellent';
   else if (percentile >= 70) ranking = 'good';
   else if (percentile >= 50) ranking = 'average';
   else ranking = 'below_average';
-  
+
   return {
     userScore,
     benchmarkScore,

@@ -273,14 +273,6 @@ export function classifyQuery(query: string): RouterResult {
   };
 }
 
-export function getQueryTypes(): QueryType[] {
-  return ["factual", "analytical", "creative", "strategic", "ethical", "technical"];
-}
-
-export function shouldAutoRoute(result: RouterResult, threshold = CONFIDENCE_THRESHOLD): boolean {
-  return result.confidence >= threshold;
-}
-
 export function formatRouterMetadata(result: RouterResult): Record<string, unknown> {
   return {
     routerType: result.type,

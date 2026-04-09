@@ -3,4 +3,3 @@ dist
 .env
 *.db
 .git
-prisma/migrations

@@ -4,9 +4,8 @@ import { useNavigate } from "react-router-dom";
 export function DashboardView() {
   const navigate = useNavigate();
 
-  const handleSelectTemplate = (summon: string) => {
+  return <Dashboard onStartChat={(templateId) => {
+    const summon = templateId || "default";
     navigate(`/chat?summon=${summon}`);
-  };
-
-  return <Dashboard onSelectTemplate={handleSelectTemplate} />;
+  }} />;
 }

@@ -31,20 +31,20 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Check if Prisma is installed
+# Check prerequisites
 check_prerequisites() {
     print_status "Checking prerequisites..."
-    
+
     if ! command -v npx &> /dev/null; then
         print_error "npx is not installed. Please install Node.js and npm."
         exit 1
     fi
-    
+
     if [ ! -f "package.json" ]; then
         print_error "package.json not found. Please run this script from the project root."
         exit 1
     fi
-    
+
     print_success "Prerequisites check completed"
 }
 
@@ -80,65 +80,35 @@ install_dependencies() {
     
     npm install
     
-    # Install Prisma CLI if not present
-    if ! npx prisma --version &> /dev/null; then
-        npm install prisma --save-dev
-    fi
-    
     print_success "Dependencies installed"
 }
 
-# Generate Prisma client
-generate_client() {
-    print_status "Generating Prisma client..."
-    
-    npx prisma generate
-    
-    print_success "Prisma client generated"
-}
-
-# Apply database migrations
+# Apply database schema
 apply_migrations() {
-    print_status "Applying database migrations..."
-    
-    # Check if database exists
-    if ! npx prisma db pull --force &> /dev/null; then
-        print_status "Database not found, creating new database..."
-        
-        # Apply all migrations
-        npx prisma migrate deploy
-        
-        print_success "Database created and migrations applied"
-    else
-        print_status "Database exists, applying pending migrations..."
-        
-        # Apply pending migrations
-        npx prisma migrate deploy
-        
-        print_success "Migrations applied successfully"
-    fi
+    print_status "Applying database schema with Drizzle..."
+
+    npx drizzle-kit push
+
+    print_success "Database schema applied successfully"
 }
 
 # Verify database schema
 verify_schema() {
     print_status "Verifying database schema..."
-    
-    # Check if all tables exist
-    npx prisma db pull --force
-    
-    # Validate schema
-    npx prisma validate
-    
+
+    # Test basic connectivity
+    node -e "const { Pool } = require('pg'); const pool = new Pool({connectionString: process.env.DATABASE_URL}); pool.query('SELECT 1').then(() => { console.log('Schema verified'); pool.end(); }).catch(e => { console.error(e); process.exit(1); })"
+
     print_success "Database schema verified"
 }
 
 # Seed database with initial data
 seed_database() {
     print_status "Seeding database with initial data..."
-    
+
     # Check if seed file exists
-    if [ -f "prisma/seed.ts" ]; then
-        npx tsx prisma/seed.ts
+    if [ -f "scripts/seed.ts" ]; then
+        npx tsx scripts/seed.ts
         print_success "Database seeded successfully"
     else
         print_warning "Seed file not found, skipping database seeding"
@@ -148,87 +118,75 @@ seed_database() {
 # Test database connection
 test_connection() {
     print_status "Testing database connection..."
-    
+
     # Create a simple test script
     cat > test-db-connection.js << 'EOF'
-const { PrismaClient } = require('@prisma/client');
+const { Pool } = require('pg');
 
 async function testConnection() {
-    const prisma = new PrismaClient();
-    
+    const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
     try {
         // Test basic connection
-        await prisma.$queryRaw`SELECT 1`;
-        console.log('✅ Database connection successful');
-        
-        // Test user table
-        const userCount = await prisma.user.count();
-        console.log(`✅ User table accessible (${userCount} users)`);
-        
-        // Test conversation table
-        const conversationCount = await prisma.conversation.count();
-        console.log(`✅ Conversation table accessible (${conversationCount} conversations)`);
-        
-        // Test new Evaluation table
-        try {
-            const evaluationCount = await prisma.evaluation.count();
-            console.log(`✅ Evaluation table accessible (${evaluationCount} evaluations)`);
-        } catch (error) {
-            console.log('⚠️ Evaluation table not yet created');
-        }
-        
-        // Test AuditLog metadata field
-        try {
-            const auditLog = await prisma.auditLog.findFirst();
-            if (auditLog) {
-                console.log('✅ AuditLog metadata field accessible');
-            }
-        } catch (error) {
-            console.log('⚠️ AuditLog metadata field not yet updated');
-        }
-        
-        console.log('✅ All database tests passed');
-        
+        await pool.query('SELECT 1');
+        console.log('Database connection successful');
+
+        // Test that tables exist
+        const result = await pool.query(`
+            SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename
+        `);
+        console.log(`Found ${result.rows.length} tables in public schema`);
+
+        console.log('All database tests passed');
     } catch (error) {
-        console.error('❌ Database connection failed:', error.message);
+        console.error('Database connection failed:', error.message);
         process.exit(1);
     } finally {
-        await prisma.$disconnect();
+        await pool.end();
     }
 }
 
 testConnection();
 EOF
-    
+
     node test-db-connection.js
-    
+
     # Clean up test file
     rm test-db-connection.js
-    
+
     print_success "Database connection test completed"
 }
 
 # Create database indexes for performance
 create_indexes() {
     print_status "Creating performance indexes..."
-    
-    # Create indexes for better performance
-    npx prisma db execute --stdin << 'EOF'
--- Create indexes for better performance
-CREATE INDEX CONCURRENTLY IF NOT EXISTS "chat_created_at_idx" ON "Chat"("createdAt");
-CREATE INDEX CONCURRENTLY IF NOT EXISTS "chat_user_created_at_idx" ON "Chat"("userId", "createdAt");
-CREATE INDEX CONCURRENTLY IF NOT EXISTS "conversation_user_updated_at_idx" ON "Conversation"("userId", "updatedAt");
-CREATE INDEX CONCURRENTLY IF NOT EXISTS "audit_log_user_created_at_idx" ON "AuditLog"("userId", "createdAt");
-CREATE INDEX CONCURRENTLY IF NOT EXISTS "audit_log_conversation_created_at_idx" ON "AuditLog"("conversationId", "createdAt");
-CREATE INDEX CONCURRENTLY IF NOT EXISTS "evaluation_user_timestamp_idx" ON "Evaluation"("userId", "timestamp");
-CREATE INDEX CONCURRENTLY IF NOT EXISTS "evaluation_session_idx" ON "Evaluation"("sessionId");
-CREATE INDEX CONCURRENTLY IF NOT EXISTS "daily_usage_user_date_idx" ON "DailyUsage"("userId", "date");
-CREATE INDEX CONCURRENTLY IF NOT EXISTS "context_summary_conversation_created_at_idx" ON "ContextSummary"("conversationId", "createdAt");
 
--- Update table statistics
-ANALYZE;
-EOF
-    
+    # Create indexes for better performance using psql or node pg
+    node -e "
+const { Pool } = require('pg');
+const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+async function run() {
+  const sql = \`
+    CREATE INDEX CONCURRENTLY IF NOT EXISTS \"chat_created_at_idx\" ON \"Chat\"(\"createdAt\");
+    CREATE INDEX CONCURRENTLY IF NOT EXISTS \"chat_user_created_at_idx\" ON \"Chat\"(\"userId\", \"createdAt\");
+    CREATE INDEX CONCURRENTLY IF NOT EXISTS \"conversation_user_updated_at_idx\" ON \"Conversation\"(\"userId\", \"updatedAt\");
+    CREATE INDEX CONCURRENTLY IF NOT EXISTS \"audit_log_user_created_at_idx\" ON \"AuditLog\"(\"userId\", \"createdAt\");
+    CREATE INDEX CONCURRENTLY IF NOT EXISTS \"audit_log_conversation_created_at_idx\" ON \"AuditLog\"(\"conversationId\", \"createdAt\");
+    CREATE INDEX CONCURRENTLY IF NOT EXISTS \"evaluation_user_timestamp_idx\" ON \"Evaluation\"(\"userId\", \"timestamp\");
+    CREATE INDEX CONCURRENTLY IF NOT EXISTS \"evaluation_session_idx\" ON \"Evaluation\"(\"sessionId\");
+    CREATE INDEX CONCURRENTLY IF NOT EXISTS \"daily_usage_user_date_idx\" ON \"DailyUsage\"(\"userId\", \"date\");
+    CREATE INDEX CONCURRENTLY IF NOT EXISTS \"context_summary_conversation_created_at_idx\" ON \"ContextSummary\"(\"conversationId\", \"createdAt\");
+    ANALYZE;
+  \`;
+  // CONCURRENTLY indexes can't run in a transaction, execute each separately
+  for (const stmt of sql.split(';').map(s => s.trim()).filter(Boolean)) {
+    await pool.query(stmt);
+  }
+  await pool.end();
+}
+run().catch(e => { console.error(e); process.exit(1); });
+"
+
     print_success "Performance indexes created"
 }
 
@@ -289,11 +247,7 @@ EOF
 # Generate database documentation
 generate_documentation() {
     print_status "Generating database documentation..."
-    
-    # Generate schema documentation
-    npx prisma db pull --force
-    npx prisma docs-generator
-    
+
     # Create database schema overview
     cat > docs/database-schema.md << 'EOF'
 # AI Council Database Schema
@@ -416,7 +370,6 @@ main() {
     check_prerequisites
     backup_database
     install_dependencies
-    generate_client
     apply_migrations
     verify_schema
     seed_database

@@ -5,6 +5,7 @@ node_modules/
 __pycache__/
 *.db
 *.log
-/src/generated/prisma
 dist/
 .DS_Store
+*.Identifier
+Thumbs.db

@@ -113,17 +113,3 @@ function generateRecommendations(types: Set<string>, matches: PIIDetection["matc
   return recommendations;
 }
 
-export function isSafeToProceed(detection: PIIDetection, threshold: number = 30): boolean {
-  return detection.riskScore < threshold;
-}
-
-export function getPIIWarning(detection: PIIDetection): string {
-  if (!detection.found) {
-    return "✅ No sensitive information detected";
-  }
-
-  const severity = detection.riskScore >= 70 ? "HIGH" : detection.riskScore >= 30 ? "MEDIUM" : "LOW";
-  const typesList = detection.types.join(", ");
-
-  return `⚠️ ${severity} RISK: Detected ${detection.matches.length} PII items (${typesList}). Risk Score: ${detection.riskScore}/100`;
-}
