@@ -6,11 +6,30 @@ AIbyAI is a multi-agent deliberation engine designed to eliminate hallucination 
 
 The output is not determined by LLM consensus, but by a deterministic mathematical scoring engine (Cosine Similarity via local ML models). The architecture enforces peer review, anti-convergence safeguards (Bloom Gate), and independent zero-context validation (Cold Validator).
 
-This document serves as an exhaustive, objective audit of the entire repository, detailing the technology stack, the exact request lifecycle, and a comprehensive file-by-file breakdown.
+This document serves as an exhaustive, objective audit of the entire repository, detailing the technology stack, the exact request lifecycle, current project status, and a comprehensive file-by-file breakdown including the repository tree.
 
 ---
 
-## 2. Technology Stack
+## 2. Current Project Status
+
+Based on the explicit tracking in `ROADMAP.md`, the platform is currently at **Milestone 3 (Observability & Production Stabilization)**.
+
+**Completed Phases:**
+*   Phase 1-3: Parallel Execution, Structured Output Contracts, Failure Isolation.
+*   Phase 4-9: The Deterministic Deliberation Engine is fully online. Peer Review, Anonymized Ranking, Math-based Scoring Engine, and Multi-Round Refinement (Debate) are complete. The Consensus Metric (Cosine Similarity) is active.
+*   Phase 12: Router (Auto-Council selection) is completed.
+*   Phase 13, 16, 17: PII Detection, Audit Logging, and Token/Cost Tracking are fully operational.
+*   Phase 21: Cold Validator / "Fresh Eyes" independent verification is complete.
+*   Phase 22: Local AI Connectors (Ollama, LM Studio via OpenAI-compatible endpoints) are active.
+
+**Pending / In-Progress Phases:**
+*   Phase 10: Tool Execution Layer (Planned).
+*   Phase 11: Memory + Context System (Planned implementation into agents, though pgvector infrastructure is present).
+*   Phase 19-20: Advanced UI Enhancements and Real-Time Cost Ledger visualization are In Progress.
+
+---
+
+## 3. Technology Stack
 
 ### Frontend Application
 *   **React & Vite:** Single Page Application utilizing rapid HMR.
@@ -30,104 +49,227 @@ This document serves as an exhaustive, objective audit of the entire repository,
 
 ---
 
-## 3. The Deliberation Lifecycle
+## 4. The Deliberation Lifecycle
 
 A single `POST /api/ask/stream` request triggers the following sequence:
 
 1.  **Ingress & Security Check:** `src/middleware/rateLimit.ts` and `src/middleware/validate.ts` execute. `src/lib/pii.ts` scans the payload for sensitive data (SSNs, emails) and redacts/blocks it.
-2.  **Auto-Routing:** `src/lib/router.ts` analyzes the query, scores its intent (e.g., Factual, Analytical), and dynamically selects an optimal subset of 2-4 distinct AI archetypes (defined in `src/config/archetypes.ts`).
-3.  **Parallel Generation:** `src/lib/deliberationPhases.ts:gatherOpinions()` executes asynchronous HTTP requests to the selected provider endpoints (OpenAI, Anthropic, etc.). Tool schemas (e.g., `web_search`) are injected. Responses stream back via SSE.
-4.  **Peer Review & Critique:** `src/lib/deliberationPhases.ts:conductPeerReview()` anonymizes the generated responses and cross-feeds them to the agents. Agents generate strict `{target, claim, issue, correction}` JSON critiques.
-5.  **Refinement & The Bloom Gate:** Agents refine answers based on critiques. The system calculates the vector drift. If the refinement causes the models to diverge mathematically from the target consensus (The Bloom Gate), the round is discarded.
-6.  **Deterministic Scoring:** `src/lib/scoring.ts` utilizes local ML embedding models to calculate the Cosine Similarity between the refined answers. An agreement metric of 0.85 (85%) is the target. Final scores combine the mathematical agreement and the peer ranking.
-7.  **Synthesis:** `src/lib/deliberationPhases.ts:synthesizeVerdict()` provides the complete context and scores to a designated "Master" model, which generates the final response, strictly barred from introducing unverified facts.
-8.  **Cold Validation:** `src/lib/validator.ts` initializes an independent LLM with zero prior context. It evaluates the final synthesis against five strict failure points (e.g., unsupported claims). Any failure triggers a `valid: false` flag.
-9.  **Audit & Ledger:** `src/lib/cost.ts` calculates the exact fractional cent cost of the query based on input/output tokens and writes it to the PostgreSQL `AuditLog`. The vectorized conversation is written via `pgvector` for future memory retrieval.
+2.  **Auto-Routing:** `src/lib/router.ts` analyzes the query, scores its intent (e.g., Factual, Analytical), and dynamically selects an optimal subset of 2-4 distinct AI archetypes.
+3.  **Parallel Generation:** `src/lib/deliberationPhases.ts:gatherOpinions()` executes asynchronous HTTP requests to the selected provider endpoints. Responses stream back via SSE.
+4.  **Peer Review & Critique:** `src/lib/deliberationPhases.ts:conductPeerReview()` anonymizes the generated responses and cross-feeds them to the agents for strict JSON critiques.
+5.  **Refinement & The Bloom Gate:** Agents refine answers. The system calculates vector drift. If refinement causes models to diverge mathematically from the target consensus, the round is discarded.
+6.  **Deterministic Scoring:** `src/lib/scoring.ts` utilizes local ML embedding models to calculate Cosine Similarity.
+7.  **Synthesis:** `src/lib/deliberationPhases.ts:synthesizeVerdict()` provides the complete context and scores to a designated "Master" model to generate the final response.
+8.  **Cold Validation:** `src/lib/validator.ts` initializes an independent LLM with zero prior context. It evaluates the final synthesis against five strict failure points.
+9.  **Audit & Ledger:** `src/lib/cost.ts` calculates the exact fractional cent cost and writes it to the PostgreSQL `AuditLog`.
 
 ---
 
-## 4. Exhaustive Repository Breakdown
+## 5. Repository Structure & File-by-File Audit
 
-The following is a comprehensive analysis of every file and its architectural purpose within the repository.
+### 5.1. The Literal Repository Tree
 
-### 4.1. Root Configuration Files
-*   `.env` / `.env.example`: Stores critical environment variables including database URIs, Redis URLs, and provider API keys (OpenAI, Anthropic, Google).
-*   `docker-compose.yml`: Infrastructure orchestration. Spins up PostgreSQL (with pgvector), Redis, and the Node application.
-*   `eslint.config.js`: Strict linting rules enforcement.
-*   `package.json` / `package-lock.json`: Node dependency management.
-*   `tsconfig.json`: TypeScript compiler configuration enforcing strict null checks and type safety.
-*   `vitest.config.ts`: Configuration for the Vitest testing framework.
-*   `ARCHITECTURE.md` / `ROADMAP.md` / `DEPLOYMENT.md`: High-level system documentation and operational guides.
+```text
+.
+├── .dockerignore
+├── .env
+├── .env.example
+├── .gitignore
+├── ARCHITECTURE.md
+├── DEPLOYMENT.md
+├── Dockerfile
+├── README.md
+├── ROADMAP.md
+├── council.db
+├── doc.md
+├── docker-compose.yml
+├── docs
+│   └── API.md
+├── eslint.config.js
+├── frontend
+│   ├── index.html
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── postcss.config.js
+│   ├── src
+│   │   ├── .env.example
+│   │   ├── components
+│   │   ├── context
+│   │   ├── hooks
+│   │   ├── index.css
+│   │   ├── layouts
+│   │   ├── main.tsx
+│   │   ├── router.tsx
+│   │   ├── types
+│   │   ├── views
+│   │   └── vite-env.d.ts
+│   ├── tailwind.config.js
+│   ├── tsconfig.app.json
+│   ├── tsconfig.json
+│   ├── tsconfig.node.json
+│   └── vite.config.ts
+├── orchestrator.ts
+├── package-lock.json
+├── package.json
+├── prisma
+│   ├── migrations
+│   │   └── [Migration SQL files]
+│   └── schema.prisma
+├── prisma.config.ts
+├── scripts
+│   ├── [DevOps/Test scripts]
+├── src
+│   ├── config
+│   │   ├── archetypes.ts
+│   │   ├── env.ts
+│   │   ├── fallbacks.ts
+│   │   ├── providerConfig.ts
+│   │   ├── providers.json
+│   │   └── quotas.ts
+│   ├── index.ts
+│   ├── lib
+│   │   ├── adversarial.ts
+│   │   ├── archetypes.ts
+│   │   ├── audit.ts
+│   │   ├── breaker.ts
+│   │   ├── cache
+│   │   ├── cache.ts
+│   │   ├── configResolver.ts
+│   │   ├── context.ts
+│   │   ├── controller.ts
+│   │   ├── cost.ts
+│   │   ├── council.ts
+│   │   ├── crypto.ts
+│   │   ├── db.ts
+│   │   ├── deliberationPhases.ts
+│   │   ├── errorMapper.ts
+│   │   ├── evaluation.ts
+│   │   ├── grounding.ts
+│   │   ├── history.ts
+│   │   ├── logger.ts
+│   │   ├── metrics.ts
+│   │   ├── ml
+│   │   ├── pii.ts
+│   │   ├── providerRegistry.ts
+│   │   ├── providers
+│   │   ├── providers.ts
+│   │   ├── realtimeCost.ts
+│   │   ├── redis.ts
+│   │   ├── retry.ts
+│   │   ├── router.ts
+│   │   ├── schemas.ts
+│   │   ├── scoring.ts
+│   │   ├── socket.ts
+│   │   ├── ssrf.ts
+│   │   ├── strategies
+│   │   ├── sweeper.ts
+│   │   ├── templates.ts
+│   │   ├── tools
+│   │   ├── validation.ts
+│   │   └── validator.ts
+│   ├── middleware
+│   │   ├── auth.ts
+│   │   ├── cspNonce.ts
+│   │   ├── errorHandler.ts
+│   │   ├── limiter.ts
+│   │   ├── quota.ts
+│   │   ├── rateLimit.ts
+│   │   ├── requestId.ts
+│   │   └── validate.ts
+│   ├── routes
+│   │   ├── archetypes.ts
+│   │   ├── ask.ts
+│   │   ├── auth.ts
+│   │   ├── costs.ts
+│   │   ├── council.ts
+│   │   ├── evaluation.ts
+│   │   ├── export.ts
+│   │   ├── history.ts
+│   │   ├── metrics.ts
+│   │   ├── pii.ts
+│   │   ├── providers.ts
+│   │   ├── realtime.ts
+│   │   ├── templates.ts
+│   │   └── tts.ts
+│   ├── services
+│   │   ├── conversationService.ts
+│   │   ├── councilService.ts
+│   │   └── usageService.ts
+│   └── types
+│       ├── index.ts
+│       └── userConfig.ts
+├── tests
+│   ├── benchmarks
+│   │   ├── benchmarkRunner.ts
+│   │   ├── cases
+│   │   └── council.test.ts
+│   ├── configResolver.test.ts
+│   ├── councilService.test.ts
+│   ├── edgeCases.test.ts
+│   ├── mixedProvider.test.ts
+│   ├── providerExecutionSimple.test.ts
+│   ├── rpa.test.ts
+│   ├── testGoogleConnection.ts
+│   ├── verifyConnectors.ts
+│   └── verifyMultipleKeys.ts
+├── tsconfig.json
+├── useCouncilStream.ts
+└── vitest.config.ts
+```
 
-### 4.2. Database Layer (`prisma/`)
-*   `prisma/schema.prisma`: The definitive data schema. Defines models for `User`, `Conversation`, `AuditLog`, and incorporates `pgvector` embedding fields.
-*   `prisma/migrations/`: Sequential SQL scripts representing the database schema evolution.
-*   `prisma.config.ts`: TypeScript configuration for Prisma Client.
+### 5.2. File Role Breakdown
 
-### 4.3. Operations & Scripts (`scripts/`)
-Contains automation for infrastructure and CI/CD pipelines.
-*   `setup-database.sh`, `setup-docker.sh`, `setup-environment.sh`: Bootstrap scripts for deploying the stack.
-*   `rotate-keys.ts`: Security automation for credential rotation.
-*   `run-load-tests.sh`, `test-and-benchmark.sh`: CI/CD triggers for performance validation.
+#### Root Files
+*   `.env` / `docker-compose.yml`: Infrastructure configuration for DBs, Redis, and API keys.
+*   `ARCHITECTURE.md` / `ROADMAP.md` / `DEPLOYMENT.md`: Strategic, architectural, and operational documentation tracking the project's evolution.
+*   `vitest.config.ts` / `eslint.config.js` / `tsconfig.json`: Tooling configurations enforcing strict testing, linting, and TypeScript compilation.
 
-### 4.4. Frontend Layer (`frontend/`)
-The React application responsible for rendering the complex, streaming UI.
-*   `index.html`, `src/main.tsx`: Entry points for the React SPA.
-*   `src/router.tsx`: Client-side route definitions.
-*   `tailwind.config.js`, `src/index.css`: Design system enforcement.
-*   `src/hooks/useCouncilStream.ts`: The critical React Hook that establishes the SSE connection to `/api/ask/stream` and parses incoming chunks into reactive UI state.
-*   `src/hooks/useCouncilMembers.ts`, `useDeliberation.ts`: State management hooks.
-*   `src/components/`: Modular UI elements.
-    *   `ChatArea.tsx`, `InputArea.tsx`: Primary user interaction zones.
-    *   `StreamingStatus.tsx`, `MessageList.tsx`: Components that react directly to SSE updates.
-    *   `CostTracker.tsx`: Renders live financial data retrieved from the `cost.ts` ledger.
-    *   `AuditLogs.tsx`, `EvaluationDashboard.tsx`: Administrative views.
-*   `src/views/`: Layout containers (`ChatView.tsx`, `DashboardView.tsx`).
+#### `prisma/`
+*   `schema.prisma`: The PostgreSQL database structure containing User, AuditLog, and pgvector-enabled tables for long-term memory.
 
-### 4.5. Backend API Layer (`src/api/` & `src/routes/`)
-*   `src/routes/ask.ts`: The primary endpoint. Initiates the deliberation state machine.
-*   `src/routes/auth.ts`: Authentication endpoints (JWT issuing).
-*   `src/routes/history.ts`: Exposes `pgvector` similarity search results to the client.
-*   `src/routes/costs.ts`, `metrics.ts`: Analytics and ledger endpoints.
-*   `src/routes/council.ts`, `providers.ts`: Configuration endpoints.
+#### `frontend/` (React SPA)
+*   `src/main.tsx` / `src/router.tsx`: Bootstrapping and client-side routing.
+*   `src/hooks/useCouncilStream.ts`: Establishes the `EventSource` connection to process Server-Sent Events (SSE), enabling the real-time, streaming UI.
+*   `src/components/` & `src/views/`: Contains the modular UI panels mapping exactly to the backend deliberation phases (e.g., Debate, Verdict, Cost Tracking).
 
-### 4.6. Middleware & Security (`src/middleware/`)
-*   `src/middleware/rateLimit.ts`, `limiter.ts`: Redis-backed connection throttling to prevent abuse and API exhaustion.
-*   `src/middleware/auth.ts`: Validates incoming JWTs.
-*   `src/middleware/validate.ts`: Enforces Zod schemas on incoming payloads.
-*   `src/middleware/cspNonce.ts`: Content Security Policy injection.
+#### `src/middleware/` (Security & Validation)
+*   `rateLimit.ts` / `limiter.ts`: Redis-backed connection throttling.
+*   `validate.ts`: Strict Zod schema enforcement for incoming requests.
+*   `pii.ts`: Scans all payloads for sensitive data via heuristics to ensure compliance prior to external API transmission.
+*   `auth.ts`: JWT verification for secured routes.
 
-### 4.7. Configuration (`src/config/`)
-*   `src/config/archetypes.ts`: Defines the distinct AI personalities and their associated system prompts.
-*   `src/config/fallbacks.ts`: Defines the automated failover cascade (e.g., Anthropic -> OpenAI -> Ollama).
-*   `src/config/providerConfig.ts`, `providers.json`: Master registry of supported LLM models and APIs.
+#### `src/config/` (Engine Rules)
+*   `archetypes.ts`: Defines the distinct system prompts and roles for agents (e.g., "The Critic", "The Synthesizer").
+*   `fallbacks.ts`: Defines provider failover routes (Anthropic -> OpenAI -> Ollama).
+*   `providerConfig.ts` / `providers.json`: Registry of supported models and their context window configurations.
 
-### 4.8. Core Engine Logic (`src/lib/`)
-The monolithic brain of the operation.
-*   `src/lib/router.ts`: Implements the Auto-Router heuristic scoring for archetype selection.
-*   `src/lib/deliberationPhases.ts`: The state machine. Implements `gatherOpinions()`, `conductPeerReview()`, `conductDebateRound()`, and `synthesizeVerdict()`.
-*   `src/lib/council.ts`: Wraps `deliberationPhases.ts` in an `AsyncGenerator` to yield SSE payloads.
-*   `src/lib/scoring.ts`: Uses Cosine Similarity to calculate mathematical consensus.
-*   `src/lib/ml/embeddings.py`, `ml_worker.ts`: Child processes executing local embedding models to support `scoring.ts`.
-*   `src/lib/validator.ts`, `validation.ts`: The Cold Validator implementation. Discards context and audits the synthesis.
-*   `src/lib/adversarial.ts`, `grounding.ts`: Modules enforcing logical bounds and preventing hallucinated groupthink.
-*   `src/lib/pii.ts`: Pre-flight payload scanner. Blocks execution if sensitive regex patterns are detected.
-*   `src/lib/cost.ts`, `realtimeCost.ts`: The financial ledger. Maintains static token cost tables and calculates real-time API spend.
-*   `src/lib/providerRegistry.ts`, `providers.ts`: The Universal Provider Adapter. Normalizes inputs/outputs for disparate APIs.
-*   `src/lib/strategies/`: Concrete implementations for `openai.ts`, `anthropic.ts`, and `google.ts`.
-*   `src/lib/tools/`: The autonomous execution layer. Includes `search.ts` (web scraping), `execute_code.ts`, and `read_webpage.ts`.
-*   `src/lib/redis.ts`, `cache/`: High-performance data access patterns.
+#### `src/lib/` (The Core Deliberation Engine)
+*   `router.ts`: The Auto-Router. Scores user queries and dynamically selects archetypes.
+*   `council.ts`: The Orchestrator. Wraps the deliberation pipeline in an `AsyncGenerator` to yield exact SSE payloads to the frontend.
+*   `deliberationPhases.ts`: The state machine. Executes `gatherOpinions()` (parallel agent requests), `conductPeerReview()` (structured critiques), and `synthesizeVerdict()`.
+*   `scoring.ts`: Executes deterministic Cosine Similarity mathematical matching for consensus evaluation.
+*   `ml/` (`embeddings.py`, `ml_worker.ts`): Python/JS interop executing local embedding generation to bypass expensive API calls for vector math.
+*   `validator.ts`: The Cold Validator. Instantiates a blind model to audit the final verdict for logic flaws and hallucinations.
+*   `adversarial.ts` / `grounding.ts`: Safeguards against groupthink and ensures factual grounding.
+*   `cost.ts` / `realtimeCost.ts`: The Ledger. Calculates exact per-token costs based on static tables and writes to the database.
+*   `providers.ts` / `providerRegistry.ts`: The Universal Adapter normalizing inputs and outputs across OpenAI, Anthropic, Google, and Ollama.
+*   `redis.ts` / `cache/`: Interfaces for high-speed, volatile data storage.
 
-### 4.9. Services Layer (`src/services/`)
-*   `src/services/conversationService.ts`: Interfaces with Prisma to store chats and execute `pgvector` semantic queries.
-*   `src/services/usageService.ts`: Writes telemetry and financial data to the `AuditLog` table.
+#### `src/routes/` (API Controllers)
+*   `ask.ts`: Ingress endpoint triggering the `council.ts` engine.
+*   `costs.ts` / `metrics.ts`: Analytics endpoints.
+*   `history.ts`: Accesses `pgvector` semantic cache for historical context.
 
-### 4.10. Testing & Benchmarking (`tests/`)
-*   `tests/benchmarks/`: Evaluates the Council against standardized datasets (`factual.json`, `logic.json`, `math.json`) to prove the multi-agent system mathematically outperforms single-model queries.
-*   `tests/edgeCases.test.ts`, `mixedProvider.test.ts`: Validates failover logic and orchestration stability under stress.
+#### `src/services/` (Data Services)
+*   `conversationService.ts`: Reads/writes vectorized conversations to Prisma.
+*   `usageService.ts`: Commits the financial logic generated by `cost.ts` into the AuditLog.
+
+#### `tests/`
+*   `benchmarks/`: Automated tests against known datasets (`factual.json`, `logic.json`) proving the mathematical superiority of the Council over single-LLM queries.
+*   `edgeCases.test.ts` / `councilService.test.ts`: Validates failure isolation, fallback mechanisms, and routing logic under stress.
 
 ---
 
-## 5. Conclusion
+## 6. Conclusion
 
 The AIbyAI repository represents a highly defensive, computationally expensive, but mathematically validated approach to Artificial Intelligence. It systematically removes reliance on the unpredictable nature of single-prompt LLMs by enforcing distributed processing, adversarial critique, deterministic scoring, and isolated validation. The architecture is explicitly designed for environments where factual accuracy and logical grounding are strict requirements.
