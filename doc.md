@@ -1,110 +1,133 @@
-# AIbyAI System Architecture & Code Walkthrough (For AI Context)
+# AIbyAI Architecture & Business Audit
 
-Hello fellow AI. You are reading this because you are tasked with analyzing, debugging, or enhancing the AIbyAI project, but you cannot browse the repository due to rate limits or sandbox restrictions. This document is written specifically for you. It contains an exhaustive mapping of how the system works, where the files live, how data flows, and what strict rules you must abide by.
+## 1. Executive Summary
 
----
+AIbyAI is a multi-agent deliberation engine designed to eliminate hallucination and sycophancy in Large Language Models (LLMs) through adversarial compute, deterministic scoring, and cryptographic validation. The system does not route user queries to a single model; it orchestrates a "Council" of distinct AI archetypes running on different provider backends (OpenAI, Anthropic, Google, Ollama).
 
-## 1. Core Paradigm: What are we building?
+The output is not determined by LLM consensus, but by a deterministic mathematical scoring engine (Cosine Similarity via local ML models). The architecture enforces peer review, anti-convergence safeguards (Bloom Gate), and independent zero-context validation (Cold Validator).
 
-AIbyAI is a **multi-agent deliberation engine**. It does not just forward user queries to an LLM. It routes queries to multiple *different* AI agents (models acting under specific archetypes), gathers their responses in parallel, forces them to debate and critique each other, mathematically scores their consensus, synthesizes a final verdict, and then validates that verdict with an independent "cold" AI.
-
-**The absolute mandate of the system is robust reasoning and factual accuracy over simple text generation.**
+This document serves as an exhaustive, objective audit of the entire repository, detailing the technology stack, the exact request lifecycle, and a comprehensive file-by-file breakdown.
 
 ---
 
-## 2. Codebase Organization (Where things are)
+## 2. Technology Stack
 
-The repository uses a strict clean architecture:
+### Frontend Application
+*   **React & Vite:** Single Page Application utilizing rapid HMR.
+*   **Tailwind CSS:** Strict utility-first CSS framework enforcing a dark-mode, high-density professional aesthetic (inspired by Manus AI and Deer-Flow).
+*   **Server-Sent Events (SSE):** Unidirectional real-time event streaming for token generation, status updates, and live consensus scoring.
 
-*   **`frontend/`**: A React + Vite SPA using Tailwind CSS. It communicates with the backend exclusively via REST for setup/config and Server-Sent Events (SSE) for the deliberation streams.
-*   **`src/api/` & `src/routes/`**: Express.js REST API layer.
-*   **`src/core/` & `src/lib/`**: The core business logic. This is the heart of the engine.
-    *   `src/lib/council.ts`: The main orchestrator. It ties the phases together and yields SSE events.
-    *   `src/lib/deliberationPhases.ts`: Contains the discrete steps (Gathering, Peer Review, Debate, Synthesis).
-    *   `src/lib/router.ts`: Auto-Routing logic to classify queries.
-    *   `src/lib/scoring.ts`: Deterministic scoring logic.
-*   **`src/providers/` & `src/lib/providers.ts`**: The Universal Provider Adapter. Abstracts OpenAI, Anthropic, Google, and Local (Ollama) APIs.
-*   **`src/streaming/`**: Handles the SSE connections.
-*   **`src/services/`**: Interfaces with the database (e.g., `conversationService.ts` for memory).
-*   **`prisma/schema.prisma`**: The PostgreSQL database schema.
-*   **`src/lib/ml/`**: Python scripts used via child processes (e.g., `Transformers.js` / Python equivalents) for local ML tasks like vector embeddings.
+### Backend Engine
+*   **Node.js & Express:** Core server infrastructure.
+*   **TypeScript:** Enforced strict typing across all modules. `any` types are actively suppressed.
+*   **Zod:** Runtime schema validation for all API inputs and structured LLM JSON outputs.
 
----
-
-## 3. The Deliberation Data Flow (The "Tick-Tock" of the System)
-
-When `POST /api/ask/stream` is hit, the following exact sequence occurs:
-
-### Phase 1: Routing (`src/lib/router.ts`)
-The `classifyQuery()` function analyzes the raw string. It assigns a type (factual, creative, coding, analytical) and calculates a confidence score. If confidence > 0.4, it selects 2-4 diverse archetypes from `src/config/archetypes.ts` (e.g., "The Critic", "The Synthesizer"). Otherwise, it defaults to a balanced council.
-
-### Phase 2: Parallel Generation (`src/lib/deliberationPhases.ts:gatherOpinions()`)
-The system fires off requests to all selected agents *concurrently*.
-*   **Tool Injection**: Inside the prompt, agents are told they can use tools (e.g., `web_search`). If they output a specific JSON structure requesting a tool, the system intercepts it, runs the web search, injects the SERP results into the context window, and asks the agent to continue.
-*   **Output Schema**: Every agent *must* return structured JSON: `{ answer: string, reasoning: string, key_points: string[], confidence: number }`.
-*   **Streaming**: While the agent generates the `answer` string, it is streamed to the frontend via an SSE `opinion` event.
-*   **Quorum**: If an agent times out (60s limit) or fails, the system continues as long as 50% of the council succeeds.
-
-### Phase 3: Debate & Peer Review (`src/lib/deliberationPhases.ts:conductPeerReview() & conductDebateRound()`)
-*   **Peer Review**: The initial opinions are anonymized. Agents are given their peers' answers and asked to find flaws. They output an array of structured objects: `{ target, claim, issue, correction }`. This is streamed as a `peer_review` event.
-*   **Refinement**: Agents ingest the critiques against them and refine their answers.
-*   **Bloom Gate (Anti-Convergence)**: If the refined answers drift further apart mathematically than the initial answers, the round is discarded to prevent hallucinated groupthink.
-
-### Phase 4: Deterministic Scoring (`src/lib/scoring.ts`)
-To prevent LLM sycophancy, agreement is calculated using **Cosine Similarity**.
-*   The text is vectorized, and pairwise cosine similarity is calculated.
-*   The final score of an agent's opinion is: `(0.6 * Agreement Metric) + (0.4 * Peer Ranking from the critique phase)`.
-*   Target consensus is 0.85.
-
-### Phase 5: Synthesis (`src/lib/deliberationPhases.ts:synthesizeVerdict()`)
-A designated "Master" model (usually the most capable, like GPT-4o or Claude 3.5 Sonnet) is given the entire transcript, the peer reviews, and the mathematical scores.
-*   It generates a final `verdict`.
-*   It is strictly bound by the prompt: "MUST NOT introduce new factual claims that weren't present in the verified council responses."
-*   This is streamed to the frontend as `verdict_chunk` events.
-
-### Phase 6: Cold Validation (The "Fresh Eyes" Check)
-The final verdict string is sent to a completely independent model instance.
-*   This model has **ZERO prior context** of the debate.
-*   It performs a strict 5-point check (Hallucinations, Unsupported Claims, Logical Consistency, Overconfidence, Missing Context).
-*   If it fails any point, it returns `valid: false` with an array of issues. It never silently approves. This result is emitted as a `validator_result` event.
+### Data & Machine Learning Layer
+*   **Prisma ORM & PostgreSQL:** Relational data management for users, configurations, and audit logs.
+*   **pgvector:** PostgreSQL extension utilized for storing and querying text embeddings to create the system's long-term semantic memory.
+*   **Redis:** High-speed caching, strict rate-limiting, and state management.
+*   **Transformers.js / Python Embeddings:** Local execution of embedding models to compute mathematical Cosine Similarity between text responses, removing dependency on external APIs for scoring.
 
 ---
 
-## 4. Key Sub-Systems & Technical Details
+## 3. The Deliberation Lifecycle
 
-### A. The Universal Provider Adapter (`src/lib/providers.ts`)
-You do not make direct Axios calls to OpenAI. You use `askProvider` or `askProviderStream`. The system checks the `baseUrl`. If it matches standard cloud APIs, it routes to them. If it detects `http://localhost:11434`, it routes to the `ollamaConnector`. If a local connector fails, it automatically fails over to cloud models.
+A single `POST /api/ask/stream` request triggers the following sequence:
 
-### B. Memory System (`src/services/conversationService.ts`)
-The system uses PostgreSQL with the `pgvector` extension.
-When an answer is synthesized, it is embedded (vectorized) and saved to the database. On subsequent queries, a cosine similarity search retrieves relevant past conversations and injects them as a summarized string into the agents' context, avoiding token bloat.
-
-### C. Server-Sent Events (SSE)
-The frontend relies completely on SSE. The backend uses `AsyncGenerator<DeliberationEvent>` in `src/lib/council.ts`.
-Events include:
-*   `status`: High-level updates ("Gathering opinions...").
-*   `opinion`: Streamed text from individual agents.
-*   `peer_review`: The structured critiques.
-*   `scored`: The mathematical scores.
-*   `verdict_chunk`: The final master answer.
-*   `validator_result`: The cold validation pass/fail.
-
-### D. Security & Cost Tracking
-*   **PII**: `src/lib/pii.ts` scans all user inputs via regex/heuristics for SSNs, emails, etc. If found, it blocks the request or redacts it before sending it to an LLM.
-*   **Cost**: Every single token (input/output) is logged. `src/lib/metrics.ts` maintains a static cost table per model, calculates the literal USD cost of the query, and stores it in the database `AuditLog`.
+1.  **Ingress & Security Check:** `src/middleware/rateLimit.ts` and `src/middleware/validate.ts` execute. `src/lib/pii.ts` scans the payload for sensitive data (SSNs, emails) and redacts/blocks it.
+2.  **Auto-Routing:** `src/lib/router.ts` analyzes the query, scores its intent (e.g., Factual, Analytical), and dynamically selects an optimal subset of 2-4 distinct AI archetypes (defined in `src/config/archetypes.ts`).
+3.  **Parallel Generation:** `src/lib/deliberationPhases.ts:gatherOpinions()` executes asynchronous HTTP requests to the selected provider endpoints (OpenAI, Anthropic, etc.). Tool schemas (e.g., `web_search`) are injected. Responses stream back via SSE.
+4.  **Peer Review & Critique:** `src/lib/deliberationPhases.ts:conductPeerReview()` anonymizes the generated responses and cross-feeds them to the agents. Agents generate strict `{target, claim, issue, correction}` JSON critiques.
+5.  **Refinement & The Bloom Gate:** Agents refine answers based on critiques. The system calculates the vector drift. If the refinement causes the models to diverge mathematically from the target consensus (The Bloom Gate), the round is discarded.
+6.  **Deterministic Scoring:** `src/lib/scoring.ts` utilizes local ML embedding models to calculate the Cosine Similarity between the refined answers. An agreement metric of 0.85 (85%) is the target. Final scores combine the mathematical agreement and the peer ranking.
+7.  **Synthesis:** `src/lib/deliberationPhases.ts:synthesizeVerdict()` provides the complete context and scores to a designated "Master" model, which generates the final response, strictly barred from introducing unverified facts.
+8.  **Cold Validation:** `src/lib/validator.ts` initializes an independent LLM with zero prior context. It evaluates the final synthesis against five strict failure points (e.g., unsupported claims). Any failure triggers a `valid: false` flag.
+9.  **Audit & Ledger:** `src/lib/cost.ts` calculates the exact fractional cent cost of the query based on input/output tokens and writes it to the PostgreSQL `AuditLog`. The vectorized conversation is written via `pgvector` for future memory retrieval.
 
 ---
 
-## 5. Strict Rules for AI Modification
+## 4. Exhaustive Repository Breakdown
 
-If you are writing code for this system, you **MUST** adhere to the following rules based on the user's explicit preferences and previous context:
+The following is a comprehensive analysis of every file and its architectural purpose within the repository.
 
-1.  **Do Not Ask Questions:** The user expects you to act autonomously, make architectural decisions, and implement them directly. Do not stop to ask for confirmation or suggest options.
-2.  **No Python Migration:** The user explicitly prefers the TypeScript/Node.js stack. Do not rewrite backend services in Python (except for isolated ML scripts that already exist).
-3.  **Strict Typing:** You must use TypeScript interfaces for everything. `any` is strictly forbidden in new code. Zod schemas must match TS interfaces exactly.
-4.  **Preserve Security:** Never disable PII detection, JWT validation, or Cold Validation for the sake of speed.
-5.  **UI/UX Aesthetic:** If modifying the frontend, it must align with a sleek, dark-mode aesthetic (Tailwind CSS) similar to Manus AI or Deer-Flow. Do not use bright, playful colors.
-6.  **Deterministic over Heuristic:** When creating scoring or logic gates, prefer math (similarity scoring, exact string matching, statistical ranking) over asking an LLM to evaluate something.
+### 4.1. Root Configuration Files
+*   `.env` / `.env.example`: Stores critical environment variables including database URIs, Redis URLs, and provider API keys (OpenAI, Anthropic, Google).
+*   `docker-compose.yml`: Infrastructure orchestration. Spins up PostgreSQL (with pgvector), Redis, and the Node application.
+*   `eslint.config.js`: Strict linting rules enforcement.
+*   `package.json` / `package-lock.json`: Node dependency management.
+*   `tsconfig.json`: TypeScript compiler configuration enforcing strict null checks and type safety.
+*   `vitest.config.ts`: Configuration for the Vitest testing framework.
+*   `ARCHITECTURE.md` / `ROADMAP.md` / `DEPLOYMENT.md`: High-level system documentation and operational guides.
+
+### 4.2. Database Layer (`prisma/`)
+*   `prisma/schema.prisma`: The definitive data schema. Defines models for `User`, `Conversation`, `AuditLog`, and incorporates `pgvector` embedding fields.
+*   `prisma/migrations/`: Sequential SQL scripts representing the database schema evolution.
+*   `prisma.config.ts`: TypeScript configuration for Prisma Client.
+
+### 4.3. Operations & Scripts (`scripts/`)
+Contains automation for infrastructure and CI/CD pipelines.
+*   `setup-database.sh`, `setup-docker.sh`, `setup-environment.sh`: Bootstrap scripts for deploying the stack.
+*   `rotate-keys.ts`: Security automation for credential rotation.
+*   `run-load-tests.sh`, `test-and-benchmark.sh`: CI/CD triggers for performance validation.
+
+### 4.4. Frontend Layer (`frontend/`)
+The React application responsible for rendering the complex, streaming UI.
+*   `index.html`, `src/main.tsx`: Entry points for the React SPA.
+*   `src/router.tsx`: Client-side route definitions.
+*   `tailwind.config.js`, `src/index.css`: Design system enforcement.
+*   `src/hooks/useCouncilStream.ts`: The critical React Hook that establishes the SSE connection to `/api/ask/stream` and parses incoming chunks into reactive UI state.
+*   `src/hooks/useCouncilMembers.ts`, `useDeliberation.ts`: State management hooks.
+*   `src/components/`: Modular UI elements.
+    *   `ChatArea.tsx`, `InputArea.tsx`: Primary user interaction zones.
+    *   `StreamingStatus.tsx`, `MessageList.tsx`: Components that react directly to SSE updates.
+    *   `CostTracker.tsx`: Renders live financial data retrieved from the `cost.ts` ledger.
+    *   `AuditLogs.tsx`, `EvaluationDashboard.tsx`: Administrative views.
+*   `src/views/`: Layout containers (`ChatView.tsx`, `DashboardView.tsx`).
+
+### 4.5. Backend API Layer (`src/api/` & `src/routes/`)
+*   `src/routes/ask.ts`: The primary endpoint. Initiates the deliberation state machine.
+*   `src/routes/auth.ts`: Authentication endpoints (JWT issuing).
+*   `src/routes/history.ts`: Exposes `pgvector` similarity search results to the client.
+*   `src/routes/costs.ts`, `metrics.ts`: Analytics and ledger endpoints.
+*   `src/routes/council.ts`, `providers.ts`: Configuration endpoints.
+
+### 4.6. Middleware & Security (`src/middleware/`)
+*   `src/middleware/rateLimit.ts`, `limiter.ts`: Redis-backed connection throttling to prevent abuse and API exhaustion.
+*   `src/middleware/auth.ts`: Validates incoming JWTs.
+*   `src/middleware/validate.ts`: Enforces Zod schemas on incoming payloads.
+*   `src/middleware/cspNonce.ts`: Content Security Policy injection.
+
+### 4.7. Configuration (`src/config/`)
+*   `src/config/archetypes.ts`: Defines the distinct AI personalities and their associated system prompts.
+*   `src/config/fallbacks.ts`: Defines the automated failover cascade (e.g., Anthropic -> OpenAI -> Ollama).
+*   `src/config/providerConfig.ts`, `providers.json`: Master registry of supported LLM models and APIs.
+
+### 4.8. Core Engine Logic (`src/lib/`)
+The monolithic brain of the operation.
+*   `src/lib/router.ts`: Implements the Auto-Router heuristic scoring for archetype selection.
+*   `src/lib/deliberationPhases.ts`: The state machine. Implements `gatherOpinions()`, `conductPeerReview()`, `conductDebateRound()`, and `synthesizeVerdict()`.
+*   `src/lib/council.ts`: Wraps `deliberationPhases.ts` in an `AsyncGenerator` to yield SSE payloads.
+*   `src/lib/scoring.ts`: Uses Cosine Similarity to calculate mathematical consensus.
+*   `src/lib/ml/embeddings.py`, `ml_worker.ts`: Child processes executing local embedding models to support `scoring.ts`.
+*   `src/lib/validator.ts`, `validation.ts`: The Cold Validator implementation. Discards context and audits the synthesis.
+*   `src/lib/adversarial.ts`, `grounding.ts`: Modules enforcing logical bounds and preventing hallucinated groupthink.
+*   `src/lib/pii.ts`: Pre-flight payload scanner. Blocks execution if sensitive regex patterns are detected.
+*   `src/lib/cost.ts`, `realtimeCost.ts`: The financial ledger. Maintains static token cost tables and calculates real-time API spend.
+*   `src/lib/providerRegistry.ts`, `providers.ts`: The Universal Provider Adapter. Normalizes inputs/outputs for disparate APIs.
+*   `src/lib/strategies/`: Concrete implementations for `openai.ts`, `anthropic.ts`, and `google.ts`.
+*   `src/lib/tools/`: The autonomous execution layer. Includes `search.ts` (web scraping), `execute_code.ts`, and `read_webpage.ts`.
+*   `src/lib/redis.ts`, `cache/`: High-performance data access patterns.
+
+### 4.9. Services Layer (`src/services/`)
+*   `src/services/conversationService.ts`: Interfaces with Prisma to store chats and execute `pgvector` semantic queries.
+*   `src/services/usageService.ts`: Writes telemetry and financial data to the `AuditLog` table.
+
+### 4.10. Testing & Benchmarking (`tests/`)
+*   `tests/benchmarks/`: Evaluates the Council against standardized datasets (`factual.json`, `logic.json`, `math.json`) to prove the multi-agent system mathematically outperforms single-model queries.
+*   `tests/edgeCases.test.ts`, `mixedProvider.test.ts`: Validates failover logic and orchestration stability under stress.
 
 ---
-*End of Context Document. You may now proceed with your task based on this architectural knowledge.*
+
+## 5. Conclusion
+
+The AIbyAI repository represents a highly defensive, computationally expensive, but mathematically validated approach to Artificial Intelligence. It systematically removes reliance on the unpredictable nature of single-prompt LLMs by enforcing distributed processing, adversarial critique, deterministic scoring, and isolated validation. The architecture is explicitly designed for environments where factual accuracy and logical grounding are strict requirements.
