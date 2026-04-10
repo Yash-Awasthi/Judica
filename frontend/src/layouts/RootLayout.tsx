@@ -3,7 +3,7 @@ import { Sidebar } from "../components/Sidebar";
 import { AuthScreen } from "../components/AuthScreen";
 import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
-import type { Conversation, UserMetrics } from "../types/index.js";
+import type { Conversation } from "../types/index.js";
 
 export function RootLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -82,7 +82,7 @@ export function RootLayout() {
     setIsSidebarOpen(false);
   };
 
-  const handleLogin = (newToken: string) => {
+  const handleLogin = (_newToken: string) => {
     // The AuthContext probably needs to be updated with the token.
     // AuthContext uses localStorage, so we'll just set it and let context pick it up, or maybe it sets it.
     // Actually the AuthScreen itself does:

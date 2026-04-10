@@ -4,7 +4,7 @@ import { ChatArea } from "../components/ChatArea";
 import { useCouncilMembers } from "../hooks/useCouncilMembers";
 import { useDeliberation } from "../hooks/useDeliberation";
 import { useAuth } from "../context/AuthContext";
-import type { Conversation, ChatMessage } from "../types/index.js";
+import type { Conversation } from "../types/index.js";
 
 interface OutletContextType {
   setIsSidebarOpen: (v: boolean) => void;
