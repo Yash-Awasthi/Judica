@@ -66,8 +66,8 @@ router.get("/search", requireAuth, async (req: AuthRequest, res: Response) => {
     };
 
     const formattedResults = rawResults.map((chat: any) => {
-      const qMatch = chat.question.toLowerCase().includes(searchTerm.toLowerCase());
-      const vMatch = chat.verdict.toLowerCase().includes(searchTerm.toLowerCase());
+      const qMatch = chat.question && chat.question.toLowerCase().includes(searchTerm.toLowerCase());
+      const vMatch = chat.verdict && chat.verdict.toLowerCase().includes(searchTerm.toLowerCase());
 
       const score = (qMatch && vMatch) ? 0.95 : qMatch ? 0.8 : vMatch ? 0.6 : 0.4;
 
@@ -85,7 +85,7 @@ router.get("/search", requireAuth, async (req: AuthRequest, res: Response) => {
         relevanceScore: score,
         highlights: {
           question: qMatch ? highlightText(chat.question, searchTerm) : chat.question,
-          verdict: vMatch ? highlightText(chat.verdict.slice(0, 300) + (chat.verdict.length > 300 ? "..." : ""), searchTerm) : chat.verdict.slice(0, 300) + "...",
+          verdict: vMatch ? highlightText((chat.verdict?.slice(0, 300) || "") + (chat.verdict?.length > 300 ? "..." : ""), searchTerm) : (chat.verdict?.slice(0, 300) || "") + (chat.verdict?.length > 300 ? "..." : ""),
           hasOpinionMatch: false
         }
       };
