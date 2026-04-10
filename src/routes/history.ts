@@ -27,38 +27,77 @@ function paginationMeta(page: number, limit: number, total: number) {
 
 router.get("/search", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
-    const { q, limit = "10" } = req.query;
+    const { q, limit = "20", page = "1" } = req.query;
 
     if (!q || typeof q !== "string" || q.trim().length < 2) {
-      return res.json([]);
+      return res.json({ data: [], pagination: { total: 0, page: 1, limit: 20, totalPages: 0 } });
     }
 
     const searchTerm = q.trim();
-    const limitNum = Math.min(Math.max(parseInt(limit as string, 10) || 10, 1), 50);
+    const { limit: limitNum, skip, page: pageNum } = parsePagination({ limit: limit as string, page: page as string }, 20, 50);
 
-    const results = await prisma.chat.findMany({
-      where: {
-        userId: req.userId!,
-        OR: [
-          { question: { contains: searchTerm, mode: "insensitive" } },
-          { verdict: { contains: searchTerm, mode: "insensitive" } }
-        ]
-      },
-      orderBy: { createdAt: "desc" },
-      take: limitNum,
-      select: {
-        id: true,
-        conversationId: true,
-        question: true,
-        verdict: true,
-        createdAt: true
-      }
+    const whereClause = {
+      userId: req.userId!,
+      OR: [
+        { question: { contains: searchTerm, mode: "insensitive" as const } },
+        { verdict: { contains: searchTerm, mode: "insensitive" as const } }
+      ]
+    };
+
+    const [rawResults, total] = await Promise.all([
+      prisma.chat.findMany({
+        where: whereClause,
+        orderBy: { createdAt: "desc" },
+        take: limitNum,
+        skip: skip,
+        include: {
+          Conversation: {
+            select: { title: true }
+          }
+        }
+      }),
+      prisma.chat.count({ where: whereClause })
+    ]);
+
+    const highlightText = (text: string, term: string) => {
+      if (!text) return "";
+      const regex = new RegExp(`(${term})`, "gi");
+      return text.replace(regex, "<mark>$1</mark>");
+    };
+
+    const formattedResults = rawResults.map((chat: any) => {
+      const qMatch = chat.question.toLowerCase().includes(searchTerm.toLowerCase());
+      const vMatch = chat.verdict.toLowerCase().includes(searchTerm.toLowerCase());
+
+      const score = (qMatch && vMatch) ? 0.95 : qMatch ? 0.8 : vMatch ? 0.6 : 0.4;
+
+
+
+
+
+      return {
+        id: chat.id.toString(),
+        question: chat.question,
+        verdict: chat.verdict,
+        conversationId: chat.conversationId,
+        conversationTitle: chat.Conversation?.title || "Unknown Conversation",
+        createdAt: chat.createdAt.toISOString(),
+        relevanceScore: score,
+        highlights: {
+          question: qMatch ? highlightText(chat.question, searchTerm) : chat.question,
+          verdict: vMatch ? highlightText(chat.verdict.slice(0, 300) + (chat.verdict.length > 300 ? "..." : ""), searchTerm) : chat.verdict.slice(0, 300) + "...",
+          hasOpinionMatch: false
+        }
+      };
     });
 
-    res.json(results);
+    res.json({
+      data: formattedResults,
+      pagination: { page: pageNum, limit: limitNum, total, totalPages: Math.ceil(total / limitNum) }
+    });
   } catch (err) {
     logger.error({ err, userId: req.userId }, "History search failed");
-    res.json([]);
+    res.json({ data: [], pagination: { total: 0, page: 1, limit: 20, totalPages: 0 } });
   }
 });
 

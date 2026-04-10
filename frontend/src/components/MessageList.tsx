@@ -10,6 +10,7 @@ interface MessageListProps {
   visibleKeyIds: Record<string, boolean>;
   setVisibleKeyIds: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
   isStreaming?: boolean;
+  onSuggestionClick?: (text: string) => void;
 }
 
 const mdComponents = {
@@ -52,7 +53,8 @@ export function MessageList({
   getMemberColor,
   visibleKeyIds,
   setVisibleKeyIds,
-  isStreaming = false
+  isStreaming = false,
+  onSuggestionClick
 }: MessageListProps) {
   if (messages.length === 0) {
     return (
@@ -76,13 +78,7 @@ export function MessageList({
             <button
               key={suggestion}
               className="px-4 py-2 rounded-xl bg-white/[0.03] border border-white/[0.06] text-xs text-white/40 hover:text-white/70 hover:border-white/[0.12] hover:bg-white/[0.05] transition-all duration-200"
-              onClick={() => {
-                const input = document.querySelector('textarea');
-                if (input) {
-                  input.value = suggestion;
-                  input.dispatchEvent(new Event('input', { bubbles: true }));
-                }
-              }}
+              onClick={() => onSuggestionClick && onSuggestionClick(suggestion)}
             >
               {suggestion}
             </button>

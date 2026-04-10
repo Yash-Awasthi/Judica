@@ -191,6 +191,7 @@ export function ChatArea({
           visibleKeyIds={visibleKeyIds}
           setVisibleKeyIds={setVisibleKeyIds}
           isStreaming={isStreaming}
+          onSuggestionClick={setInput}
         />
       </div>
 

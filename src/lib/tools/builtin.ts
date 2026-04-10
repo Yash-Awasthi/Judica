@@ -60,3 +60,60 @@ registerTool(
     }
   }
 );
+
+registerTool(
+  {
+    name: "calculator",
+    description: "Evaluate a mathematical expression and return the result",
+    parameters: {
+      type: "object",
+      properties: {
+        expression: { type: "string", description: "The mathematical expression to evaluate (e.g. '2 + 2', '10 * 5')" }
+      },
+      required: ["expression"]
+    }
+  },
+  async (args) => {
+    const expression = args.expression as string;
+    try {
+      // Basic safety: only allow math characters
+      if (!/^[0-9+\-*/().\s]+$/.test(expression)) {
+        return "Error: Invalid characters in mathematical expression. Only digits and operators (+, -, *, /, (), .) are allowed.";
+      }
+
+      // Use isolated-vm via execute_code tool for safe evaluation
+      const result = await executeCodeTool.execute({ code: expression });
+      return `Result of ${expression} = ${result}`;
+    } catch (err) {
+      return `Failed to evaluate expression: ${(err as Error).message}`;
+    }
+  }
+);
+
+registerTool(
+  {
+    name: "get_current_time",
+    description: "Get the current time and date",
+    parameters: {
+      type: "object",
+      properties: {
+        timezone: { type: "string", description: "Optional timezone (e.g. 'UTC', 'America/New_York'). Defaults to UTC." }
+      },
+      required: []
+    }
+  },
+  async (args) => {
+    const timezone = (args.timezone as string) || "UTC";
+    try {
+      const now = new Date();
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        dateStyle: 'full',
+        timeStyle: 'long',
+      });
+      return `The current time in ${timezone} is: ${formatter.format(now)}`;
+    } catch (err) {
+      return `Failed to get current time (possibly invalid timezone): ${(err as Error).message}`;
+    }
+  }
+);
