@@ -45,6 +45,7 @@ import promptDnaRouter from "./routes/promptDna.js";
 import memoryRouter from "./routes/memory.js";
 import adminRouter from "./routes/admin.js";
 import shareRouter from "./routes/share.js";
+import marketplaceRouter from "./routes/marketplace.js";
 import { startMemoryCrons } from "./lib/memoryCrons.js";
 
 const app = express();
@@ -152,6 +153,7 @@ app.use("/api/prompt-dna", requireAuth, promptDnaRouter);
 app.use("/api/memory",    requireAuth, memoryRouter);
 app.use("/api/admin",     requireAuth, adminRouter);
 app.use("/api/share",     shareRouter);
+app.use("/api/marketplace", requireAuth, marketplaceRouter);
 
 app.get("/health", async (req, res) => {
   const checks: Record<string, string> = {};

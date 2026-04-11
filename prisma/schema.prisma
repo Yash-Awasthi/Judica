@@ -477,3 +477,85 @@ model SharedPrompt {
   expiresAt  DateTime?
   createdAt  DateTime  @default(now())
 }
+
+// ─── Marketplace (Tier 10) ──────────────────────────────────────────────────
+model MarketplaceItem {
+  id          String   @id @default(cuid())
+  type        String   // 'prompt'|'workflow'|'persona'|'tool'
+  name        String
+  description String
+  content     Json
+  authorId    String
+  authorName  String
+  tags        String[]
+  downloads   Int      @default(0)
+  stars       Int      @default(0)
+  version     String   @default("1.0.0")
+  published   Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  reviews     MarketplaceReview[]
+
+  @@index([authorId])
+  @@index([type])
+}
+
+model MarketplaceReview {
+  id        String   @id @default(cuid())
+  itemId    String
+  userId    String
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now())
+  item      MarketplaceItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId])
+}
+
+model MarketplaceStar {
+  userId String
+  itemId String
+  @@id([userId, itemId])
+}
+
+// ─── Skills Framework (Tier 10) ─────────────────────────────────────────────
+model UserSkill {
+  id          String   @id @default(cuid())
+  userId      String
+  name        String
+  description String
+  code        String
+  parameters  Json
+  createdAt   DateTime @default(now())
+  active      Boolean  @default(true)
+
+  @@index([userId])
+}
+
+// ─── Traces & Reliability (Tier 11) ─────────────────────────────────────────
+model Trace {
+  id              String   @id @default(cuid())
+  conversationId  String?
+  workflowRunId   String?
+  userId          Int
+  type            String   // 'chat'|'debate'|'workflow'|'research'
+  steps           Json     // array of TraceStep objects
+  totalLatencyMs  Int
+  totalTokens     Int
+  totalCostUsd    Float
+  createdAt       DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([conversationId])
+  @@index([type])
+}
+
+model ModelReliability {
+  model         String   @id
+  totalResponses Int     @default(0)
+  agreedWith    Int      @default(0)
+  contradicted  Int      @default(0)
+  toolErrors    Int      @default(0)
+  avgConfidence Float    @default(0.0)
+  updatedAt     DateTime @updatedAt
+}
