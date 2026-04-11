@@ -151,6 +151,8 @@ model User {
   Workflow           Workflow[]
   WorkflowRun        WorkflowRun[]
   Prompt             Prompt[]
+  customPersonas     CustomPersona[]
+  promptDnas         PromptDNA[]
 }
 
 // ─── Custom Providers (EMOF) ─────────────────────────────────────────────────
@@ -367,4 +369,48 @@ model PromptVersion {
   Prompt     Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
 
   @@unique([promptId, versionNum])
+}
+
+// ─── Shared Facts & Personas (Tier 6) ───────────────────────────────────────
+model SharedFact {
+  id              String   @id @default(cuid())
+  conversationId  String
+  content         String
+  sourceAgent     String
+  type            String   // 'fact' | 'decision' | 'assumption' | 'contradiction'
+  confidence      Float
+  confirmedBy     String[] // agent ids that agreed
+  disputedBy      String[] // agent ids that disagreed
+  createdAt       DateTime @default(now())
+
+  @@index([conversationId])
+}
+
+model CustomPersona {
+  id             String   @id @default(cuid())
+  userId         Int
+  name           String
+  systemPrompt   String
+  temperature    Float    @default(0.7)
+  critiqueStyle  String?
+  domain         String?
+  aggressiveness Int      @default(5)
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+}
+
+model PromptDNA {
+  id             String   @id @default(cuid())
+  userId         Int
+  name           String
+  systemPrompt   String
+  steeringRules  String
+  consensusBias  String   // 'agree'|'disagree'|'neutral'|'synthesize'
+  critiqueStyle  String
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id])
+
+  @@index([userId])
 }

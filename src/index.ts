@@ -40,6 +40,8 @@ import artifactsRouter from "./routes/artifacts.js";
 import sandboxRouter from "./routes/sandbox.js";
 import workflowsRouter from "./routes/workflows.js";
 import promptsRouter from "./routes/prompts.js";
+import personasRouter from "./routes/personas.js";
+import promptDnaRouter from "./routes/promptDna.js";
 
 const app = express();
 
@@ -141,6 +143,8 @@ app.use("/api/artifacts", requireAuth, artifactsRouter);
 app.use("/api/sandbox",   requireAuth, sandboxRouter);
 app.use("/api/workflows", requireAuth, workflowsRouter);
 app.use("/api/prompts",   requireAuth, promptsRouter);
+app.use("/api/personas",  requireAuth, personasRouter);
+app.use("/api/prompt-dna", requireAuth, promptDnaRouter);
 
 app.get("/health", async (req, res) => {
   const checks: Record<string, string> = {};
