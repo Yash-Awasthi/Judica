@@ -1,6 +1,7 @@
 import prisma from "../lib/db.js";
 import { hybridSearch, type MemoryChunk } from "./vectorStore.service.js";
 import logger from "../lib/logger.js";
+import type { AdapterContentBlock } from "../adapters/types.js";
 
 export interface FileContext {
   text_documents: string[];
@@ -79,6 +80,7 @@ export async function loadRAGContext(
 
 /**
  * Build the enriched question with file context and RAG context prepended.
+ * Returns a string for text-only, or AdapterContentBlock[] when images are present.
  */
 export function buildEnrichedQuestion(
   question: string,
@@ -86,7 +88,7 @@ export function buildEnrichedQuestion(
   ragContext: string,
   memoryContext: string,
   groundTruthContext?: string
-): string {
+): string | AdapterContentBlock[] {
   const parts: string[] = [];
 
   if (groundTruthContext) {
@@ -107,5 +109,25 @@ export function buildEnrichedQuestion(
 
   parts.push(`QUESTION: ${question}`);
 
-  return parts.join("\n\n");
+  const textContent = parts.join("\n\n");
+
+  // If no images, return plain string
+  if (fileContext.image_blocks.length === 0) {
+    return textContent;
+  }
+
+  // With images: return content blocks array for multimodal messages
+  const blocks: AdapterContentBlock[] = [
+    { type: "text", text: textContent },
+  ];
+
+  for (const img of fileContext.image_blocks) {
+    blocks.push({
+      type: "image_base64",
+      data: img.base64,
+      media_type: img.mimeType,
+    });
+  }
+
+  return blocks;
 }
