@@ -130,11 +130,12 @@ model SemanticCache {
 
 model User {
   id                 Int              @id @default(autoincrement())
+  email              String?          @unique
   username           String           @unique
   passwordHash       String
   customInstructions String           @default("")
   createdAt          DateTime         @default(now())
-  role               String           @default("user")
+  role               String           @default("member")
   AuditLog           AuditLog[]
   Chat               Chat[]
   Conversation       Conversation[]
@@ -155,6 +156,7 @@ model User {
   customPersonas     CustomPersona[]
   promptDnas         PromptDNA[]
   memoryBackend      MemoryBackend?
+  groupMemberships   GroupMembership[]
 }
 
 // ─── Custom Providers (EMOF) ─────────────────────────────────────────────────
@@ -426,4 +428,52 @@ model MemoryBackend {
   active    Boolean  @default(true)
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
+}
+
+// ─── RBAC & Groups (Tier 9) ───────────────────────────────────────────────
+model UserGroup {
+  id        String            @id @default(cuid())
+  name      String
+  members   GroupMembership[]
+  createdAt DateTime          @default(now())
+}
+
+model GroupMembership {
+  userId  Int
+  groupId String
+  user    User      @relation(fields: [userId], references: [id])
+  group   UserGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@id([userId, groupId])
+}
+
+// ─── Sharing (Tier 9) ────────────────────────────────────────────────────
+model SharedConversation {
+  id             String    @id @default(cuid())
+  conversationId String    @unique
+  ownerId        Int
+  shareToken     String    @unique @default(cuid())
+  access         String    @default("read")
+  expiresAt      DateTime?
+  createdAt      DateTime  @default(now())
+}
+
+model SharedWorkflow {
+  id         String    @id @default(cuid())
+  workflowId String    @unique
+  ownerId    Int
+  shareToken String    @unique @default(cuid())
+  access     String    @default("read")
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
+}
+
+model SharedPrompt {
+  id         String    @id @default(cuid())
+  promptId   String    @unique
+  ownerId    Int
+  shareToken String    @unique @default(cuid())
+  access     String    @default("read")
+  expiresAt  DateTime?
+  createdAt  DateTime  @default(now())
 }

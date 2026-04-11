@@ -32,6 +32,11 @@ const envSchema = z.object({
   FRONTEND_URL: z.string().optional(),
   CURRENT_ENCRYPTION_VERSION: z.string().regex(/^\d+$/).default("1"),
   ENABLE_VECTOR_CACHE: z.preprocess((v) => v === "true" || v === "1", z.boolean()).default(false),
+  GOOGLE_CLIENT_ID: z.string().optional().default(""),
+  GOOGLE_CLIENT_SECRET: z.string().optional().default(""),
+  GITHUB_CLIENT_ID: z.string().optional().default(""),
+  GITHUB_CLIENT_SECRET: z.string().optional().default(""),
+  OAUTH_CALLBACK_BASE_URL: z.string().optional().default("http://localhost:3000"),
 });
 
 const parsed = envSchema.safeParse(process.env);
