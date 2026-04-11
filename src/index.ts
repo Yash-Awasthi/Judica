@@ -38,6 +38,8 @@ import voiceRouter from "./routes/voice.js";
 import researchRouter from "./routes/research.js";
 import artifactsRouter from "./routes/artifacts.js";
 import sandboxRouter from "./routes/sandbox.js";
+import workflowsRouter from "./routes/workflows.js";
+import promptsRouter from "./routes/prompts.js";
 
 const app = express();
 
@@ -137,6 +139,8 @@ app.use("/api/voice",     askLimiter, voiceRouter);
 app.use("/api/research",  requireAuth, researchRouter);
 app.use("/api/artifacts", requireAuth, artifactsRouter);
 app.use("/api/sandbox",   requireAuth, sandboxRouter);
+app.use("/api/workflows", requireAuth, workflowsRouter);
+app.use("/api/prompts",   requireAuth, promptsRouter);
 
 app.get("/health", async (req, res) => {
   const checks: Record<string, string> = {};

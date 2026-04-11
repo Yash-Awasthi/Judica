@@ -3,6 +3,9 @@ import { RootLayout } from "./layouts/RootLayout";
 import { ChatView } from "./views/ChatView";
 import { DashboardView } from "./views/DashboardView";
 import { MetricsView } from "./views/MetricsView";
+import { WorkflowsView } from "./views/WorkflowsView";
+import { WorkflowEditorView } from "./views/WorkflowEditorView";
+import { PromptIDEView } from "./views/PromptIDEView";
 
 export const router = createBrowserRouter([
   {
@@ -13,6 +16,10 @@ export const router = createBrowserRouter([
       { path: "chat", element: <ChatView /> },
       { path: "chat/:conversationId", element: <ChatView /> },
       { path: "metrics", element: <MetricsView /> },
+      { path: "workflows", element: <WorkflowsView /> },
+      { path: "workflows/new", element: <WorkflowEditorView /> },
+      { path: "workflows/:id", element: <WorkflowEditorView /> },
+      { path: "prompts", element: <PromptIDEView /> },
     ],
   },
 ]);

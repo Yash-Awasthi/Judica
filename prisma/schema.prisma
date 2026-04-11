@@ -148,6 +148,9 @@ model User {
   Memory             Memory[]
   ResearchJob        ResearchJob[]
   Artifact           Artifact[]
+  Workflow           Workflow[]
+  WorkflowRun        WorkflowRun[]
+  Prompt             Prompt[]
 }
 
 // ─── Custom Providers (EMOF) ─────────────────────────────────────────────────
@@ -303,4 +306,65 @@ model Artifact {
 
   @@index([userId, createdAt])
   @@index([conversationId])
+}
+
+// ─── Workflows (Tier 5) ─────────────────────────────────────────────────────
+model Workflow {
+  id          String        @id @default(cuid())
+  userId      Int
+  name        String
+  description String?
+  definition  Json          // WorkflowDefinition
+  version     Int           @default(1)
+  published   Boolean       @default(false)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  User        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  runs        WorkflowRun[]
+
+  @@index([userId, createdAt])
+}
+
+model WorkflowRun {
+  id         String    @id @default(cuid())
+  workflowId String
+  userId     Int
+  status     String    @default("pending") // pending | running | paused | done | failed
+  inputs     Json
+  outputs    Json?
+  error      String?
+  startedAt  DateTime  @default(now())
+  endedAt    DateTime?
+  Workflow   Workflow   @relation(fields: [workflowId], references: [id], onDelete: Cascade)
+  User       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([workflowId, startedAt])
+  @@index([userId, startedAt])
+}
+
+// ─── Prompts (Tier 5) ────────────────────────────────────────────────────────
+model Prompt {
+  id          String          @id @default(cuid())
+  userId      Int
+  name        String
+  description String?
+  createdAt   DateTime        @default(now())
+  User        User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  versions    PromptVersion[]
+
+  @@index([userId, createdAt])
+}
+
+model PromptVersion {
+  id         String   @id @default(cuid())
+  promptId   String
+  versionNum Int
+  content    String
+  model      String?
+  temperature Float?
+  notes      String?
+  createdAt  DateTime @default(now())
+  Prompt     Prompt   @relation(fields: [promptId], references: [id], onDelete: Cascade)
+
+  @@unique([promptId, versionNum])
 }
