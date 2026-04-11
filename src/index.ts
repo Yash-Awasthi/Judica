@@ -35,6 +35,9 @@ import usageRouter from "./routes/usage.js";
 import uploadsRouter from "./routes/uploads.js";
 import kbRouter from "./routes/kb.js";
 import voiceRouter from "./routes/voice.js";
+import researchRouter from "./routes/research.js";
+import artifactsRouter from "./routes/artifacts.js";
+import sandboxRouter from "./routes/sandbox.js";
 
 const app = express();
 
@@ -131,6 +134,9 @@ app.use("/api/usage",     requireAuth, usageRouter);
 app.use("/api/uploads",   requireAuth, uploadsRouter);
 app.use("/api/kb",        requireAuth, kbRouter);
 app.use("/api/voice",     askLimiter, voiceRouter);
+app.use("/api/research",  requireAuth, researchRouter);
+app.use("/api/artifacts", requireAuth, artifactsRouter);
+app.use("/api/sandbox",   requireAuth, sandboxRouter);
 
 app.get("/health", async (req, res) => {
   const checks: Record<string, string> = {};

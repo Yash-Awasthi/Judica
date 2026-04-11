@@ -28,6 +28,7 @@ import {
   prepareCouncilMembers
 } from "../services/councilService.js";
 import { loadFileContext, loadRAGContext, buildEnrichedQuestion } from "../services/messageBuilder.service.js";
+import { detectArtifact, saveArtifact } from "../services/artifacts.service.js";
 
 function handleCouncilError(err: unknown): never {
   if (err instanceof CouncilServiceError) {
@@ -173,6 +174,15 @@ router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: Auth
       await updateDailyUsage({ userId: userId!, tokensUsed, isCacheHit });
     }
 
+    // Detect and save artifacts from the verdict
+    let artifactId: string | undefined;
+    if (verdict && userId) {
+      const detected = detectArtifact(verdict);
+      if (detected) {
+        artifactId = await saveArtifact(userId, effectiveConversationId || null, detected);
+      }
+    }
+
     res.json({
       success: true,
       conversationId: effectiveConversationId,
@@ -182,6 +192,7 @@ router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: Auth
       cacheHit: isCacheHit,
       router: routerDecision ? formatRouterMetadata(routerDecision) : undefined,
       citations: ragCitations.length > 0 ? ragCitations : undefined,
+      artifact_id: artifactId,
       metrics: (tokensUsed > 0 || isCacheHit) ? { totalTokens: tokensUsed, totalCost: 0, hallucinationCount: 0 } : undefined
     });
 
@@ -355,6 +366,14 @@ router.post("/stream", optionalAuth, checkQuota, validate(askSchema), async (req
       }
       if (userId) {
         await updateDailyUsage({ userId, tokensUsed, isCacheHit });
+      }
+
+      // Detect and save artifacts from stream verdict
+      if (finalVerdict && userId) {
+        const detected = detectArtifact(finalVerdict);
+        if (detected) {
+          await saveArtifact(userId, effectiveConversationId || null, detected);
+        }
       }
     }
 

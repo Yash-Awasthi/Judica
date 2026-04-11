@@ -146,6 +146,8 @@ model User {
   Upload             Upload[]
   KnowledgeBase      KnowledgeBase[]
   Memory             Memory[]
+  ResearchJob        ResearchJob[]
+  Artifact           Artifact[]
 }
 
 // ─── Custom Providers (EMOF) ─────────────────────────────────────────────────
@@ -269,4 +271,36 @@ model KBDocument {
   createdAt  DateTime       @default(now())
   KB         KnowledgeBase  @relation(fields: [kbId], references: [id], onDelete: Cascade)
   Upload     Upload         @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+}
+
+// ─── Research Jobs (Tier 4) ─────────────────────────────────────────────────
+model ResearchJob {
+  id        String   @id @default(cuid())
+  userId    Int
+  query     String
+  status    String   @default("pending") // pending | running | done | failed
+  steps     Json     @default("[]")      // ResearchStep[]
+  report    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+}
+
+// ─── Artifacts (Tier 4) ─────────────────────────────────────────────────────
+model Artifact {
+  id             String   @id @default(cuid())
+  userId         Int
+  conversationId String?
+  name           String
+  type           String   // code | markdown | html | json | csv
+  content        String
+  language       String?  // for code: python | javascript | typescript | etc
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  User           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([conversationId])
 }
