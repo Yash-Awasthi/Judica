@@ -48,6 +48,7 @@ import shareRouter from "./routes/share.js";
 import marketplaceRouter from "./routes/marketplace.js";
 import tracesRouter from "./routes/traces.js";
 import analyticsRouter from "./routes/analytics.js";
+import reposRouter from "./routes/repos.js";
 import { startMemoryCrons } from "./lib/memoryCrons.js";
 
 const app = express();
@@ -158,6 +159,7 @@ app.use("/api/share",     shareRouter);
 app.use("/api/marketplace", requireAuth, marketplaceRouter);
 app.use("/api/traces",      requireAuth, tracesRouter);
 app.use("/api/analytics",   requireAuth, analyticsRouter);
+app.use("/api/repos",       requireAuth, reposRouter);
 
 app.get("/health", async (req, res) => {
   const checks: Record<string, string> = {};
