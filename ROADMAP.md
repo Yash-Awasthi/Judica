@@ -1,224 +1,306 @@
-[ 📖 README ](./README.md) | [ 🗺️ ROADMAP ](./ROADMAP.md)
+<div align="center">
 
-# 🚀 AI Council Roadmap
+# AIBYAI Roadmap
 
-This document outlines the 22-phase technical roadmap for the AI Council platform, plus the 12-tier Master Execution Plan. Updated 2026-04-11 after full codebase audit.
+### What's Next
 
----
+[![Status](https://img.shields.io/badge/Core_Platform-Complete-22C55E?style=for-the-badge)](./README.md)
+[![Status](https://img.shields.io/badge/Next_Phase-Quality_%26_Scale-3B82F6?style=for-the-badge)](#-testing--quality-assurance)
 
-## Current State
-
-AIBYAI is a **production-grade** multimodal multi-agent deliberation engine. All 22 original roadmap phases and all 12 Master Execution Plan tiers are **implemented**. The system includes:
-
-- Multi-agent council deliberation with peer review, debate rounds, and cold validation
-- 8+ LLM provider adapters (OpenAI, Anthropic, Gemini, Groq, Ollama, OpenRouter, custom)
-- Full RAG pipeline (pgvector, hybrid search, knowledge bases, document processing)
-- Workflow engine with visual canvas (React Flow, 10+ node types)
-- Deep research mode with multi-step web search and synthesis
-- Code sandbox (JS via isolated-vm, Python via subprocess)
-- Community marketplace (prompts, workflows, personas, tools)
-- User skills framework (Python functions as callable tools)
-- Observability (tracer, LangFuse integration, analytics dashboard)
-- Model reliability scoring (agreement/contradiction tracking)
-- GitHub intelligence engine (repo ingestion, code-aware chat)
-- BullMQ async job queues (ingestion, research, repo, compaction)
-- OAuth2 (Google, GitHub), RBAC, sharing/collaboration
-- Memory system (3-layer context, compaction, distributed backends)
-- PWA with offline support (IndexedDB caching)
-- Docker + docker-compose, PM2 cluster mode, GitHub Actions CI
+</div>
 
 ---
 
-## Actual System Architecture
+All 22 original roadmap phases and all 12 Master Execution Plan tiers are **complete**. This document tracks future work — quality improvements, new capabilities, and scaling targets.
+
+---
+
+## Current Architecture
 
 ```mermaid
 flowchart LR
-    A[Router P12] --> B[Parallel Agents P1]
-    B --> C[Debate Round P9]
-    C --> D[Synthesis]
-    D --> E[Cold Validator P21]
-    E --> F[Memory Update P11]
-    F --> G[Audit & Cost Tracking P17/P20]
-    G --> H[Response]
-
-    subgraph "Tool System"
-        B --> Tools[Tool Execution P10]
+    subgraph COMPLETE["Implemented"]
+        direction TB
+        A["Multi-Agent Deliberation\n4+ agents, peer review, debate"]
+        B["9 LLM Providers\nOpenAI, Anthropic, Gemini, Groq, Ollama..."]
+        C["RAG Pipeline\npgvector, hybrid search, KB management"]
+        D["Workflow Engine\n10+ node types, visual canvas"]
+        E["Research Mode\nMulti-step web research"]
+        F["Code Sandbox\nisolated-vm + Python"]
+        G["Marketplace\nPrompts, workflows, personas, tools"]
+        H["Observability\nTracing, LangFuse, reliability scoring"]
+        I["Auth + RBAC\nOAuth2, roles, sharing"]
+        J["Infrastructure\nDocker, PM2, BullMQ, CI, PWA"]
     end
 
-    subgraph "Async Jobs"
-        I[BullMQ] --> J[Ingestion]
-        I --> K[Research]
-        I --> L[Repo Index]
-        I --> M[Compaction]
-    end
+    style COMPLETE fill:#022c22,stroke:#22c55e,color:#bbf7d0
 ```
 
 ---
 
-## Phase Progress Tracker (Original 22 Phases)
+## Future Roadmap
 
-| Phase | Name | Milestone | Complexity | Status |
-| :--- | :--- | :--- | :--- | :--- |
-| 1 | Fix Parallel Execution | 1 | S | ✅ Completed |
-| 2 | Introduce Structured Output Contract | 1 | M | ✅ Completed |
-| 3 | Add Failure Isolation | 1 | S | ✅ Completed |
-| 4 | Add Peer Review + Anonymized Ranking | 2 | M | ✅ Completed |
-| 5 | Build Scoring Engine | 2 | M | ✅ Completed |
-| 6 | Split Critic Into Multiple Roles | 2 | M | ✅ Completed |
-| 7 | Implement Consensus Metric | 2 | M | ✅ Completed |
-| 8 | Enable Cross-Agent Interaction | 2 | M | ✅ Completed |
-| 9 | Add Multi-Round Refinement | 2 | M | ✅ Completed |
-| 10 | Add Tool Execution Layer | 3 | L | ✅ Completed |
-| 11 | Add Memory + Context System | 3 | L | ✅ Completed |
-| 12 | Implement Router (Auto-Council) | 3 | L | ✅ Completed |
-| 13 | PII Detection Pre-Send | 3 | S | ✅ Completed |
-| 14 | Runtime-Editable Archetypes | 3 | M | ✅ Completed |
-| 15 | Conversation Search | 3 | S | ✅ Completed |
-| 16 | Audit Log | 3 | S | ✅ Completed |
-| 17 | Add Token + Cost Tracking | 4 | S | ✅ Completed |
-| 18 | Build Evaluation Framework | 4 | L | ✅ Completed |
-| 19 | UI Enhancements | 4 | M | ✅ Completed |
-| 20 | Real-Time Cost Ledger | 4 | S | ✅ Completed |
-| 21 | Cold Validator / "Fresh Eyes" | 4 | M | ✅ Completed |
-| 22 | Local AI & Desktop App Connectors | 4 | L | ✅ Completed |
+```mermaid
+timeline
+    title AIBYAI Development Timeline
+    section Quality
+        Testing Suite : Unit tests (vitest) : Integration tests (supertest) : E2E tests (Playwright)
+        API Documentation : Swagger/OpenAPI : Auto-generated API.md
+    section Intelligence
+        Agentic Memory v2 : Cross-conversation learning : Topic clustering : Automatic forgetting
+        Advanced Reranking : Cohere rerank integration : Custom reranker training
+        Multi-turn Research : Iterative research with follow-ups : Source quality scoring
+    section Platform
+        Real-time Collaboration : Multi-user deliberation : Live cursors : Shared councils
+        Plugin SDK : Third-party tool integration : Webhook triggers : Custom node types
+        Mobile App : React Native client : Push notifications : Voice-first interface
+    section Scale
+        Kubernetes : Horizontal auto-scaling : Multi-region : Health-based routing
+        Multi-tenant : Workspace isolation : Per-tenant quotas : SSO (SAML)
+        Enterprise : Audit compliance : Data residency : SLA monitoring
+```
 
 ---
 
-## Master Execution Plan — Tier Progress
+## Testing & Quality Assurance
 
-| Tier | Name | Status |
-| :--- | :--- | :--- |
-| 0 | Repo Audit + Foundation Hardening | ✅ Completed |
-| 1 | Provider Power + Unified Adapter | ✅ Completed |
-| 2 | Multimodal Input Layer | ✅ Completed |
-| 3 | RAG Brain | ✅ Completed |
-| 4 | Deep Research + Artifacts | ✅ Completed |
-| 5 | Workflow Engine | ✅ Completed |
-| 6 | Multi-Agent Upgrade | ✅ Completed |
-| 7 | Deep Memory Architecture | ✅ Completed |
-| 8 | Live Debate Dashboard | ✅ Completed |
-| 9 | Auth + RBAC + Collaboration | ✅ Completed |
-| 10 | Community Marketplace + Skills | ✅ Completed |
-| 11 | Observability + LLMOps | ✅ Completed |
-| 12 | Code Intelligence + Scaling | ✅ Completed |
+> **Priority: High** — The platform is feature-complete but test coverage is minimal.
 
----
+### Unit Tests
 
-## Milestone 5 — Scale & Hardening
+Target **70% statement coverage** across all services.
 
-| Item | Status |
-| :--- | :--- |
-| Session Storage → Redis | ✅ Completed (stateless JWT + Redis rate limits) |
-| Limiter Persistence → Redis | ✅ Completed (rate-limit-redis in middleware) |
-| Key Rotation & Management | ✅ Completed (POST /api/admin/rotate-keys endpoint) |
+| Area | Files | Framework |
+|---|---|---|
+| Services | `src/services/*.ts` | vitest + mocked Prisma |
+| Adapters | `src/adapters/*.ts` | vitest + nock (HTTP mocking) |
+| Middleware | `src/middleware/*.ts` | vitest |
+| Workflow nodes | `src/workflow/nodes/*.ts` | vitest |
+| Lib utilities | `src/lib/*.ts` | vitest |
 
----
+### Integration Tests
 
-## Implementation Evidence by Tier
+Every API route: happy path + 401 + invalid input = minimum 3 tests per route.
 
-### Tier 0 — Foundation
-- `src/config/env.ts` — Zod-validated environment schema
-- `src/lib/logger.ts` — Pino logger with pino-http
-- `src/middleware/errorHandler.ts` — Global error handler
-- `src/middleware/requestId.ts` — Request ID tracking
+| Area | Approach |
+|---|---|
+| 33 API routes | supertest against Express app |
+| Database operations | Test Prisma against real PostgreSQL |
+| Queue processing | BullMQ job lifecycle testing |
+| SSE streaming | Event stream validation |
 
-### Tier 1 — Unified Adapter
-- `src/adapters/` — 8 adapters (OpenAI, Anthropic, Gemini, Groq, Ollama, OpenRouter, custom, types)
-- `src/adapters/registry.ts` — Provider registry + discovery
-- `src/routes/customProviders.ts` — EMOF (custom provider CRUD)
+### E2E Tests
 
-### Tier 2 — Multimodal Input
-- `src/processors/` — 9 files (PDF, DOCX, XLSX, CSV, TXT, image, router)
-- `src/routes/uploads.ts` — File upload with multer
-- `src/routes/voice.ts` + `src/routes/tts.ts` — Voice I/O
+Critical user flows with Playwright (already installed in the project).
 
-### Tier 3 — RAG Brain
-- `src/services/vectorStore.service.ts` — pgvector operations
-- `src/services/embeddings.service.ts` — Embedding generation
-- `src/services/chunker.service.ts` — Document chunking
-- `src/services/ingestion.service.ts` — Document ingestion pipeline
-- `src/routes/kb.ts` — Knowledge base CRUD
-
-### Tier 4 — Research + Artifacts
-- `src/services/research.service.ts` — Multi-step research engine
-- `src/services/artifacts.service.ts` — Artifact detection & storage
-- `src/sandbox/` — JS (isolated-vm) + Python sandbox
-
-### Tier 5 — Workflow Engine
-- `src/workflow/executor.ts` — Workflow execution engine (9.1KB)
-- `src/workflow/nodes/` — 10 node handlers
-- `frontend/src/views/WorkflowEditorView.tsx` — Visual canvas
-- `src/routes/prompts.ts` — Prompt IDE with versioning
-
-### Tier 6 — Multi-Agent
-- `src/agents/orchestrator.ts` — Full orchestration DAG (16.8KB)
-- `src/agents/conflictDetector.ts` — Conflict detection
-- `src/agents/messageBus.ts` — Inter-agent messaging
-- `src/agents/sharedMemory.ts` — Shared fact graph
-- `src/agents/personas.ts` — Built-in + custom personas
-- `src/routes/promptDna.ts` — Prompt DNA system
-
-### Tier 7 — Memory
-- `src/services/sessionSummary.service.ts` — Session summarization
-- `src/services/memoryCompaction.service.ts` — Memory compaction
-- `src/services/memoryRouter.service.ts` — Distributed memory backends
-- `src/lib/memoryCrons.ts` — Scheduled memory jobs
-
-### Tier 8 — Debate Dashboard
-- `frontend/src/views/DebateDashboardView.tsx` — Live debate UI (16.1KB)
-- `frontend/src/components/tabs/MainTabs.tsx` — 5-tab results panel
-
-### Tier 9 — Auth + RBAC
-- `src/auth/google.strategy.ts` + `github.strategy.ts` — OAuth2
-- `src/middleware/rbac.ts` — Role-based access control
-- `src/routes/admin.ts` — Admin management
-- `src/routes/share.ts` — Sharing system
-
-### Tier 10 — Marketplace + Skills
-- `src/routes/marketplace.ts` — Full marketplace CRUD + install flow
-- `src/routes/skills.ts` — User skills CRUD
-- `src/lib/tools/skillExecutor.ts` — Skill execution as tools
-- `frontend/src/views/MarketplaceView.tsx` + `SkillsView.tsx`
-
-### Tier 11 — Observability
-- `src/observability/tracer.ts` — Trace logging + LangFuse integration
-- `src/services/reliability.service.ts` — Model reliability scoring
-- `src/routes/analytics.ts` + `traces.ts` — Analytics API
-- `frontend/src/views/AnalyticsView.tsx` — Analytics dashboard
-
-### Tier 12 — Code Intelligence + Scaling
-- `src/services/repoIngestion.service.ts` — GitHub repo indexing
-- `src/services/repoSearch.service.ts` — Code search
-- `src/queue/` — BullMQ queues + workers (ingestion, research, repo, compaction)
-- `src/middleware/rateLimit.ts` — Redis-backed rate limiting
-- `Dockerfile` + `docker-compose.yml` — Production containers
-- `ecosystem.config.cjs` — PM2 cluster mode
-- `.github/workflows/ci.yml` — CI pipeline
-- `frontend/src/components/OfflineIndicator.tsx` — PWA offline support
+| Flow | Description |
+|---|---|
+| Authentication | Sign up, login, OAuth redirect |
+| Council deliberation | Ask question, receive streamed debate + verdict |
+| Knowledge base | Create KB, upload document, query with RAG |
+| Workflow builder | Create workflow, add nodes, execute |
+| Marketplace | Browse, install item, verify in account |
 
 ---
 
-## What Remains (Post-Implementation Quality)
+## API Documentation
 
-All features are implemented. Remaining work is **quality, testing, and polish**:
+> **Priority: High** — No auto-generated docs exist yet.
 
-### Testing (High Priority)
-- Unit tests for services (vitest + mocked DB) — target 70% coverage
-- Integration tests for API routes (supertest)
-- E2E tests for critical flows
+```mermaid
+flowchart LR
+    A["JSDoc annotations\non route handlers"] --> B["swagger-jsdoc\nparses annotations"]
+    B --> C["OpenAPI 3.0\nspec.json"]
+    C --> D["swagger-ui-express\nGET /api/docs"]
+    C --> E["Auto-generated\nAPI.md"]
 
-### Documentation
-- Swagger/OpenAPI docs (swagger-jsdoc + swagger-ui-express)
-- JSDoc on all public service functions
-- API.md auto-generation
+    style A fill:#1e293b,stroke:#8b5cf6,color:#e2e8f0
+    style B fill:#1e293b,stroke:#8b5cf6,color:#e2e8f0
+    style C fill:#1e293b,stroke:#f59e0b,color:#e2e8f0
+    style D fill:#1e293b,stroke:#22c55e,color:#e2e8f0
+    style E fill:#1e293b,stroke:#22c55e,color:#e2e8f0
+```
 
-### Polish
-- `src/routes/templates.ts` is a 412-byte stub — needs full implementation or removal
-- `src/routes/ask.ts:80` references undeclared `userConfig` variable (pre-existing bug, falls through safely)
-- Benchmark test suite expansion (tests/benchmarks/)
+### Deliverables
 
-### Optional Future
-- Tauri desktop app wrapper
-- Multi-tenant workspace isolation
-- Horizontal auto-scaling (Kubernetes)
-- Advanced reranking (Cohere integration)
+- Swagger UI mounted at `/api/docs` (protected by auth)
+- OpenAPI 3.0 spec at `/api/docs/spec.json`
+- Static `docs/API.md` auto-generated from spec
+- JSDoc `@param`, `@returns`, `@throws` on all public service functions
+
+---
+
+## Agentic Memory v2
+
+> **Priority: Medium** — Current memory works but doesn't learn across conversations.
+
+```mermaid
+flowchart TB
+    subgraph CURRENT["Current (Implemented)"]
+        direction LR
+        L1["Layer 1\nActive Context\nLast N messages"]
+        L2["Layer 2\nSession Summary\nAuto-generated"]
+        L3["Layer 3\nLong-term\npgvector + compaction"]
+    end
+
+    subgraph FUTURE["Future (Planned)"]
+        direction LR
+        F1["Cross-conversation\nTopic linking"]
+        F2["Automatic forgetting\nDecay + relevance"]
+        F3["User preference\nlearning"]
+        F4["Contradiction\nresolution memory"]
+    end
+
+    CURRENT --> FUTURE
+
+    style CURRENT fill:#022c22,stroke:#22c55e,color:#bbf7d0
+    style FUTURE fill:#1e1b4b,stroke:#818cf8,color:#c7d2fe
+```
+
+### Goals
+
+- **Cross-conversation learning**: Link related topics across separate conversations. When a user discusses "React performance" in one chat and "frontend optimization" in another, the system should connect these.
+- **Automatic forgetting**: Implement decay functions so stale memories lose relevance over time. Frequently accessed memories persist; one-off facts fade.
+- **Preference learning**: Track which agent archetypes the user prefers, which response styles they engage with, and adapt council composition over time.
+- **Contradiction resolution**: When new information contradicts stored memory, create a resolution record rather than silently overwriting.
+
+---
+
+## Advanced Reranking
+
+> **Priority: Medium** — Currently using RRF (Reciprocal Rank Fusion) only.
+
+### Planned
+
+- **Cohere rerank**: Integration with `rerank-english-v3.0` for hybrid search results (code exists in vectorStore.service.ts but needs the Cohere API key path)
+- **Cross-encoder reranking**: Fine-tuned model for domain-specific relevance scoring
+- **Dynamic k selection**: Automatically choose how many chunks to retrieve based on query complexity
+
+---
+
+## Real-time Collaboration
+
+> **Priority: Medium** — Currently single-user per session.
+
+### Vision
+
+```mermaid
+flowchart LR
+    U1["User A"] --> WS["WebSocket Hub\nSocket.IO"]
+    U2["User B"] --> WS
+    U3["User C"] --> WS
+    WS --> COUNCIL["Shared Council\nSession"]
+    COUNCIL --> STREAM["Shared SSE\nStream"]
+    STREAM --> U1
+    STREAM --> U2
+    STREAM --> U3
+
+    style WS fill:#1e293b,stroke:#f59e0b,color:#e2e8f0
+    style COUNCIL fill:#1e293b,stroke:#3b82f6,color:#e2e8f0
+```
+
+- Multiple users join a shared deliberation session
+- Live cursors showing who's viewing what
+- Shared council configuration (collaborative archetype selection)
+- Per-user annotations on agent responses
+- Voting on which synthesis direction to take
+
+---
+
+## Plugin SDK
+
+> **Priority: Low** — For third-party extensibility.
+
+### Planned Capabilities
+
+- **Custom tool types**: NPM package that registers new tools in the tool registry
+- **Custom workflow nodes**: Third-party node handlers with UI components
+- **Webhook triggers**: Fire webhooks on deliberation events (verdict, conflict, etc.)
+- **Provider plugins**: Package-based provider adapters (beyond current EMOF UI approach)
+
+---
+
+## Mobile App
+
+> **Priority: Low** — PWA covers basic mobile usage.
+
+### Planned
+
+- React Native client with shared API
+- Push notifications for research job completion, workflow results
+- Voice-first interaction mode (STT input, TTS output by default)
+- Offline mode with syncing (extending current IndexedDB approach)
+
+---
+
+## Kubernetes & Multi-Region
+
+> **Priority: Low** — Docker Compose + PM2 covers current scale.
+
+```mermaid
+flowchart TB
+    LB["Load Balancer"] --> N1["Node 1\nUS-East"]
+    LB --> N2["Node 2\nEU-West"]
+    LB --> N3["Node 3\nAP-South"]
+
+    N1 --> PG1["PostgreSQL\nPrimary"]
+    N2 --> PG2["PostgreSQL\nReplica"]
+    N3 --> PG3["PostgreSQL\nReplica"]
+
+    PG1 --> PG2
+    PG1 --> PG3
+
+    N1 --> RD["Redis Cluster"]
+    N2 --> RD
+    N3 --> RD
+
+    style LB fill:#1e293b,stroke:#f59e0b,color:#e2e8f0
+    style N1 fill:#1e293b,stroke:#3b82f6,color:#e2e8f0
+    style N2 fill:#1e293b,stroke:#3b82f6,color:#e2e8f0
+    style N3 fill:#1e293b,stroke:#3b82f6,color:#e2e8f0
+    style PG1 fill:#1e293b,stroke:#22c55e,color:#e2e8f0
+    style RD fill:#1e293b,stroke:#ef4444,color:#e2e8f0
+```
+
+### Goals
+
+- Helm charts for Kubernetes deployment
+- Horizontal pod auto-scaling based on queue depth and request latency
+- Multi-region PostgreSQL with read replicas
+- Redis Cluster for distributed caching and rate limiting
+- Health-based routing (route away from degraded regions)
+
+---
+
+## Multi-Tenant & Enterprise
+
+> **Priority: Low** — Single-tenant architecture is sufficient for current use.
+
+### Planned
+
+- **Workspace isolation**: Separate data, configs, and billing per tenant
+- **Per-tenant quotas**: Token limits, storage limits, concurrent deliberation limits
+- **SSO**: SAML 2.0 and OpenID Connect for enterprise identity providers
+- **Audit compliance**: SOC 2 logging format, data retention policies
+- **Data residency**: Ensure data stays in specific geographic regions
+- **SLA monitoring**: Uptime tracking, latency SLOs, automated alerting
+
+---
+
+## Bug Fixes & Polish
+
+> **Priority: High** — Known issues in current codebase.
+
+| Issue | Location | Description |
+|---|---|---|
+| `templates.ts` stub | `src/routes/templates.ts` | 412-byte placeholder — needs full implementation or removal |
+| `userConfig` reference | `src/routes/ask.ts:80` | References undeclared variable (falls through safely but should be cleaned up) |
+| Test job passthrough | `.github/workflows/ci.yml` | `vitest run \|\| true` always passes — remove `\|\| true` once tests are written |
+
+---
+
+<div align="center">
+
+**[Back to README](./README.md)**
+
+</div>
