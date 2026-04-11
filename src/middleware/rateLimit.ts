@@ -2,6 +2,8 @@ import rateLimit from "express-rate-limit";
 import { Request, Response, NextFunction } from "express";
 import { env } from "../config/env.js";
 import logger from "../lib/logger.js";
+import { RedisStore } from "rate-limit-redis";
+import IORedis from "ioredis";
 
 const commonHandler = (req: Request, res: Response, _next: NextFunction, options: any) => {
   logger.warn({
@@ -11,36 +13,90 @@ const commonHandler = (req: Request, res: Response, _next: NextFunction, options
   res.status(options.statusCode).send(options.message);
 };
 
+// Redis-backed store for clustered/multi-instance deployments
+let redisStore: RedisStore | undefined;
+try {
+  const redisClient = new IORedis(env.REDIS_URL || "redis://localhost:6379", {
+    maxRetriesPerRequest: null,
+    enableOfflineQueue: false,
+    lazyConnect: true,
+  });
+  redisClient.connect().catch(() => {});
+
+  redisStore = new RedisStore({
+    sendCommand: (...args: string[]) => redisClient.call(...args) as any,
+    prefix: "rl:",
+  });
+} catch {
+  logger.warn("Redis store for rate limiter unavailable, falling back to memory store");
+}
+
+const userKeyGenerator = (req: any) => {
+  if (req.userId) {
+    const ip = req.ip || "127.0.0.1";
+    return `user:${req.userId}:${ip}`;
+  }
+  return req.ip || "127.0.0.1";
+};
+
 export const askLimiter = rateLimit({
   windowMs: env.RATE_LIMIT_WINDOW_MS,
   max: 1000,
-  keyGenerator: (req: any) => {
-    if (req.userId) {
-      const ip = req.ip || "127.0.0.1";
-      return `user:${req.userId}:${ip}`;
-    }
-    return req.ip || "127.0.0.1";
-  },
+  keyGenerator: userKeyGenerator,
   message: { error: "Too many requests, slow down." },
   standardHeaders: true,
   legacyHeaders: false,
   handler: commonHandler,
-  validate: { keyGeneratorIpFallback: false }
+  validate: { keyGeneratorIpFallback: false },
+  ...(redisStore ? { store: redisStore } : {}),
 });
 
 export const authLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
   max: 1000,
-  keyGenerator: (req: any) => {
-    if (req.userId) {
-      const ip = req.ip || "127.0.0.1";
-      return `user:${req.userId}:${ip}`;
-    }
-    return req.ip || "127.0.0.1";
-  },
+  keyGenerator: userKeyGenerator,
   message: { error: "Too many auth attempts, try again later." },
   standardHeaders: true,
   legacyHeaders: false,
   handler: commonHandler,
-  validate: { keyGeneratorIpFallback: false }
+  validate: { keyGeneratorIpFallback: false },
+  ...(redisStore ? { store: redisStore } : {}),
+});
+
+// ─── Tier 12.3: Specialized Redis-backed rate limiters ──────────────────────
+
+export const apiLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  keyGenerator: userKeyGenerator,
+  message: { error: "API rate limit exceeded (60 req/min)." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: commonHandler,
+  validate: { keyGeneratorIpFallback: false },
+  ...(redisStore ? { store: redisStore } : {}),
+});
+
+export const sandboxLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 10,
+  keyGenerator: userKeyGenerator,
+  message: { error: "Sandbox rate limit exceeded (10 req/min)." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: commonHandler,
+  validate: { keyGeneratorIpFallback: false },
+  ...(redisStore ? { store: redisStore } : {}),
+});
+
+export const voiceLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 20,
+  keyGenerator: userKeyGenerator,
+  message: { error: "Voice rate limit exceeded (20 req/min)." },
+  standardHeaders: true,
+  legacyHeaders: false,
+  handler: commonHandler,
+  validate: { keyGeneratorIpFallback: false },
+  ...(redisStore ? { store: redisStore } : {}),
 });
