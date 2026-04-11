@@ -7,6 +7,7 @@ import logger from "../lib/logger.js";
 import { requireAuth } from "../middleware/auth.js";
 import { AuthRequest } from "../types/index.js";
 import { encrypt, decrypt } from "../lib/crypto.js";
+import { AppError } from "../middleware/errorHandler.js";
 
 const router = Router();
 
@@ -30,7 +31,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
     res.json({ providers: maskedProviders });
   } catch (err) {
     logger.error({ err: (err as Error).message }, "Failed to get providers");
-    res.status(500).json({ error: "Failed to get providers" });
+    throw new AppError(500, "Failed to get providers", "PROVIDERS_FETCH_FAILED");
   }
 });
 
@@ -87,7 +88,7 @@ router.post("/", requireAuth, validate(addProviderSchema), async (req: AuthReque
     });
   } catch (err) {
     logger.error({ err: (err as Error).message }, "Failed to add provider");
-    res.status(500).json({ error: "Failed to add provider" });
+    throw new AppError(500, "Failed to add provider", "PROVIDER_CREATE_FAILED");
   }
 });
 
@@ -163,7 +164,7 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     res.json({ message: "Provider deleted" });
   } catch (err) {
     logger.error({ err: (err as Error).message }, "Failed to delete provider");
-    res.status(500).json({ error: "Failed to delete provider" });
+    throw new AppError(500, "Failed to delete provider", "PROVIDER_DELETE_FAILED");
   }
 });
 

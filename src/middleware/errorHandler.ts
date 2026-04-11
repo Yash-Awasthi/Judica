@@ -7,6 +7,7 @@ export class AppError extends Error {
   constructor(
     public statusCode: number,
     public message: string,
+    public code: string = 'INTERNAL_ERROR',
     public isOperational = true
   ) {
     super(message);
@@ -29,7 +30,7 @@ export function errorHandler(
       path: req.path,
       requestId
     });
-    res.status(err.statusCode).json({ error: err.message });
+    res.status(err.statusCode).json({ error: err.message, code: err.code });
     return;
   }
 
@@ -49,5 +50,6 @@ export function errorHandler(
     error: env.NODE_ENV === "production"
       ? "Internal server error"
       : err.message,
+    code: "INTERNAL_ERROR",
   });
 }

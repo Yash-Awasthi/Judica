@@ -48,6 +48,8 @@ export const askSchema = z
     rounds: z.number().int().min(1).max(5).default(1),
     anonymous: z.boolean().default(false),
     context: z.string().max(100000).optional(),
+    upload_ids: z.array(z.string()).max(10).optional(),
+    kb_id: z.string().optional(),
     userConfig: z.object({
       providers: z.array(z.object({
         name: z.string(),

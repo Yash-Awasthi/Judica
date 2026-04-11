@@ -27,6 +27,7 @@ import {
   CouncilServiceError,
   prepareCouncilMembers
 } from "../services/councilService.js";
+import { loadFileContext, loadRAGContext, buildEnrichedQuestion } from "../services/messageBuilder.service.js";
 
 function handleCouncilError(err: unknown): never {
   if (err instanceof CouncilServiceError) {
@@ -45,6 +46,8 @@ router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: Auth
   const startTime = Date.now();
   try {
     const { question, conversationId, summon, maxTokens, rounds = 1, context, mode } = req.body;
+    const upload_ids: string[] | undefined = req.body.upload_ids;
+    const kb_id: string | undefined = req.body.kb_id;
 
     let effectiveSummon: QueryType | "default" = summon || "default";
     let effectiveMembers = req.body.members;
@@ -111,11 +114,17 @@ router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: Auth
       memoryContext = formatContextForInjection(relevantChats);
     }
 
-    const questionWithContext = context
-      ? `GROUND TRUTH CONTEXT:\n${context}\n\n---\n\n${memoryContext}QUESTION: ${question}`
-      : memoryContext
-        ? `${memoryContext}QUESTION: ${question}`
-        : question;
+    // Load file attachments and RAG context
+    const fileContext = await loadFileContext(upload_ids || [], userId || 0);
+    let ragContext = "";
+    let ragCitations: { source: string; score: number }[] = [];
+    if (kb_id && userId) {
+      const rag = await loadRAGContext(userId, question, kb_id);
+      ragContext = rag.context;
+      ragCitations = rag.citations;
+    }
+
+    const questionWithContext = buildEnrichedQuestion(question, fileContext, ragContext, memoryContext, context);
     const currentMessages = [...messages, { role: "user" as const, content: questionWithContext }];
 
     const cached = await getCachedResponse(question, councilMembers, master, messages);
@@ -172,6 +181,7 @@ router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: Auth
       latency: Date.now() - startTime,
       cacheHit: isCacheHit,
       router: routerDecision ? formatRouterMetadata(routerDecision) : undefined,
+      citations: ragCitations.length > 0 ? ragCitations : undefined,
       metrics: (tokensUsed > 0 || isCacheHit) ? { totalTokens: tokensUsed, totalCost: 0, hallucinationCount: 0 } : undefined
     });
 
@@ -189,6 +199,8 @@ router.post("/stream", optionalAuth, checkQuota, validate(askSchema), async (req
 
   try {
     const { question, conversationId, summon, maxTokens, rounds = 1, context, mode } = req.body;
+    const upload_ids: string[] | undefined = req.body.upload_ids;
+    const kb_id: string | undefined = req.body.kb_id;
 
     let effectiveSummon: QueryType | "default" = summon || "default";
     let effectiveMembers = req.body.members;
@@ -253,11 +265,17 @@ router.post("/stream", optionalAuth, checkQuota, validate(askSchema), async (req
       memoryContext = formatContextForInjection(relevantChats);
     }
 
-    const questionWithContext = context
-      ? `GROUND TRUTH CONTEXT:\n${context}\n\n---\n\n${memoryContext}QUESTION: ${question}`
-      : memoryContext
-        ? `${memoryContext}QUESTION: ${question}`
-        : question;
+    // Load file attachments and RAG context
+    const fileContext = await loadFileContext(upload_ids || [], userId || 0);
+    let ragContext = "";
+    let ragCitations: { source: string; score: number }[] = [];
+    if (kb_id && userId) {
+      const rag = await loadRAGContext(userId, question, kb_id);
+      ragContext = rag.context;
+      ragCitations = rag.citations;
+    }
+
+    const questionWithContext = buildEnrichedQuestion(question, fileContext, ragContext, memoryContext, context);
     const currentMessages = [...messages, { role: "user" as const, content: questionWithContext }];
 
     const controller = new AbortController();

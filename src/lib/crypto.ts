@@ -1,12 +1,13 @@
 import crypto from "crypto";
 import logger from "./logger.js";
+import { env } from "../config/env.js";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
 const TAG_LENGTH = 16;
 
 function getMasterKey(): Buffer {
-  const keyStr = process.env.MASTER_ENCRYPTION_KEY;
+  const keyStr = env.MASTER_ENCRYPTION_KEY;
   if (!keyStr) {
     throw new Error("CRITICAL: MASTER_ENCRYPTION_KEY environment variable is not set");
   }

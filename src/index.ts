@@ -8,6 +8,7 @@ import compression from "compression";
 import path from "path";
 import fs from "fs";
 import logger from "./lib/logger.js";
+import pinoHttp from "pino-http";
 import { askLimiter, authLimiter } from "./middleware/rateLimit.js";
 import { perUserLimiter } from "./middleware/limiter.js";
 import { errorHandler } from "./middleware/errorHandler.js";
@@ -24,10 +25,16 @@ import exportRouter from "./routes/export.js";
 import ttsRouter from "./routes/tts.js";
 import { startSweepers } from "./lib/sweeper.js";
 import "./lib/tools/builtin.js";
+import "./adapters/registry.js"; // Initialize adapter registry on startup
 import { initSocket } from "./lib/socket.js";
 import prisma, { pool } from "./lib/db.js";
 import redis from "./lib/redis.js";
 import { requestContext } from "./lib/context.js";
+import customProvidersRouter from "./routes/customProviders.js";
+import usageRouter from "./routes/usage.js";
+import uploadsRouter from "./routes/uploads.js";
+import kbRouter from "./routes/kb.js";
+import voiceRouter from "./routes/voice.js";
 
 const app = express();
 
@@ -71,6 +78,7 @@ app.use(cors({
 }));
 
 app.use(compression());
+app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === '/health' } }));
 app.use(express.json({ limit: "200kb" }));
 
 app.use(requestId);
@@ -106,11 +114,6 @@ app.get("/", (req, res) => {
   }
 });
 
-app.use((req: any, res, next) => {
-  logger.debug({ method: req.method, path: req.path }, "Incoming request");
-  next();
-});
-
 app.use(perUserLimiter);
 
 app.use("/api/auth",      authLimiter, authRouter);
@@ -123,6 +126,11 @@ app.use("/api/metrics",   metricsRouter);
 app.use("/api/export",    exportRouter);
 app.use("/api/tts",       askLimiter, ttsRouter);
 app.use("/api/pii",       requireAuth, piiRouter);
+app.use("/api/custom-providers", requireAuth, customProvidersRouter);
+app.use("/api/usage",     requireAuth, usageRouter);
+app.use("/api/uploads",   requireAuth, uploadsRouter);
+app.use("/api/kb",        requireAuth, kbRouter);
+app.use("/api/voice",     askLimiter, voiceRouter);
 
 app.get("/health", async (req, res) => {
   const checks: Record<string, string> = {};
@@ -145,7 +153,16 @@ app.get("/health", async (req, res) => {
   }
 
   const status = healthy ? "ok" : "degraded";
-  res.status(healthy ? 200 : 503).json({ status, uptime: process.uptime(), env: env.NODE_ENV, checks });
+  const { listAvailableProviders } = await import("./adapters/registry.js");
+  const providers = listAvailableProviders();
+  res.status(healthy ? 200 : 503).json({
+    status,
+    uptime: process.uptime(),
+    env: env.NODE_ENV,
+    checks,
+    providers,
+    version: "1.0.0",
+  });
 });
 
 app.use((req, res) => {

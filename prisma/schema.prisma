@@ -128,19 +128,60 @@ model SemanticCache {
 }
 
 model User {
-  id                 Int             @id @default(autoincrement())
-  username           String          @unique
+  id                 Int              @id @default(autoincrement())
+  username           String           @unique
   passwordHash       String
-  customInstructions String          @default("")
-  createdAt          DateTime        @default(now())
-  role               String          @default("user")
+  customInstructions String           @default("")
+  createdAt          DateTime         @default(now())
+  role               String           @default("user")
   AuditLog           AuditLog[]
   Chat               Chat[]
   Conversation       Conversation[]
   CouncilConfig      CouncilConfig?
+  CustomProvider     CustomProvider[]
   DailyUsage         DailyUsage[]
   Evaluation         Evaluation[]
   UserArchetype      UserArchetype[]
+  UsageLog           UsageLog[]
+  Upload             Upload[]
+  KnowledgeBase      KnowledgeBase[]
+  Memory             Memory[]
+}
+
+// ─── Custom Providers (EMOF) ─────────────────────────────────────────────────
+model CustomProvider {
+  id           Int      @id @default(autoincrement())
+  userId       Int
+  name         String
+  baseUrl      String
+  authType     String   // 'bearer' | 'api_key_query' | 'api_key_header' | 'basic' | 'none'
+  authKey      String   // AES-256-GCM encrypted
+  authHeaderName String? // Custom header name for api_key_header type
+  capabilities Json     // { streaming: bool, tools: bool, vision: bool }
+  models       String[] // List of model identifiers
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  User         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, name])
+}
+
+// ─── Usage Logging ───────────────────────────────────────────────────────────
+model UsageLog {
+  id              Int      @id @default(autoincrement())
+  userId          Int
+  conversationId  String?
+  provider        String
+  model           String
+  promptTokens    Int      @default(0)
+  completionTokens Int     @default(0)
+  costUsd         Float    @default(0.0)
+  latencyMs       Int      @default(0)
+  createdAt       DateTime @default(now())
+  User            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([provider, createdAt])
 }
 
 model UserArchetype {
@@ -163,4 +204,69 @@ model UserArchetype {
   User            User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, archetypeId])
+}
+
+// ─── File Uploads (Tier 2) ──────────────────────────────────────────────────
+model Upload {
+  id            String      @id @default(cuid())
+  userId        Int
+  filename      String
+  originalName  String
+  mimeType      String
+  sizeBytes     Int
+  storagePath   String
+  processed     Boolean     @default(false)
+  extractedText String?
+  metadata      Json?
+  createdAt     DateTime    @default(now())
+  User          User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+  KBDocument    KBDocument[]
+
+  @@index([userId, createdAt])
+}
+
+// ─── RAG Memory Chunks (Tier 3) ─────────────────────────────────────────────
+model Memory {
+  id          String                 @id @default(cuid())
+  userId      Int
+  kbId        String?
+  content     String
+  chunkIndex  Int                    @default(0)
+  sourceName  String?
+  sourceUrl   String?
+  embedding   Unsupported("vector(1536)")
+  createdAt   DateTime               @default(now())
+  User        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  KB          KnowledgeBase?         @relation(fields: [kbId], references: [id], onDelete: Cascade)
+
+  @@index([userId, kbId])
+}
+
+// ─── Knowledge Bases (Tier 3) ───────────────────────────────────────────────
+model KnowledgeBase {
+  id          String       @id @default(cuid())
+  userId      Int
+  name        String
+  description String?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  User        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  documents   KBDocument[]
+  memories    Memory[]
+
+  @@unique([userId, name])
+}
+
+// ─── KB Documents (Tier 3) ──────────────────────────────────────────────────
+model KBDocument {
+  id         String         @id @default(cuid())
+  kbId       String
+  uploadId   String
+  filename   String
+  chunkCount Int            @default(0)
+  indexed    Boolean        @default(false)
+  indexedAt  DateTime?
+  createdAt  DateTime       @default(now())
+  KB         KnowledgeBase  @relation(fields: [kbId], references: [id], onDelete: Cascade)
+  Upload     Upload         @relation(fields: [uploadId], references: [id], onDelete: Cascade)
 }

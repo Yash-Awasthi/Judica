@@ -1,0 +1,21 @@
+import fs from "fs";
+import Papa from "papaparse";
+import type { ProcessedFile } from "./types.js";
+
+export async function processCSV(filePath: string): Promise<ProcessedFile> {
+  const raw = fs.readFileSync(filePath, "utf-8");
+  const parsed = Papa.parse(raw, { header: true, skipEmptyLines: true });
+  const rows = parsed.data as Record<string, string>[];
+
+  // Convert to markdown table (max 500 rows)
+  const limited = rows.slice(0, 500);
+  if (limited.length === 0) return { type: "text", text: raw, metadata: { rows: 0 } };
+
+  const headers = Object.keys(limited[0]);
+  const headerRow = `| ${headers.join(" | ")} |`;
+  const separator = `| ${headers.map(() => "---").join(" | ")} |`;
+  const dataRows = limited.map((r) => `| ${headers.map((h) => String(r[h] ?? "")).join(" | ")} |`);
+
+  const text = [headerRow, separator, ...dataRows].join("\n");
+  return { type: "spreadsheet", text, metadata: { rows: rows.length, truncated: rows.length > 500 } };
+}

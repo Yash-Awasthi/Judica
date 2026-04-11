@@ -2,9 +2,11 @@ import { Router, Response } from "express";
 import { requireAuth } from "../middleware/auth.js";
 import { AuthRequest } from "../types/index.js";
 import { realTimeCostTracker } from "../lib/realtimeCost.js";
+import { env } from "../config/env.js";
 import { createServer } from "http";
 import { Server as SocketIOServer, Socket } from "socket.io";
 import logger from "../lib/logger.js";
+import { AppError } from "../middleware/errorHandler.js";
 
 interface SocketWithUserId extends Socket {
   userId?: number;
@@ -15,7 +17,7 @@ const router = Router();
 const httpServer = createServer();
 const io = new SocketIOServer(httpServer, {
   cors: {
-    origin: process.env.FRONTEND_URL || "http://localhost:3000",
+    origin: env.FRONTEND_URL || "http://localhost:3000",
     methods: ["GET", "POST"]
   }
 });
@@ -83,7 +85,7 @@ router.post("/session/start", requireAuth, async (req: AuthRequest, res: Respons
       message: "Cost tracking started"
     });
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+    throw new AppError(500, (err as Error).message, "COST_SESSION_START_FAILED");
   }
 });
 
@@ -105,7 +107,7 @@ router.post("/session/end", requireAuth, async (req: AuthRequest, res: Response)
       requestCount: entries.length
     });
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+    throw new AppError(500, (err as Error).message, "COST_SESSION_END_FAILED");
   }
 });
 
@@ -122,7 +124,7 @@ router.get("/ledger", requireAuth, async (req: AuthRequest, res: Response) => {
       ledger
     });
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+    throw new AppError(500, (err as Error).message, "COST_LEDGER_FETCH_FAILED");
   }
 });
 
@@ -137,7 +139,7 @@ router.get("/statistics", requireAuth, async (req: AuthRequest, res: Response) =
       statistics: stats
     });
   } catch (err) {
-    res.status(500).json({ error: (err as Error).message });
+    throw new AppError(500, (err as Error).message, "COST_STATISTICS_FETCH_FAILED");
   }
 });
 

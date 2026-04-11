@@ -3,6 +3,7 @@ import prisma from "../lib/db.js";
 import logger from "../lib/logger.js";
 import { requireAuth } from "../middleware/auth.js";
 import { AuthRequest } from "../types/index.js";
+import { AppError } from "../middleware/errorHandler.js";
 
 const router = Router();
 
@@ -51,7 +52,7 @@ router.get("/conversation/:id", requireAuth, async (req: AuthRequest, res: Respo
     res.json(exportData);
   } catch (err) {
     logger.error({ err: (err as Error).message }, "Failed to export conversation");
-    res.status(500).json({ error: "Failed to export conversation" });
+    throw new AppError(500, "Failed to export conversation", "EXPORT_FAILED");
   }
 });
 
@@ -95,7 +96,7 @@ router.get("/all", requireAuth, async (req: AuthRequest, res: Response) => {
     res.json(exportData);
   } catch (err) {
     logger.error({ err: (err as Error).message }, "Failed to export all conversations");
-    res.status(500).json({ error: "Failed to export conversations" });
+    throw new AppError(500, "Failed to export conversations", "EXPORT_FAILED");
   }
 });
 
@@ -144,7 +145,7 @@ router.get("/conversation/:id/markdown", requireAuth, async (req: AuthRequest, r
     res.send(markdown);
   } catch (err) {
     logger.error({ err: (err as Error).message }, "Failed to export conversation as markdown");
-    res.status(500).json({ error: "Failed to export conversation" });
+    throw new AppError(500, "Failed to export conversation", "EXPORT_FAILED");
   }
 });
 

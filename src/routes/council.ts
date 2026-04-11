@@ -6,6 +6,7 @@ import prisma from "../lib/db.js";
 import logger from "../lib/logger.js";
 import { requireAuth } from "../middleware/auth.js";
 import { AuthRequest } from "../types/index.js";
+import { AppError } from "../middleware/errorHandler.js";
 
 const router = Router();
 
@@ -39,7 +40,7 @@ router.get("/config", requireAuth, async (req: AuthRequest, res: Response) => {
     res.json({ config: config?.config || null });
   } catch (err) {
     logger.error({ err: (err as Error).message }, "Failed to get council config");
-    res.status(500).json({ error: "Failed to get council config" });
+    throw new AppError(500, "Failed to get council config", "COUNCIL_CONFIG_FETCH_FAILED");
   }
 });
 
@@ -75,7 +76,7 @@ router.put("/config", requireAuth, validate(updateConfigSchema), async (req: Aut
     res.json({ config: updated.config });
   } catch (err) {
     logger.error({ err: (err as Error).message }, "Failed to update council config");
-    res.status(500).json({ error: "Failed to update council config" });
+    throw new AppError(500, "Failed to update council config", "COUNCIL_CONFIG_UPDATE_FAILED");
   }
 });
 
@@ -90,7 +91,7 @@ router.delete("/config", requireAuth, async (req: AuthRequest, res: Response) =>
     res.json({ message: "Council config deleted" });
   } catch (err) {
     logger.error({ err: (err as Error).message }, "Failed to delete council config");
-    res.status(500).json({ error: "Failed to delete council config" });
+    throw new AppError(500, "Failed to delete council config", "COUNCIL_CONFIG_DELETE_FAILED");
   }
 });
 

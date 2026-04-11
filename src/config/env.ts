@@ -23,6 +23,13 @@ const envSchema = z.object({
   GROQ_API_KEY: z.string().optional(),
   MISTRAL_API_KEY: z.string().optional(),
   CEREBRAS_API_KEY: z.string().optional(),
+  COHERE_API_KEY: z.string().optional(),
+  OLLAMA_BASE_URL: z.string().optional().default("http://localhost:11434"),
+  SERP_API_KEY: z.string().optional(),
+  LANGFUSE_SECRET_KEY: z.string().optional(),
+  LANGFUSE_PUBLIC_KEY: z.string().optional(),
+  PROVIDER_REGISTRY_CONFIG: z.string().optional(),
+  FRONTEND_URL: z.string().optional(),
   CURRENT_ENCRYPTION_VERSION: z.string().regex(/^\d+$/).default("1"),
   ENABLE_VECTOR_CACHE: z.preprocess((v) => v === "true" || v === "1", z.boolean()).default(false),
 });

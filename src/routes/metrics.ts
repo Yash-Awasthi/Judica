@@ -3,6 +3,7 @@ import prisma from "../lib/db.js";
 import logger from "../lib/logger.js";
 import { requireAuth } from "../middleware/auth.js";
 import { AuthRequest } from "../types/index.js";
+import { AppError } from "../middleware/errorHandler.js";
 
 const router = Router();
 
@@ -80,7 +81,7 @@ router.get("/usage", requireAuth, async (req: AuthRequest, res: Response) => {
     });
   } catch (err) {
     logger.error({ err: (err as Error).message }, "Failed to get usage metrics");
-    res.status(500).json({ error: "Failed to get usage metrics" });
+    throw new AppError(500, "Failed to get usage metrics", "USAGE_METRICS_FETCH_FAILED");
   }
 });
 
@@ -122,7 +123,7 @@ router.get("/system", requireAuth, async (req: AuthRequest, res: Response) => {
     });
   } catch (err) {
     logger.error({ err: (err as Error).message }, "Failed to get system metrics");
-    res.status(500).json({ error: "Failed to get system metrics" });
+    throw new AppError(500, "Failed to get system metrics", "SYSTEM_METRICS_FETCH_FAILED");
   }
 });
 
@@ -167,7 +168,7 @@ router.get("/conversation/:id", requireAuth, async (req: AuthRequest, res: Respo
     });
   } catch (err) {
     logger.error({ err: (err as Error).message }, "Failed to get conversation metrics");
-    res.status(500).json({ error: "Failed to get conversation metrics" });
+    throw new AppError(500, "Failed to get conversation metrics", "CONVERSATION_METRICS_FETCH_FAILED");
   }
 });
 

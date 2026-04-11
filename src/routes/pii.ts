@@ -3,6 +3,7 @@ import { requireAuth } from "../middleware/auth.js";
 import { AuthRequest } from "../types/index.js";
 import { detectPII, type PIIDetection } from "../lib/pii.js";
 import logger from "../lib/logger.js";
+import { AppError } from "../middleware/errorHandler.js";
 
 interface PiiCheckRequest {
   text: string;
@@ -65,7 +66,7 @@ router.post("/check", requireAuth, async (req: AuthRequest, res: Response) => {
     res.json(response);
   } catch (err) {
     logger.error({ err, userId: req.userId }, "PII check failed");
-    res.status(500).json({ error: "PII check failed" });
+    throw new AppError(500, "PII check failed", "PII_CHECK_FAILED");
   }
 });
 
