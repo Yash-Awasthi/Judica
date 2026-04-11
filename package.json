@@ -66,7 +66,8 @@
     "xlsx": "0.18.5",
     "zod": "4.3.6",
     "@octokit/rest": "^21.0.0",
-    "bullmq": "^5.0.0"
+    "bullmq": "^5.0.0",
+    "rate-limit-redis": "^4.0.0"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",

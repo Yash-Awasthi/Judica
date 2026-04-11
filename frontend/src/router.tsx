@@ -10,6 +10,8 @@ import { MemorySettingsView } from "./views/MemorySettingsView";
 import { DebateDashboardView } from "./views/DebateDashboardView";
 import { AdminView } from "./views/AdminView";
 import { AnalyticsView } from "./views/AnalyticsView";
+import { MarketplaceView } from "./views/MarketplaceView";
+import { SkillsView } from "./views/SkillsView";
 
 export const router = createBrowserRouter([
   {
