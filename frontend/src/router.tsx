@@ -9,6 +9,7 @@ import { PromptIDEView } from "./views/PromptIDEView";
 import { MemorySettingsView } from "./views/MemorySettingsView";
 import { DebateDashboardView } from "./views/DebateDashboardView";
 import { AdminView } from "./views/AdminView";
+import { AnalyticsView } from "./views/AnalyticsView";
 
 export const router = createBrowserRouter([
   {
@@ -26,6 +27,7 @@ export const router = createBrowserRouter([
       { path: "prompts", element: <PromptIDEView /> },
       { path: "memory", element: <MemorySettingsView /> },
       { path: "admin", element: <AdminView /> },
+      { path: "analytics", element: <AnalyticsView /> },
     ],
   },
 ]);

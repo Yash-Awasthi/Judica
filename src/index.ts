@@ -50,6 +50,8 @@ import skillsRouter from "./routes/skills.js";
 import tracesRouter from "./routes/traces.js";
 import analyticsRouter from "./routes/analytics.js";
 import reposRouter from "./routes/repos.js";
+import queueRouter from "./routes/queue.js";
+import { startWorkers, stopWorkers } from "./queue/workers.js";
 import { startMemoryCrons } from "./lib/memoryCrons.js";
 
 const app = express();
@@ -162,6 +164,7 @@ app.use("/api/skills",      requireAuth, skillsRouter);
 app.use("/api/traces",      requireAuth, tracesRouter);
 app.use("/api/analytics",   requireAuth, analyticsRouter);
 app.use("/api/repos",       requireAuth, reposRouter);
+app.use("/api/queue",       requireAuth, queueRouter);
 
 app.get("/health", async (req, res) => {
   const checks: Record<string, string> = {};
@@ -212,6 +215,7 @@ const server = app.listen(Number(env.PORT), () => {
   logger.info({ port: env.PORT, env: env.NODE_ENV }, "Council server started");
   startSweepers();
   startMemoryCrons();
+  startWorkers();
 });
 
 const io = initSocket(server);
@@ -226,6 +230,12 @@ const shutdown = async (signal: string) => {
   forceTimer.unref();
 
   server.close(async () => {
+    try {
+      await stopWorkers();
+      logger.info("BullMQ workers stopped");
+    } catch (err) {
+      logger.error({ err }, "Error stopping workers");
+    }
     try {
       await pool.end();
       logger.info("Database pool closed");

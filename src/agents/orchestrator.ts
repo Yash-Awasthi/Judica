@@ -10,6 +10,7 @@ import {
 } from "./sharedMemory.js";
 import { routeAndCollect } from "../router/index.js";
 import { hybridSearch } from "../services/vectorStore.service.js";
+import { updateReliability, getReliabilityScores } from "../services/reliability.service.js";
 import logger from "../lib/logger.js";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
@@ -299,12 +300,33 @@ export class DeliberationOrchestrator {
       }
     }
 
-    // ── 6. TOOL EXECUTION ─────────────────────────────────────────────────────
+    // ── 6. RELIABILITY UPDATE ──────────────────────────────────────────────────
+
+    // Build member->model map and track concessions for reliability scoring
+    const memberModels = new Map<string, string>();
+    for (const member of members) {
+      if (member.model) memberModels.set(member.id, member.model);
+    }
+
+    const concessionAgentIds = debateExchanges
+      .filter((m) => m.type === "concession")
+      .map((m) => m.from);
+
+    const reliabilityConflicts = conflicts.map((c) => ({
+      agentA: c.agentA,
+      agentB: c.agentB,
+      modelA: memberModels.get(c.agentA),
+      modelB: memberModels.get(c.agentB),
+    }));
+
+    await updateReliability(reliabilityConflicts, concessionAgentIds, memberModels);
+
+    // ── 7. TOOL EXECUTION ─────────────────────────────────────────────────────
     // Tool execution is handled at the adapter level via routeAndCollect.
     // If tools are enabled, the LLM can invoke them during generation.
     // This phase is a placeholder for explicit tool orchestration if needed.
 
-    // ── 7. HUMAN GATE ─────────────────────────────────────────────────────────
+    // ── 8. HUMAN GATE ─────────────────────────────────────────────────────────
 
     if (humanGates && conflicts.length > 0) {
       const gateId = randomUUID();
@@ -337,7 +359,11 @@ export class DeliberationOrchestrator {
       }
     }
 
-    // ── 8. SYNTHESIS ──────────────────────────────────────────────────────────
+    // ── 9. SYNTHESIS ──────────────────────────────────────────────────────────
+
+    // Load reliability scores for each member's model
+    const uniqueModels = [...new Set(members.map((m) => m.model).filter(Boolean))];
+    const reliabilityScores = await getReliabilityScores(uniqueModels);
 
     const updatedFactCtx = await getFactContext(conversationId);
     const allBusMessages = this.bus.getAllMessages();
@@ -362,6 +388,23 @@ export class DeliberationOrchestrator {
 
     if (updatedFactCtx) {
       synthesisInput.push(updatedFactCtx, "");
+    }
+
+    // Add reliability scores so synthesizer can weight accordingly
+    if (reliabilityScores.size > 0) {
+      synthesisInput.push("=== MODEL RELIABILITY SCORES ===");
+      for (const member of members) {
+        const score = reliabilityScores.get(member.model);
+        if (score) {
+          synthesisInput.push(
+            `[${member.name}] model=${member.model} reliability=${(score.avgConfidence * 100).toFixed(1)}% (${score.totalResponses} responses)`
+          );
+        }
+      }
+      synthesisInput.push(
+        "Weight responses from higher-reliability models more heavily.",
+        ""
+      );
     }
 
     const consensusBias = promptDna?.consensusBias || "neutral";
@@ -396,7 +439,7 @@ Produce the final synthesis:`;
       },
     };
 
-    // ── 9. CONFIDENCE SCORE ───────────────────────────────────────────────────
+    // ── 10. CONFIDENCE SCORE ──────────────────────────────────────────────────
 
     const totalClaims = totalFacts;
     const agreements = debateExchanges.filter((m) => m.type === "concession").length;
@@ -428,7 +471,7 @@ Produce the final synthesis:`;
       },
     };
 
-    // ── 10. CLEANUP ───────────────────────────────────────────────────────────
+    // ── 11. CLEANUP ──────────────────────────────────────────────────────────
 
     this.bus.reset();
   }
