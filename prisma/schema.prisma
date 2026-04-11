@@ -61,6 +61,7 @@ model Conversation {
   createdAt      DateTime         @default(now())
   updatedAt      DateTime
   isPublic       Boolean          @default(false)
+  sessionSummary String?
   AuditLog       AuditLog[]
   Chat           Chat[]
   ContextSummary ContextSummary[]
@@ -153,6 +154,7 @@ model User {
   Prompt             Prompt[]
   customPersonas     CustomPersona[]
   promptDnas         PromptDNA[]
+  memoryBackend      MemoryBackend?
 }
 
 // ─── Custom Providers (EMOF) ─────────────────────────────────────────────────
@@ -413,4 +415,15 @@ model PromptDNA {
   user           User     @relation(fields: [userId], references: [id])
 
   @@index([userId])
+}
+
+// ─── Memory Backend (Tier 7) ──────────────────────────────────────────────────
+model MemoryBackend {
+  id        String   @id @default(cuid())
+  userId    Int      @unique
+  type      String   // 'local'|'qdrant'|'getzep'|'google_drive'
+  config    String   // AES-256-GCM encrypted JSON
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
 }

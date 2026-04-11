@@ -6,6 +6,7 @@ import { MetricsView } from "./views/MetricsView";
 import { WorkflowsView } from "./views/WorkflowsView";
 import { WorkflowEditorView } from "./views/WorkflowEditorView";
 import { PromptIDEView } from "./views/PromptIDEView";
+import { MemorySettingsView } from "./views/MemorySettingsView";
 
 export const router = createBrowserRouter([
   {
@@ -20,6 +21,7 @@ export const router = createBrowserRouter([
       { path: "workflows/new", element: <WorkflowEditorView /> },
       { path: "workflows/:id", element: <WorkflowEditorView /> },
       { path: "prompts", element: <PromptIDEView /> },
+      { path: "memory", element: <MemorySettingsView /> },
     ],
   },
 ]);

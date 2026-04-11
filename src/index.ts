@@ -42,6 +42,8 @@ import workflowsRouter from "./routes/workflows.js";
 import promptsRouter from "./routes/prompts.js";
 import personasRouter from "./routes/personas.js";
 import promptDnaRouter from "./routes/promptDna.js";
+import memoryRouter from "./routes/memory.js";
+import { startMemoryCrons } from "./lib/memoryCrons.js";
 
 const app = express();
 
@@ -145,6 +147,7 @@ app.use("/api/workflows", requireAuth, workflowsRouter);
 app.use("/api/prompts",   requireAuth, promptsRouter);
 app.use("/api/personas",  requireAuth, personasRouter);
 app.use("/api/prompt-dna", requireAuth, promptDnaRouter);
+app.use("/api/memory",    requireAuth, memoryRouter);
 
 app.get("/health", async (req, res) => {
   const checks: Record<string, string> = {};
@@ -194,6 +197,7 @@ app.use(errorHandler);
 const server = app.listen(Number(env.PORT), () => {
   logger.info({ port: env.PORT, env: env.NODE_ENV }, "Council server started");
   startSweepers();
+  startMemoryCrons();
 });
 
 const io = initSocket(server);
