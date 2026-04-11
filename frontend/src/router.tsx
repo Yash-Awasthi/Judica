@@ -7,6 +7,7 @@ import { WorkflowsView } from "./views/WorkflowsView";
 import { WorkflowEditorView } from "./views/WorkflowEditorView";
 import { PromptIDEView } from "./views/PromptIDEView";
 import { MemorySettingsView } from "./views/MemorySettingsView";
+import { DebateDashboardView } from "./views/DebateDashboardView";
 
 export const router = createBrowserRouter([
   {
@@ -15,6 +16,7 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <DashboardView /> },
       { path: "chat", element: <ChatView /> },
+      { path: "debate", element: <DebateDashboardView /> },
       { path: "chat/:conversationId", element: <ChatView /> },
       { path: "metrics", element: <MetricsView /> },
       { path: "workflows", element: <WorkflowsView /> },

@@ -201,6 +201,15 @@ export function Sidebar({
           <span>Usage Stats</span>
         </button>
 
+        {/* Debate */}
+        <a
+          href="/debate"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-text-muted hover:bg-white/[0.04] hover:text-accent transition-all duration-150"
+        >
+          <span className="material-symbols-outlined text-[18px]">forum</span>
+          <span>Debate</span>
+        </a>
+
         {/* Workflows */}
         <a
           href="/workflows"
