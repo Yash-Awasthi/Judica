@@ -1,6 +1,7 @@
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { Sidebar } from "../components/Sidebar";
 import { AuthScreen } from "../components/AuthScreen";
+import { OfflineIndicator } from "../components/OfflineIndicator";
 import { useState, useCallback, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
 import type { Conversation, UserMetrics } from "../types/index.js";
@@ -101,6 +102,7 @@ export function RootLayout() {
       className="flex h-screen overflow-hidden bg-bg text-text font-sans"
       style={{ "--sidebar-w": `${sidebarWidth}px` } as React.CSSProperties}
     >
+      <OfflineIndicator />
       {/* Mobile overlay */}
       {isSidebarOpen && (
         <div

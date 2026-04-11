@@ -12,6 +12,7 @@ import { AdminView } from "./views/AdminView";
 import { AnalyticsView } from "./views/AnalyticsView";
 import { MarketplaceView } from "./views/MarketplaceView";
 import { SkillsView } from "./views/SkillsView";
+import { ReposView } from "./views/ReposView";
 
 export const router = createBrowserRouter([
   {
@@ -32,6 +33,7 @@ export const router = createBrowserRouter([
       { path: "analytics", element: <AnalyticsView /> },
       { path: "marketplace", element: <MarketplaceView /> },
       { path: "skills", element: <SkillsView /> },
+      { path: "repos", element: <ReposView /> },
     ],
   },
 ]);
