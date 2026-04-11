@@ -5,6 +5,7 @@ import logger from "../lib/logger.js";
 let ingestionWorker: Worker;
 let repoWorker: Worker;
 let compactionWorker: Worker;
+let researchWorker: Worker;
 
 export function startWorkers() {
   ingestionWorker = new Worker(
@@ -31,17 +32,31 @@ export function startWorkers() {
     { connection, concurrency: 2 }
   );
 
+  researchWorker = new Worker(
+    "research",
+    async (job) => {
+      logger.info({ jobId: job.id, data: job.data }, "Processing research job");
+      const { runResearch } = await import("../services/research.service.js");
+      const { jobId, userId, query } = job.data;
+      await runResearch(jobId, userId, query);
+      logger.info({ jobId: job.id }, "Research job completed");
+    },
+    { connection, concurrency: 2 }
+  );
+
   compactionWorker = new Worker(
     "compaction",
     async (job) => {
       logger.info({ jobId: job.id, data: job.data }, "Processing memory compaction job");
-      // Memory compaction logic — placeholder for future implementation
+      const { compact } = await import("../services/memoryCompaction.service.js");
+      const { userId } = job.data;
+      await compact(userId);
       logger.info({ jobId: job.id }, "Memory compaction job completed");
     },
     { connection, concurrency: 1 }
   );
 
-  const workers = [ingestionWorker, repoWorker, compactionWorker];
+  const workers = [ingestionWorker, repoWorker, researchWorker, compactionWorker];
   for (const worker of workers) {
     worker.on("failed", (job, err) => {
       logger.error({ jobId: job?.id, queue: worker.name, err }, "Worker job failed");
@@ -51,11 +66,11 @@ export function startWorkers() {
     });
   }
 
-  logger.info("BullMQ workers started");
+  logger.info("BullMQ workers started (ingestion, repo, research, compaction)");
 }
 
 export async function stopWorkers() {
-  const workers = [ingestionWorker, repoWorker, compactionWorker].filter(Boolean);
+  const workers = [ingestionWorker, repoWorker, researchWorker, compactionWorker].filter(Boolean);
   await Promise.all(workers.map((w) => w.close()));
   logger.info("BullMQ workers stopped");
 }

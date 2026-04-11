@@ -2,8 +2,8 @@ import { Router } from "express";
 import type { Response } from "express";
 import type { AuthRequest } from "../types/index.js";
 import prisma from "../lib/db.js";
-import { ingestGitHubRepo } from "../services/repoIngestion.service.js";
 import { searchRepo } from "../services/repoSearch.service.js";
+import { repoQueue } from "../queue/queues.js";
 import logger from "../lib/logger.js";
 
 const router = Router();
@@ -37,12 +37,10 @@ router.post("/github", async (req: AuthRequest, res: Response) => {
     return;
   }
 
-  // Fire and forget
-  ingestGitHubRepo(userId, owner, repo).catch((err) =>
-    logger.error({ err, owner, repo }, "Background repo ingestion failed")
-  );
+  // Queue the ingestion via BullMQ
+  await repoQueue.add("ingest", { userId, owner: owner.trim(), repo: repo.trim() });
 
-  res.status(202).json({ message: "Ingestion started", owner, repo });
+  res.status(202).json({ message: "Ingestion queued", owner, repo });
 });
 
 // GET /:id/status — return indexed status

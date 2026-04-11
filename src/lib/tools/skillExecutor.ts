@@ -1,6 +1,7 @@
 import { execSync } from "child_process";
 import prisma from "../db.js";
 import logger from "../logger.js";
+import { registerTool, type ToolExecutionContext } from "./index.js";
 
 /**
  * Execute a user-defined skill by name.
@@ -24,6 +25,15 @@ export async function executeUserSkill(
     throw new Error(`Skill "${skillName}" not found or inactive`);
   }
 
+  return runSkillCode(skill.code, inputs, userId, skillName);
+}
+
+function runSkillCode(
+  code: string,
+  inputs: Record<string, any>,
+  userId: string,
+  skillName: string
+): any {
   // Build Python script: inject inputs as variables, then append skill code
   const inputLines = Object.entries(inputs)
     .map(([key, value]) => {
@@ -35,7 +45,7 @@ export async function executeUserSkill(
   const script = `import json, sys
 ${inputLines}
 
-${skill.code}
+${code}
 `;
 
   logger.info(
@@ -68,6 +78,51 @@ ${skill.code}
     logger.error({ userId, skillName, error: message }, "Skill execution error");
     throw new Error(`Skill execution failed: ${message}`);
   }
+}
+
+/**
+ * Register a dynamic "user_skill" tool in the tool registry.
+ * When called, it looks up the skill by name from the calling user's skills
+ * and executes it.
+ */
+export function registerUserSkillsAsTools(): void {
+  registerTool(
+    {
+      name: "user_skill",
+      description: "Execute a custom user-defined Python skill by name. The skill must be created and active in the user's skill library.",
+      parameters: {
+        type: "object",
+        properties: {
+          skill_name: { type: "string", description: "The name of the user skill to execute" },
+          inputs: { type: "string", description: "JSON string of input parameters for the skill" },
+        },
+        required: ["skill_name"],
+      },
+    },
+    async (args: Record<string, unknown>, context?: ToolExecutionContext): Promise<string> => {
+      const skillName = args.skill_name as string;
+      const userId = context?.userId;
+      if (!userId) {
+        return JSON.stringify({ error: "User authentication required to execute skills" });
+      }
+
+      let inputs: Record<string, any> = {};
+      if (args.inputs) {
+        try {
+          inputs = typeof args.inputs === "string" ? JSON.parse(args.inputs) : (args.inputs as Record<string, any>);
+        } catch {
+          return JSON.stringify({ error: "Invalid inputs JSON" });
+        }
+      }
+
+      try {
+        const result = await executeUserSkill(userId, skillName, inputs);
+        return typeof result === "string" ? result : JSON.stringify(result);
+      } catch (err) {
+        return JSON.stringify({ error: (err as Error).message });
+      }
+    }
+  );
 }
 
 function escapeShellArg(arg: string): string {

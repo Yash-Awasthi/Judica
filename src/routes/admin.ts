@@ -4,6 +4,8 @@ import { requireRole } from "../middleware/rbac.js";
 import prisma from "../lib/db.js";
 import type { AuthRequest } from "../types/index.js";
 import { AppError } from "../middleware/errorHandler.js";
+import { randomBytes, createCipheriv, createDecipheriv, scryptSync } from "crypto";
+import logger from "../lib/logger.js";
 
 const router = Router();
 
@@ -84,6 +86,70 @@ router.get("/stats", requireAuth, requireRole("admin"), async (_req: AuthRequest
   ]);
 
   res.json({ totalUsers, totalConversations, totalChats });
+});
+
+// POST /rotate-keys — rotate AES encryption key (admin only)
+router.post("/rotate-keys", requireAuth, requireRole("admin"), async (req: AuthRequest, res: Response) => {
+  const { old_key, new_key } = req.body;
+  if (!old_key || !new_key) {
+    throw new AppError(400, "old_key and new_key are required", "MISSING_KEYS");
+  }
+  if (new_key.length < 32) {
+    throw new AppError(400, "new_key must be at least 32 characters", "KEY_TOO_SHORT");
+  }
+
+  const ALGO = "aes-256-gcm";
+
+  function decrypt(encrypted: string, key: string): string {
+    const buf = Buffer.from(encrypted, "base64");
+    const iv = buf.subarray(0, 16);
+    const tag = buf.subarray(16, 32);
+    const ciphertext = buf.subarray(32);
+    const derivedKey = scryptSync(key, "salt", 32);
+    const decipher = createDecipheriv(ALGO, derivedKey, iv);
+    decipher.setAuthTag(tag);
+    return decipher.update(ciphertext, undefined, "utf8") + decipher.final("utf8");
+  }
+
+  function encrypt(text: string, key: string): string {
+    const iv = randomBytes(16);
+    const derivedKey = scryptSync(key, "salt", 32);
+    const cipher = createCipheriv(ALGO, derivedKey, iv);
+    const encrypted = Buffer.concat([cipher.update(text, "utf8"), cipher.final()]);
+    const tag = cipher.getAuthTag();
+    return Buffer.concat([iv, tag, encrypted]).toString("base64");
+  }
+
+  let rotated = 0;
+
+  // Rotate CustomProvider authKey fields
+  const providers = await prisma.customProvider.findMany({ select: { id: true, authKey: true } });
+  for (const p of providers) {
+    try {
+      const decrypted = decrypt(p.authKey, old_key);
+      const reEncrypted = encrypt(decrypted, new_key);
+      await prisma.customProvider.update({ where: { id: p.id }, data: { authKey: reEncrypted } });
+      rotated++;
+    } catch (err) {
+      logger.warn({ err, providerId: p.id }, "Failed to rotate key for provider");
+    }
+  }
+
+  // Rotate MemoryBackend config fields
+  const backends = await prisma.memoryBackend.findMany({ select: { id: true, config: true } });
+  for (const b of backends) {
+    try {
+      const decrypted = decrypt(b.config, old_key);
+      const reEncrypted = encrypt(decrypted, new_key);
+      await prisma.memoryBackend.update({ where: { id: b.id }, data: { config: reEncrypted } });
+      rotated++;
+    } catch (err) {
+      logger.warn({ err, backendId: b.id }, "Failed to rotate key for memory backend");
+    }
+  }
+
+  logger.info({ rotated, adminId: req.userId }, "Encryption key rotation completed");
+  res.json({ message: "Key rotation complete", rotated });
 });
 
 export default router;

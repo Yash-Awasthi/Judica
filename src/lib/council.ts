@@ -9,6 +9,7 @@ import { gatherOpinions, conductPeerReview, evaluateConsensus, synthesizeVerdict
 import { PeerReview, ValidatorResult } from "./schemas.js";
 import { controller } from "./controller.js";
 import { calculateCost } from "./cost.js";
+import { updateReliability, getReliabilityScores } from "../services/reliability.service.js";
 
 export type { PeerReview, ValidatorResult };
 
@@ -232,6 +233,25 @@ export async function* deliberate(
 
       if (reviews.length > 0) {
         yield { type: "peer_review", round: r, reviews };
+
+        // ── Reliability tracking: update model scores based on peer review ──
+        const memberModels = new Map<string, string>();
+        for (const m of members as any[]) {
+          if (m.name && m.model) memberModels.set(m.name, m.model);
+        }
+        const conflicts: Array<{ agentA: string; agentB: string }> = [];
+        const concessions: string[] = [];
+        for (const review of reviews) {
+          for (const flaw of review.identified_flaws) {
+            conflicts.push({ agentA: review.reviewer, agentB: flaw.target });
+          }
+          if (review.identified_flaws.length === 0) {
+            concessions.push(review.reviewer);
+          }
+        }
+        updateReliability(conflicts, concessions, memberModels).catch((err) =>
+          logger.warn({ err }, "Failed to update reliability scores")
+        );
       }
       yield { type: "scored", round: r, scored: currentScored };
     }
@@ -290,6 +310,34 @@ export async function* deliberate(
   }
 
   yield { type: "status", round: rounds, message: "Master synthesis started" };
+
+  // ── Reliability-weighted synthesis: inject model reliability scores ──
+  let reliabilityContext = "";
+  try {
+    const modelNames = (members as any[]).map((m) => m.model).filter(Boolean);
+    const scores = await getReliabilityScores(modelNames);
+    if (scores.size > 0) {
+      const memberScores = (members as any[]).map((m) => {
+        const score = scores.get(m.model);
+        return score
+          ? `${m.name} (${m.model}): reliability ${(score.avgConfidence * 100).toFixed(1)}% (${score.totalResponses} responses)`
+          : null;
+      }).filter(Boolean);
+      if (memberScores.length > 0) {
+        reliabilityContext = `\n\n[MODEL RELIABILITY SCORES - weight responses accordingly]\n${memberScores.join("\n")}\n[/MODEL RELIABILITY SCORES]`;
+        // Inject into the last message for synthesis context
+        if (currentMessages.length > 0) {
+          const lastMsg = currentMessages[currentMessages.length - 1];
+          currentMessages[currentMessages.length - 1] = {
+            ...lastMsg,
+            content: lastMsg.content + reliabilityContext,
+          };
+        }
+      }
+    }
+  } catch (err) {
+    logger.warn({ err }, "Failed to load reliability scores for synthesis");
+  }
 
   const { verdict, validatorResult, totalTokens: verdictTokens } = await synthesizeVerdict({
     master,

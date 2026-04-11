@@ -29,6 +29,9 @@ import {
 } from "../services/councilService.js";
 import { loadFileContext, loadRAGContext, buildEnrichedQuestion } from "../services/messageBuilder.service.js";
 import { detectArtifact, saveArtifact } from "../services/artifacts.service.js";
+import { startTrace, addStep, endTrace } from "../observability/tracer.js";
+import { searchRepo } from "../services/repoSearch.service.js";
+import prisma from "../lib/db.js";
 
 function handleCouncilError(err: unknown): never {
   if (err instanceof CouncilServiceError) {
@@ -125,8 +128,37 @@ router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: Auth
       ragCitations = rag.citations;
     }
 
+    // Code-aware chat: inject repo context if repo_id is attached
+    const repo_id: string | undefined = req.body.repo_id;
+    let codeContext = "";
+    if (repo_id && userId) {
+      try {
+        const repoRecord = await prisma.codeRepository.findFirst({
+          where: { id: repo_id, userId: String(userId), indexed: true },
+        });
+        if (repoRecord) {
+          const codeResults = await searchRepo(repo_id, question, 5);
+          if (codeResults.length > 0) {
+            codeContext = codeResults
+              .map((r) => `[CODE CONTEXT]\nFile: ${r.path}\n\`\`\`${r.language}\n${r.content.slice(0, 1500)}\n\`\`\`\n[/CODE CONTEXT]`)
+              .join("\n\n");
+          }
+        }
+      } catch (err) {
+        logger.warn({ err, repo_id }, "Failed to load code context");
+      }
+    }
+
     const questionWithContext = buildEnrichedQuestion(question, fileContext, ragContext, memoryContext, context);
-    const currentMessages = [...messages, { role: "user" as const, content: questionWithContext }];
+    const enrichedQuestion = codeContext
+      ? `${codeContext}\n\n${questionWithContext}`
+      : questionWithContext;
+    const currentMessages = [...messages, { role: "user" as const, content: enrichedQuestion }];
+
+    // Start trace for observability
+    const traceCtx = userId
+      ? startTrace(userId, "chat", { conversationId: effectiveConversationId || undefined })
+      : null;
 
     const cached = await getCachedResponse(question, councilMembers, master, messages);
 
@@ -140,15 +172,30 @@ router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: Auth
       finalOpinions = cached.opinions as any;
       isCacheHit = true;
       logger.info({ question: question.slice(0, 50) }, "Serving from semantic cache");
+      if (traceCtx) addStep(traceCtx, { name: "cache_hit", type: "retrieval", input: question.slice(0, 500), output: "served from cache", latencyMs: 0 });
     } else {
       logger.info({ question: question.slice(0, 80), memberCount: councilMembers.length, summon: effectiveSummon, rounds: effectiveRounds }, "Council ask started");
 
+      const councilStart = Date.now();
       const councilResponse = await askCouncil(councilMembers, master, currentMessages, maxTokens, effectiveRounds);
       verdict = councilResponse.verdict;
       finalOpinions = councilResponse.opinions;
       tokensUsed = councilResponse.metrics?.totalTokens ?? 0;
 
+      if (traceCtx) {
+        for (const op of finalOpinions) {
+          addStep(traceCtx, { name: op.name || "agent", type: "llm_call", input: question.slice(0, 500), output: (op.opinion || "").slice(0, 500), tokens: 0, latencyMs: 0 });
+        }
+        addStep(traceCtx, { name: "synthesis", type: "synthesis", input: question.slice(0, 500), output: verdict.slice(0, 500), tokens: tokensUsed, latencyMs: Date.now() - councilStart });
+      }
+
       await setCachedResponse(question, councilMembers, master, messages, verdict, finalOpinions);
+    }
+
+    // End trace
+    if (traceCtx) {
+      traceCtx.conversationId = effectiveConversationId || undefined;
+      endTrace(traceCtx).catch((err) => logger.warn({ err }, "Failed to save trace"));
     }
 
     if (userId) {

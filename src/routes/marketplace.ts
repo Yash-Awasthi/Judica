@@ -163,9 +163,11 @@ router.delete("/:id", async (req: AuthRequest, res: Response) => {
   res.json({ success: true });
 });
 
-// POST /:id/install — increment downloads and return content
+// POST /:id/install — increment downloads, import into user account, return content
 router.post("/:id/install", async (req: AuthRequest, res: Response) => {
   const id = String(req.params.id);
+  const userId = req.userId!;
+
   const item = await prisma.marketplaceItem.update({
     where: { id },
     data: { downloads: { increment: 1 } },
@@ -175,7 +177,78 @@ router.post("/:id/install", async (req: AuthRequest, res: Response) => {
     throw new AppError(404, "Item not found", "ITEM_NOT_FOUND");
   }
 
-  logger.info({ userId: req.userId, itemId: id }, "Marketplace item installed");
+  const content = item.content as Record<string, any>;
+
+  // Import item into user's account based on type
+  try {
+    switch (item.type) {
+      case "prompt": {
+        const prompt = await prisma.prompt.create({
+          data: {
+            userId,
+            name: content.name || item.name,
+            description: content.description || item.description,
+          },
+        });
+        await prisma.promptVersion.create({
+          data: {
+            promptId: prompt.id,
+            versionNum: 1,
+            content: content.text || content.content || JSON.stringify(content),
+            model: content.model || null,
+            temperature: content.temperature ?? null,
+            notes: `Installed from marketplace: ${item.name}`,
+          },
+        });
+        break;
+      }
+      case "workflow": {
+        await prisma.workflow.create({
+          data: {
+            userId,
+            name: content.name || item.name,
+            description: content.description || item.description,
+            definition: content.definition || content,
+          },
+        });
+        break;
+      }
+      case "persona": {
+        await prisma.customPersona.create({
+          data: {
+            userId,
+            name: content.name || item.name,
+            systemPrompt: content.systemPrompt || content.system_prompt || "",
+            temperature: content.temperature ?? 0.7,
+            critiqueStyle: content.critiqueStyle || null,
+            domain: content.domain || null,
+            aggressiveness: content.aggressiveness ?? 5,
+          },
+        });
+        break;
+      }
+      case "tool": {
+        // Register as a user skill if the format is valid
+        if (content.code) {
+          await prisma.userSkill.create({
+            data: {
+              userId: String(userId),
+              name: content.name || item.name,
+              description: content.description || item.description,
+              code: content.code,
+              parameters: content.parameters || {},
+              active: true,
+            },
+          });
+        }
+        break;
+      }
+    }
+  } catch (err) {
+    logger.warn({ err, userId, itemId: id, type: item.type }, "Failed to auto-import marketplace item (download still counted)");
+  }
+
+  logger.info({ userId, itemId: id, type: item.type }, "Marketplace item installed");
   res.json({ content: item.content, type: item.type, name: item.name });
 });
 

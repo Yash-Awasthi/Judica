@@ -1,6 +1,11 @@
 import { registerTool } from "./index.js";
 import { executeCodeTool } from "./execute_code.js";
 import { env } from "../../config/env.js";
+import { registerUserSkillsAsTools } from "./skillExecutor.js";
+
+// Register user skills as callable tools on startup (lazy, per-request)
+// Skills are loaded dynamically when the tool is called
+registerUserSkillsAsTools();
 
 // ── web_search ──────────────────────────────────────────────────────────────
 registerTool(

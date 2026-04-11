@@ -71,4 +71,42 @@ router.get(
   }
 );
 
+// DELETE /jobs/:queueName/:jobId — cancel job (admin only)
+router.delete(
+  "/jobs/:queueName/:jobId",
+  requireRole("admin"),
+  async (req: AuthRequest, res: Response) => {
+    const queues: Record<string, typeof ingestionQueue> = {
+      ingestion: ingestionQueue,
+      research: researchQueue,
+      "repo-ingestion": repoQueue,
+      compaction: compactionQueue,
+    };
+
+    const queue = queues[req.params.queueName];
+    if (!queue) {
+      res.status(404).json({ error: "Queue not found" });
+      return;
+    }
+
+    const job = await queue.getJob(req.params.jobId);
+    if (!job) {
+      res.status(404).json({ error: "Job not found" });
+      return;
+    }
+
+    const state = await job.getState();
+    if (state === "active") {
+      await job.moveToFailed(new Error("Cancelled by admin"), "0");
+    } else if (state === "waiting" || state === "delayed") {
+      await job.remove();
+    } else {
+      res.status(400).json({ error: `Cannot cancel job in '${state}' state` });
+      return;
+    }
+
+    res.json({ message: "Job cancelled", jobId: job.id, previousState: state });
+  }
+);
+
 export default router;

@@ -4,6 +4,7 @@ import { ChatArea } from "../components/ChatArea";
 import { useCouncilMembers } from "../hooks/useCouncilMembers";
 import { useDeliberation } from "../hooks/useDeliberation";
 import { useAuth } from "../context/AuthContext";
+import { cacheConversation, getCachedConversation } from "../components/OfflineIndicator";
 import type { Conversation, ChatMessage } from "../types/index.js";
 
 interface OutletContextType {
@@ -44,11 +45,47 @@ export function ChatView() {
           if (res.ok) {
             const data = await res.json() as { chats: any[] };
             setMessages(data.chats || []);
+            // Cache conversation for offline use
+            const title = conversations.find(c => c.id === conversationId)?.title || "Conversation";
+            cacheConversation({
+              id: conversationId,
+              title,
+              messages: (data.chats || []).slice(-20).map((c: any) => ({
+                question: c.question,
+                verdict: c.verdict,
+                createdAt: c.createdAt,
+              })),
+              cachedAt: Date.now(),
+            }).catch(() => {});
           } else {
-             // Handle 404 or other errors by resetting to a new chat
-             navigate('/chat');
+            // Try offline cache before giving up
+            const cached = await getCachedConversation(conversationId);
+            if (cached) {
+              setMessages(cached.messages.map((m, i) => ({
+                id: i,
+                question: m.question,
+                verdict: m.verdict,
+                createdAt: m.createdAt,
+                opinions: [],
+              })) as any);
+            } else {
+              navigate('/chat');
+            }
           }
         } catch (err) {
+          // Network error — try offline cache
+          if (conversationId) {
+            const cached = await getCachedConversation(conversationId);
+            if (cached) {
+              setMessages(cached.messages.map((m, i) => ({
+                id: i,
+                question: m.question,
+                verdict: m.verdict,
+                createdAt: m.createdAt,
+                opinions: [],
+              })) as any);
+            }
+          }
           console.error("Failed to load history", err);
         } finally {
           setIsLoadingHistory(false);
@@ -58,7 +95,7 @@ export function ChatView() {
       }
     };
     fetchHistory();
-  }, [conversationId, fetchWithAuth, setMessages, navigate]);
+  }, [conversationId, fetchWithAuth, setMessages, navigate, conversations]);
 
   const handleExport = async (format: "markdown" | "json") => {
     if (!conversationId) return;

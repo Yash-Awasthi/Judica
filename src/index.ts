@@ -53,6 +53,7 @@ import reposRouter from "./routes/repos.js";
 import queueRouter from "./routes/queue.js";
 import { startWorkers, stopWorkers } from "./queue/workers.js";
 import { startMemoryCrons } from "./lib/memoryCrons.js";
+import { ingestionQueue, researchQueue, repoQueue, compactionQueue } from "./queue/queues.js";
 
 const app = express();
 
@@ -165,6 +166,28 @@ app.use("/api/traces",      requireAuth, tracesRouter);
 app.use("/api/analytics",   requireAuth, analyticsRouter);
 app.use("/api/repos",       requireAuth, reposRouter);
 app.use("/api/queue",       requireAuth, queueRouter);
+
+// ── BullMQ Board (dev only) ────────────────────────────────────────────────
+if (env.NODE_ENV === "development") {
+  import("@bull-board/api").then(async ({ createBullBoard, BullMQAdapter }) => {
+    const { ExpressAdapter } = await import("@bull-board/express");
+    const serverAdapter = new ExpressAdapter();
+    serverAdapter.setBasePath("/admin/queues");
+    createBullBoard({
+      queues: [
+        new BullMQAdapter(ingestionQueue),
+        new BullMQAdapter(researchQueue),
+        new BullMQAdapter(repoQueue),
+        new BullMQAdapter(compactionQueue),
+      ],
+      serverAdapter,
+    });
+    app.use("/admin/queues", requireAuth, serverAdapter.getRouter());
+    logger.info("BullMQ Board mounted at /admin/queues");
+  }).catch((err) => {
+    logger.warn({ err }, "BullMQ Board not available (install @bull-board/api @bull-board/express as dev deps)");
+  });
+}
 
 app.get("/health", async (req, res) => {
   const checks: Record<string, string> = {};
