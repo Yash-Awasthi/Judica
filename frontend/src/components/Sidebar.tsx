@@ -255,6 +255,24 @@ export function Sidebar({
           <span>Analytics</span>
         </a>
 
+        {/* Marketplace */}
+        <a
+          href="/marketplace"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-text-muted hover:bg-white/[0.04] hover:text-accent transition-all duration-150"
+        >
+          <span className="material-symbols-outlined text-[18px]">storefront</span>
+          <span>Marketplace</span>
+        </a>
+
+        {/* Skills */}
+        <a
+          href="/skills"
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm text-text-muted hover:bg-white/[0.04] hover:text-accent transition-all duration-150"
+        >
+          <span className="material-symbols-outlined text-[18px]">code</span>
+          <span>Skills</span>
+        </a>
+
         {/* User row */}
         <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl bg-white/[0.02] border border-white/[0.04]">
           <div className="w-8 h-8 rounded-lg bg-accent/10 border border-accent/15 flex items-center justify-center text-accent text-xs font-black uppercase shrink-0">

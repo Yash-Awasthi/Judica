@@ -30,6 +30,8 @@ export const router = createBrowserRouter([
       { path: "memory", element: <MemorySettingsView /> },
       { path: "admin", element: <AdminView /> },
       { path: "analytics", element: <AnalyticsView /> },
+      { path: "marketplace", element: <MarketplaceView /> },
+      { path: "skills", element: <SkillsView /> },
     ],
   },
 ]);
