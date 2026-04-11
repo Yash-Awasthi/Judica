@@ -559,3 +559,28 @@ model ModelReliability {
   avgConfidence Float    @default(0.0)
   updatedAt     DateTime @updatedAt
 }
+
+// ─── Code Repositories (Tier 12) ────────────────────────────────────────────
+model CodeRepository {
+  id        String   @id @default(cuid())
+  userId    String
+  source    String   // 'github'
+  repoUrl   String?
+  name      String
+  indexed   Boolean  @default(false)
+  fileCount Int      @default(0)
+  createdAt DateTime @default(now())
+  files     CodeFile[]
+}
+
+model CodeFile {
+  id        String  @id @default(cuid())
+  repoId    String
+  path      String
+  language  String?
+  content   String
+  embedding Unsupported("vector(1536)")
+  repo      CodeRepository @relation(fields: [repoId], references: [id], onDelete: Cascade)
+
+  @@index([repoId])
+}
