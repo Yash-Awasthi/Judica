@@ -117,6 +117,17 @@ model RevokedToken {
   createdAt DateTime @default(now())
 }
 
+model RefreshToken {
+  id        String   @id @default(cuid())
+  userId    Int
+  tokenHash String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  User      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
 model SemanticCache {
   id        Int                    @id @default(autoincrement())
   createdAt DateTime               @default(now())
@@ -156,6 +167,7 @@ model User {
   customPersonas     CustomPersona[]
   promptDnas         PromptDNA[]
   memoryBackend      MemoryBackend?
+  refreshTokens      RefreshToken[]
   groupMemberships   GroupMembership[]
 }
 

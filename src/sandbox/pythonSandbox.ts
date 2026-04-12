@@ -21,9 +21,12 @@ export async function executePython(code: string, timeout: number = 10000): Prom
       const stdout: string[] = [];
       const stderr: string[] = [];
 
-      const proc = spawn("python3", [tmpFile], {
+      const proc = spawn("bash", [
+        "-c",
+        `ulimit -v 262144 -t 10 -f 1024 -u 32 -n 64; exec python3 "${tmpFile}"`,
+      ], {
         timeout,
-        env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1" },
+        env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1", PYTHONPATH: "" },
         stdio: ["pipe", "pipe", "pipe"],
       });
 

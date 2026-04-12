@@ -1,10 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
-import {
-  LineChart, Line, BarChart, Bar, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
-} from "recharts";
+import ReactECharts from "echarts-for-react";
 import { Activity, Coins, Clock, MessageSquare, BarChart3 } from "lucide-react";
 import { AnimatedCounter } from "../components/AnimatedCounter";
 import { SkeletonLoader } from "../components/SkeletonLoader";
@@ -97,13 +94,97 @@ export function AnalyticsView() {
     );
   }
 
-  // Tooltip style for charts (adapts to theme via CSS variables)
-  const tooltipStyle = {
-    background: "var(--bg-surface-1)",
-    border: "1px solid var(--border-medium)",
-    borderRadius: 12,
-    color: "var(--text-primary)",
-    fontSize: 12,
+  const tokenLineOption = {
+    tooltip: {
+      trigger: "axis" as const,
+      backgroundColor: "var(--bg-surface-1)",
+      borderColor: "var(--border-medium)",
+      textStyle: { color: "var(--text-primary)", fontSize: 12 },
+    },
+    grid: { left: 40, right: 16, top: 16, bottom: 30 },
+    xAxis: {
+      type: "category" as const,
+      data: data.dailyUsage.map(d => d.date.slice(5)),
+      axisLine: { lineStyle: { color: "var(--border-subtle)" } },
+      axisLabel: { color: "var(--text-muted)", fontSize: 10 },
+    },
+    yAxis: {
+      type: "value" as const,
+      axisLine: { lineStyle: { color: "var(--border-subtle)" } },
+      axisLabel: { color: "var(--text-muted)", fontSize: 10 },
+      splitLine: { lineStyle: { color: "var(--border-subtle)", type: "dashed" as const } },
+    },
+    series: [{
+      data: data.dailyUsage.map(d => d.tokens),
+      type: "line" as const,
+      smooth: true,
+      lineStyle: { color: "#6ee7b7", width: 2 },
+      itemStyle: { color: "#6ee7b7" },
+      showSymbol: false,
+      areaStyle: { color: "rgba(110,231,183,0.08)" },
+    }],
+  };
+
+  const costBarOption = {
+    tooltip: {
+      trigger: "axis" as const,
+      backgroundColor: "var(--bg-surface-1)",
+      borderColor: "var(--border-medium)",
+      textStyle: { color: "var(--text-primary)", fontSize: 12 },
+      formatter: (params: any) => {
+        const p = Array.isArray(params) ? params[0] : params;
+        return `${p.name}<br/>Cost: $${Number(p.value).toFixed(4)}`;
+      },
+    },
+    grid: { left: 40, right: 16, top: 16, bottom: 30 },
+    xAxis: {
+      type: "category" as const,
+      data: data.dailyUsage.map(d => d.date.slice(5)),
+      axisLine: { lineStyle: { color: "var(--border-subtle)" } },
+      axisLabel: { color: "var(--text-muted)", fontSize: 10 },
+    },
+    yAxis: {
+      type: "value" as const,
+      axisLine: { lineStyle: { color: "var(--border-subtle)" } },
+      axisLabel: { color: "var(--text-muted)", fontSize: 10 },
+      splitLine: { lineStyle: { color: "var(--border-subtle)", type: "dashed" as const } },
+    },
+    series: [{
+      data: data.dailyUsage.map(d => d.cost),
+      type: "bar" as const,
+      barBorderRadius: [4, 4, 0, 0],
+      itemStyle: { color: "#60a5fa" },
+    }],
+  };
+
+  const pieOption = {
+    tooltip: {
+      backgroundColor: "var(--bg-surface-1)",
+      borderColor: "var(--border-medium)",
+      textStyle: { color: "var(--text-primary)", fontSize: 12 },
+    },
+    legend: {
+      bottom: 0,
+      textStyle: { color: "var(--text-muted)", fontSize: 11 },
+    },
+    series: [{
+      type: "pie" as const,
+      radius: ["30%", "65%"],
+      center: ["50%", "45%"],
+      data: data.modelDistribution.map((d, i) => ({
+        name: d.model.split("/").pop() || d.model,
+        value: d.count,
+        itemStyle: { color: CHART_COLORS[i % CHART_COLORS.length] },
+      })),
+      label: {
+        formatter: "{b} {d}%",
+        color: "var(--text-muted)",
+        fontSize: 11,
+      },
+      emphasis: {
+        itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: "rgba(0,0,0,0.3)" },
+      },
+    }],
   };
 
   return (
@@ -135,20 +216,7 @@ export function AnalyticsView() {
           <div className="surface-card p-5">
             <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Daily Token Usage (30d)</h2>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={data.dailyUsage}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fill: "var(--text-muted)", fontSize: 10 }}
-                    tickFormatter={(v: string) => v.slice(5)}
-                    stroke="var(--border-subtle)"
-                  />
-                  <YAxis tick={{ fill: "var(--text-muted)", fontSize: 10 }} stroke="var(--border-subtle)" />
-                  <Tooltip contentStyle={tooltipStyle} />
-                  <Line type="monotone" dataKey="tokens" stroke="var(--accent-mint)" strokeWidth={2} dot={false} />
-                </LineChart>
-              </ResponsiveContainer>
+              <ReactECharts option={tokenLineOption} style={{ height: "100%", width: "100%" }} />
             </div>
           </div>
 
@@ -156,23 +224,7 @@ export function AnalyticsView() {
           <div className="surface-card p-5">
             <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Daily Cost Breakdown</h2>
             <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.dailyUsage}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
-                  <XAxis
-                    dataKey="date"
-                    tick={{ fill: "var(--text-muted)", fontSize: 10 }}
-                    tickFormatter={(v: string) => v.slice(5)}
-                    stroke="var(--border-subtle)"
-                  />
-                  <YAxis tick={{ fill: "var(--text-muted)", fontSize: 10 }} stroke="var(--border-subtle)" />
-                  <Tooltip
-                    contentStyle={tooltipStyle}
-                    formatter={(value: any) => ["$" + Number(value).toFixed(4), "Cost"]}
-                  />
-                  <Bar dataKey="cost" fill="var(--accent-blue)" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
+              <ReactECharts option={costBarOption} style={{ height: "100%", width: "100%" }} />
             </div>
           </div>
         </motion.div>
@@ -184,30 +236,7 @@ export function AnalyticsView() {
             <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4">Model Distribution</h2>
             <div className="h-64">
               {data.modelDistribution.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={data.modelDistribution}
-                      dataKey="count"
-                      nameKey="model"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={80}
-                      label={(props: any) =>
-                        `${(props.model || "").split("/").pop()} ${((props.percent || 0) * 100).toFixed(0)}%`
-                      }
-                      labelLine={{ stroke: "var(--border-medium)" }}
-                    >
-                      {data.modelDistribution.map((_, i) => (
-                        <Cell key={i} fill={CHART_COLORS[i % CHART_COLORS.length]} />
-                      ))}
-                    </Pie>
-                    <Tooltip contentStyle={tooltipStyle} />
-                    <Legend
-                      wrapperStyle={{ fontSize: 11, color: "var(--text-muted)" }}
-                    />
-                  </PieChart>
-                </ResponsiveContainer>
+                <ReactECharts option={pieOption} style={{ height: "100%", width: "100%" }} />
               ) : (
                 <div className="h-full flex items-center justify-center text-[var(--text-muted)] text-sm">
                   No model data yet

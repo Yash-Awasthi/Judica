@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "engines": {
-    "node": ">=20.0.0",
+    "node": ">=22.0.0",
     "npm": ">=10.0.0"
   },
   "scripts": {
@@ -26,7 +26,8 @@
     "react-is": "^19.2.5",
     "react-markdown": "9.0.1",
     "react-router-dom": "7.14.0",
-    "recharts": "^3.8.1",
+    "echarts": "^5.6.0",
+    "echarts-for-react": "^3.0.2",
     "remark-gfm": "4.0.0",
     "three": "^0.183.2",
     "uuid": "10.0.0",

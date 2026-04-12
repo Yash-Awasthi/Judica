@@ -1,22 +1,42 @@
-import templatesRouter from "./routes/templates.js";
-import piiRouter from "./routes/pii.js";
-import { env } from "./config/env.js";
-import express from "express";
-import helmet from "helmet";
-import cors from "cors";
-import compression from "compression";
+import Fastify from "fastify";
+import fastifyExpress from "@fastify/express";
+import fastifyCors from "@fastify/cors";
+import fastifyCompress from "@fastify/compress";
+import fastifyCookie from "@fastify/cookie";
+import fastifyStatic from "@fastify/static";
 import path from "path";
 import fs from "fs";
+
+import { env } from "./config/env.js";
 import logger from "./lib/logger.js";
-import pinoHttp from "pino-http";
-import swaggerUi from "swagger-ui-express";
-import { swaggerSpec } from "./lib/swagger.js";
+import prisma, { pool } from "./lib/db.js";
+import redis from "./lib/redis.js";
+import { initSocket } from "./lib/socket.js";
+import { startSweepers } from "./lib/sweeper.js";
+import { startWorkers, stopWorkers } from "./queue/workers.js";
+import { startMemoryCrons } from "./lib/memoryCrons.js";
+import { registry } from "./lib/prometheusMetrics.js";
+
+// Side-effect imports
+import "./lib/tools/builtin.js";
+import "./adapters/registry.js";
+
+// Express middleware (run inside @fastify/express compat layer)
 import { askLimiter, authLimiter } from "./middleware/rateLimit.js";
 import { perUserLimiter } from "./middleware/limiter.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { requireAuth } from "./middleware/auth.js";
 import { requestId } from "./middleware/requestId.js";
 import { cspNonce } from "./middleware/cspNonce.js";
+import { prometheusMiddleware } from "./middleware/prometheusMiddleware.js";
+
+// Express routers (work as-is via @fastify/express)
+import express from "express";
+import pinoHttp from "pino-http";
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./lib/swagger.js";
+import { requestContext } from "./lib/context.js";
+
 import askRouter from "./routes/ask.js";
 import historyRouter from "./routes/history.js";
 import authRouter from "./routes/auth.js";
@@ -25,13 +45,8 @@ import councilRouter from "./routes/council.js";
 import metricsRouter from "./routes/metrics.js";
 import exportRouter from "./routes/export.js";
 import ttsRouter from "./routes/tts.js";
-import { startSweepers } from "./lib/sweeper.js";
-import "./lib/tools/builtin.js";
-import "./adapters/registry.js";
-import { initSocket } from "./lib/socket.js";
-import prisma, { pool } from "./lib/db.js";
-import redis from "./lib/redis.js";
-import { requestContext } from "./lib/context.js";
+import templatesRouter from "./routes/templates.js";
+import piiRouter from "./routes/pii.js";
 import customProvidersRouter from "./routes/customProviders.js";
 import usageRouter from "./routes/usage.js";
 import uploadsRouter from "./routes/uploads.js";
@@ -55,169 +70,63 @@ import reposRouter from "./routes/repos.js";
 import queueRouter from "./routes/queue.js";
 import costsRouter from "./routes/costs.js";
 import evaluationRouter from "./routes/evaluation.js";
-import { startWorkers, stopWorkers } from "./queue/workers.js";
-import { startMemoryCrons } from "./lib/memoryCrons.js";
 import { ingestionQueue, researchQueue, repoQueue, compactionQueue } from "./queue/queues.js";
 
-const app = express();
+// ─── Build the Fastify server ───────────────────────────────────────────────
 
-app.use(cspNonce);
-
-app.use(helmet({
-  contentSecurityPolicy: {
-    directives: {
-      defaultSrc: ["'self'"],
-      scriptSrc: ["'self'", (_req: any, res: any) => `'nonce-${res.locals.cspNonce}'`],
-      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
-      fontSrc: ["'self'", "https://fonts.gstatic.com"],
-      connectSrc: ["'self'", "http://localhost:3000", "ws://localhost:3000", "http://localhost:5173"],
-    },
-  },
-}));
-
-const trustProxyConfig = env.TRUST_PROXY;
-if (trustProxyConfig === "true") {
-  app.set("trust proxy", true);
-} else if (trustProxyConfig === "false") {
-  app.set("trust proxy", false);
-} else if (trustProxyConfig && !isNaN(Number(trustProxyConfig))) {
-  app.set("trust proxy", Number(trustProxyConfig));
-} else if (trustProxyConfig) {
-  app.set("trust proxy", trustProxyConfig);
-} else {
-  app.set("trust proxy", 1); // Default to 1 hop
-}
+const fastify = Fastify({
+  logger: false, // We use our own Pino logger
+  trustProxy: env.TRUST_PROXY === "true" ? true
+    : env.TRUST_PROXY === "false" ? false
+    : env.TRUST_PROXY && !isNaN(Number(env.TRUST_PROXY)) ? Number(env.TRUST_PROXY)
+    : env.TRUST_PROXY || true,
+  bodyLimit: 200 * 1024, // 200KB
+});
 
 const allowedOrigins = env.ALLOWED_ORIGINS
   ? env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
   : ["http://localhost:3000", "http://localhost:5173"];
 
-app.use(cors({
+// ─── Native Fastify plugins (bypass Express overhead) ───────────────────────
+
+await fastify.register(fastifyCors, {
   origin: (origin, cb) => {
     if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
-    cb(new Error("CORS Policy: Origin not allowed"));
+    cb(new Error("CORS Policy: Origin not allowed"), false);
   },
   credentials: true,
-}));
-
-app.use(compression());
-app.use((pinoHttp as any)({ logger, autoLogging: { ignore: (req: any) => req.url === '/health' } }));
-app.use(express.json({ limit: "200kb" }));
-
-app.use(requestId);
-
-app.use((req: any, res, next) => {
-  requestContext.run({ requestId: req.requestId || res.getHeader('x-request-id') as string }, () => {
-    next();
-  });
 });
+
+await fastify.register(fastifyCompress);
+await fastify.register(fastifyCookie);
 
 const publicPath = fs.existsSync(path.join(process.cwd(), "frontend/dist"))
   ? path.join(process.cwd(), "frontend/dist")
   : path.join(process.cwd(), "dist/public");
 
-app.use(express.static(publicPath, { index: false }));
+await fastify.register(fastifyStatic, {
+  root: publicPath,
+  prefix: "/",
+  serve: true,
+  index: false,
+  wildcard: false,
+});
 
-app.get("/", (req, res) => {
-  const indexPath = path.join(publicPath, "index.html");
+// ─── Native Fastify routes (no Express overhead) ────────────────────────────
+
+// Prometheus metrics endpoint
+fastify.get("/metrics", async (_request, reply) => {
   try {
-    let html = fs.readFileSync(indexPath, "utf8");
-    const nonce = res.locals.cspNonce as string;
-
-    html = html
-      .replace(/<script\b([^>]*)>/g, (_match, attrs) => {
-        if (attrs.includes('nonce=')) return _match;
-        return `<script nonce="${nonce}"${attrs}>`;
-      });
-
-    res.setHeader("Content-Type", "text/html");
-    res.send(html);
+    reply.type(registry.contentType);
+    return await registry.metrics();
   } catch {
-    res.status(500).send("Failed to load application index");
+    reply.code(500);
+    return "";
   }
 });
 
-app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
-  customCss: ".swagger-ui .topbar { display: none }",
-  customSiteTitle: "AIBYAI API Documentation",
-}));
-app.get("/api/docs/spec.json", (_req, res) => res.json(swaggerSpec));
-
-app.use(perUserLimiter);
-
-app.use("/api/auth",      authLimiter, authRouter);
-app.use("/api/ask",       askLimiter,  askRouter);
-app.use("/api/council",   askLimiter,  councilRouter);
-app.use("/api/history",   historyRouter);
-app.use("/api/templates", templatesRouter);
-app.use("/api/providers", providersRouter);
-app.use("/api/metrics",   metricsRouter);
-app.use("/api/export",    exportRouter);
-app.use("/api/tts",       askLimiter, ttsRouter);
-app.use("/api/pii",       requireAuth, piiRouter);
-app.use("/api/custom-providers", requireAuth, customProvidersRouter);
-app.use("/api/usage",     requireAuth, usageRouter);
-app.use("/api/uploads",   requireAuth, uploadsRouter);
-app.use("/api/kb",        requireAuth, kbRouter);
-app.use("/api/voice",     askLimiter, voiceRouter);
-app.use("/api/research",  requireAuth, researchRouter);
-app.use("/api/artifacts", requireAuth, artifactsRouter);
-app.use("/api/sandbox",   requireAuth, sandboxRouter);
-app.use("/api/workflows", requireAuth, workflowsRouter);
-app.use("/api/prompts",   requireAuth, promptsRouter);
-app.use("/api/personas",  requireAuth, personasRouter);
-app.use("/api/prompt-dna", requireAuth, promptDnaRouter);
-app.use("/api/memory",    requireAuth, memoryRouter);
-app.use("/api/admin",     requireAuth, adminRouter);
-app.use("/api/share",     shareRouter);
-app.use("/api/marketplace", requireAuth, marketplaceRouter);
-app.use("/api/skills",      requireAuth, skillsRouter);
-app.use("/api/traces",      requireAuth, tracesRouter);
-app.use("/api/analytics",   requireAuth, analyticsRouter);
-app.use("/api/repos",       requireAuth, reposRouter);
-app.use("/api/queue",       requireAuth, queueRouter);
-app.use("/api/costs",       requireAuth, costsRouter);
-app.use("/api/evaluation",  requireAuth, evaluationRouter);
-
-if (env.NODE_ENV === "development") {
-  import("@bull-board/api").then(async ({ createBullBoard, BullMQAdapter }) => {
-    const { ExpressAdapter } = await import("@bull-board/express");
-    const serverAdapter = new ExpressAdapter();
-    serverAdapter.setBasePath("/admin/queues");
-    createBullBoard({
-      queues: [
-        new BullMQAdapter(ingestionQueue),
-        new BullMQAdapter(researchQueue),
-        new BullMQAdapter(repoQueue),
-        new BullMQAdapter(compactionQueue),
-      ],
-      serverAdapter,
-    });
-    app.use("/admin/queues", requireAuth, serverAdapter.getRouter());
-    logger.info("BullMQ Board mounted at /admin/queues");
-  }).catch((err) => {
-    logger.warn({ err }, "BullMQ Board not available (install @bull-board/api @bull-board/express as dev deps)");
-  });
-}
-
-/**
- * @openapi
- * /health:
- *   get:
- *     tags: [Health]
- *     summary: System health check
- *     description: Returns health status of the application, database, and Redis
- *     responses:
- *       200:
- *         description: System is healthy
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/HealthCheck'
- *       503:
- *         description: System is unhealthy
- */
-app.get("/health", async (req, res) => {
+// Health check
+fastify.get("/health", async (_request, reply) => {
   const checks: Record<string, string> = {};
   let healthy = true;
 
@@ -240,36 +149,159 @@ app.get("/health", async (req, res) => {
   const status = healthy ? "ok" : "degraded";
   const { listAvailableProviders } = await import("./adapters/registry.js");
   const providers = listAvailableProviders();
-  res.status(healthy ? 200 : 503).json({
+
+  reply.code(healthy ? 200 : 503);
+  return {
     status,
     uptime: process.uptime(),
     env: env.NODE_ENV,
     checks,
     providers,
     version: "1.0.0",
+  };
+});
+
+// ─── Express compatibility layer ────────────────────────────────────────────
+// All existing Express routers and middleware run inside this layer.
+// This lets us migrate incrementally — move routes to native Fastify one by one.
+
+await fastify.register(fastifyExpress);
+
+// Express middleware chain
+fastify.use(cspNonce);
+fastify.use((pinoHttp as any)({ logger, autoLogging: { ignore: (req: any) => req.url === '/health' } }));
+fastify.use(express.json({ limit: "200kb" }));
+fastify.use(requestId);
+fastify.use(prometheusMiddleware);
+
+fastify.use((req: any, res: any, next: any) => {
+  requestContext.run({ requestId: req.requestId || res.getHeader('x-request-id') as string }, () => {
+    next();
   });
 });
 
-app.use((req, res) => {
-  if (req.originalUrl.startsWith("/api/")) {
-    res.status(404).json({ error: `Not Found: ${req.originalUrl}` });
-  } else {
-    res.status(404).sendFile(path.join(publicPath, "404.html"), (err) => {
-      if (err) res.status(404).json({ error: "Not Found" });
+// Index route with CSP nonce injection
+fastify.use("/", (req: any, res: any, next: any) => {
+  if (req.method === "GET" && req.url === "/") {
+    const indexPath = path.join(publicPath, "index.html");
+    try {
+      let html = fs.readFileSync(indexPath, "utf8");
+      const nonce = res.locals.cspNonce as string;
+
+      html = html
+        .replace(/<script\b([^>]*)>/g, (_match: string, attrs: string) => {
+          if (attrs.includes('nonce=')) return _match;
+          return `<script nonce="${nonce}"${attrs}>`;
+        });
+
+      res.setHeader("Content-Type", "text/html");
+      res.send(html);
+    } catch {
+      res.status(500).send("Failed to load application index");
+    }
+    return;
+  }
+  next();
+});
+
+// Swagger docs
+fastify.use("/api/docs", swaggerUi.serve);
+fastify.use("/api/docs", swaggerUi.setup(swaggerSpec, {
+  customCss: ".swagger-ui .topbar { display: none }",
+  customSiteTitle: "AIBYAI API Documentation",
+}));
+
+// Per-user rate limiting
+fastify.use(perUserLimiter);
+
+// Mount all Express routers
+fastify.use("/api/auth",      authLimiter, authRouter);
+fastify.use("/api/ask",       askLimiter,  askRouter);
+fastify.use("/api/council",   askLimiter,  councilRouter);
+fastify.use("/api/history",   historyRouter);
+fastify.use("/api/templates", templatesRouter);
+fastify.use("/api/providers", providersRouter);
+fastify.use("/api/metrics",   metricsRouter);
+fastify.use("/api/export",    exportRouter);
+fastify.use("/api/tts",       askLimiter, ttsRouter);
+fastify.use("/api/pii",       requireAuth, piiRouter);
+fastify.use("/api/custom-providers", requireAuth, customProvidersRouter);
+fastify.use("/api/usage",     requireAuth, usageRouter);
+fastify.use("/api/uploads",   requireAuth, uploadsRouter);
+fastify.use("/api/kb",        requireAuth, kbRouter);
+fastify.use("/api/voice",     askLimiter, voiceRouter);
+fastify.use("/api/research",  requireAuth, researchRouter);
+fastify.use("/api/artifacts", requireAuth, artifactsRouter);
+fastify.use("/api/sandbox",   requireAuth, sandboxRouter);
+fastify.use("/api/workflows", requireAuth, workflowsRouter);
+fastify.use("/api/prompts",   requireAuth, promptsRouter);
+fastify.use("/api/personas",  requireAuth, personasRouter);
+fastify.use("/api/prompt-dna", requireAuth, promptDnaRouter);
+fastify.use("/api/memory",    requireAuth, memoryRouter);
+fastify.use("/api/admin",     requireAuth, adminRouter);
+fastify.use("/api/share",     shareRouter);
+fastify.use("/api/marketplace", requireAuth, marketplaceRouter);
+fastify.use("/api/skills",      requireAuth, skillsRouter);
+fastify.use("/api/traces",      requireAuth, tracesRouter);
+fastify.use("/api/analytics",   requireAuth, analyticsRouter);
+fastify.use("/api/repos",       requireAuth, reposRouter);
+fastify.use("/api/queue",       requireAuth, queueRouter);
+fastify.use("/api/costs",       requireAuth, costsRouter);
+fastify.use("/api/evaluation",  requireAuth, evaluationRouter);
+
+// BullMQ Board (dev only)
+if (env.NODE_ENV === "development") {
+  import("@bull-board/api").then(async ({ createBullBoard, BullMQAdapter }) => {
+    const { ExpressAdapter } = await import("@bull-board/express");
+    const serverAdapter = new ExpressAdapter();
+    serverAdapter.setBasePath("/admin/queues");
+    createBullBoard({
+      queues: [
+        new BullMQAdapter(ingestionQueue),
+        new BullMQAdapter(researchQueue),
+        new BullMQAdapter(repoQueue),
+        new BullMQAdapter(compactionQueue),
+      ],
+      serverAdapter,
     });
+    fastify.use("/admin/queues", requireAuth, serverAdapter.getRouter());
+    logger.info("BullMQ Board mounted at /admin/queues");
+  }).catch((err) => {
+    logger.warn({ err }, "BullMQ Board not available (install @bull-board/api @bull-board/express as dev deps)");
+  });
+}
+
+// Express error handler (must be last .use())
+fastify.use(errorHandler);
+
+// ─── Fastify 404 handler ────────────────────────────────────────────────────
+
+fastify.setNotFoundHandler((request, reply) => {
+  if (request.url.startsWith("/api/")) {
+    reply.code(404).send({ error: `Not Found: ${request.url}` });
+  } else {
+    reply.code(404).sendFile("404.html");
   }
 });
 
-app.use(errorHandler);
+// ─── Start server ───────────────────────────────────────────────────────────
 
-const server = app.listen(Number(env.PORT), () => {
-  logger.info({ port: env.PORT, env: env.NODE_ENV }, "Council server started");
+try {
+  await fastify.listen({ port: Number(env.PORT), host: "0.0.0.0" });
+  logger.info({ port: env.PORT, env: env.NODE_ENV }, "Council server started (Fastify)");
+
   startSweepers();
   startMemoryCrons();
   startWorkers();
-});
 
-const io = initSocket(server);
+  // Initialize WebSocket on the underlying Node.js HTTP server
+  initSocket(fastify.server);
+} catch (err) {
+  logger.fatal({ err }, "Failed to start server");
+  process.exit(1);
+}
+
+// ─── Graceful shutdown ──────────────────────────────────────────────────────
 
 const shutdown = async (signal: string) => {
   logger.info({ signal }, "Shutdown signal received, shutting down gracefully");
@@ -280,28 +312,36 @@ const shutdown = async (signal: string) => {
   }, 5000);
   forceTimer.unref();
 
-  server.close(async () => {
-    try {
-      await stopWorkers();
-      logger.info("BullMQ workers stopped");
-    } catch (err) {
-      logger.error({ err }, "Error stopping workers");
-    }
-    try {
-      await pool.end();
-      logger.info("Database pool closed");
-    } catch (err) {
-      logger.error({ err }, "Error closing database pool");
-    }
-    try {
-      await redis.quit();
-      logger.info("Redis connection closed");
-    } catch (err) {
-      logger.error({ err }, "Error closing Redis connection");
-    }
-    logger.info("Server closed");
-    process.exit(0);
-  });
+  try {
+    await fastify.close();
+    logger.info("Fastify server closed");
+  } catch (err) {
+    logger.error({ err }, "Error closing Fastify server");
+  }
+
+  try {
+    await stopWorkers();
+    logger.info("BullMQ workers stopped");
+  } catch (err) {
+    logger.error({ err }, "Error stopping workers");
+  }
+
+  try {
+    await pool.end();
+    logger.info("Database pool closed");
+  } catch (err) {
+    logger.error({ err }, "Error closing database pool");
+  }
+
+  try {
+    await redis.quit();
+    logger.info("Redis connection closed");
+  } catch (err) {
+    logger.error({ err }, "Error closing Redis connection");
+  }
+
+  logger.info("Server closed");
+  process.exit(0);
 };
 
 process.on("SIGTERM", () => shutdown("SIGTERM"));

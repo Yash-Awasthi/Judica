@@ -3,82 +3,79 @@ import { requireAuth } from "../middleware/auth.js";
 import { AuthRequest } from "../types/index.js";
 import { realTimeCostTracker } from "../lib/realtimeCost.js";
 import { env } from "../config/env.js";
+import { WebSocketServer, WebSocket } from "ws";
 import { createServer } from "http";
-import { Server as SocketIOServer, Socket } from "socket.io";
 import logger from "../lib/logger.js";
 import { AppError } from "../middleware/errorHandler.js";
 
-interface SocketWithUserId extends Socket {
+interface CostSocket extends WebSocket {
   userId?: number;
 }
 
 const router = Router();
 
 const httpServer = createServer();
-const io = new SocketIOServer(httpServer, {
-  cors: {
-    origin: env.FRONTEND_URL || "http://localhost:3000",
-    methods: ["GET", "POST"]
-  }
-});
+const wss = new WebSocketServer({ server: httpServer });
 
 const connectedUsers = new Map<number, string>();
 
-io.on('connection', (socket) => {
+wss.on('connection', (ws: CostSocket) => {
   logger.info("User connected to real-time cost tracking");
 
-  const socketWithId = socket as SocketWithUserId;
+  ws.on('message', (raw) => {
+    try {
+      const msg = JSON.parse(raw.toString());
 
-  socket.on('authenticate', (data: { userId: number, token: string }) => {
-    connectedUsers.set(data.userId, socket.id);
-    socketWithId.userId = data.userId;
-    
-    const costData = realTimeCostTracker.getRealTimeData(data.userId);
-    if (costData) {
-      socket.emit('cost-update', costData);
+      if (msg.type === 'authenticate') {
+        connectedUsers.set(msg.userId, '');
+        ws.userId = msg.userId;
+
+        const costData = realTimeCostTracker.getRealTimeData(msg.userId);
+        if (costData) {
+          ws.send(JSON.stringify({ event: 'cost-update', data: costData }));
+        }
+
+        realTimeCostTracker.onAlert(msg.userId, (alerts) => {
+          if (ws.readyState === WebSocket.OPEN) {
+            ws.send(JSON.stringify({ event: 'cost-alert', data: { alerts, timestamp: new Date() } }));
+          }
+        });
+
+        logger.info({ userId: msg.userId }, "User authenticated for real-time updates");
+      } else if (msg.type === 'request-cost-data' && msg.userId) {
+        const costData = realTimeCostTracker.getRealTimeData(msg.userId);
+        if (costData) {
+          ws.send(JSON.stringify({ event: 'cost-update', data: costData }));
+        }
+      } else if (msg.type === 'set-limits') {
+        realTimeCostTracker.setLimits(msg.userId, msg.dailyLimit, msg.monthlyLimit);
+      } else if (msg.type === 'get-statistics') {
+        const stats = realTimeCostTracker.getStatistics(msg.userId, msg.hours);
+        ws.send(JSON.stringify({ event: 'statistics-update', data: stats }));
+      }
+    } catch {
+      // Ignore invalid messages
     }
-
-    realTimeCostTracker.onAlert(data.userId, (alerts) => {
-      socket.emit('cost-alert', { alerts, timestamp: new Date() });
-    });
-
-    logger.info({ userId: data.userId }, "User authenticated for real-time updates");
   });
 
-  socket.on('disconnect', () => {
-    if (socketWithId.userId) {
-      connectedUsers.delete(socketWithId.userId);
-      logger.info({ userId: socketWithId.userId }, "User disconnected from real-time updates");
+  ws.on('close', () => {
+    if (ws.userId) {
+      connectedUsers.delete(ws.userId);
+      logger.info({ userId: ws.userId }, "User disconnected from real-time updates");
     }
-  });
-
-  socket.on('request-cost-data', (userId: number) => {
-    const costData = realTimeCostTracker.getRealTimeData(userId);
-    if (costData) {
-      socket.emit('cost-update', costData);
-    }
-  });
-
-  socket.on('set-limits', (data: { userId: number; dailyLimit?: number; monthlyLimit?: number }) => {
-    realTimeCostTracker.setLimits(data.userId, data.dailyLimit, data.monthlyLimit);
-  });
-
-  socket.on('get-statistics', (data: { userId: number; hours?: number }) => {
-    const stats = realTimeCostTracker.getStatistics(data.userId, data.hours);
-    socket.emit('statistics-update', stats);
   });
 });
 
 router.post("/session/start", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { sessionId, conversationId } = req.body;
-    
+
     if (!sessionId || !conversationId) {
       return res.status(400).json({ error: "sessionId and conversationId are required" });
     }
 
     realTimeCostTracker.startSession(req.userId!, sessionId, conversationId);
-    
+
     res.json({
       success: true,
       sessionId,
@@ -92,13 +89,13 @@ router.post("/session/start", requireAuth, async (req: AuthRequest, res: Respons
 router.post("/session/end", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { sessionId } = req.body;
-    
+
     if (!sessionId) {
       return res.status(400).json({ error: "sessionId is required" });
     }
 
     const entries = realTimeCostTracker.endSession(sessionId);
-    
+
     res.json({
       success: true,
       sessionId,
@@ -114,7 +111,7 @@ router.post("/session/end", requireAuth, async (req: AuthRequest, res: Response)
 router.get("/ledger", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const ledger = realTimeCostTracker.getLedger(req.userId!);
-    
+
     if (!ledger) {
       return res.status(404).json({ error: "No active cost tracking session" });
     }
@@ -131,9 +128,9 @@ router.get("/ledger", requireAuth, async (req: AuthRequest, res: Response) => {
 router.get("/statistics", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const { hours = 24 } = req.query;
-    
+
     const stats = realTimeCostTracker.getStatistics(req.userId!, parseInt(hours as string));
-    
+
     res.json({
       success: true,
       statistics: stats
@@ -143,6 +140,6 @@ router.get("/statistics", requireAuth, async (req: AuthRequest, res: Response) =
   }
 });
 
-export { io, httpServer };
+export { wss, httpServer };
 
 export default router;
