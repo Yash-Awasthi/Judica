@@ -2,397 +2,250 @@
 
 # AIBYAI Roadmap
 
-### What's Next
+### The Future in a Coconut
 
-[![Status](https://img.shields.io/badge/Core_Platform-Complete-22C55E?style=for-the-badge)](./README.md)
-[![Status](https://img.shields.io/badge/Migration-Complete-22C55E?style=for-the-badge)](#-completed-migrations)
-[![Status](https://img.shields.io/badge/Next_Phase-Quality_%26_Scale-3B82F6?style=for-the-badge)](#-testing--quality-assurance)
+[![Phase](https://img.shields.io/badge/Now-Hardening_%26_GTM-3B82F6?style=for-the-badge)](#-phase-1-hardening--production-readiness-q2-2026)
+[![Next](https://img.shields.io/badge/Next-Intelligence_Layer-8B5CF6?style=for-the-badge)](#-phase-2-intelligence-layer-q3-2026)
+[![Then](https://img.shields.io/badge/Then-Autonomy_%26_Scale-F59E0B?style=for-the-badge)](#-phase-3-autonomous-operations-q4-2026)
 
 </div>
 
 ---
 
-All 22 original roadmap phases, all 12 Master Execution Plan tiers, and the 10-task tech migration are **complete**. This document tracks future work — quality improvements, new capabilities, and scaling targets.
-
----
-
-## Completed Migrations
-
-The following infrastructure upgrades have been completed on the `sidecamel` branch:
-
-| Migration | From | To | Status |
-|---|---|---|---|
-| Runtime | Node.js 20 | Node.js 22 LTS | Done |
-| Vector indexes | IVFFlat (default) | pgvector with B-tree indexes | Done |
-| Password hashing | bcrypt | argon2id (with legacy fallback) | Done |
-| Token security | Static JWT | Short-lived access + rotating refresh tokens | Done |
-| Metrics | Internal JSON only | Prometheus (prom-client) + histograms | Done |
-| Sandbox | No resource caps | isolated-vm 128MB + Python ulimit | Done |
-| WebSocket | Socket.IO | Native ws | Done |
-| Charts | Recharts | Apache ECharts | Done |
-| HTTP framework | Express 5.2 | Fastify 5 (31 native plugins + Express compat layer for Swagger UI) | Done |
-| ORM | Prisma 7.6 | Drizzle ORM (zero Prisma imports) | Done |
-
----
-
-## Current Architecture
-
-```mermaid
-flowchart LR
-    subgraph COMPLETE["Implemented"]
-        direction TB
-        A["Multi-Agent Deliberation\n4+ agents, peer review, debate"]
-        B["7 LLM Provider Adapters\nOpenAI, Anthropic, Gemini, Groq, Ollama, OpenRouter, Custom"]
-        C["RAG Pipeline\npgvector embeddings, hybrid search, KB management"]
-        D["Workflow Engine\n10+ node types, visual canvas"]
-        E["Research Mode\nMulti-step web research"]
-        F["Code Sandbox\nisolated-vm + Python (hardened)"]
-        G["Marketplace\nPrompts, workflows, personas, tools"]
-        H["Observability\nPrometheus, LangFuse, reliability scoring"]
-        I["Auth + Security\nargon2id, JWT rotation, OAuth2, RBAC"]
-        J["Infrastructure\nFastify 5, Drizzle, Node 22, Docker, CI"]
-    end
-
-    style COMPLETE fill:#022c22,stroke:#22c55e,color:#bbf7d0
-```
-
----
-
-## Future Roadmap
-
 ```mermaid
 timeline
-    title AIBYAI Development Timeline
-    section Quality
-        Testing Suite : Unit tests (80% coverage) : Integration tests (Fastify inject + real DB) : E2E tests (Playwright)
-        Grafana Dashboards : Wire Prometheus to Grafana : Alert rules for latency and errors
-    section Intelligence
-        Agentic Memory v2 : Cross-conversation learning : Topic clustering : Automatic forgetting : Episodic memory
-        Agent Specialization : Domain-specific agents : Self-improving personas : Confidence calibration
-        Advanced RAG : Cohere reranking : Parent-child chunking : HyDE query expansion : Multi-index search
-    section Autonomy
-        Autonomous Agents : Goal decomposition : Tool chains : Long-running tasks : Human-in-the-loop gates
-        Code Generation : Full-stack scaffolding : PR review agent : Test generation : Refactoring assistant
-        Multi-Modal Council : Image analysis agents : Audio/video understanding : Visual output generation
-    section Platform
-        MCP Integration : MCP server mode : MCP client mode : Tool marketplace federation
-        Real-time Collaboration : Multi-user deliberation : Live cursors : Shared councils
-        Plugin SDK : Third-party tools : Custom workflow nodes : Webhook triggers : Middleware hooks
-        Mobile App : React Native : Push notifications : Voice-first : Haptic feedback
-    section Scale
-        Kubernetes : Horizontal auto-scaling : Multi-region : Health-based routing
-        Multi-Tenant Enterprise : Workspace isolation : SSO (SAML/OIDC) : Audit compliance : Data residency
-        Marketplace v2 : Revenue sharing : Verified publishers : Usage analytics : Dependency resolution
+    title AIBYAI 2026–2027
+    section Q2 2026 — Hardening
+        Production Readiness : Security hardened : 80%+ test coverage : Grafana observability
+        Performance : < 2s p95 latency : Connection pooling : CDN
+    section Q3 2026 — Intelligence
+        Memory v2 : Cross-conversation learning : Preference adaptation : Auto-forgetting
+        Advanced RAG : Cohere reranking : Parent-child chunks : HyDE : Multi-index
+        Smart Agents : Domain experts : Self-improving : Confidence calibration
+    section Q4 2026 — Autonomy
+        Autonomous Mode : Goal decomposition : Tool chains : Long-running tasks
+        Code Generation : PR review agent : Test generation : Refactoring
+        Multi-Modal : Image analysis : Audio/video : Visual output
+    section Q1 2027 — Platform
+        MCP Integration : Server + client mode : Tool federation
+        Plugin SDK : Custom tools : Custom nodes : Webhooks
+        Collaboration : Multi-user councils : Live presence
+    section Q2 2027 — Enterprise
+        Kubernetes : Auto-scaling : Multi-region : Health routing
+        Enterprise : SSO (SAML/OIDC) : Workspace isolation : SOC 2
+        Marketplace v2 : Revenue sharing : Verified publishers
 ```
 
 ---
 
-## Testing & Quality Assurance
+## Phase 1: Hardening & Production Readiness (Q2 2026)
 
-> **Priority: High** — Test suite exists (7 test files, ~92 active tests) but coverage needs expansion for the new Fastify + Drizzle codebase.
+> **Status: In Progress**
 
-### Unit Tests
+### Security
 
-Target **80% statement coverage** across all services.
+| What | Why | Status |
+|------|-----|--------|
+| Redis-backed rate limiting | In-memory resets on restart, bypassed in multi-instance | Done |
+| Sandbox network isolation | Python subprocess could phone home | Done |
+| SSRF on all outbound HTTP | Workflow nodes, tools, adapters could hit internal IPs | Done |
+| JWT algorithm pinning + Zod | Prevent algorithm confusion + type-safe payloads | Done |
+| Safe math parser (no eval) | Agent expressions could inject code | Done |
+| Upload allowlist + auth | Anonymous uploads, no file type filter | Done |
+| OAuth email collision fix | Account takeover via duplicate email | Done |
+| Circuit breaker on all providers | Cascading failures when one provider goes down | Done |
 
-| Area | Files | Framework |
-|---|---|---|
-| Services | `src/services/*.ts` | vitest + mocked Drizzle |
-| Adapters | `src/adapters/*.ts` | vitest + nock (HTTP mocking) |
-| Middleware | `src/middleware/*.ts` | vitest |
-| Workflow nodes | `src/workflow/nodes/*.ts` | vitest |
-| Lib utilities | `src/lib/*.ts` | vitest |
+### Testing
 
-### Integration Tests
+| What | Target | Status |
+|------|--------|--------|
+| Unit tests (auth, SSRF, RBAC, sandbox, validation, rate limit) | 6 test files, 63 tests | Done |
+| Integration tests (all major API routes) | 8 route test files | Done |
+| E2E tests (Playwright) | 5 critical user flows | Planned |
+| Target 80% statement coverage | From 6.2% to 80% | In Progress |
 
-Every API route: happy path + 401 + invalid input = minimum 3 tests per route.
+### Observability
 
-| Area | Approach |
-|---|---|
-| 35 API routes | `inject()` against Fastify instance |
-| Database operations | Drizzle against real PostgreSQL |
-| Queue processing | BullMQ job lifecycle testing |
-| SSE streaming | Event stream validation |
+| What | Status |
+|------|--------|
+| Grafana dashboards (latency, provider health, errors, tokens) | Done |
+| Prometheus datasource auto-provisioned | Done |
+| Alert rules (error rate > 5%, p99 > 5s, queue backlog > 100) | Planned |
+| Structured error tracking with correlation IDs | Planned |
 
-### E2E Tests
+### Performance
 
-Critical user flows with Playwright.
-
-| Flow | Description |
-|---|---|
-| Authentication | Sign up, login, token refresh, OAuth redirect |
-| Council deliberation | Ask question, receive streamed debate + verdict |
-| Knowledge base | Create KB, upload document, query with RAG |
-| Workflow builder | Create workflow, add nodes, execute |
-| Marketplace | Browse, install item, verify in account |
-
----
-
-## Grafana Dashboards
-
-> **Priority: High** — Prometheus metrics are exported but no visualization layer yet.
-
-### Goals
-
-- Wire `prom-client` metrics to Grafana via Prometheus scraping
-- Create dashboards: request latency (p50/p95/p99), provider call duration, queue depth, active SSE connections, token usage per model
-- Set up alert rules: error rate spike, latency degradation, queue backlog
-- Add `docker-compose` services for Prometheus + Grafana (dev profile)
+- Database HNSW vector indexes on all 4 pgvector columns (Done)
+- Queue dead-letter queue with exponential backoff retry (Done)
+- Connection pooling for PostgreSQL
+- Frontend bundle splitting and lazy loading
+- CDN for static assets
 
 ---
 
-## Agentic Memory v2
+## Phase 2: Intelligence Layer (Q3 2026)
 
-> **Priority: Medium** — Current memory works but doesn't learn across conversations.
+> **Status: Planned**
 
-```mermaid
-flowchart TB
-    subgraph CURRENT["Current (Implemented)"]
-        direction LR
-        L1["Layer 1\nActive Context\nLast N messages"]
-        L2["Layer 2\nSession Summary\nAuto-generated"]
-        L3["Layer 3\nLong-term\npgvector + compaction"]
-    end
+### Agentic Memory v2
 
-    subgraph FUTURE["Future (Planned)"]
-        direction LR
-        F1["Cross-conversation\nTopic linking"]
-        F2["Automatic forgetting\nDecay + relevance"]
-        F3["User preference\nlearning"]
-        F4["Contradiction\nresolution memory"]
-    end
+Current memory is 3-layer (active context → session summary → long-term vector) but doesn't learn across conversations.
 
-    CURRENT --> FUTURE
+- **Cross-conversation learning** — "React performance" in chat A connects to "frontend optimization" in chat B
+- **Preference adaptation** — Auto-tune council composition based on what archetypes/styles users prefer
+- **Auto-forgetting** — Decay functions so stale memories fade; frequently accessed ones persist
+- **Contradiction resolution** — New info vs. stored memory creates resolution records, not silent overwrites
 
-    style CURRENT fill:#022c22,stroke:#22c55e,color:#bbf7d0
-    style FUTURE fill:#1e1b4b,stroke:#818cf8,color:#c7d2fe
-```
+### Advanced RAG
 
-### Goals
+Current: RRF only. Target:
 
-- **Cross-conversation learning**: Link related topics across separate conversations. When a user discusses "React performance" in one chat and "frontend optimization" in another, the system should connect these.
-- **Automatic forgetting**: Implement decay functions so stale memories lose relevance over time. Frequently accessed memories persist; one-off facts fade.
-- **Preference learning**: Track which agent archetypes the user prefers, which response styles they engage with, and adapt council composition over time.
-- **Contradiction resolution**: When new information contradicts stored memory, create a resolution record rather than silently overwriting.
+- Cohere `rerank-english-v3.0` for hybrid search
+- Parent-child chunking (retrieve parent when child matches)
+- HyDE (Hypothetical Document Embeddings) for better recall
+- Multi-index search across KBs, repos, and conversation history
+- Dynamic k selection based on query complexity
+
+### Agent Specialization
+
+Current: Static archetypes. Target:
+
+- Domain experts (legal, medical, financial, engineering)
+- Self-improving personas that track accuracy and adjust strategies
+- Inter-agent delegation — specialists form dynamic chains
+- Confidence calibration through feedback loops
 
 ---
 
-## Advanced Reranking
+## Phase 3: Autonomous Operations (Q4 2026)
 
-> **Priority: Medium** — Currently using RRF (Reciprocal Rank Fusion) only.
+> **Status: Planned**
 
-### Goals
+### Autonomous Agent Mode
 
-- **Cohere rerank**: Integration with `rerank-english-v3.0` for hybrid search results
-- **Cross-encoder reranking**: Fine-tuned model for domain-specific relevance scoring
-- **Dynamic k selection**: Automatically choose how many chunks to retrieve based on query complexity
-- **Parent-child chunking**: Retrieve parent context when child chunk matches for better context windows
-- **Query expansion**: Automatic query rewriting and HyDE (Hypothetical Document Embeddings) for improved recall
-- **Multi-index search**: Search across knowledge bases, code repos, and conversation history simultaneously
+- **Goal decomposition** — High-level goal → executable subtask tree
+- **Tool chains** — search → analyze → code → test → deploy without human intervention
+- **Long-running tasks** — Background agents working hours on complex research
+- **Human-in-the-loop gates** — Configurable approval checkpoints
+- **Progress streaming** — Real-time SSE with intermediate artifacts
 
----
+### Code Generation & Review
 
-## Agent Specialization & Self-Improvement
+- Full-stack scaffolding from natural language
+- PR review agent (security + performance + style perspectives)
+- Test generation with edge cases
+- Refactoring assistant with before/after diffs
 
-> **Priority: High** — Agents use static archetypes today.
+### Multi-Modal Council
 
-- **Domain-specific agents**: Pre-trained archetypes for legal, medical, financial, and engineering domains with specialized vocabulary and reasoning patterns
-- **Self-improving personas**: Agents track their own accuracy over time and adjust reasoning strategies based on past performance
-- **Agent collaboration protocols**: Agents can delegate sub-tasks to other agents, forming dynamic chains
-- **Confidence calibration**: Agents learn to produce well-calibrated confidence scores through feedback loops
-- **Archetype evolution**: User interaction patterns gradually shift archetype weights and behavior
-
----
-
-## Autonomous Agent Mode
-
-> **Priority: High** — Currently agents only respond to single queries.
-
-```mermaid
-flowchart TB
-    USER["User Goal"] --> PLAN["Planning Agent\nDecompose into subtasks"]
-    PLAN --> T1["Task 1\nResearch"]
-    PLAN --> T2["Task 2\nCode Generation"]
-    PLAN --> T3["Task 3\nValidation"]
-    T1 --> TOOLS1["Web Search\nRAG Query\nRepo Analysis"]
-    T2 --> TOOLS2["Sandbox\nFile System\nGit Operations"]
-    T3 --> TOOLS3["Test Runner\nCode Review\nBenchmark"]
-    T1 --> MERGE["Merge & Report"]
-    T2 --> MERGE
-    T3 --> MERGE
-    MERGE --> USER
-
-    style USER fill:#1e293b,stroke:#f59e0b,color:#e2e8f0
-    style PLAN fill:#1e293b,stroke:#3b82f6,color:#e2e8f0
-    style MERGE fill:#1e293b,stroke:#22c55e,color:#e2e8f0
-```
-
-- **Goal decomposition**: User provides a high-level goal; planning agent breaks it into executable subtasks
-- **Tool chains**: Agents can sequence tools (search, analyze, code, test, deploy) without user intervention
-- **Long-running tasks**: Background agents that work for hours on complex research or code generation
-- **Human-in-the-loop checkpoints**: Configurable approval gates before irreversible actions
-- **Progress streaming**: Real-time task progress via SSE with intermediate artifacts
+- Image analysis agents in deliberation
+- Audio/video understanding as council input
+- Document OCR (scanned docs, whiteboards)
+- Visual output (diagrams, charts, explanations)
+- Cross-modal reasoning (visual evidence in text debates)
 
 ---
 
-## Multi-Modal Council
+## Phase 4: Platform & Ecosystem (Q1 2027)
 
-> **Priority: Medium** — Currently text-only deliberation.
+> **Status: Planned**
 
-- **Image analysis agents**: Council members that can analyze images, charts, diagrams, and screenshots
-- **Audio/video understanding**: Process audio transcripts and video frames as council input
-- **Document OCR**: Extract and reason over scanned documents, handwritten notes, whiteboards
-- **Visual output generation**: Agents can produce diagrams, charts, and visual explanations as part of their responses
-- **Cross-modal reasoning**: Agents reference visual evidence when debating text-based claims
+### MCP Integration
 
----
+- **Server mode** — Expose deliberation as MCP tool for external agents
+- **Client mode** — AIBYAI agents call external MCP servers
+- **Tool federation** — Browse/install MCP ecosystem tools into workflows
 
-## MCP Integration (Model Context Protocol)
+### Plugin SDK
 
-> **Priority: Medium** — Enables AIBYAI as a tool server for external agents.
+- Custom tools via NPM packages
+- Custom workflow nodes with UI components
+- Webhook triggers on deliberation events
+- Middleware hooks (pre/post-process, custom scoring)
 
-- **MCP server mode**: Expose AIBYAI's deliberation engine as an MCP tool — any MCP-compatible client can invoke a council
-- **MCP client mode**: AIBYAI agents can call external MCP servers for specialized capabilities (databases, APIs, file systems)
-- **Tool marketplace federation**: Browse and install tools from the MCP ecosystem directly into AIBYAI workflows
-- **Dynamic tool discovery**: Agents automatically discover and use available MCP tools based on task requirements
+### Real-time Collaboration
 
----
-
-## Code Generation & Review
-
-> **Priority: Medium** — Sandbox exists but no autonomous code generation.
-
-- **Full-stack scaffolding**: Describe an app in natural language and council generates project structure, components, API routes, database schema
-- **PR review agent**: Automated code review with multi-perspective analysis (security agent, performance agent, style agent)
-- **Test generation**: Given a function or module, generate comprehensive test suites with edge cases
-- **Refactoring assistant**: Council analyzes codebase and suggests refactoring with before/after diffs
-- **Documentation generation**: Produce API docs, architecture diagrams, and inline documentation from code analysis
+- Multi-user deliberation with shared councils
+- Live cursors and presence
+- Per-user annotations on responses
+- Voting on synthesis direction
 
 ---
 
-## Real-time Collaboration
+## Phase 5: Scale & Enterprise (Q2 2027)
 
-> **Priority: Medium** — Currently single-user per session.
+> **Status: Planned**
 
-```mermaid
-flowchart LR
-    U1["User A"] --> WS["WebSocket Hub\nNative ws"]
-    U2["User B"] --> WS
-    U3["User C"] --> WS
-    WS --> COUNCIL["Shared Council\nSession"]
-    COUNCIL --> STREAM["Shared SSE\nStream"]
-    STREAM --> U1
-    STREAM --> U2
-    STREAM --> U3
+### Infrastructure
 
-    style WS fill:#1e293b,stroke:#f59e0b,color:#e2e8f0
-    style COUNCIL fill:#1e293b,stroke:#3b82f6,color:#e2e8f0
-```
+- Helm charts for Kubernetes
+- Horizontal auto-scaling on queue depth + latency
+- Multi-region PostgreSQL with read replicas
+- Redis Cluster for distributed state
+- Health-based routing with automatic failover
 
-- Multiple users join a shared deliberation session
-- Live cursors showing who's viewing what
-- Shared council configuration (collaborative archetype selection)
-- Per-user annotations on agent responses
-- Voting on which synthesis direction to take
+### Enterprise Features
 
----
+- **SSO** — SAML 2.0 + OpenID Connect
+- **Workspace isolation** — Separate data, configs, billing per tenant
+- **Per-tenant quotas** — Tokens, storage, concurrent deliberations
+- **Audit compliance** — SOC 2 logging, GDPR export, data retention
+- **Data residency** — Geographic data pinning
+- **SLA monitoring** — 99.9% uptime target
 
-## Plugin SDK
+### Marketplace v2
 
-> **Priority: Low** — For third-party extensibility.
+- Revenue sharing for creators
+- Verified publisher badges
+- Usage analytics (installs, retention)
+- Curated collections ("Legal Pack", "Code Review Kit")
+- Semantic versioning with auto-update notifications
+- Dependency resolution
 
-### Goals
+### Mobile App
 
-- **Custom tool types**: NPM package that registers new tools in the tool registry
-- **Custom workflow nodes**: Third-party node handlers with UI components
-- **Webhook triggers**: Fire webhooks on deliberation events (verdict, conflict, etc.)
-- **Provider plugins**: Package-based provider adapters (beyond current EMOF UI approach)
-- **Middleware hooks**: Plugin into the deliberation pipeline (pre-process, post-process, custom scoring)
-
----
-
-## Mobile App
-
-> **Priority: Low** — PWA covers basic mobile usage.
-
-### Goals
-
-- React Native client with shared API
-- Push notifications for research job completion, workflow results, background agent updates
-- Voice-first interaction mode (STT input, TTS output by default)
-- Offline mode with syncing (extending current IndexedDB approach)
+- React Native with shared API
+- Push notifications for job completion
+- Voice-first mode (STT in, TTS out)
+- Offline sync
 - Haptic feedback for deliberation milestones
 
 ---
 
-## Kubernetes & Multi-Region
+## Business Milestones
 
-> **Priority: Low** — Docker Compose covers current scale.
-
-```mermaid
-flowchart TB
-    LB["Load Balancer"] --> N1["Node 1\nUS-East"]
-    LB --> N2["Node 2\nEU-West"]
-    LB --> N3["Node 3\nAP-South"]
-
-    N1 --> PG1["PostgreSQL\nPrimary"]
-    N2 --> PG2["PostgreSQL\nReplica"]
-    N3 --> PG3["PostgreSQL\nReplica"]
-
-    PG1 --> PG2
-    PG1 --> PG3
-
-    N1 --> RD["Redis Cluster"]
-    N2 --> RD
-    N3 --> RD
-
-    style LB fill:#1e293b,stroke:#f59e0b,color:#e2e8f0
-    style N1 fill:#1e293b,stroke:#3b82f6,color:#e2e8f0
-    style N2 fill:#1e293b,stroke:#3b82f6,color:#e2e8f0
-    style N3 fill:#1e293b,stroke:#3b82f6,color:#e2e8f0
-    style PG1 fill:#1e293b,stroke:#22c55e,color:#e2e8f0
-    style RD fill:#1e293b,stroke:#ef4444,color:#e2e8f0
-```
-
-### Goals
-
-- Helm charts for Kubernetes deployment
-- Horizontal pod auto-scaling based on queue depth and request latency
-- Multi-region PostgreSQL with read replicas
-- Redis Cluster for distributed caching and rate limiting
-- Health-based routing (route away from degraded regions)
+| Milestone | Target | Metric |
+|---|---|---|
+| **Production Launch** | Q2 2026 | Zero critical vulns, 80%+ test coverage |
+| **First 100 Users** | Q3 2026 | Organic via open-source community |
+| **Enterprise Pilot** | Q4 2026 | 1–3 enterprises on paid pilot |
+| **SaaS Launch** | Q1 2027 | Self-serve signup, usage-based billing |
+| **Series A Ready** | Q2 2027 | $100K ARR, 10+ enterprise accounts |
 
 ---
 
-## Multi-Tenant & Enterprise
+## Why AIBYAI Wins
 
-> **Priority: Low** — Single-tenant architecture is sufficient for current use.
+1. **Multi-Agent Consensus** — No competitor offers structured deliberation with mathematical scoring. One model gives opinions; AIBYAI gives peer-reviewed verdicts.
 
-### Goals
+2. **Provider Agnostic** — 7+ adapters with automatic failover. No vendor lock-in. Mix providers per query for cost optimization.
 
-- **Workspace isolation**: Separate data, configs, and billing per tenant
-- **Per-tenant quotas**: Token limits, storage limits, concurrent deliberation limits
-- **SSO**: SAML 2.0 and OpenID Connect for enterprise identity providers
-- **Audit compliance**: SOC 2 logging format, data retention policies, GDPR data export
-- **Data residency**: Ensure data stays in specific geographic regions
-- **SLA monitoring**: Uptime tracking, latency SLOs, automated alerting
+3. **Enterprise Trust** — Cold validation, hallucination detection, confidence scores, full audit trail. The evidence layer enterprises need.
 
----
+4. **Extensibility** — Workflow engine, marketplace, plugin SDK, MCP. AIBYAI becomes the orchestration layer for any AI capability.
 
-## Marketplace v2
-
-> **Priority: Low** — Current marketplace is functional but basic.
-
-### Goals
-
-- **Revenue sharing**: Creators earn from paid marketplace items
-- **Verified publishers**: Trust badges for vetted creators
-- **Usage analytics**: Track installs, active usage, retention per item
-- **Collections & categories**: Curated bundles (e.g. "Legal Pack", "Code Review Kit")
-- **Versioning with changelogs**: Semantic versioning, automatic update notifications
-- **Dependency resolution**: Marketplace items that depend on other items auto-install dependencies
+5. **Self-Hosted Option** — Docker Compose to production in minutes. Data residency requirements? Run it on your own infra.
 
 ---
+
+## Revenue Model
+
+| Tier | Price | Includes |
+|---|---|---|
+| **Community** | Free / OSS | Self-hosted, unlimited deliberations, all 7 providers |
+| **Pro** | $49/user/mo | Managed hosting, priority support, advanced analytics |
+| **Team** | $29/user/mo (min 5) | Shared workspaces, collaboration, SSO |
+| **Enterprise** | Custom | Multi-region, SLA, dedicated support, data residency |
 
 ---
 
