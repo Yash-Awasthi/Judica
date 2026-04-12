@@ -1,4 +1,6 @@
-import prisma from "../lib/db.js";
+import { db } from "../lib/drizzle.js";
+import { uploads } from "../db/schema/uploads.js";
+import { eq, inArray, and } from "drizzle-orm";
 import { hybridSearch, type MemoryChunk } from "./vectorStore.service.js";
 import logger from "../lib/logger.js";
 import type { AdapterContentBlock } from "../adapters/types.js";
@@ -14,14 +16,17 @@ export interface FileContext {
 export async function loadFileContext(uploadIds: string[], userId: number): Promise<FileContext> {
   if (!uploadIds || uploadIds.length === 0) return { text_documents: [], image_blocks: [] };
 
-  const uploads = await prisma.upload.findMany({
-    where: { id: { in: uploadIds }, userId },
-  });
+  const results = await db.select().from(uploads).where(
+    and(
+      inArray(uploads.id, uploadIds),
+      eq(uploads.userId, userId),
+    )
+  );
 
   const text_documents: string[] = [];
   const image_blocks: FileContext["image_blocks"] = [];
 
-  for (const upload of uploads) {
+  for (const upload of results) {
     if (upload.mimeType.startsWith("image/") && upload.storagePath) {
       // Read image as base64
       const { readFileSync } = await import("fs");

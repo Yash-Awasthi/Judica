@@ -1,5 +1,7 @@
 import { ARCHETYPES, SUMMONS, UNIVERSAL_PROMPT } from "../config/archetypes.js";
-import prisma from "./db.js";
+import { db } from "./drizzle.js";
+import { councilConfigs } from "../db/schema/auth.js";
+import { eq } from "drizzle-orm";
 import { mapProviderError } from "./errorMapper.js";
 import { Message, Provider } from "./providers.js";
 import logger from "./logger.js";
@@ -68,7 +70,7 @@ export async function prepareCouncilMembers(members: CouncilMemberInput[], summo
 
   const userArchetypes: Record<string, any> = {};
   if (userId) {
-    const config = await prisma.councilConfig.findUnique({ where: { userId } });
+    const [config] = await db.select().from(councilConfigs).where(eq(councilConfigs.userId, userId)).limit(1);
     if (config) {
       const customs = (config.config as any).customArchetypes || [];
       customs.forEach((a: any) => { userArchetypes[a.id] = a; });

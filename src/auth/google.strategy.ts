@@ -1,5 +1,7 @@
 import { Strategy as GoogleStrategy } from "passport-google-oauth20";
-import prisma from "../lib/db.js";
+import { db } from "../lib/drizzle.js";
+import { users } from "../db/schema/users.js";
+import { eq } from "drizzle-orm";
 import { env } from "../config/env.js";
 
 export function createGoogleStrategy() {
@@ -16,17 +18,25 @@ export function createGoogleStrategy() {
         const email = profile.emails?.[0]?.value;
         if (!email) return done(new Error("No email from Google"));
 
-        let user = await prisma.user.findUnique({ where: { email } });
-        if (!user) {
-          user = await prisma.user.create({
-            data: {
-              email: email ?? undefined,
-              username: profile.displayName || email.split("@")[0],
-              passwordHash: "", // OAuth user, no password
-              role: "member",
-            },
-          });
+        const [existing] = await db
+          .select()
+          .from(users)
+          .where(eq(users.email, email))
+          .limit(1);
+
+        if (existing) {
+          return done(null, existing as any);
         }
+
+        const [user] = await db
+          .insert(users)
+          .values({
+            email: email ?? undefined,
+            username: profile.displayName || email.split("@")[0],
+            passwordHash: "", // OAuth user, no password
+            role: "member",
+          })
+          .returning();
 
         done(null, user as any);
       } catch (err) {

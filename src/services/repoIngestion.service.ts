@@ -1,5 +1,9 @@
 import { Octokit } from "@octokit/rest";
-import prisma, { pool } from "../lib/db.js";
+import { pool } from "../lib/db.js";
+import { db } from "../lib/drizzle.js";
+import { codeRepositories } from "../db/schema/repos.js";
+import { eq } from "drizzle-orm";
+import { randomUUID } from "crypto";
 import { embed } from "./embeddings.service.js";
 import logger from "../lib/logger.js";
 
@@ -38,14 +42,13 @@ export async function ingestGitHubRepo(
   owner: string,
   repo: string
 ): Promise<string> {
-  const repoRecord = await prisma.codeRepository.create({
-    data: {
-      userId,
-      source: "github",
-      repoUrl: `https://github.com/${owner}/${repo}`,
-      name: `${owner}/${repo}`,
-    },
-  });
+  const [repoRecord] = await db.insert(codeRepositories).values({
+    id: randomUUID(),
+    userId,
+    source: "github",
+    repoUrl: `https://github.com/${owner}/${repo}`,
+    name: `${owner}/${repo}`,
+  }).returning();
 
   const repoId = repoRecord.id;
 
@@ -119,19 +122,13 @@ export async function ingestGitHubRepo(
       }
     }
 
-    await prisma.codeRepository.update({
-      where: { id: repoId },
-      data: { indexed: true, fileCount: indexed },
-    });
+    await db.update(codeRepositories).set({ indexed: true, fileCount: indexed }).where(eq(codeRepositories.id, repoId));
 
     logger.info({ repoId, indexed }, "GitHub repo ingestion complete");
     return repoId;
   } catch (err) {
     logger.error({ repoId, err }, "GitHub repo ingestion failed");
-    await prisma.codeRepository.update({
-      where: { id: repoId },
-      data: { indexed: false, fileCount: 0 },
-    });
+    await db.update(codeRepositories).set({ indexed: false, fileCount: 0 }).where(eq(codeRepositories.id, repoId));
     throw err;
   }
 }

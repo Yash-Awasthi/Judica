@@ -1,5 +1,7 @@
 import { Strategy as GitHubStrategy } from "passport-github2";
-import prisma from "../lib/db.js";
+import { db } from "../lib/drizzle.js";
+import { users } from "../db/schema/users.js";
+import { eq } from "drizzle-orm";
 import { env } from "../config/env.js";
 
 export function createGitHubStrategy() {
@@ -16,17 +18,25 @@ export function createGitHubStrategy() {
       try {
         const email = profile.emails?.[0]?.value || `${profile.username}@github.local`;
 
-        let user = await prisma.user.findUnique({ where: { email } });
-        if (!user) {
-          user = await prisma.user.create({
-            data: {
-              email,
-              username: profile.username || profile.displayName || email.split("@")[0],
-              passwordHash: "",
-              role: "member",
-            },
-          });
+        const [existing] = await db
+          .select()
+          .from(users)
+          .where(eq(users.email, email))
+          .limit(1);
+
+        if (existing) {
+          return done(null, existing);
         }
+
+        const [user] = await db
+          .insert(users)
+          .values({
+            email,
+            username: profile.username || profile.displayName || email.split("@")[0],
+            passwordHash: "",
+            role: "member",
+          })
+          .returning();
 
         done(null, user);
       } catch (err) {

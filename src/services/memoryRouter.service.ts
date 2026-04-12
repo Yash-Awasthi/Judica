@@ -1,4 +1,6 @@
-import prisma from "../lib/db.js";
+import { db } from "../lib/drizzle.js";
+import { memoryBackends } from "../db/schema/memory.js";
+import { eq } from "drizzle-orm";
 import { storeChunk, searchSimilar } from "./vectorStore.service.js";
 import { embed } from "./embeddings.service.js";
 import logger from "../lib/logger.js";
@@ -37,9 +39,11 @@ export interface MemoryBackendConfig {
 }
 
 export async function getBackend(userId: number): Promise<MemoryBackendConfig | null> {
-  const backend = await prisma.memoryBackend.findUnique({
-    where: { userId },
-  });
+  const [backend] = await db
+    .select()
+    .from(memoryBackends)
+    .where(eq(memoryBackends.userId, userId))
+    .limit(1);
 
   if (!backend || !backend.active) return null;
 
@@ -58,15 +62,17 @@ export async function setBackend(
 ): Promise<void> {
   const encrypted = encryptConfig(JSON.stringify(config));
 
-  await prisma.memoryBackend.upsert({
-    where: { userId },
-    create: { userId, type, config: encrypted, active: true },
-    update: { type, config: encrypted, active: true },
-  });
+  await db
+    .insert(memoryBackends)
+    .values({ id: crypto.randomUUID(), userId, type, config: encrypted, active: true })
+    .onConflictDoUpdate({
+      target: memoryBackends.userId,
+      set: { type, config: encrypted, active: true },
+    });
 }
 
 export async function removeBackend(userId: number): Promise<void> {
-  await prisma.memoryBackend.deleteMany({ where: { userId } });
+  await db.delete(memoryBackends).where(eq(memoryBackends.userId, userId));
 }
 
 // Routed store: dispatches to correct backend

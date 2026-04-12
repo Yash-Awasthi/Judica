@@ -1,10 +1,13 @@
 import { Router, Response } from "express";
 import { requireAuth } from "../middleware/auth.js";
 import { upload } from "../middleware/upload.js";
-import prisma from "../lib/db.js";
+import { db } from "../lib/drizzle.js";
+import { uploads } from "../db/schema/uploads.js";
+import { eq, and, desc } from "drizzle-orm";
 import { AuthRequest } from "../types/index.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { processFile } from "../processors/router.processor.js";
+import { randomUUID } from "crypto";
 import fs from "fs";
 import path from "path";
 import logger from "../lib/logger.js";
@@ -74,19 +77,27 @@ router.post("/", requireAuth, upload.array("files", 10), async (req: AuthRequest
 
   const userId = req.userId!;
   const records = await Promise.all(
-    files.map((f) =>
-      prisma.upload.create({
-        data: {
+    files.map(async (f) => {
+      const [row] = await db
+        .insert(uploads)
+        .values({
+          id: randomUUID(),
           userId,
           filename: f.filename,
           originalName: f.originalname,
           mimeType: f.mimetype,
           sizeBytes: f.size,
           storagePath: f.path,
-        },
-        select: { id: true, filename: true, originalName: true, mimeType: true, sizeBytes: true },
-      })
-    )
+        })
+        .returning({
+          id: uploads.id,
+          filename: uploads.filename,
+          originalName: uploads.originalName,
+          mimeType: uploads.mimeType,
+          sizeBytes: uploads.sizeBytes,
+        });
+      return row;
+    })
   );
 
   res.status(201).json({ uploads: records });
@@ -137,19 +148,28 @@ router.post("/", requireAuth, upload.array("files", 10), async (req: AuthRequest
  */
 // GET /api/uploads/:id/status
 router.get("/:id/status", requireAuth, async (req: AuthRequest, res: Response) => {
-  const upload = await prisma.upload.findFirst({
-    where: { id: req.params.id as string, userId: req.userId! },
-    select: { id: true, processed: true, extractedText: true, metadata: true, mimeType: true, originalName: true },
-  });
-  if (!upload) throw new AppError(404, "Upload not found", "UPLOAD_NOT_FOUND");
+  const [record] = await db
+    .select({
+      id: uploads.id,
+      processed: uploads.processed,
+      extractedText: uploads.extractedText,
+      metadata: uploads.metadata,
+      mimeType: uploads.mimeType,
+      originalName: uploads.originalName,
+    })
+    .from(uploads)
+    .where(and(eq(uploads.id, req.params.id as string), eq(uploads.userId, req.userId!)))
+    .limit(1);
+
+  if (!record) throw new AppError(404, "Upload not found", "UPLOAD_NOT_FOUND");
 
   res.json({
-    id: upload.id,
-    processed: upload.processed,
-    extracted_text_length: upload.extractedText?.length || 0,
-    metadata: upload.metadata,
-    mimeType: upload.mimeType,
-    originalName: upload.originalName,
+    id: record.id,
+    processed: record.processed,
+    extracted_text_length: record.extractedText?.length || 0,
+    metadata: record.metadata,
+    mimeType: record.mimeType,
+    originalName: record.originalName,
   });
 });
 
@@ -197,9 +217,12 @@ router.get("/:id/status", requireAuth, async (req: AuthRequest, res: Response) =
  */
 // POST /api/uploads/:id/process — trigger processing
 router.post("/:id/process", requireAuth, async (req: AuthRequest, res: Response) => {
-  const record = await prisma.upload.findFirst({
-    where: { id: req.params.id as string, userId: req.userId! },
-  });
+  const [record] = await db
+    .select()
+    .from(uploads)
+    .where(and(eq(uploads.id, req.params.id as string), eq(uploads.userId, req.userId!)))
+    .limit(1);
+
   if (!record) throw new AppError(404, "Upload not found", "UPLOAD_NOT_FOUND");
 
   if (record.processed) {
@@ -209,14 +232,14 @@ router.post("/:id/process", requireAuth, async (req: AuthRequest, res: Response)
   try {
     const result = await processFile(record);
 
-    await prisma.upload.update({
-      where: { id: record.id },
-      data: {
+    await db
+      .update(uploads)
+      .set({
         processed: true,
         extractedText: result.text || null,
         metadata: (result.metadata || undefined) as any,
-      },
-    });
+      })
+      .where(eq(uploads.id, record.id));
 
     res.json({ success: true, extracted_text_length: result.text?.length || 0, type: result.type });
   } catch (err: any) {
@@ -257,9 +280,12 @@ router.post("/:id/process", requireAuth, async (req: AuthRequest, res: Response)
  */
 // GET /api/uploads/:id/raw — serve file with auth
 router.get("/:id/raw", requireAuth, async (req: AuthRequest, res: Response) => {
-  const record = await prisma.upload.findFirst({
-    where: { id: req.params.id as string, userId: req.userId! },
-  });
+  const [record] = await db
+    .select()
+    .from(uploads)
+    .where(and(eq(uploads.id, req.params.id as string), eq(uploads.userId, req.userId!)))
+    .limit(1);
+
   if (!record) throw new AppError(404, "Upload not found", "UPLOAD_NOT_FOUND");
 
   if (!fs.existsSync(record.storagePath)) {
@@ -312,13 +338,21 @@ router.get("/:id/raw", requireAuth, async (req: AuthRequest, res: Response) => {
  */
 // GET /api/uploads — list user's uploads
 router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
-  const uploads = await prisma.upload.findMany({
-    where: { userId: req.userId! },
-    orderBy: { createdAt: "desc" },
-    take: 50,
-    select: { id: true, originalName: true, mimeType: true, sizeBytes: true, processed: true, createdAt: true },
-  });
-  res.json({ uploads });
+  const rows = await db
+    .select({
+      id: uploads.id,
+      originalName: uploads.originalName,
+      mimeType: uploads.mimeType,
+      sizeBytes: uploads.sizeBytes,
+      processed: uploads.processed,
+      createdAt: uploads.createdAt,
+    })
+    .from(uploads)
+    .where(eq(uploads.userId, req.userId!))
+    .orderBy(desc(uploads.createdAt))
+    .limit(50);
+
+  res.json({ uploads: rows });
 });
 
 export default router;

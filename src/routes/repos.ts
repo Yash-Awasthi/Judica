@@ -1,12 +1,11 @@
-import { Router } from "express";
-import type { Response } from "express";
-import type { AuthRequest } from "../types/index.js";
-import prisma from "../lib/db.js";
+import { FastifyPluginAsync } from "fastify";
+import { db } from "../lib/drizzle.js";
+import { codeRepositories } from "../db/schema/repos.js";
+import { eq, and, desc } from "drizzle-orm";
+import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { searchRepo } from "../services/repoSearch.service.js";
 import { repoQueue } from "../queue/queues.js";
 import logger from "../lib/logger.js";
-
-const router = Router();
 
 /**
  * @openapi
@@ -48,250 +47,266 @@ const router = Router();
  *       401:
  *         description: Unauthorized
  */
-// GET / — list user's repos
-router.get("/", async (req: AuthRequest, res: Response) => {
-  const userId = String(req.userId);
-  const repos = await prisma.codeRepository.findMany({
-    where: { userId },
-    orderBy: { createdAt: "desc" },
-    select: {
-      id: true,
-      source: true,
-      repoUrl: true,
-      name: true,
-      indexed: true,
-      fileCount: true,
-      createdAt: true,
-    },
-  });
-  res.json({ data: repos });
-});
+const reposPlugin: FastifyPluginAsync = async (fastify) => {
+  // GET / — list user's repos
+  fastify.get("/", { preHandler: fastifyRequireAuth }, async (request) => {
+    const userId = String(request.userId);
+    const repos = await db
+      .select({
+        id: codeRepositories.id,
+        source: codeRepositories.source,
+        repoUrl: codeRepositories.repoUrl,
+        name: codeRepositories.name,
+        indexed: codeRepositories.indexed,
+        fileCount: codeRepositories.fileCount,
+        createdAt: codeRepositories.createdAt,
+      })
+      .from(codeRepositories)
+      .where(eq(codeRepositories.userId, userId))
+      .orderBy(desc(codeRepositories.createdAt));
 
-/**
- * @openapi
- * /api/repos/github:
- *   post:
- *     tags:
- *       - Repositories
- *     summary: Start GitHub repository ingestion
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - owner
- *               - repo
- *             properties:
- *               owner:
- *                 type: string
- *                 description: GitHub repository owner
- *               repo:
- *                 type: string
- *                 description: GitHub repository name
- *     responses:
- *       202:
- *         description: Ingestion queued
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                 owner:
- *                   type: string
- *                 repo:
- *                   type: string
- *       400:
- *         description: Missing owner or repo
- *       401:
- *         description: Unauthorized
- */
-// POST /github — start ingestion
-router.post("/github", async (req: AuthRequest, res: Response) => {
-  const userId = String(req.userId);
-  const { owner, repo } = req.body as { owner?: string; repo?: string };
-
-  if (!owner || !repo) {
-    res.status(400).json({ error: "owner and repo are required" });
-    return;
-  }
-
-  // Queue the ingestion via BullMQ
-  await repoQueue.add("ingest", { userId, owner: owner.trim(), repo: repo.trim() });
-
-  res.status(202).json({ message: "Ingestion queued", owner, repo });
-});
-
-/**
- * @openapi
- * /api/repos/{id}/status:
- *   get:
- *     tags:
- *       - Repositories
- *     summary: Get repository indexing status
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Repository ID
- *     responses:
- *       200:
- *         description: Repository status
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 indexed:
- *                   type: boolean
- *                 fileCount:
- *                   type: integer
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Repository not found
- */
-// GET /:id/status — return indexed status
-router.get("/:id/status", async (req: AuthRequest, res: Response) => {
-  const userId = String(req.userId);
-  const repoRecord = await prisma.codeRepository.findFirst({
-    where: { id: req.params.id as string, userId },
-    select: { indexed: true, fileCount: true },
+    return { data: repos };
   });
 
-  if (!repoRecord) {
-    res.status(404).json({ error: "Repository not found" });
-    return;
-  }
+  /**
+   * @openapi
+   * /api/repos/github:
+   *   post:
+   *     tags:
+   *       - Repositories
+   *     summary: Start GitHub repository ingestion
+   *     security:
+   *       - bearerAuth: []
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - owner
+   *               - repo
+   *             properties:
+   *               owner:
+   *                 type: string
+   *                 description: GitHub repository owner
+   *               repo:
+   *                 type: string
+   *                 description: GitHub repository name
+   *     responses:
+   *       202:
+   *         description: Ingestion queued
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 message:
+   *                   type: string
+   *                 owner:
+   *                   type: string
+   *                 repo:
+   *                   type: string
+   *       400:
+   *         description: Missing owner or repo
+   *       401:
+   *         description: Unauthorized
+   */
+  // POST /github — start ingestion
+  fastify.post("/github", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    const userId = String(request.userId);
+    const { owner, repo } = request.body as { owner?: string; repo?: string };
 
-  res.json(repoRecord);
-});
+    if (!owner || !repo) {
+      reply.code(400);
+      return { error: "owner and repo are required" };
+    }
 
-/**
- * @openapi
- * /api/repos/{id}/search:
- *   post:
- *     tags:
- *       - Repositories
- *     summary: Search repository files
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Repository ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - query
- *             properties:
- *               query:
- *                 type: string
- *                 description: Search query
- *     responses:
- *       200:
- *         description: Search results
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 data:
- *                   type: array
- *                   items:
- *                     type: object
- *       400:
- *         description: Missing query
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Repository not found
- */
-// POST /:id/search — search repo files
-router.post("/:id/search", async (req: AuthRequest, res: Response) => {
-  const userId = String(req.userId);
-  const { query } = req.body as { query?: string };
+    // Queue the ingestion via BullMQ
+    await repoQueue.add("ingest", { userId, owner: owner.trim(), repo: repo.trim() });
 
-  if (!query) {
-    res.status(400).json({ error: "query is required" });
-    return;
-  }
-
-  const repoRecord = await prisma.codeRepository.findFirst({
-    where: { id: req.params.id as string, userId },
+    reply.code(202);
+    return { message: "Ingestion queued", owner, repo };
   });
 
-  if (!repoRecord) {
-    res.status(404).json({ error: "Repository not found" });
-    return;
-  }
+  /**
+   * @openapi
+   * /api/repos/{id}/status:
+   *   get:
+   *     tags:
+   *       - Repositories
+   *     summary: Get repository indexing status
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Repository ID
+   *     responses:
+   *       200:
+   *         description: Repository status
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 indexed:
+   *                   type: boolean
+   *                 fileCount:
+   *                   type: integer
+   *       401:
+   *         description: Unauthorized
+   *       404:
+   *         description: Repository not found
+   */
+  // GET /:id/status — return indexed status
+  fastify.get("/:id/status", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    const userId = String(request.userId);
+    const { id } = request.params as { id: string };
 
-  const results = await searchRepo(req.params.id as string, query);
-  res.json({ data: results });
-});
+    const [repoRecord] = await db
+      .select({
+        indexed: codeRepositories.indexed,
+        fileCount: codeRepositories.fileCount,
+      })
+      .from(codeRepositories)
+      .where(and(eq(codeRepositories.id, id), eq(codeRepositories.userId, userId)))
+      .limit(1);
 
-/**
- * @openapi
- * /api/repos/{id}:
- *   delete:
- *     tags:
- *       - Repositories
- *     summary: Delete a repository and cascade files
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Repository ID
- *     responses:
- *       200:
- *         description: Repository deleted
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Repository not found
- */
-// DELETE /:id — delete repo + cascade files
-router.delete("/:id", async (req: AuthRequest, res: Response) => {
-  const userId = String(req.userId);
+    if (!repoRecord) {
+      reply.code(404);
+      return { error: "Repository not found" };
+    }
 
-  const repoRecord = await prisma.codeRepository.findFirst({
-    where: { id: req.params.id as string, userId },
+    return repoRecord;
   });
 
-  if (!repoRecord) {
-    res.status(404).json({ error: "Repository not found" });
-    return;
-  }
+  /**
+   * @openapi
+   * /api/repos/{id}/search:
+   *   post:
+   *     tags:
+   *       - Repositories
+   *     summary: Search repository files
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Repository ID
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             required:
+   *               - query
+   *             properties:
+   *               query:
+   *                 type: string
+   *                 description: Search query
+   *     responses:
+   *       200:
+   *         description: Search results
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 data:
+   *                   type: array
+   *                   items:
+   *                     type: object
+   *       400:
+   *         description: Missing query
+   *       401:
+   *         description: Unauthorized
+   *       404:
+   *         description: Repository not found
+   */
+  // POST /:id/search — search repo files
+  fastify.post("/:id/search", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    const userId = String(request.userId);
+    const { id } = request.params as { id: string };
+    const { query } = request.body as { query?: string };
 
-  await prisma.codeRepository.delete({ where: { id: req.params.id as string } });
-  res.json({ message: "Repository deleted" });
-});
+    if (!query) {
+      reply.code(400);
+      return { error: "query is required" };
+    }
 
-export default router;
+    const [repoRecord] = await db
+      .select()
+      .from(codeRepositories)
+      .where(and(eq(codeRepositories.id, id), eq(codeRepositories.userId, userId)))
+      .limit(1);
+
+    if (!repoRecord) {
+      reply.code(404);
+      return { error: "Repository not found" };
+    }
+
+    const results = await searchRepo(id, query);
+    return { data: results };
+  });
+
+  /**
+   * @openapi
+   * /api/repos/{id}:
+   *   delete:
+   *     tags:
+   *       - Repositories
+   *     summary: Delete a repository and cascade files
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Repository ID
+   *     responses:
+   *       200:
+   *         description: Repository deleted
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 message:
+   *                   type: string
+   *       401:
+   *         description: Unauthorized
+   *       404:
+   *         description: Repository not found
+   */
+  // DELETE /:id — delete repo + cascade files
+  fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    const userId = String(request.userId);
+    const { id } = request.params as { id: string };
+
+    const [repoRecord] = await db
+      .select()
+      .from(codeRepositories)
+      .where(and(eq(codeRepositories.id, id), eq(codeRepositories.userId, userId)))
+      .limit(1);
+
+    if (!repoRecord) {
+      reply.code(404);
+      return { error: "Repository not found" };
+    }
+
+    await db.delete(codeRepositories).where(eq(codeRepositories.id, id));
+    return { message: "Repository deleted" };
+  });
+};
+
+export default reposPlugin;

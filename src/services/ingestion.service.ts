@@ -1,6 +1,8 @@
 import { chunkText } from "./chunker.service.js";
 import { storeChunk } from "./vectorStore.service.js";
-import prisma from "../lib/db.js";
+import { db } from "../lib/drizzle.js";
+import { kbDocuments } from "../db/schema/uploads.js";
+import { eq } from "drizzle-orm";
 import logger from "../lib/logger.js";
 
 const BATCH_SIZE = 10;
@@ -35,10 +37,9 @@ export async function ingestDocument(
     }
   }
 
-  await prisma.kBDocument.update({
-    where: { id: docId },
-    data: { chunkCount: chunks.length, indexed: true, indexedAt: new Date() },
-  });
+  await db.update(kbDocuments)
+    .set({ chunkCount: chunks.length, indexed: true, indexedAt: new Date() })
+    .where(eq(kbDocuments.id, docId));
 
   logger.info({ docId, filename, chunkCount: chunks.length }, "Document ingestion complete");
   return chunks.length;

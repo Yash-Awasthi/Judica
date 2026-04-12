@@ -1,4 +1,7 @@
-import prisma from "../lib/db.js";
+import { db } from "../lib/drizzle.js";
+import { sharedFacts } from "../db/schema/council.js";
+import { eq, asc } from "drizzle-orm";
+import { randomUUID } from "crypto";
 import { routeAndCollect } from "../router/index.js";
 
 export interface SharedFactData {
@@ -20,52 +23,58 @@ export async function addFact(
   type: "fact" | "decision" | "assumption" | "contradiction",
   confidence: number
 ): Promise<SharedFactData> {
-  const fact = await prisma.sharedFact.create({
-    data: {
-      conversationId,
-      content,
-      sourceAgent,
-      type,
-      confidence: Math.min(1, Math.max(0, confidence)),
-      confirmedBy: [sourceAgent],
-      disputedBy: [],
-    },
-  });
+  const [fact] = await db.insert(sharedFacts).values({
+    id: randomUUID(),
+    conversationId,
+    content,
+    sourceAgent,
+    type,
+    confidence: Math.min(1, Math.max(0, confidence)),
+    confirmedBy: [sourceAgent],
+    disputedBy: [],
+  }).returning();
   return fact as SharedFactData;
 }
 
 export async function getFacts(conversationId: string): Promise<SharedFactData[]> {
-  const facts = await prisma.sharedFact.findMany({
-    where: { conversationId },
-    orderBy: { createdAt: "asc" },
-  });
+  const facts = await db
+    .select()
+    .from(sharedFacts)
+    .where(eq(sharedFacts.conversationId, conversationId))
+    .orderBy(asc(sharedFacts.createdAt));
   return facts as SharedFactData[];
 }
 
 export async function confirmFact(factId: string, agentId: string): Promise<void> {
-  const fact = await prisma.sharedFact.findUnique({ where: { id: factId } });
+  const [fact] = await db
+    .select()
+    .from(sharedFacts)
+    .where(eq(sharedFacts.id, factId));
   if (!fact) return;
 
   const confirmed = Array.from(new Set([...fact.confirmedBy, agentId]));
   const disputed = fact.disputedBy.filter((id) => id !== agentId);
 
-  await prisma.sharedFact.update({
-    where: { id: factId },
-    data: { confirmedBy: confirmed, disputedBy: disputed },
-  });
+  await db
+    .update(sharedFacts)
+    .set({ confirmedBy: confirmed, disputedBy: disputed })
+    .where(eq(sharedFacts.id, factId));
 }
 
 export async function disputeFact(factId: string, agentId: string): Promise<void> {
-  const fact = await prisma.sharedFact.findUnique({ where: { id: factId } });
+  const [fact] = await db
+    .select()
+    .from(sharedFacts)
+    .where(eq(sharedFacts.id, factId));
   if (!fact) return;
 
   const disputed = Array.from(new Set([...fact.disputedBy, agentId]));
   const confirmed = fact.confirmedBy.filter((id) => id !== agentId);
 
-  await prisma.sharedFact.update({
-    where: { id: factId },
-    data: { confirmedBy: confirmed, disputedBy: disputed },
-  });
+  await db
+    .update(sharedFacts)
+    .set({ confirmedBy: confirmed, disputedBy: disputed })
+    .where(eq(sharedFacts.id, factId));
 }
 
 export async function getFactContext(conversationId: string): Promise<string> {

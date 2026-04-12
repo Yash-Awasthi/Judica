@@ -1,6 +1,5 @@
-import { Router, Response } from "express";
-import { requireAuth } from "../middleware/auth.js";
-import { AuthRequest } from "../types/index.js";
+import { FastifyPluginAsync } from "fastify";
+import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { realTimeCostTracker } from "../lib/realtimeCost.js";
 import { env } from "../config/env.js";
 import { WebSocketServer, WebSocket } from "ws";
@@ -11,8 +10,6 @@ import { AppError } from "../middleware/errorHandler.js";
 interface CostSocket extends WebSocket {
   userId?: number;
 }
-
-const router = Router();
 
 const httpServer = createServer();
 const wss = new WebSocketServer({ server: httpServer });
@@ -66,80 +63,102 @@ wss.on('connection', (ws: CostSocket) => {
   });
 });
 
-router.post("/session/start", requireAuth, async (req: AuthRequest, res: Response) => {
-  try {
-    const { sessionId, conversationId } = req.body;
+const realtimePlugin: FastifyPluginAsync = async (fastify) => {
+  fastify.post("/session/start", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    try {
+      const { sessionId, conversationId } = request.body as { sessionId?: string; conversationId?: string };
 
-    if (!sessionId || !conversationId) {
-      return res.status(400).json({ error: "sessionId and conversationId are required" });
+      if (!sessionId || !conversationId) {
+        return reply.code(400).send({ error: "sessionId and conversationId are required" });
+      }
+
+      realTimeCostTracker.startSession(request.userId!, sessionId, conversationId);
+
+      return {
+        success: true,
+        sessionId,
+        message: "Cost tracking started"
+      };
+    } catch (err) {
+      throw new AppError(500, (err as Error).message, "COST_SESSION_START_FAILED");
     }
+  });
 
-    realTimeCostTracker.startSession(req.userId!, sessionId, conversationId);
+  fastify.post("/session/end", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    try {
+      const { sessionId } = request.body as { sessionId?: string };
 
-    res.json({
-      success: true,
-      sessionId,
-      message: "Cost tracking started"
-    });
-  } catch (err) {
-    throw new AppError(500, (err as Error).message, "COST_SESSION_START_FAILED");
-  }
-});
+      if (!sessionId) {
+        return reply.code(400).send({ error: "sessionId is required" });
+      }
 
-router.post("/session/end", requireAuth, async (req: AuthRequest, res: Response) => {
-  try {
-    const { sessionId } = req.body;
+      const entries = realTimeCostTracker.endSession(sessionId);
 
-    if (!sessionId) {
-      return res.status(400).json({ error: "sessionId is required" });
+      return {
+        success: true,
+        sessionId,
+        totalCost: entries.reduce((sum, entry) => sum + entry.cost, 0),
+        totalTokens: entries.reduce((sum, entry) => sum + entry.inputTokens + entry.outputTokens, 0),
+        requestCount: entries.length
+      };
+    } catch (err) {
+      throw new AppError(500, (err as Error).message, "COST_SESSION_END_FAILED");
     }
+  });
 
-    const entries = realTimeCostTracker.endSession(sessionId);
+  fastify.get("/ledger", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    try {
+      const ledger = realTimeCostTracker.getLedger(request.userId!);
 
-    res.json({
-      success: true,
-      sessionId,
-      totalCost: entries.reduce((sum, entry) => sum + entry.cost, 0),
-      totalTokens: entries.reduce((sum, entry) => sum + entry.inputTokens + entry.outputTokens, 0),
-      requestCount: entries.length
-    });
-  } catch (err) {
-    throw new AppError(500, (err as Error).message, "COST_SESSION_END_FAILED");
-  }
-});
+      if (!ledger) {
+        return reply.code(404).send({ error: "No active cost tracking session" });
+      }
 
-router.get("/ledger", requireAuth, async (req: AuthRequest, res: Response) => {
-  try {
-    const ledger = realTimeCostTracker.getLedger(req.userId!);
-
-    if (!ledger) {
-      return res.status(404).json({ error: "No active cost tracking session" });
+      return {
+        success: true,
+        ledger
+      };
+    } catch (err) {
+      throw new AppError(500, (err as Error).message, "COST_LEDGER_FETCH_FAILED");
     }
+  });
 
-    res.json({
-      success: true,
-      ledger
-    });
-  } catch (err) {
-    throw new AppError(500, (err as Error).message, "COST_LEDGER_FETCH_FAILED");
-  }
-});
+  /**
+   * @openapi
+   * /api/realtime/statistics:
+   *   get:
+   *     tags:
+   *       - Realtime
+   *     summary: Get real-time cost statistics
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: query
+   *         name: hours
+   *         schema:
+   *           type: integer
+   *           default: 24
+   *         description: Number of hours for statistics
+   *     responses:
+   *       200:
+   *         description: Cost statistics
+   */
+  fastify.get("/statistics", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    try {
+      const { hours = 24 } = request.query as { hours?: string };
 
-router.get("/statistics", requireAuth, async (req: AuthRequest, res: Response) => {
-  try {
-    const { hours = 24 } = req.query;
+      const stats = realTimeCostTracker.getStatistics(request.userId!, parseInt(hours as string));
 
-    const stats = realTimeCostTracker.getStatistics(req.userId!, parseInt(hours as string));
-
-    res.json({
-      success: true,
-      statistics: stats
-    });
-  } catch (err) {
-    throw new AppError(500, (err as Error).message, "COST_STATISTICS_FETCH_FAILED");
-  }
-});
+      return {
+        success: true,
+        statistics: stats
+      };
+    } catch (err) {
+      throw new AppError(500, (err as Error).message, "COST_STATISTICS_FETCH_FAILED");
+    }
+  });
+};
 
 export { wss, httpServer };
 
-export default router;
+export default realtimePlugin;

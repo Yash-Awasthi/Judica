@@ -1,166 +1,170 @@
-import { Router, Response } from "express";
-import prisma from "../lib/db.js";
-import type { AuthRequest } from "../types/index.js";
+import { FastifyPluginAsync } from "fastify";
+import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
+import { db } from "../lib/drizzle.js";
+import { conversations, chats } from "../db/schema/conversations.js";
+import { traces } from "../db/schema/traces.js";
+import { eq, count, sum, avg, sql } from "drizzle-orm";
 
-const router = Router();
+const analyticsPlugin: FastifyPluginAsync = async (fastify) => {
+  /**
+   * @openapi
+   * /api/analytics/overview:
+   *   get:
+   *     tags:
+   *       - Analytics
+   *     summary: Get analytics overview for the authenticated user
+   *     security:
+   *       - bearerAuth: []
+   *     responses:
+   *       200:
+   *         description: Analytics overview including conversations, messages, tokens, costs, daily usage, model distribution, and top tools
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 totalConversations:
+   *                   type: integer
+   *                 totalMessages:
+   *                   type: integer
+   *                 totalTokensUsed:
+   *                   type: integer
+   *                 totalCostUsd:
+   *                   type: number
+   *                 avgLatencyMs:
+   *                   type: integer
+   *                 modelDistribution:
+   *                   type: array
+   *                   items:
+   *                     type: object
+   *                     properties:
+   *                       model:
+   *                         type: string
+   *                       count:
+   *                         type: integer
+   *                 dailyUsage:
+   *                   type: array
+   *                   items:
+   *                     type: object
+   *                     properties:
+   *                       date:
+   *                         type: string
+   *                       tokens:
+   *                         type: integer
+   *                       cost:
+   *                         type: number
+   *                 topTools:
+   *                   type: array
+   *                   items:
+   *                     type: object
+   *                     properties:
+   *                       tool:
+   *                         type: string
+   *                       count:
+   *                         type: integer
+   *       401:
+   *         description: Unauthorized
+   */
+  fastify.get("/overview", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    const userId = request.userId!;
 
-/**
- * @openapi
- * /api/analytics/overview:
- *   get:
- *     tags:
- *       - Analytics
- *     summary: Get analytics overview for the authenticated user
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: Analytics overview including conversations, messages, tokens, costs, daily usage, model distribution, and top tools
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 totalConversations:
- *                   type: integer
- *                 totalMessages:
- *                   type: integer
- *                 totalTokensUsed:
- *                   type: integer
- *                 totalCostUsd:
- *                   type: number
- *                 avgLatencyMs:
- *                   type: integer
- *                 modelDistribution:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       model:
- *                         type: string
- *                       count:
- *                         type: integer
- *                 dailyUsage:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       date:
- *                         type: string
- *                       tokens:
- *                         type: integer
- *                       cost:
- *                         type: number
- *                 topTools:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       tool:
- *                         type: string
- *                       count:
- *                         type: integer
- *       401:
- *         description: Unauthorized
- */
-router.get("/overview", async (req: AuthRequest, res: Response) => {
-  const userId = req.userId!;
+    // Total conversations
+    const [convCount] = await db
+      .select({ value: count() })
+      .from(conversations)
+      .where(eq(conversations.userId, userId));
+    const totalConversations = convCount.value;
 
-  // Total conversations
-  const totalConversations = await prisma.conversation.count({ where: { userId } });
+    // Total messages (chats)
+    const [chatCount] = await db
+      .select({ value: count() })
+      .from(chats)
+      .where(eq(chats.userId, userId));
+    const totalMessages = chatCount.value;
 
-  // Total messages (chats)
-  const totalMessages = await prisma.chat.count({ where: { userId } });
+    // Aggregated trace data
+    const [traceAgg] = await db
+      .select({
+        totalTokens: sum(traces.totalTokens),
+        totalCostUsd: sum(traces.totalCostUsd),
+        avgLatency: avg(traces.totalLatencyMs),
+      })
+      .from(traces)
+      .where(eq(traces.userId, userId));
 
-  // Aggregated trace data
-  const traceAgg = await prisma.trace.aggregate({
-    where: { userId },
-    _sum: { totalTokens: true, totalCostUsd: true },
-    _avg: { totalLatencyMs: true },
-  });
+    const totalTokensUsed = Number(traceAgg.totalTokens ?? 0);
+    const totalCostUsd = Number(traceAgg.totalCostUsd ?? 0);
+    const avgLatencyMs = Math.round(Number(traceAgg.avgLatency ?? 0));
 
-  const totalTokensUsed = traceAgg._sum.totalTokens ?? 0;
-  const totalCostUsd = traceAgg._sum.totalCostUsd ?? 0;
-  const avgLatencyMs = Math.round(traceAgg._avg.totalLatencyMs ?? 0);
+    // Daily usage from traces (last 30 days)
+    const thirtyDaysAgo = new Date();
+    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-  // Daily usage from traces (last 30 days)
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    const dailyRaw = await db.execute(sql`
+      SELECT DATE("createdAt") as date,
+             SUM("totalTokens")::bigint as tokens,
+             SUM("totalCostUsd") as cost
+      FROM "Trace"
+      WHERE "userId" = ${userId} AND "createdAt" >= ${thirtyDaysAgo}
+      GROUP BY DATE("createdAt")
+      ORDER BY date ASC
+    `);
 
-  const dailyRaw = await prisma.$queryRawUnsafe<
-    { date: Date; tokens: bigint; cost: number }[]
-  >(
-    `SELECT DATE("createdAt") as date,
-            SUM("totalTokens")::bigint as tokens,
-            SUM("totalCostUsd") as cost
-     FROM "Trace"
-     WHERE "userId" = $1 AND "createdAt" >= $2
-     GROUP BY DATE("createdAt")
-     ORDER BY date ASC`,
-    userId,
-    thirtyDaysAgo
-  );
-
-  const dailyUsage = dailyRaw.map((d) => ({
-    date: d.date.toISOString().split("T")[0],
-    tokens: Number(d.tokens),
-    cost: d.cost,
-  }));
-
-  // Model distribution from trace steps JSON
-  let modelDistribution: { model: string; count: number }[] = [];
-  try {
-    const modelRaw = await prisma.$queryRawUnsafe<
-      { model: string; count: bigint }[]
-    >(
-      `SELECT step->>'model' as model, COUNT(*)::bigint as count
-       FROM "Trace", jsonb_array_elements(steps) AS step
-       WHERE "userId" = $1 AND step->>'model' IS NOT NULL AND step->>'model' != ''
-       GROUP BY step->>'model'
-       ORDER BY count DESC
-       LIMIT 20`,
-      userId
-    );
-    modelDistribution = modelRaw.map((m) => ({
-      model: m.model,
-      count: Number(m.count),
+    const dailyUsage = (dailyRaw.rows as any[]).map((d: any) => ({
+      date: new Date(d.date).toISOString().split("T")[0],
+      tokens: Number(d.tokens),
+      cost: Number(d.cost),
     }));
-  } catch {
-    // If steps JSON structure doesn't match, return empty
-  }
 
-  // Top tools from trace steps where type='tool_call'
-  let topTools: { tool: string; count: number }[] = [];
-  try {
-    const toolRaw = await prisma.$queryRawUnsafe<
-      { tool: string; count: bigint }[]
-    >(
-      `SELECT step->>'name' as tool, COUNT(*)::bigint as count
-       FROM "Trace", jsonb_array_elements(steps) AS step
-       WHERE "userId" = $1 AND step->>'type' = 'tool_call'
-       GROUP BY step->>'name'
-       ORDER BY count DESC
-       LIMIT 20`,
-      userId
-    );
-    topTools = toolRaw.map((t) => ({
-      tool: t.tool,
-      count: Number(t.count),
-    }));
-  } catch {
-    // If steps JSON structure doesn't match, return empty
-  }
+    // Model distribution from trace steps JSON
+    let modelDistribution: { model: string; count: number }[] = [];
+    try {
+      const modelRaw = await db.execute(sql`
+        SELECT step->>'model' as model, COUNT(*)::bigint as count
+        FROM "Trace", jsonb_array_elements(steps) AS step
+        WHERE "userId" = ${userId} AND step->>'model' IS NOT NULL AND step->>'model' != ''
+        GROUP BY step->>'model'
+        ORDER BY count DESC
+        LIMIT 20
+      `);
+      modelDistribution = (modelRaw.rows as any[]).map((m: any) => ({
+        model: m.model,
+        count: Number(m.count),
+      }));
+    } catch {
+      // If steps JSON structure doesn't match, return empty
+    }
 
-  res.json({
-    totalConversations,
-    totalMessages,
-    totalTokensUsed,
-    totalCostUsd,
-    avgLatencyMs,
-    modelDistribution,
-    dailyUsage,
-    topTools,
+    // Top tools from trace steps where type='tool_call'
+    let topTools: { tool: string; count: number }[] = [];
+    try {
+      const toolRaw = await db.execute(sql`
+        SELECT step->>'name' as tool, COUNT(*)::bigint as count
+        FROM "Trace", jsonb_array_elements(steps) AS step
+        WHERE "userId" = ${userId} AND step->>'type' = 'tool_call'
+        GROUP BY step->>'name'
+        ORDER BY count DESC
+        LIMIT 20
+      `);
+      topTools = (toolRaw.rows as any[]).map((t: any) => ({
+        tool: t.tool,
+        count: Number(t.count),
+      }));
+    } catch {
+      // If steps JSON structure doesn't match, return empty
+    }
+
+    return {
+      totalConversations,
+      totalMessages,
+      totalTokensUsed,
+      totalCostUsd,
+      avgLatencyMs,
+      modelDistribution,
+      dailyUsage,
+      topTools,
+    };
   });
-});
+};
 
-export default router;
+export default analyticsPlugin;

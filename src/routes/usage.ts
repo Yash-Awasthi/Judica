@@ -1,9 +1,8 @@
-import { Router, Response } from "express";
-import { requireAuth } from "../middleware/auth.js";
-import prisma from "../lib/db.js";
-import type { AuthRequest } from "../types/index.js";
-
-const router = Router();
+import type { FastifyPluginAsync } from "fastify";
+import { db } from "../lib/drizzle.js";
+import { usageLogs, dailyUsage } from "../db/schema/users.js";
+import { eq, and, gte, lte, sum, count, avg, sql, desc } from "drizzle-orm";
+import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 
 /**
  * @openapi
@@ -87,92 +86,100 @@ const router = Router();
  *       401:
  *         description: Unauthorized
  */
-router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
-  const userId = req.user!.id;
-  const { start_date, end_date, group_by } = req.query;
+const usageRoutes: FastifyPluginAsync = async (fastify) => {
+  fastify.get(
+    "/",
+    { preHandler: fastifyRequireAuth },
+    async (request, reply) => {
+      const userId = request.userId!;
+      const { start_date, end_date } = request.query as {
+        start_date?: string;
+        end_date?: string;
+        group_by?: string;
+      };
 
-  const where: Record<string, unknown> = { userId };
+      // Build where conditions
+      const conditions = [eq(usageLogs.userId, userId)];
+      if (start_date) conditions.push(gte(usageLogs.createdAt, new Date(start_date)));
+      if (end_date) conditions.push(lte(usageLogs.createdAt, new Date(end_date)));
 
-  if (start_date || end_date) {
-    where.createdAt = {};
-    if (start_date) (where.createdAt as Record<string, unknown>).gte = new Date(start_date as string);
-    if (end_date) (where.createdAt as Record<string, unknown>).lte = new Date(end_date as string);
-  }
+      const whereClause = and(...conditions);
 
-  // Summary stats
-  const summary = await prisma.usageLog.aggregate({
-    where,
-    _sum: {
-      promptTokens: true,
-      completionTokens: true,
-      costUsd: true,
+      // Summary stats
+      const [summaryRow] = await db
+        .select({
+          totalRequests: count(),
+          totalPromptTokens: sum(usageLogs.promptTokens),
+          totalCompletionTokens: sum(usageLogs.completionTokens),
+          totalCostUsd: sum(usageLogs.costUsd),
+          avgLatencyMs: avg(usageLogs.latencyMs),
+        })
+        .from(usageLogs)
+        .where(whereClause);
+
+      // Group by provider + model
+      const byProvider = await db
+        .select({
+          provider: usageLogs.provider,
+          model: usageLogs.model,
+          requests: count(),
+          totalPromptTokens: sum(usageLogs.promptTokens),
+          totalCompletionTokens: sum(usageLogs.completionTokens),
+          totalCostUsd: sum(usageLogs.costUsd),
+          avgLatencyMs: avg(usageLogs.latencyMs),
+        })
+        .from(usageLogs)
+        .where(whereClause)
+        .groupBy(usageLogs.provider, usageLogs.model)
+        .orderBy(desc(sum(usageLogs.costUsd)));
+
+      // Daily usage (last 30 days)
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
+      const dailyRaw = await db.execute<{
+        date: Date;
+        total_tokens: string;
+        total_cost: number;
+        count: string;
+      }>(sql`
+        SELECT DATE("createdAt") as date,
+               SUM("promptTokens" + "completionTokens")::bigint as total_tokens,
+               SUM("costUsd") as total_cost,
+               COUNT(*)::bigint as count
+        FROM "UsageLog"
+        WHERE "userId" = ${userId} AND "createdAt" >= ${thirtyDaysAgo}
+        GROUP BY DATE("createdAt")
+        ORDER BY date DESC
+      `);
+
+      const daily = dailyRaw.rows.map((d) => ({
+        date: d.date,
+        total_tokens: Number(d.total_tokens),
+        total_cost: d.total_cost,
+        count: Number(d.count),
+      }));
+
+      return {
+        summary: {
+          total_requests: summaryRow.totalRequests,
+          total_prompt_tokens: Number(summaryRow.totalPromptTokens) || 0,
+          total_completion_tokens: Number(summaryRow.totalCompletionTokens) || 0,
+          total_cost_usd: Number(summaryRow.totalCostUsd) || 0,
+          avg_latency_ms: Math.round(Number(summaryRow.avgLatencyMs) || 0),
+        },
+        by_provider: byProvider.map((p) => ({
+          provider: p.provider,
+          model: p.model,
+          requests: p.requests,
+          total_tokens: (Number(p.totalPromptTokens) || 0) + (Number(p.totalCompletionTokens) || 0),
+          total_cost_usd: Number(p.totalCostUsd) || 0,
+          avg_latency_ms: Math.round(Number(p.avgLatencyMs) || 0),
+        })),
+        daily,
+      };
     },
-    _count: true,
-    _avg: {
-      latencyMs: true,
-    },
-  });
-
-  // Group by provider + model
-  const byProvider = await prisma.usageLog.groupBy({
-    by: ["provider", "model"],
-    where,
-    _sum: {
-      promptTokens: true,
-      completionTokens: true,
-      costUsd: true,
-    },
-    _count: true,
-    _avg: {
-      latencyMs: true,
-    },
-    orderBy: { _sum: { costUsd: "desc" } },
-  });
-
-  // Daily usage (last 30 days)
-  const thirtyDaysAgo = new Date();
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-
-  const dailyRaw = await prisma.$queryRawUnsafe<
-    { date: Date; total_tokens: bigint; total_cost: number; count: bigint }[]
-  >(
-    `SELECT DATE("createdAt") as date,
-            SUM("promptTokens" + "completionTokens")::bigint as total_tokens,
-            SUM("costUsd") as total_cost,
-            COUNT(*)::bigint as count
-     FROM "UsageLog"
-     WHERE "userId" = $1 AND "createdAt" >= $2
-     GROUP BY DATE("createdAt")
-     ORDER BY date DESC`,
-    userId,
-    thirtyDaysAgo
   );
+};
 
-  const daily = dailyRaw.map((d) => ({
-    date: d.date,
-    total_tokens: Number(d.total_tokens),
-    total_cost: d.total_cost,
-    count: Number(d.count),
-  }));
-
-  res.json({
-    summary: {
-      total_requests: summary._count,
-      total_prompt_tokens: summary._sum.promptTokens || 0,
-      total_completion_tokens: summary._sum.completionTokens || 0,
-      total_cost_usd: summary._sum.costUsd || 0,
-      avg_latency_ms: Math.round(summary._avg.latencyMs || 0),
-    },
-    by_provider: byProvider.map((p) => ({
-      provider: p.provider,
-      model: p.model,
-      requests: p._count,
-      total_tokens: (p._sum.promptTokens || 0) + (p._sum.completionTokens || 0),
-      total_cost_usd: p._sum.costUsd || 0,
-      avg_latency_ms: Math.round(p._avg.latencyMs || 0),
-    })),
-    daily,
-  });
-});
-
-export default router;
+export default usageRoutes;

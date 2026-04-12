@@ -1,4 +1,5 @@
-import prisma from "../lib/db.js";
+import { db } from "../lib/drizzle.js";
+import { artifacts } from "../db/schema/research.js";
 import logger from "../lib/logger.js";
 
 export interface DetectedArtifact {
@@ -111,16 +112,15 @@ export async function saveArtifact(
   conversationId: string | null,
   artifact: DetectedArtifact
 ): Promise<string> {
-  const record = await prisma.artifact.create({
-    data: {
-      userId,
-      conversationId,
-      name: artifact.name,
-      type: artifact.type,
-      content: artifact.content,
-      language: artifact.language || null,
-    },
-  });
+  const [record] = await db.insert(artifacts).values({
+    userId,
+    conversationId,
+    name: artifact.name,
+    type: artifact.type,
+    content: artifact.content,
+    language: artifact.language || null,
+    updatedAt: new Date(),
+  }).returning();
 
   logger.info({ artifactId: record.id, type: artifact.type }, "Artifact saved");
   return record.id;

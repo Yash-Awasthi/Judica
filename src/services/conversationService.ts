@@ -1,5 +1,6 @@
-import prisma from "../lib/db.js";
-import { pool } from "../lib/db.js";
+import { db } from "../lib/drizzle.js";
+import { conversations, chats } from "../db/schema/conversations.js";
+import { eq, and, desc, asc, sql } from "drizzle-orm";
 import { Message } from "../lib/providers.js";
 import logger from "../lib/logger.js";
 import { getEmbeddingWithLock } from "../lib/cache.js";
@@ -51,14 +52,19 @@ export interface RelevantContext {
 
 export async function createConversation(input: CreateConversationInput): Promise<Conversation> {
   try {
-    const conversation = await prisma.conversation.create({
-      data: {
+    const now = new Date();
+    const [conversation] = await db
+      .insert(conversations)
+      .values({
+        id: crypto.randomUUID(),
         userId: input.userId,
         title: input.title,
         isPublic: input.isPublic ?? false,
-      } as any
-    });
-    return conversation;
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning();
+    return conversation as Conversation;
   } catch (err) {
     logger.error({ err, input }, "Failed to create conversation");
     throw err;
@@ -67,13 +73,17 @@ export async function createConversation(input: CreateConversationInput): Promis
 
 export async function findConversationById(id: string, userId?: number): Promise<Conversation | null> {
   try {
-    const conversation = await prisma.conversation.findFirst({
-      where: { 
-        id,
-        ...(userId && { userId })
-      }
-    });
-    return conversation;
+    const conditions = userId
+      ? and(eq(conversations.id, id), eq(conversations.userId, userId))
+      : eq(conversations.id, id);
+
+    const [conversation] = await db
+      .select()
+      .from(conversations)
+      .where(conditions)
+      .limit(1);
+
+    return (conversation as Conversation) ?? null;
   } catch (err) {
     logger.error({ err, id, userId }, "Failed to find conversation");
     throw err;
@@ -83,34 +93,26 @@ export async function findConversationById(id: string, userId?: number): Promise
 export async function createChat(input: CreateChatInput, generateEmbedding: boolean = false): Promise<Chat> {
   try {
     let embeddingVector: number[] | null = null;
-    
+
     if (generateEmbedding) {
       const chatText = `${input.question} ${input.verdict}`.slice(0, 1000);
       embeddingVector = await getEmbeddingWithLock(chatText);
     }
-    
+
     if (embeddingVector) {
-      const result = await pool.query(`
+      const vectorStr = `[${embeddingVector.join(',')}]`;
+      const result = await db.execute(sql`
         INSERT INTO "Chat" ("userId", "conversationId", question, verdict, opinions, "durationMs", "tokensUsed", "cacheHit", embedding, "createdAt")
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9::vector, NOW())
+        VALUES (${input.userId ?? null}, ${input.conversationId ?? null}, ${input.question}, ${input.verdict}, ${JSON.stringify(input.opinions)}::jsonb, ${input.durationMs ?? null}, ${input.tokensUsed ?? null}, ${input.cacheHit ?? false}, ${vectorStr}::vector, NOW())
         RETURNING *
-      `, [
-        input.userId ?? null,
-        input.conversationId ?? null,
-        input.question,
-        input.verdict,
-        JSON.stringify(input.opinions),
-        input.durationMs ?? null,
-        input.tokensUsed ?? null,
-        input.cacheHit ?? false,
-        `[${embeddingVector.join(',')}]`
-      ]);
-      
-      return result.rows[0] as Chat;
+      `);
+
+      return (result as any).rows[0] as Chat;
     }
-    
-    const chat = await prisma.chat.create({
-      data: {
+
+    const [chat] = await db
+      .insert(chats)
+      .values({
         userId: input.userId,
         conversationId: input.conversationId,
         question: input.question,
@@ -119,9 +121,9 @@ export async function createChat(input: CreateChatInput, generateEmbedding: bool
         durationMs: input.durationMs,
         tokensUsed: input.tokensUsed,
         cacheHit: input.cacheHit ?? false,
-      }
-    });
-    return chat;
+      })
+      .returning();
+    return chat as Chat;
   } catch (err) {
     logger.error({ err, input }, "Failed to create chat");
     throw err;
@@ -130,14 +132,15 @@ export async function createChat(input: CreateChatInput, generateEmbedding: bool
 
 export async function getRecentHistory(conversationId: string): Promise<Message[]> {
   try {
-    const chats = await prisma.chat.findMany({
-      where: { conversationId },
-      orderBy: { createdAt: 'asc' },
-      take: 20 // Limit to prevent context overflow
-    });
+    const result = await db
+      .select()
+      .from(chats)
+      .where(eq(chats.conversationId, conversationId))
+      .orderBy(asc(chats.createdAt))
+      .limit(20);
 
     const messages: Message[] = [];
-    for (const chat of chats) {
+    for (const chat of result) {
       messages.push({ role: "user", content: chat.question });
       messages.push({ role: "assistant", content: chat.verdict });
     }
@@ -150,12 +153,13 @@ export async function getRecentHistory(conversationId: string): Promise<Message[
 
 export async function getConversationList(userId: number, limit: number = 50): Promise<Conversation[]> {
   try {
-    const conversations = await prisma.conversation.findMany({
-      where: { userId },
-      orderBy: { updatedAt: 'desc' },
-      take: limit
-    });
-    return conversations;
+    const result = await db
+      .select()
+      .from(conversations)
+      .where(eq(conversations.userId, userId))
+      .orderBy(desc(conversations.updatedAt))
+      .limit(limit);
+    return result as Conversation[];
   } catch (err) {
     logger.error({ err, userId }, "Failed to get conversation list");
     throw err;
@@ -164,13 +168,11 @@ export async function getConversationList(userId: number, limit: number = 50): P
 
 export async function deleteConversation(id: string, userId: number): Promise<boolean> {
   try {
-    const result = await prisma.conversation.deleteMany({
-      where: { 
-        id,
-        userId // Ensure user can only delete their own conversations
-      }
-    });
-    return result.count > 0;
+    const result = await db
+      .delete(conversations)
+      .where(and(eq(conversations.id, id), eq(conversations.userId, userId)))
+      .returning({ id: conversations.id });
+    return result.length > 0;
   } catch (err) {
     logger.error({ err, id, userId }, "Failed to delete conversation");
     throw err;
@@ -179,19 +181,17 @@ export async function deleteConversation(id: string, userId: number): Promise<bo
 
 export async function updateConversationTitle(id: string, userId: number, title: string): Promise<Conversation | null> {
   try {
-    const conversation = await prisma.conversation.updateMany({
-      where: { 
-        id,
-        userId
-      },
-      data: { title }
-    });
-    
-    if (conversation.count === 0) {
+    const result = await db
+      .update(conversations)
+      .set({ title })
+      .where(and(eq(conversations.id, id), eq(conversations.userId, userId)))
+      .returning();
+
+    if (result.length === 0) {
       return null;
     }
-    
-    return findConversationById(id, userId);
+
+    return result[0] as Conversation;
   } catch (err) {
     logger.error({ err, id, userId, title }, "Failed to update conversation title");
     throw err;
@@ -200,19 +200,19 @@ export async function updateConversationTitle(id: string, userId: number, title:
 
 function cosineSimilarity(a: number[], b: number[]): number {
   if (a.length !== b.length) return 0;
-  
+
   let dotProduct = 0;
   let normA = 0;
   let normB = 0;
-  
+
   for (let i = 0; i < a.length; i++) {
     dotProduct += a[i] * b[i];
     normA += a[i] * a[i];
     normB += b[i] * b[i];
   }
-  
+
   if (normA === 0 || normB === 0) return 0;
-  
+
   return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
@@ -229,14 +229,14 @@ function extractKeywords(text: string): Set<string> {
 function calculateKeywordRelevance(query: string, question: string, verdict: string): number {
   const queryKeywords = extractKeywords(query);
   const contentKeywords = extractKeywords(question + " " + verdict);
-  
+
   if (queryKeywords.size === 0) return 0;
-  
+
   let matches = 0;
   for (const kw of queryKeywords) {
     if (contentKeywords.has(kw)) matches++;
   }
-  
+
   return matches / queryKeywords.size;
 }
 
@@ -247,33 +247,31 @@ export async function retrieveRelevantContext(
 ): Promise<RelevantContext[]> {
   try {
     const queryEmbedding = await getEmbeddingWithLock(query);
-    
+
     if (queryEmbedding) {
       try {
-        const result = await pool.query(`
-          SELECT id, question, verdict, 
-                 embedding <-> $1 as distance
+        const vectorStr = `[${queryEmbedding.join(',')}]`;
+        const result = await db.execute(sql`
+          SELECT id, question, verdict,
+                 embedding <-> ${vectorStr}::vector as distance
           FROM "Chat"
-          WHERE "conversationId" = $2 
+          WHERE "conversationId" = ${conversationId}
             AND embedding IS NOT NULL
-          ORDER BY embedding <-> $1
-          LIMIT $3
-        `, [
-          `[${queryEmbedding.join(',')}]`,
-          conversationId,
-          maxResults
-        ]);
+          ORDER BY embedding <-> ${vectorStr}::vector
+          LIMIT ${maxResults}
+        `);
 
-        if (result.rows.length > 0) {
-          const contexts: RelevantContext[] = result.rows.map((row: any) => ({
+        const rows = (result as any).rows;
+        if (rows && rows.length > 0) {
+          const contexts: RelevantContext[] = rows.map((row: any) => ({
             question: row.question,
             verdict: row.verdict,
             relevance: Math.max(0, 1 - (row.distance || 0)) // Convert distance to similarity
           }));
 
-          logger.debug({ 
-            conversationId, 
-            query: query.slice(0, 50), 
+          logger.debug({
+            conversationId,
+            query: query.slice(0, 50),
             found: contexts.length,
             method: "semantic-db"
           }, "Retrieved relevant context (DB vector search)");
@@ -284,18 +282,19 @@ export async function retrieveRelevantContext(
         logger.warn({ err: dbErr }, "DB vector search failed, falling back");
       }
     }
-    
-    const chats = await prisma.chat.findMany({
-      where: { conversationId },
-      orderBy: { createdAt: 'desc' },
-      take: 50
-    });
 
-    if (chats.length === 0) {
+    const chatResults = await db
+      .select()
+      .from(chats)
+      .where(eq(chats.conversationId, conversationId))
+      .orderBy(desc(chats.createdAt))
+      .limit(50);
+
+    if (chatResults.length === 0) {
       return [];
     }
 
-    const scored: RelevantContext[] = chats.map((chat: Chat) => ({
+    const scored: RelevantContext[] = chatResults.map((chat) => ({
       question: chat.question,
       verdict: chat.verdict,
       relevance: calculateKeywordRelevance(query, chat.question, chat.verdict)
@@ -306,9 +305,9 @@ export async function retrieveRelevantContext(
       .sort((a: RelevantContext, b: RelevantContext) => b.relevance - a.relevance)
       .slice(0, maxResults);
 
-    logger.debug({ 
-      conversationId, 
-      query: query.slice(0, 50), 
+    logger.debug({
+      conversationId,
+      query: query.slice(0, 50),
       found: topResults.length,
       method: "keyword"
     }, "Retrieved relevant context (keyword fallback)");
@@ -326,7 +325,7 @@ export function formatContextForInjection(context: RelevantContext[]): string {
   }
 
   const MAX_CONTEXT_LENGTH = 1500; // Token-safe limit
-  
+
   const formatted = context
     .map((c, i) => {
       const item = `- Past Q${i + 1}: ${c.question.slice(0, 200)}\n  A: ${c.verdict.slice(0, 300)}`;

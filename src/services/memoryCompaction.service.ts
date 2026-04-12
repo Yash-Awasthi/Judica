@@ -1,4 +1,6 @@
-import prisma from "../lib/db.js";
+import { db } from "../lib/drizzle.js";
+import { memories } from "../db/schema/memory.js";
+import { eq, and, lt, inArray } from "drizzle-orm";
 import { embed } from "./embeddings.service.js";
 import { storeChunk } from "./vectorStore.service.js";
 import { routeAndCollect } from "../router/index.js";
@@ -32,19 +34,20 @@ export async function compact(userId: number): Promise<CompactionResult> {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
 
   // Get old memories
-  const oldMemories = await prisma.memory.findMany({
-    where: {
-      userId,
-      createdAt: { lt: sevenDaysAgo },
-    },
-    select: {
-      id: true,
-      content: true,
-      // embedding: true,
-      kbId: true,
-      sourceName: true,
-    },
-  });
+  const oldMemories = await db
+    .select({
+      id: memories.id,
+      content: memories.content,
+      kbId: memories.kbId,
+      sourceName: memories.sourceName,
+    })
+    .from(memories)
+    .where(
+      and(
+        eq(memories.userId, userId),
+        lt(memories.createdAt, sevenDaysAgo)
+      )
+    );
 
   if (oldMemories.length < 10) {
     return { originalCount: 0, compactedCount: 0, tokensSaved: 0 };
@@ -129,9 +132,9 @@ export async function compact(userId: number): Promise<CompactionResult> {
     );
 
     // Delete original chunks
-    await prisma.memory.deleteMany({
-      where: { id: { in: cluster.map((c) => c.id) } },
-    });
+    await db
+      .delete(memories)
+      .where(inArray(memories.id, cluster.map((c) => c.id)));
 
     compactedCount++;
   }

@@ -1,4 +1,6 @@
-import prisma from "../lib/db.js";
+import { db } from "../lib/drizzle.js";
+import { conversations, chats } from "../db/schema/conversations.js";
+import { eq, desc, count } from "drizzle-orm";
 import { routeAndCollect } from "../router/index.js";
 import logger from "../lib/logger.js";
 
@@ -6,19 +8,19 @@ export async function summarizeSession(
   conversationId: string,
   userId: number
 ): Promise<string> {
-  // Get last 20 messages
-  const messages = await (prisma as any).message.findMany({
-    where: { conversationId },
-    orderBy: { createdAt: "desc" },
-    take: 20,
-    select: { role: true, content: true },
-  });
+  // Get last 20 messages (chats)
+  const messages = await db
+    .select({ question: chats.question, verdict: chats.verdict })
+    .from(chats)
+    .where(eq(chats.conversationId, conversationId))
+    .orderBy(desc(chats.createdAt))
+    .limit(20);
 
   if (messages.length < 5) return "";
 
   const transcript = messages
     .reverse()
-    .map((m: any) => `${m.role}: ${typeof m.content === "string" ? m.content.substring(0, 500) : JSON.stringify(m.content).substring(0, 500)}`)
+    .map((m) => `user: ${m.question.substring(0, 500)}\nassistant: ${m.verdict.substring(0, 500)}`)
     .join("\n");
 
   const result = await routeAndCollect({
@@ -35,23 +37,29 @@ export async function summarizeSession(
   const summary = result.text;
 
   // Store summary in conversation
-  await prisma.conversation.update({
-    where: { id: conversationId },
-    data: { sessionSummary: summary },
-  });
+  await db
+    .update(conversations)
+    .set({ sessionSummary: summary })
+    .where(eq(conversations.id, conversationId));
 
   logger.info({ conversationId }, "Session summary generated");
   return summary;
 }
 
 export async function autoSummarize(conversationId: string, userId: number): Promise<void> {
-  const count = await (prisma as any).message.count({ where: { conversationId } });
+  const [result] = await db
+    .select({ value: count() })
+    .from(chats)
+    .where(eq(chats.conversationId, conversationId));
 
-  if (count > 30) {
-    const conversation = await prisma.conversation.findUnique({
-      where: { id: conversationId },
-      select: { sessionSummary: true, updatedAt: true },
-    });
+  const chatCount = result?.value ?? 0;
+
+  if (chatCount > 30) {
+    const [conversation] = await db
+      .select({ sessionSummary: conversations.sessionSummary, updatedAt: conversations.updatedAt })
+      .from(conversations)
+      .where(eq(conversations.id, conversationId))
+      .limit(1);
 
     // Only summarize if no summary or summary is older than 1 hour
     const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);

@@ -1,7 +1,11 @@
-import prisma from "../lib/db.js";
+import { db } from "./drizzle.js";
+import { conversations } from "../db/schema/conversations.js";
+import { chats } from "../db/schema/conversations.js";
+import { memories } from "../db/schema/memory.js";
 import { summarizeSession } from "../services/sessionSummary.service.js";
 import { compact } from "../services/memoryCompaction.service.js";
-import logger from "../lib/logger.js";
+import logger from "./logger.js";
+import { isNull, lt, or, eq, count, sql } from "drizzle-orm";
 
 const ONE_HOUR = 60 * 60 * 1000;
 const ONE_WEEK = 7 * 24 * 60 * 60 * 1000;
@@ -15,20 +19,23 @@ async function runAutoSummarization(): Promise<void> {
   try {
     const oneHourAgo = new Date(Date.now() - ONE_HOUR);
 
-    const conversations = await prisma.conversation.findMany({
-      where: {
-        OR: [
-          { sessionSummary: null },
-          { updatedAt: { lt: oneHourAgo } },
-        ],
-      },
-      select: { id: true, userId: true },
-    });
+    const convos = await db
+      .select({ id: conversations.id, userId: conversations.userId })
+      .from(conversations)
+      .where(
+        or(
+          isNull(conversations.sessionSummary),
+          lt(conversations.updatedAt, oneHourAgo)
+        )
+      );
 
-    for (const convo of conversations) {
-      const msgCount = await (prisma as any).message.count({
-        where: { conversationId: convo.id },
-      });
+    for (const convo of convos) {
+      const [result] = await db
+        .select({ count: count() })
+        .from(chats)
+        .where(eq(chats.conversationId, convo.id));
+
+      const msgCount = result?.count ?? 0;
 
       if (msgCount > 30) {
         try {
@@ -48,11 +55,14 @@ async function runWeeklyCompaction(): Promise<void> {
   logger.info("Running weekly memory compaction job");
 
   try {
-    const userCounts = await prisma.memory.groupBy({
-      by: ["userId"],
-      _count: { id: true },
-      having: { id: { _count: { gt: 50 } } },
-    });
+    const userCounts = await db
+      .select({
+        userId: memories.userId,
+        count: count(memories.id),
+      })
+      .from(memories)
+      .groupBy(memories.userId)
+      .having(sql`count(${memories.id}) > 50`);
 
     for (const entry of userCounts) {
       try {

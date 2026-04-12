@@ -1,7 +1,9 @@
 import { Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
-import prisma from "../lib/db.js";
+import { db } from "../lib/drizzle.js";
+import { revokedTokens } from "../db/schema/auth.js";
+import { eq } from "drizzle-orm";
 import redis from "../lib/redis.js";
 import logger from "../lib/logger.js";
 import { AuthRequest } from "../types/index.js";
@@ -10,7 +12,11 @@ async function isTokenRevoked(token: string): Promise<boolean> {
   const revokedInRedis = await redis.get(`revoked:${token}`);
   if (revokedInRedis) return true;
 
-  const revokedInDB = await prisma.revokedToken.findUnique({ where: { token } });
+  const [revokedInDB] = await db
+    .select()
+    .from(revokedTokens)
+    .where(eq(revokedTokens.token, token))
+    .limit(1);
   return !!revokedInDB;
 }
 

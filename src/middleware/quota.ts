@@ -1,5 +1,7 @@
 import { Response, NextFunction } from "express";
-import prisma from "../lib/db.js";
+import { db } from "../lib/drizzle.js";
+import { dailyUsage } from "../db/schema/users.js";
+import { eq, and, sql } from "drizzle-orm";
 import { AuthRequest } from "../types/index.js";
 import logger from "../lib/logger.js";
 import { DAILY_REQUEST_LIMIT, DAILY_TOKEN_LIMIT } from "../config/quotas.js";
@@ -16,11 +18,23 @@ export async function checkQuota(req: AuthRequest, res: Response, next: NextFunc
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
 
-    const updatedUsage = await prisma.dailyUsage.upsert({
-      where: { userId_date: { userId: req.userId, date: today } },
-      update: { requests: { increment: 1 } },
-      create: { userId: req.userId, date: today, requests: 1 } as any,
-    });
+    const [updatedUsage] = await db
+      .insert(dailyUsage)
+      .values({
+        userId: req.userId,
+        date: today,
+        requests: 1,
+        tokens: 0,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: [dailyUsage.userId, dailyUsage.date],
+        set: {
+          requests: sql`${dailyUsage.requests} + 1`,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
 
     if (updatedUsage.requests > MAX_DAILY_REQUESTS || updatedUsage.tokens > MAX_DAILY_TOKENS) {
       logger.warn({

@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
-import prisma from "../lib/db.js";
+import { db } from "../lib/drizzle.js";
+import { traces } from "../db/schema/traces.js";
 import logger from "../lib/logger.js";
 
 
@@ -58,19 +59,17 @@ export async function endTrace(ctx: TraceContext): Promise<string> {
   const totalCostUsd = totalTokens * 0.000005;
 
   try {
-    const trace = await prisma.trace.create({
-      data: {
-        id: ctx.id,
-        userId: ctx.userId,
-        type: ctx.type,
-        conversationId: ctx.conversationId ?? null,
-        workflowRunId: ctx.workflowRunId ?? null,
-        steps: ctx.steps as any,
-        totalLatencyMs,
-        totalTokens,
-        totalCostUsd,
-      },
-    });
+    const [trace] = await db.insert(traces).values({
+      id: ctx.id,
+      userId: ctx.userId,
+      type: ctx.type,
+      conversationId: ctx.conversationId ?? null,
+      workflowRunId: ctx.workflowRunId ?? null,
+      steps: ctx.steps as any,
+      totalLatencyMs,
+      totalTokens,
+      totalCostUsd,
+    }).returning();
 
     // Optional LangFuse integration
     await sendToLangfuse(ctx, trace.id, totalLatencyMs, totalTokens, totalCostUsd);

@@ -9,7 +9,7 @@ import fs from "fs";
 
 import { env } from "./config/env.js";
 import logger from "./lib/logger.js";
-import prisma, { pool } from "./lib/db.js";
+import { pool } from "./lib/db.js";
 import redis from "./lib/redis.js";
 import { initSocket } from "./lib/socket.js";
 import { startSweepers } from "./lib/sweeper.js";
@@ -21,8 +21,8 @@ import { registry } from "./lib/prometheusMetrics.js";
 import "./lib/tools/builtin.js";
 import "./adapters/registry.js";
 
-// Express middleware (run inside @fastify/express compat layer)
-import { askLimiter, authLimiter } from "./middleware/rateLimit.js";
+// Express middleware (still needed for remaining Express routes + compat layer)
+import { askLimiter } from "./middleware/rateLimit.js";
 import { perUserLimiter } from "./middleware/limiter.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { requireAuth } from "./middleware/auth.js";
@@ -30,46 +30,51 @@ import { requestId } from "./middleware/requestId.js";
 import { cspNonce } from "./middleware/cspNonce.js";
 import { prometheusMiddleware } from "./middleware/prometheusMiddleware.js";
 
-// Express routers (work as-is via @fastify/express)
+// Express (for compat layer)
 import express from "express";
 import pinoHttp from "pino-http";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./lib/swagger.js";
 import { requestContext } from "./lib/context.js";
 
+// Express routers (remaining — not yet converted to Fastify)
 import askRouter from "./routes/ask.js";
-import historyRouter from "./routes/history.js";
-import authRouter from "./routes/auth.js";
-import providersPlugin from "./routes/providers.js";
-import councilRouter from "./routes/council.js";
+import uploadsRouter from "./routes/uploads.js";
+
+// Native Fastify plugins
+import templatesPlugin from "./routes/templates.js";
 import metricsPlugin from "./routes/metrics.js";
 import exportPlugin from "./routes/export.js";
-import ttsRouter from "./routes/tts.js";
-import templatesPlugin from "./routes/templates.js";
-import piiRouter from "./routes/pii.js";
-import customProvidersRouter from "./routes/customProviders.js";
-import usageRouter from "./routes/usage.js";
-import uploadsRouter from "./routes/uploads.js";
-import kbRouter from "./routes/kb.js";
-import voiceRouter from "./routes/voice.js";
-import researchRouter from "./routes/research.js";
-import artifactsRouter from "./routes/artifacts.js";
-import sandboxRouter from "./routes/sandbox.js";
-import workflowsRouter from "./routes/workflows.js";
-import promptsRouter from "./routes/prompts.js";
-import personasRouter from "./routes/personas.js";
-import promptDnaRouter from "./routes/promptDna.js";
-import memoryRouter from "./routes/memory.js";
-import adminRouter from "./routes/admin.js";
-import shareRouter from "./routes/share.js";
-import marketplaceRouter from "./routes/marketplace.js";
-import skillsRouter from "./routes/skills.js";
-import tracesRouter from "./routes/traces.js";
-import analyticsRouter from "./routes/analytics.js";
-import reposRouter from "./routes/repos.js";
-import queueRouter from "./routes/queue.js";
-import costsRouter from "./routes/costs.js";
-import evaluationRouter from "./routes/evaluation.js";
+import providersPlugin from "./routes/providers.js";
+import authPlugin from "./routes/auth.js";
+import councilPlugin from "./routes/council.js";
+import historyPlugin from "./routes/history.js";
+import ttsPlugin from "./routes/tts.js";
+import piiPlugin from "./routes/pii.js";
+import customProvidersPlugin from "./routes/customProviders.js";
+import usagePlugin from "./routes/usage.js";
+import kbPlugin from "./routes/kb.js";
+import voicePlugin from "./routes/voice.js";
+import researchPlugin from "./routes/research.js";
+import artifactsPlugin from "./routes/artifacts.js";
+import sandboxPlugin from "./routes/sandbox.js";
+import workflowsPlugin from "./routes/workflows.js";
+import promptsPlugin from "./routes/prompts.js";
+import personasPlugin from "./routes/personas.js";
+import promptDnaPlugin from "./routes/promptDna.js";
+import memoryPlugin from "./routes/memory.js";
+import adminPlugin from "./routes/admin.js";
+import sharePlugin from "./routes/share.js";
+import marketplacePlugin from "./routes/marketplace.js";
+import skillsPlugin from "./routes/skills.js";
+import tracesPlugin from "./routes/traces.js";
+import analyticsPlugin from "./routes/analytics.js";
+import reposPlugin from "./routes/repos.js";
+import queuePlugin from "./routes/queue.js";
+import costsPlugin from "./routes/costs.js";
+import evaluationPlugin from "./routes/evaluation.js";
+import realtimePlugin from "./routes/realtime.js";
+import archetypesPlugin from "./routes/archetypes.js";
 import { ingestionQueue, researchQueue, repoQueue, compactionQueue } from "./queue/queues.js";
 
 // ─── Build the Fastify server ───────────────────────────────────────────────
@@ -131,7 +136,7 @@ fastify.get("/health", async (_request, reply) => {
   let healthy = true;
 
   try {
-    await prisma.$queryRawUnsafe("SELECT 1");
+    await pool.query("SELECT 1");
     checks.database = "ok";
   } catch {
     checks.database = "unreachable";
@@ -161,14 +166,48 @@ fastify.get("/health", async (_request, reply) => {
   };
 });
 
-// ─── Express compatibility layer ────────────────────────────────────────────
-// All existing Express routers and middleware run inside this layer.
-// This lets us migrate incrementally — move routes to native Fastify one by one.
+// ─── Register all native Fastify route plugins ─────────────────────────────
+// These MUST be registered BEFORE the @fastify/express compat layer.
 
-await fastify.register(templatesPlugin, { prefix: "/api/templates" });
-await fastify.register(metricsPlugin, { prefix: "/api/metrics" });
-await fastify.register(exportPlugin, { prefix: "/api/export" });
-await fastify.register(providersPlugin, { prefix: "/api/providers" });
+await fastify.register(templatesPlugin,       { prefix: "/api/templates" });
+await fastify.register(metricsPlugin,         { prefix: "/api/metrics" });
+await fastify.register(exportPlugin,          { prefix: "/api/export" });
+await fastify.register(providersPlugin,       { prefix: "/api/providers" });
+await fastify.register(authPlugin,            { prefix: "/api/auth" });
+await fastify.register(councilPlugin,         { prefix: "/api/council" });
+await fastify.register(historyPlugin,         { prefix: "/api/history" });
+await fastify.register(ttsPlugin,             { prefix: "/api/tts" });
+await fastify.register(piiPlugin,             { prefix: "/api/pii" });
+await fastify.register(customProvidersPlugin, { prefix: "/api/custom-providers" });
+await fastify.register(usagePlugin,           { prefix: "/api/usage" });
+await fastify.register(kbPlugin,              { prefix: "/api/kb" });
+await fastify.register(voicePlugin,           { prefix: "/api/voice" });
+await fastify.register(researchPlugin,        { prefix: "/api/research" });
+await fastify.register(artifactsPlugin,       { prefix: "/api/artifacts" });
+await fastify.register(sandboxPlugin,         { prefix: "/api/sandbox" });
+await fastify.register(workflowsPlugin,       { prefix: "/api/workflows" });
+await fastify.register(promptsPlugin,         { prefix: "/api/prompts" });
+await fastify.register(personasPlugin,        { prefix: "/api/personas" });
+await fastify.register(promptDnaPlugin,       { prefix: "/api/prompt-dna" });
+await fastify.register(memoryPlugin,          { prefix: "/api/memory" });
+await fastify.register(adminPlugin,           { prefix: "/api/admin" });
+await fastify.register(sharePlugin,           { prefix: "/api/share" });
+await fastify.register(marketplacePlugin,     { prefix: "/api/marketplace" });
+await fastify.register(skillsPlugin,          { prefix: "/api/skills" });
+await fastify.register(tracesPlugin,          { prefix: "/api/traces" });
+await fastify.register(analyticsPlugin,       { prefix: "/api/analytics" });
+await fastify.register(reposPlugin,           { prefix: "/api/repos" });
+await fastify.register(queuePlugin,           { prefix: "/api/queue" });
+await fastify.register(costsPlugin,           { prefix: "/api/costs" });
+await fastify.register(evaluationPlugin,      { prefix: "/api/evaluation" });
+// realtime and archetypes routes available but not mounted in original setup
+// Uncomment to enable:
+// await fastify.register(realtimePlugin,        { prefix: "/api/realtime" });
+// await fastify.register(archetypesPlugin,      { prefix: "/api/archetypes" });
+
+// ─── Express compatibility layer ────────────────────────────────────────────
+// Remaining Express routers that haven't been converted yet (ask, uploads).
+// Also hosts swagger-ui, BullMQ Board, and shared Express middleware.
 
 await fastify.register(fastifyExpress);
 
@@ -219,36 +258,9 @@ fastify.use("/api/docs", swaggerUi.setup(swaggerSpec, {
 // Per-user rate limiting
 fastify.use(perUserLimiter);
 
-// Mount all Express routers
-fastify.use("/api/auth",      authLimiter, authRouter);
+// Remaining Express routers
 fastify.use("/api/ask",       askLimiter,  askRouter);
-fastify.use("/api/council",   askLimiter,  councilRouter);
-fastify.use("/api/history",   historyRouter);
-fastify.use("/api/tts",       askLimiter, ttsRouter);
-fastify.use("/api/pii",       requireAuth, piiRouter);
-fastify.use("/api/custom-providers", requireAuth, customProvidersRouter);
-fastify.use("/api/usage",     requireAuth, usageRouter);
 fastify.use("/api/uploads",   requireAuth, uploadsRouter);
-fastify.use("/api/kb",        requireAuth, kbRouter);
-fastify.use("/api/voice",     askLimiter, voiceRouter);
-fastify.use("/api/research",  requireAuth, researchRouter);
-fastify.use("/api/artifacts", requireAuth, artifactsRouter);
-fastify.use("/api/sandbox",   requireAuth, sandboxRouter);
-fastify.use("/api/workflows", requireAuth, workflowsRouter);
-fastify.use("/api/prompts",   requireAuth, promptsRouter);
-fastify.use("/api/personas",  requireAuth, personasRouter);
-fastify.use("/api/prompt-dna", requireAuth, promptDnaRouter);
-fastify.use("/api/memory",    requireAuth, memoryRouter);
-fastify.use("/api/admin",     requireAuth, adminRouter);
-fastify.use("/api/share",     shareRouter);
-fastify.use("/api/marketplace", requireAuth, marketplaceRouter);
-fastify.use("/api/skills",      requireAuth, skillsRouter);
-fastify.use("/api/traces",      requireAuth, tracesRouter);
-fastify.use("/api/analytics",   requireAuth, analyticsRouter);
-fastify.use("/api/repos",       requireAuth, reposRouter);
-fastify.use("/api/queue",       requireAuth, queueRouter);
-fastify.use("/api/costs",       requireAuth, costsRouter);
-fastify.use("/api/evaluation",  requireAuth, evaluationRouter);
 
 // BullMQ Board (dev only)
 if (env.NODE_ENV === "development") {

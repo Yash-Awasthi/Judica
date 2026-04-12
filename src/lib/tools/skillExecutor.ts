@@ -1,5 +1,7 @@
 import { execSync } from "child_process";
-import prisma from "../db.js";
+import { db } from "../drizzle.js";
+import { userSkills } from "../../db/schema/marketplace.js";
+import { eq, and } from "drizzle-orm";
 import logger from "../logger.js";
 import { registerTool, type ToolExecutionContext } from "./index.js";
 
@@ -13,13 +15,17 @@ export async function executeUserSkill(
   skillName: string,
   inputs: Record<string, any>
 ): Promise<any> {
-  const skill = await prisma.userSkill.findFirst({
-    where: {
-      userId,
-      name: skillName,
-      active: true,
-    },
-  });
+  const [skill] = await db
+    .select()
+    .from(userSkills)
+    .where(
+      and(
+        eq(userSkills.userId, userId),
+        eq(userSkills.name, skillName),
+        eq(userSkills.active, true)
+      )
+    )
+    .limit(1);
 
   if (!skill) {
     throw new Error(`Skill "${skillName}" not found or inactive`);

@@ -1,7 +1,9 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
-import prisma from "../lib/db.js";
+import { db } from "../lib/drizzle.js";
+import { revokedTokens } from "../db/schema/auth.js";
+import { eq } from "drizzle-orm";
 import redis from "../lib/redis.js";
 import logger from "../lib/logger.js";
 
@@ -16,8 +18,25 @@ async function isTokenRevoked(token: string): Promise<boolean> {
   const revokedInRedis = await redis.get(`revoked:${token}`);
   if (revokedInRedis) return true;
 
-  const revokedInDB = await prisma.revokedToken.findUnique({ where: { token } });
+  const [revokedInDB] = await db.select().from(revokedTokens).where(eq(revokedTokens.token, token)).limit(1);
   return !!revokedInDB;
+}
+
+export async function fastifyOptionalAuth(request: FastifyRequest, reply: FastifyReply) {
+  const authHeader = request.headers.authorization;
+  if (!authHeader?.startsWith("Bearer ")) return;
+
+  try {
+    const token = authHeader.split(" ")[1];
+    const payload = jwt.verify(token, env.JWT_SECRET) as any;
+
+    if (await isTokenRevoked(token)) return;
+
+    request.userId = payload.userId;
+    request.username = payload.username;
+  } catch {
+    // Silently ignore invalid tokens for optional auth
+  }
 }
 
 export async function fastifyRequireAuth(request: FastifyRequest, reply: FastifyReply) {

@@ -1,4 +1,6 @@
-import prisma from "../lib/db.js";
+import { db } from "../lib/drizzle.js";
+import { researchJobs } from "../db/schema/research.js";
+import { eq } from "drizzle-orm";
 import { routeAndCollect } from "../router/smartRouter.js";
 import logger from "../lib/logger.js";
 import type { AdapterMessage } from "../adapters/types.js";
@@ -88,10 +90,7 @@ export async function runResearch(
 ): Promise<void> {
   try {
     // Update status to running
-    await prisma.researchJob.update({
-      where: { id: jobId },
-      data: { status: "running" },
-    });
+    await db.update(researchJobs).set({ status: "running" }).where(eq(researchJobs.id, jobId));
 
     // STEP A: Plan — break into sub-questions
     emit?.("status", { status: "planning" });
@@ -119,19 +118,13 @@ export async function runResearch(
       sources: [],
     }));
 
-    await prisma.researchJob.update({
-      where: { id: jobId },
-      data: { steps: JSON.parse(JSON.stringify(steps)) },
-    });
+    await db.update(researchJobs).set({ steps: JSON.parse(JSON.stringify(steps)) }).where(eq(researchJobs.id, jobId));
     emit?.("plan", { steps: steps.map((s) => s.question) });
 
     // STEP B: Search each sub-question
     for (let i = 0; i < steps.length; i++) {
       steps[i].status = "searching";
-      await prisma.researchJob.update({
-        where: { id: jobId },
-        data: { steps: JSON.parse(JSON.stringify(steps)) },
-      });
+      await db.update(researchJobs).set({ steps: JSON.parse(JSON.stringify(steps)) }).where(eq(researchJobs.id, jobId));
 
       const results = await webSearch(steps[i].question, 5);
       steps[i].sources = results;
@@ -142,10 +135,7 @@ export async function runResearch(
 
       // STEP C: Synthesize answer for this sub-question
       steps[i].status = "synthesizing";
-      await prisma.researchJob.update({
-        where: { id: jobId },
-        data: { steps: JSON.parse(JSON.stringify(steps)) },
-      });
+      await db.update(researchJobs).set({ steps: JSON.parse(JSON.stringify(steps)) }).where(eq(researchJobs.id, jobId));
 
       if (steps[i].sources.length > 0) {
         const sourcesText = steps[i].sources
@@ -167,10 +157,7 @@ export async function runResearch(
       }
 
       steps[i].status = "done";
-      await prisma.researchJob.update({
-        where: { id: jobId },
-        data: { steps: JSON.parse(JSON.stringify(steps)) },
-      });
+      await db.update(researchJobs).set({ steps: JSON.parse(JSON.stringify(steps)) }).where(eq(researchJobs.id, jobId));
 
       emit?.("step_complete", {
         stepIndex: i,
@@ -206,23 +193,17 @@ Format with proper Markdown: headers, bullet points, bold for emphasis.`,
       `Research topic: "${query}"\n\nFindings:\n${findings}\n\nAll Sources:\n${allSources.map((s) => `${s.ref} ${s.title} — ${s.url}`).join("\n")}`,
     );
 
-    await prisma.researchJob.update({
-      where: { id: jobId },
-      data: {
-        status: "done",
-        report,
-        steps: JSON.parse(JSON.stringify(steps)),
-      },
-    });
+    await db.update(researchJobs).set({
+      status: "done",
+      report,
+      steps: JSON.parse(JSON.stringify(steps)),
+    }).where(eq(researchJobs.id, jobId));
 
     emit?.("report_ready", { report });
     emit?.("done", { jobId });
   } catch (err: any) {
     logger.error({ err, jobId }, "Research job failed");
-    await prisma.researchJob.update({
-      where: { id: jobId },
-      data: { status: "failed" },
-    });
+    await db.update(researchJobs).set({ status: "failed" }).where(eq(researchJobs.id, jobId));
     emit?.("error", { message: err.message });
   }
 }

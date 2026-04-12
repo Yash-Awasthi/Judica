@@ -31,7 +31,9 @@ import { loadFileContext, loadRAGContext, buildEnrichedQuestion } from "../servi
 import { detectArtifact, saveArtifact } from "../services/artifacts.service.js";
 import { startTrace, addStep, endTrace } from "../observability/tracer.js";
 import { searchRepo } from "../services/repoSearch.service.js";
-import prisma from "../lib/db.js";
+import { db } from "../lib/drizzle.js";
+import { codeRepositories } from "../db/schema/repos.js";
+import { and, eq } from "drizzle-orm";
 
 function handleCouncilError(err: unknown): never {
   if (err instanceof CouncilServiceError) {
@@ -272,9 +274,17 @@ router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: Auth
     let codeContext = "";
     if (repo_id && userId) {
       try {
-        const repoRecord = await prisma.codeRepository.findFirst({
-          where: { id: repo_id, userId: String(userId), indexed: true },
-        });
+        const [repoRecord] = await db
+          .select()
+          .from(codeRepositories)
+          .where(
+            and(
+              eq(codeRepositories.id, repo_id),
+              eq(codeRepositories.userId, String(userId)),
+              eq(codeRepositories.indexed, true)
+            )
+          )
+          .limit(1);
         if (repoRecord) {
           const codeResults = await searchRepo(repo_id, question, 5);
           if (codeResults.length > 0) {

@@ -1,10 +1,9 @@
-import { Router, Response } from "express";
-import { requireAuth } from "../middleware/auth.js";
-import prisma from "../lib/db.js";
-import { AuthRequest } from "../types/index.js";
+import { FastifyPluginAsync } from "fastify";
+import { db } from "../lib/drizzle.js";
+import { artifacts } from "../db/schema/research.js";
+import { eq, and, desc } from "drizzle-orm";
+import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { AppError } from "../middleware/errorHandler.js";
-
-const router = Router();
 
 const MIME_TYPES: Record<string, string> = {
   code: "text/plain",
@@ -91,216 +90,249 @@ const LANG_EXTENSIONS: Record<string, string> = {
  *       401:
  *         description: Unauthorized
  */
-// GET /api/artifacts — list user's artifacts
-router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
-  const { conversation_id, type } = req.query;
+const artifactsPlugin: FastifyPluginAsync = async (fastify) => {
+  // GET /api/artifacts — list user's artifacts
+  fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    const { conversation_id, type } = request.query as {
+      conversation_id?: string;
+      type?: string;
+    };
 
-  const where: Record<string, unknown> = { userId: req.userId! };
-  if (conversation_id) where.conversationId = conversation_id as string;
-  if (type) where.type = type as string;
+    const conditions = [eq(artifacts.userId, request.userId!)];
+    if (conversation_id) conditions.push(eq(artifacts.conversationId, conversation_id));
+    if (type) conditions.push(eq(artifacts.type, type));
 
-  const artifacts = await prisma.artifact.findMany({
-    where,
-    orderBy: { createdAt: "desc" },
-    take: 50,
-    select: {
-      id: true,
-      name: true,
-      type: true,
-      language: true,
-      conversationId: true,
-      createdAt: true,
-      updatedAt: true,
-    },
+    const rows = await db
+      .select({
+        id: artifacts.id,
+        name: artifacts.name,
+        type: artifacts.type,
+        language: artifacts.language,
+        conversationId: artifacts.conversationId,
+        createdAt: artifacts.createdAt,
+        updatedAt: artifacts.updatedAt,
+      })
+      .from(artifacts)
+      .where(and(...conditions))
+      .orderBy(desc(artifacts.createdAt))
+      .limit(50);
+
+    return { artifacts: rows };
   });
 
-  res.json({ artifacts });
-});
+  /**
+   * @openapi
+   * /api/artifacts/{id}:
+   *   get:
+   *     tags:
+   *       - Sandbox
+   *     summary: Get an artifact by ID
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Artifact ID
+   *     responses:
+   *       200:
+   *         description: Artifact details
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *       401:
+   *         description: Unauthorized
+   *       404:
+   *         description: Artifact not found
+   */
+  // GET /api/artifacts/:id — get artifact
+  fastify.get("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    const { id } = request.params as { id: string };
 
-/**
- * @openapi
- * /api/artifacts/{id}:
- *   get:
- *     tags:
- *       - Sandbox
- *     summary: Get an artifact by ID
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Artifact ID
- *     responses:
- *       200:
- *         description: Artifact details
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Artifact not found
- */
-// GET /api/artifacts/:id — get artifact
-router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
-  const artifact = await prisma.artifact.findFirst({
-    where: { id: req.params.id as string, userId: req.userId! },
-  });
-  if (!artifact) throw new AppError(404, "Artifact not found", "ARTIFACT_NOT_FOUND");
-  res.json(artifact);
-});
+    const artifact = await db
+      .select()
+      .from(artifacts)
+      .where(and(eq(artifacts.id, id), eq(artifacts.userId, request.userId!)))
+      .limit(1)
+      .then((rows) => rows[0]);
 
-/**
- * @openapi
- * /api/artifacts/{id}:
- *   put:
- *     tags:
- *       - Sandbox
- *     summary: Update an artifact
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Artifact ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             properties:
- *               name:
- *                 type: string
- *               content:
- *                 type: string
- *     responses:
- *       200:
- *         description: Updated artifact
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Artifact not found
- */
-// PUT /api/artifacts/:id — update artifact
-router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
-  const artifact = await prisma.artifact.findFirst({
-    where: { id: req.params.id as string, userId: req.userId! },
-  });
-  if (!artifact) throw new AppError(404, "Artifact not found", "ARTIFACT_NOT_FOUND");
+    if (!artifact) throw new AppError(404, "Artifact not found", "ARTIFACT_NOT_FOUND");
 
-  const updates: Record<string, unknown> = {};
-  if (req.body.name !== undefined) updates.name = req.body.name;
-  if (req.body.content !== undefined) updates.content = req.body.content;
-
-  const updated = await prisma.artifact.update({
-    where: { id: artifact.id },
-    data: updates,
+    return artifact;
   });
 
-  res.json(updated);
-});
+  /**
+   * @openapi
+   * /api/artifacts/{id}:
+   *   put:
+   *     tags:
+   *       - Sandbox
+   *     summary: Update an artifact
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Artifact ID
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               name:
+   *                 type: string
+   *               content:
+   *                 type: string
+   *     responses:
+   *       200:
+   *         description: Updated artifact
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *       401:
+   *         description: Unauthorized
+   *       404:
+   *         description: Artifact not found
+   */
+  // PUT /api/artifacts/:id — update artifact
+  fastify.put("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const body = request.body as { name?: string; content?: string };
 
-/**
- * @openapi
- * /api/artifacts/{id}:
- *   delete:
- *     tags:
- *       - Sandbox
- *     summary: Delete an artifact
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Artifact ID
- *     responses:
- *       200:
- *         description: Artifact deleted
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Artifact not found
- */
-// DELETE /api/artifacts/:id — delete
-router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
-  const artifact = await prisma.artifact.findFirst({
-    where: { id: req.params.id as string, userId: req.userId! },
+    const existing = await db
+      .select()
+      .from(artifacts)
+      .where(and(eq(artifacts.id, id), eq(artifacts.userId, request.userId!)))
+      .limit(1)
+      .then((rows) => rows[0]);
+
+    if (!existing) throw new AppError(404, "Artifact not found", "ARTIFACT_NOT_FOUND");
+
+    const updates: Record<string, unknown> = {};
+    if (body.name !== undefined) updates.name = body.name;
+    if (body.content !== undefined) updates.content = body.content;
+
+    const [updated] = await db
+      .update(artifacts)
+      .set(updates)
+      .where(eq(artifacts.id, existing.id))
+      .returning();
+
+    return updated;
   });
-  if (!artifact) throw new AppError(404, "Artifact not found", "ARTIFACT_NOT_FOUND");
 
-  await prisma.artifact.delete({ where: { id: artifact.id } });
-  res.json({ success: true });
-});
+  /**
+   * @openapi
+   * /api/artifacts/{id}:
+   *   delete:
+   *     tags:
+   *       - Sandbox
+   *     summary: Delete an artifact
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Artifact ID
+   *     responses:
+   *       200:
+   *         description: Artifact deleted
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *       401:
+   *         description: Unauthorized
+   *       404:
+   *         description: Artifact not found
+   */
+  // DELETE /api/artifacts/:id — delete
+  fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    const { id } = request.params as { id: string };
 
-/**
- * @openapi
- * /api/artifacts/{id}/download:
- *   get:
- *     tags:
- *       - Sandbox
- *     summary: Download an artifact as a file
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *         description: Artifact ID
- *     responses:
- *       200:
- *         description: File download
- *         content:
- *           text/plain:
- *             schema:
- *               type: string
- *               format: binary
- *       401:
- *         description: Unauthorized
- *       404:
- *         description: Artifact not found
- */
-// GET /api/artifacts/:id/download — download as file
-router.get("/:id/download", requireAuth, async (req: AuthRequest, res: Response) => {
-  const artifact = await prisma.artifact.findFirst({
-    where: { id: req.params.id as string, userId: req.userId! },
+    const existing = await db
+      .select()
+      .from(artifacts)
+      .where(and(eq(artifacts.id, id), eq(artifacts.userId, request.userId!)))
+      .limit(1)
+      .then((rows) => rows[0]);
+
+    if (!existing) throw new AppError(404, "Artifact not found", "ARTIFACT_NOT_FOUND");
+
+    await db.delete(artifacts).where(eq(artifacts.id, existing.id));
+
+    return { success: true };
   });
-  if (!artifact) throw new AppError(404, "Artifact not found", "ARTIFACT_NOT_FOUND");
 
-  const mimeType = MIME_TYPES[artifact.type] || "text/plain";
-  const ext = artifact.type === "code" && artifact.language
-    ? (LANG_EXTENSIONS[artifact.language] || "txt")
-    : (EXTENSIONS[artifact.type] || "txt");
+  /**
+   * @openapi
+   * /api/artifacts/{id}/download:
+   *   get:
+   *     tags:
+   *       - Sandbox
+   *     summary: Download an artifact as a file
+   *     security:
+   *       - bearerAuth: []
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: Artifact ID
+   *     responses:
+   *       200:
+   *         description: File download
+   *         content:
+   *           text/plain:
+   *             schema:
+   *               type: string
+   *               format: binary
+   *       401:
+   *         description: Unauthorized
+   *       404:
+   *         description: Artifact not found
+   */
+  // GET /api/artifacts/:id/download — download as file
+  fastify.get("/:id/download", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    const { id } = request.params as { id: string };
 
-  const safeName = artifact.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
-  const filename = `${safeName}.${ext}`;
+    const artifact = await db
+      .select()
+      .from(artifacts)
+      .where(and(eq(artifacts.id, id), eq(artifacts.userId, request.userId!)))
+      .limit(1)
+      .then((rows) => rows[0]);
 
-  res.setHeader("Content-Type", mimeType);
-  res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
-  res.send(artifact.content);
-});
+    if (!artifact) throw new AppError(404, "Artifact not found", "ARTIFACT_NOT_FOUND");
 
-export default router;
+    const mimeType = MIME_TYPES[artifact.type] || "text/plain";
+    const ext = artifact.type === "code" && artifact.language
+      ? (LANG_EXTENSIONS[artifact.language] || "txt")
+      : (EXTENSIONS[artifact.type] || "txt");
+
+    const safeName = artifact.name.replace(/[^a-zA-Z0-9_.-]/g, "_");
+    const filename = `${safeName}.${ext}`;
+
+    reply.header("Content-Type", mimeType);
+    reply.header("Content-Disposition", `attachment; filename="${filename}"`);
+    return reply.send(artifact.content);
+  });
+};
+
+export default artifactsPlugin;

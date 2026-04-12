@@ -1,12 +1,13 @@
-import prisma from "./db.js";
+import { db } from "./drizzle.js";
+import { chats, contextSummaries } from "../db/schema/conversations.js";
+import { eq, desc, asc } from "drizzle-orm";
 import { Message } from "./providers.js";
 
 export async function getRecentHistory(conversationId: string): Promise<Message[]> {
-  const pastChats = await prisma.chat.findMany({
-    where: { conversationId },
-    orderBy: { createdAt: "desc" },
-    take: 5,
-  });
+  const pastChats = await db.select().from(chats)
+    .where(eq(chats.conversationId, conversationId))
+    .orderBy(desc(chats.createdAt))
+    .limit(5);
 
   pastChats.reverse();
 
@@ -19,16 +20,15 @@ export async function getRecentHistory(conversationId: string): Promise<Message[
 }
 
 export async function getHistoryWithContext(conversationId: string): Promise<Message[]> {
-  const summary = await prisma.contextSummary.findFirst({
-    where: { conversationId },
-    orderBy: { createdAt: "desc" },
-  });
+  const [summary] = await db.select().from(contextSummaries)
+    .where(eq(contextSummaries.conversationId, conversationId))
+    .orderBy(desc(contextSummaries.createdAt))
+    .limit(1);
 
-  const recentChats = await prisma.chat.findMany({
-    where: { conversationId },
-    orderBy: { createdAt: "desc" },
-    take: 5,
-  });
+  const recentChats = await db.select().from(chats)
+    .where(eq(chats.conversationId, conversationId))
+    .orderBy(desc(chats.createdAt))
+    .limit(5);
   recentChats.reverse();
 
   const messages: Message[] = [];
@@ -55,11 +55,10 @@ export async function getEnhancedContext(conversationId: string, currentQuery: s
 }> {
   const recentMessages = await getRecentHistory(conversationId);
 
-  const summaries = await prisma.contextSummary.findMany({
-    where: { conversationId },
-    orderBy: { createdAt: "desc" },
-    take: 3,
-  });
+  const summaries = await db.select().from(contextSummaries)
+    .where(eq(contextSummaries.conversationId, conversationId))
+    .orderBy(desc(contextSummaries.createdAt))
+    .limit(3);
 
   const queryKeywords = extractKeywords(currentQuery);
 
@@ -101,11 +100,10 @@ function isStopWord(word: string): boolean {
 }
 
 async function extractRelevantMemories(conversationId: string, keywords: string[]): Promise<string[]> {
-  const pastChats = await prisma.chat.findMany({
-    where: { conversationId },
-    orderBy: { createdAt: "desc" },
-    take: 20, // Look at last 20 exchanges
-  });
+  const pastChats = await db.select().from(chats)
+    .where(eq(chats.conversationId, conversationId))
+    .orderBy(desc(chats.createdAt))
+    .limit(20);
 
   const relevantMemories: string[] = [];
 
@@ -128,10 +126,9 @@ async function extractRelevantMemories(conversationId: string, keywords: string[
 }
 
 export async function updateEnhancedContextSummary(conversationId: string): Promise<void> {
-  const allChats = await prisma.chat.findMany({
-    where: { conversationId },
-    orderBy: { createdAt: "asc" },
-  });
+  const allChats = await db.select().from(chats)
+    .where(eq(chats.conversationId, conversationId))
+    .orderBy(asc(chats.createdAt));
 
   if (allChats.length <= 8) return; // Wait for more substantial conversation
 
@@ -152,9 +149,7 @@ export async function updateEnhancedContextSummary(conversationId: string): Prom
   });
 
   if (summariesToCreate.length > 0) {
-    await prisma.contextSummary.createMany({
-      data: summariesToCreate,
-    });
+    await db.insert(contextSummaries).values(summariesToCreate);
   }
 }
 
