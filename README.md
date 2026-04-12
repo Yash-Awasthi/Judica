@@ -98,7 +98,7 @@ flowchart TB
         direction LR
         AUTH["Auth\nJWT + Refresh Tokens"]
         RATE["Rate Limiter\nRedis-backed"]
-        ROUTES["35 Route\nPlugins"]
+        ROUTES["31 Route\nPlugins"]
     end
 
     subgraph ENGINE["Deliberation Engine"]
@@ -124,7 +124,7 @@ flowchart TB
 
     subgraph DATA["Data Layer"]
         direction LR
-        PG["PostgreSQL 16\npgvector + HNSW"]
+        PG["PostgreSQL 16\npgvector"]
         RD["Redis 7\nCache + Queues"]
         BQ["BullMQ\nAsync Jobs"]
     end
@@ -149,11 +149,11 @@ flowchart TB
 ### Multi-Agent Deliberation
 4+ AI agents with distinct archetypes (Empiricist, Strategist, Historian, Architect, Skeptic) debate in structured rounds with peer review, adversarial critique, and deterministic consensus scoring. A cold validator independently checks the final verdict for hallucinations.
 
-### 9 LLM Provider Adapters
-Unified interface for OpenAI, Anthropic, Gemini, Groq, Ollama (local), OpenRouter, Mistral, Cerebras, and NVIDIA NIM. Add custom providers via UI — zero code changes.
+### 7 LLM Provider Adapters
+Unified interface for OpenAI, Anthropic, Gemini, Groq, Ollama (local), OpenRouter, and custom providers. Add custom providers via UI — zero code changes. Compatible with OpenAI-API-compatible services (Mistral, Cerebras, NVIDIA NIM) through the OpenRouter or Custom adapter.
 
 ### RAG Knowledge Bases
-pgvector embeddings with HNSW indexes, hybrid search (vector + BM25), document chunking, and multi-format ingestion (PDF, DOCX, XLSX, CSV, TXT, images). Attach knowledge bases to conversations for grounded responses.
+pgvector embeddings with hybrid search (vector similarity + BM25 text ranking), document chunking, and multi-format ingestion (PDF, DOCX, XLSX, CSV, TXT, images). Attach knowledge bases to conversations for grounded responses.
 
 ### Visual Workflow Engine
 Drag-and-drop builder with React Flow — 10+ node types (LLM, Tool, Condition, Loop, HTTP, Code, Human Gate). Server-side execution with real-time streaming.
@@ -162,7 +162,7 @@ Drag-and-drop builder with React Flow — 10+ node types (LLM, Tool, Condition, 
 Autonomous multi-step research: breaks queries into sub-questions, searches the web, scrapes sources, synthesizes answers, and produces cited reports. Async via BullMQ.
 
 ### Code Sandbox
-Isolated execution — JavaScript in `isolated-vm` (V8 isolate, 128MB memory cap), Python in subprocess with ulimit constraints (256MB memory, 10s CPU, 32 process limit). Artifacts auto-detected from AI responses.
+Isolated execution — JavaScript in `isolated-vm` (V8 isolate, 128MB memory cap), Python in subprocess with ulimit constraints and network isolation (256MB memory, 10s CPU, 32 process limit, no outbound network). Artifacts auto-detected from AI responses.
 
 ### Community Marketplace
 Publish and install prompts, workflows, personas, and tools. Star ratings, reviews, download tracking, one-click import.
@@ -174,7 +174,7 @@ Write Python functions that become tools during council deliberation. Sandboxed 
 Prometheus metrics (latency histograms, provider call duration, queue depth, token usage), execution tracing with LangFuse export, model reliability scoring, analytics dashboard, per-query cost tracking with color-coded tiers.
 
 ### API Documentation
-Interactive Swagger UI at `/api/docs` with OpenAPI 3.0 spec. All 35 routes annotated with request/response schemas, auth requirements, and examples.
+Interactive Swagger UI at `/api/docs` with OpenAPI 3.0 spec. All routes annotated with request/response schemas, auth requirements, and examples.
 
 ### Voice & Text-to-Speech
 Multi-provider TTS with automatic fallback (Xiaomi MiMo → CosyVoice → OpenAI). Speech-to-text input support.
@@ -201,9 +201,9 @@ Workbox service worker, IndexedDB conversation caching, NetworkFirst API strateg
 | Layer | Technology | Purpose |
 |---|---|---|
 | **Runtime** | Node.js 22 LTS, TypeScript 5.9 | Server + type safety |
-| **API** | Fastify 5 | HTTP layer, 35 native route plugins |
+| **API** | Fastify 5 | HTTP layer, 31 native route plugins + Express compat for Swagger UI |
 | **Frontend** | React 18, Vite 6, Tailwind CSS | SPA with hot reload |
-| **Database** | PostgreSQL 16 + pgvector (HNSW) | Relational data + vector embeddings |
+| **Database** | PostgreSQL 16 + pgvector | Relational data + vector embeddings |
 | **Cache / Queues** | Redis 7, BullMQ | Semantic cache, rate limiting, async jobs |
 | **ORM** | Drizzle ORM | Type-safe SQL query builder, full SQL control |
 | **Realtime** | ws (native WebSocket) | WebSocket streaming for deliberation events |
@@ -213,7 +213,7 @@ Workbox service worker, IndexedDB conversation caching, NetworkFirst API strateg
 | **Workflow UI** | XYFlow (React Flow) | Visual drag-and-drop workflow builder |
 | **Code Editor** | Monaco Editor | In-browser prompt and code editing |
 | **Charts** | Apache ECharts | Analytics and evaluation dashboards |
-| **Sandbox** | isolated-vm (128MB cap), Python subprocess (ulimit) | Secure code execution (JS + Python) |
+| **Sandbox** | isolated-vm (128MB cap), Python subprocess (ulimit + network isolation) | Secure code execution (JS + Python) |
 | **Infrastructure** | Docker, GitHub Actions CI | Containerized deployment, automated testing |
 
 ### Supported LLM Providers
@@ -221,15 +221,14 @@ Workbox service worker, IndexedDB conversation caching, NetworkFirst API strateg
 | Provider | Type | Adapter |
 |---|---|---|
 | OpenAI (GPT-4o, o1, o3) | API | Native |
-| Anthropic (Claude 3) | API | Native |
+| Anthropic (Claude 3/4) | API | Native |
 | Google (Gemini) | API | Native |
 | Groq (LLaMA, Mixtral) | API | Native |
 | Ollama | Local | Native |
 | OpenRouter | API | Native |
-| Mistral | API | OpenAI-compatible |
-| Cerebras | API | OpenAI-compatible |
-| NVIDIA NIM | API | OpenAI-compatible |
 | Custom providers | API | Configurable via UI (EMOF) |
+
+> **OpenAI-compatible services** (Mistral, Cerebras, NVIDIA NIM, etc.) work through the OpenRouter or Custom provider adapter.
 
 ---
 
@@ -273,7 +272,7 @@ curl -X POST http://localhost:3000/api/ask \
 
 Returns an SSE stream: `opinion` → `peer_review` → `scored` → `done` (verdict + confidence score)
 
-> **Full API reference with all 35 endpoints:** [docs/DOCUMENTATION.md](./docs/DOCUMENTATION.md#api-reference) | **Interactive docs:** `/api/docs`
+> **Full API reference with all endpoints:** [docs/DOCUMENTATION.md](./docs/DOCUMENTATION.md#api-reference) | **Interactive docs:** `/api/docs`
 
 ---
 
@@ -284,6 +283,103 @@ Returns an SSE stream: `opinion` → `peer_review` → `scored` → `done` (verd
 | **[Documentation](./docs/DOCUMENTATION.md)** | Setup, env vars, API reference, project structure, deployment, security |
 | **[Roadmap](./ROADMAP.md)** | Future plans — testing, collaboration, plugins, scaling |
 | **Interactive API Docs** | Available at `/api/docs` when the server is running |
+
+---
+
+## Project Structure
+
+```
+aibyai/
+├── src/
+│   ├── adapters/           # LLM provider adapters (OpenAI, Anthropic, Gemini, Groq, Ollama, OpenRouter, Custom)
+│   ├── auth/               # OAuth strategies (Google, GitHub)
+│   ├── config/             # Environment config (Zod-validated)
+│   ├── db/schema/          # Drizzle ORM schema definitions (PostgreSQL + pgvector)
+│   ├── lib/                # Core libraries (crypto, logger, breaker, cost, tools, swagger)
+│   ├── middleware/          # Auth, rate limiting, CSP, error handling, Prometheus metrics
+│   ├── processors/         # File processors (PDF, DOCX, XLSX, CSV, TXT, images)
+│   ├── queue/              # BullMQ queues and workers (ingestion, research, repo, compaction)
+│   ├── router/             # Query routing, token estimation, quota tracking
+│   ├── routes/             # Fastify route plugins (31 native plugins)
+│   ├── sandbox/            # Code sandboxes (isolated-vm for JS, subprocess for Python)
+│   ├── services/           # Business logic (council, embeddings, research, usage, memory)
+│   └── workflow/           # Workflow engine (executor, node handlers)
+├── frontend/
+│   ├── src/
+│   │   ├── components/     # React components (ChatArea, Sidebar, MessageList, Settings)
+│   │   ├── context/        # React contexts (Auth, Theme)
+│   │   ├── views/          # Page views (DebateDashboard, Analytics, WorkflowEditor)
+│   │   └── router.tsx      # React Router config
+│   └── package.json
+├── tests/                  # Vitest test files + benchmarks
+├── scripts/                # Shell scripts (run-tests, benchmark)
+├── docker-compose.yml      # PostgreSQL + Redis + Prometheus + Grafana
+├── Dockerfile              # Multi-stage production build
+└── .github/workflows/      # CI pipeline (lint, typecheck, test, build, security-audit)
+```
+
+---
+
+## Environment Variables
+
+> **Required** variables for a minimal setup. Full reference: [docs/DOCUMENTATION.md](./docs/DOCUMENTATION.md#environment-variables)
+
+| Variable | Required | Description |
+|---|---|---|
+| `DATABASE_URL` | Yes | PostgreSQL connection string (with pgvector extension) |
+| `REDIS_URL` | Yes | Redis connection string |
+| `JWT_SECRET` | Yes | Secret for signing JWT tokens (min 32 chars) |
+| `MASTER_ENCRYPTION_KEY` | Yes | AES-256-GCM key for API key vault encryption |
+| `PORT` | No | Server port (default: `3000`) |
+| `OPENAI_API_KEY` | * | OpenAI API key |
+| `ANTHROPIC_API_KEY` | * | Anthropic API key |
+| `GOOGLE_GENERATIVE_AI_API_KEY` | * | Google Gemini API key |
+| `GROQ_API_KEY` | * | Groq API key |
+| `OLLAMA_BASE_URL` | * | Ollama server URL (default: `http://localhost:11434`) |
+
+\* At least one AI provider key is required.
+
+---
+
+## Security
+
+AIBYAI implements defense-in-depth security measures:
+
+| Layer | Implementation |
+|---|---|
+| **Authentication** | JWT access tokens (15 min TTL) + rotating httpOnly refresh tokens, argon2id password hashing (OWASP params) |
+| **OAuth2** | Google + GitHub with verified email enforcement, cross-provider collision protection |
+| **Authorization** | Role-based access control (member/admin), per-route auth guards |
+| **Rate Limiting** | Redis-backed rate limiting: 10/min auth, 60/min API, 10/min sandbox, 20/min voice |
+| **Input Validation** | Zod schemas for JWT payloads, request bodies; LIKE wildcard escaping |
+| **SSRF Protection** | URL validation on all outbound HTTP (workflow nodes, tools, custom adapters) |
+| **Code Sandbox** | JS: V8 isolate (128MB cap) via isolated-vm. Python: subprocess with ulimit + network isolation |
+| **Encryption** | AES-256-GCM for API key vault, persistent encryption keys |
+| **CSP** | Content-Security-Policy with per-request nonces |
+| **Circuit Breaker** | Opossum circuit breaker on all LLM adapter calls with timeout enforcement |
+| **Upload Security** | MIME type allowlist, file size limits (100MB), path traversal protection |
+
+---
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/your-feature`
+3. Make your changes and ensure they pass:
+   ```bash
+   npm run typecheck
+   npm run lint
+   npm test
+   ```
+4. Commit with conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`
+5. Push and open a pull request
+
+### Development Tips
+
+- **Database changes**: Edit schemas in `src/db/schema/`, then run `npm run db:push`
+- **New routes**: Create a Fastify plugin in `src/routes/`, register in `src/index.ts`
+- **New adapter**: Add to `src/adapters/`, register in `src/adapters/registry.ts`
+- **Frontend**: React components in `frontend/src/components/`, Tailwind for styling
 
 ---
 

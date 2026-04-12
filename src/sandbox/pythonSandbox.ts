@@ -15,7 +15,13 @@ export async function executePython(code: string, timeout: number = 10000): Prom
   const tmpFile = path.join(os.tmpdir(), `sandbox_${crypto.randomBytes(8).toString("hex")}.py`);
 
   try {
-    fs.writeFileSync(tmpFile, code, "utf-8");
+    // SEC-4: Disable network access at the Python level by overriding socket.socket
+    // before user code runs. This prevents sandboxed code from making any network
+    // connections. We use a Python-level approach rather than unshare --net because
+    // the latter requires root/CAP_SYS_ADMIN privileges.
+    const networkBlockPreamble =
+      `import socket as _s; _s.socket = lambda *a, **k: (_ for _ in ()).throw(PermissionError("Network disabled in sandbox"))\n`;
+    fs.writeFileSync(tmpFile, networkBlockPreamble + code, "utf-8");
 
     return await new Promise<SandboxResult>((resolve) => {
       const stdout: string[] = [];

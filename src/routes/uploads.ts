@@ -88,6 +88,24 @@ const uploadsPlugin: FastifyPluginAsync = async (fastify) => {
     }> = [];
 
     for await (const part of parts) {
+      // SEC-6: Validate uploaded file MIME type against allowlist to prevent
+      // upload of executables, scripts, and other dangerous file types.
+      const ALLOWED_MIME_PATTERNS = [
+        /^image\//,
+        /^audio\//,
+        /^application\/pdf$/,
+        /^text\/plain$/,
+        /^text\/csv$/,
+        /^text\/markdown$/,
+        /^application\/vnd\.openxmlformats-officedocument\./,
+        /^application\/msword$/,
+        /^application\/vnd\.ms-excel$/,
+        /^application\/json$/,
+      ];
+      if (!ALLOWED_MIME_PATTERNS.some((pattern) => pattern.test(part.mimetype))) {
+        throw new AppError(400, `File type not allowed: ${part.mimetype}`, "INVALID_FILE_TYPE");
+      }
+
       const date = new Date().toISOString().split("T")[0];
       const dir = path.join(process.cwd(), "uploads", String(userId), date);
       fs.mkdirSync(dir, { recursive: true });
