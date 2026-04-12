@@ -35,6 +35,7 @@ jobs:
         with:
           node-version: 20
       - run: npm install --ignore-scripts
+      - run: npx prisma generate
       - run: npx vitest run --passWithNoTests
 
   build:

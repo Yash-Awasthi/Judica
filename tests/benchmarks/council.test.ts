@@ -1,4 +1,3 @@
-import { vi } from "vitest";
 import { describe, it, expect } from "vitest";
 import { computeConsensus } from "../../src/lib/metrics.js";
 import { scoreOpinions, filterAndRank } from "../../src/lib/scoring.js";
@@ -40,10 +39,7 @@ describe("Council Evaluation Benchmarks", () => {
   });
 
   describe("Consensus Metric", () => {
-  vi.setConfig({ testTimeout: 20000 });
     it("should return 1 for identical outputs", async () => {
-//vi.setConfig({ testTimeout: 20000 });
-    //vi.setConfig({ testTimeout: 20000 });
       const output = {
         answer: "Use microservices architecture",
         reasoning: "Better scalability",
@@ -55,7 +51,6 @@ describe("Council Evaluation Benchmarks", () => {
     });
 
     it("should return lower score for divergent outputs", async () => {
-//vi.setConfig({ testTimeout: 20000 });
       const a = {
         answer: "Implement machine learning pipeline using TensorFlow and PyTorch for neural network training",
         reasoning: "TensorFlow provides excellent production deployment capabilities while PyTorch offers flexible research development",

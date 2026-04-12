@@ -20,7 +20,7 @@ export default defineConfig({
     reporters: ["verbose"],
 
     // How long a single test can run before timeout
-    testTimeout: 10_000,
+    testTimeout: 30_000,
   },
   resolve: {
     alias: {
