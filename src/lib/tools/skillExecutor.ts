@@ -1,9 +1,9 @@
-import { execSync } from "child_process";
 import { db } from "../drizzle.js";
 import { userSkills } from "../../db/schema/marketplace.js";
 import { eq, and } from "drizzle-orm";
 import logger from "../logger.js";
 import { registerTool, type ToolExecutionContext } from "./index.js";
+import { executePython } from "../../sandbox/pythonSandbox.js";
 
 /**
  * Execute a user-defined skill by name.
@@ -39,7 +39,7 @@ function runSkillCode(
   inputs: Record<string, any>,
   userId: string,
   skillName: string
-): any {
+): Promise<any> {
   // Build Python script: inject inputs as variables, then append skill code
   const inputLines = Object.entries(inputs)
     .map(([key, value]) => {
@@ -59,31 +59,17 @@ ${code}
     "Executing user skill"
   );
 
-  try {
-    const stdout = execSync(`python3 -c ${escapeShellArg(script)}`, {
-      timeout: 10_000,
-      maxBuffer: 1024 * 1024, // 1MB
-      encoding: "utf-8",
-      env: {
-        ...process.env,
-        PYTHONDONTWRITEBYTECODE: "1",
-      },
-    });
-
-    // Try to parse as JSON first, fall back to raw string
-    const trimmed = stdout.trim();
+  return executePython(script, 10_000).then((result) => {
+    if (result.error) {
+      throw new Error(`Skill execution failed: ${result.error}`);
+    }
+    const trimmed = result.output.join("\n").trim();
     try {
       return JSON.parse(trimmed);
     } catch {
       return trimmed;
     }
-  } catch (err: any) {
-    const message = err.stderr
-      ? err.stderr.toString().trim()
-      : err.message || "Skill execution failed";
-    logger.error({ userId, skillName, error: message }, "Skill execution error");
-    throw new Error(`Skill execution failed: ${message}`);
-  }
+  });
 }
 
 /**
@@ -129,8 +115,4 @@ export function registerUserSkillsAsTools(): void {
       }
     }
   );
-}
-
-function escapeShellArg(arg: string): string {
-  return "'" + arg.replace(/'/g, "'\\''") + "'";
 }
