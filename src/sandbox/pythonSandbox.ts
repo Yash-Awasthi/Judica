@@ -26,7 +26,14 @@ export async function executePython(code: string, timeout: number = 10000): Prom
         `ulimit -v 262144 -t 10 -f 1024 -u 32 -n 64; exec python3 "${tmpFile}"`,
       ], {
         timeout,
-        env: { ...process.env, PYTHONDONTWRITEBYTECODE: "1", PYTHONPATH: "" },
+        env: {
+          PATH: "/usr/local/bin:/usr/bin:/bin",
+          HOME: "/tmp",
+          LANG: process.env.LANG || "en_US.UTF-8",
+          PYTHONDONTWRITEBYTECODE: "1",
+          PYTHONPATH: "",
+          PYTHONNOUSERSITE: "1",
+        },
         stdio: ["pipe", "pipe", "pipe"],
       });
 
