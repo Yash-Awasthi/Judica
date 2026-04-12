@@ -59,6 +59,8 @@ export class OllamaProvider extends BaseProvider {
         const decoder = new TextDecoder();
         let text = "";
         let buffer = "";
+        let streamPromptTokens = 0;
+        let streamCompletionTokens = 0;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -78,18 +80,26 @@ export class OllamaProvider extends BaseProvider {
                 text += parsed.response;
                 onChunk(parsed.response);
               }
+              // Capture token counts from the final chunk (done=true)
+              if (parsed.done) {
+                streamPromptTokens = parsed.prompt_eval_count || 0;
+                streamCompletionTokens = parsed.eval_count || 0;
+              }
             } catch (e) {
               // ignore unparseable chunk
             }
           }
         }
 
+        // Use actual counts from stream if available, otherwise estimate
+        const promptTokens = streamPromptTokens || Math.ceil(finalPrompt.length / 4);
+        const completionTokens = streamCompletionTokens || Math.ceil(text.length / 4);
         return {
           text: text.trim(),
           usage: {
-            promptTokens: 0,
-            completionTokens: 0,
-            totalTokens: 0
+            promptTokens,
+            completionTokens,
+            totalTokens: promptTokens + completionTokens,
           },
           cost: 0 // Local is free
         };

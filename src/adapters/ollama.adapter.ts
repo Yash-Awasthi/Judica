@@ -6,6 +6,7 @@ import type {
 } from "./types.js";
 import { createStreamResult } from "./types.js";
 import { getBreaker } from "../lib/breaker.js";
+import { validateSafeUrl } from "../lib/ssrf.js";
 import logger from "../lib/logger.js";
 
 interface OllamaChunk {
@@ -28,6 +29,14 @@ export class OllamaAdapter implements IProviderAdapter {
   }
 
   async generate(req: AdapterRequest): Promise<AdapterStreamResult> {
+    // Validate base URL against SSRF (blocks private IPs, localhost, cloud metadata).
+    // NOTE: Ollama is typically on localhost which validateSafeUrl blocks.
+    // For local-only deployments, operators should set ALLOW_PRIVATE_URLS=1 or
+    // use the adapter only with explicitly trusted URLs.
+    if (this.baseUrl !== "http://localhost:11434" && !this.baseUrl.startsWith("http://127.0.0.1")) {
+      await validateSafeUrl(this.baseUrl);
+    }
+
     const model = req.model || "llama3.2";
 
     const messages: Record<string, unknown>[] = [];
