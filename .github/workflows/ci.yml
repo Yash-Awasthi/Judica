@@ -34,7 +34,7 @@ jobs:
         with:
           node-version: 20
       - run: npm install
-      - run: npx vitest run --passWithNoTests || true
+      - run: npx vitest run --passWithNoTests
 
   build:
     runs-on: ubuntu-latest

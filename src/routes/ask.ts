@@ -49,7 +49,7 @@ router.get("/", (req, res) => {
 router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: AuthRequest, res: Response, next: NextFunction) => {
   const startTime = Date.now();
   try {
-    const { question, conversationId, summon, maxTokens, rounds = 1, context, mode } = req.body;
+    const { question, conversationId, summon, maxTokens, rounds = 1, context, mode, userConfig } = req.body;
     const upload_ids: string[] | undefined = req.body.upload_ids;
     const kb_id: string | undefined = req.body.kb_id;
 
