@@ -114,22 +114,42 @@ registerTool(
   },
   async (args) => {
     const expr = args.expression as string;
-    // Safe math evaluation using Function constructor with limited scope
-    const mathScope = {
-      abs: Math.abs, ceil: Math.ceil, floor: Math.floor, round: Math.round,
-      sqrt: Math.sqrt, cbrt: Math.cbrt, pow: Math.pow,
-      sin: Math.sin, cos: Math.cos, tan: Math.tan,
-      asin: Math.asin, acos: Math.acos, atan: Math.atan, atan2: Math.atan2,
-      log: Math.log, log2: Math.log2, log10: Math.log10,
-      exp: Math.exp, min: Math.min, max: Math.max,
-      PI: Math.PI, pi: Math.PI, E: Math.E, e: Math.E,
-      Infinity, NaN
-    };
     try {
-      // Sanitize: only allow safe math characters
-      const sanitized = expr.replace(/[^0-9+\-*/().,%^ a-zA-Z_]/g, '');
+      // Strict allowlist: only digits, math operators, parens, dots, commas, spaces,
+      // and known math function/constant names
+      const allowedNames = [
+        'abs', 'ceil', 'floor', 'round', 'sqrt', 'cbrt', 'pow',
+        'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2',
+        'log', 'log2', 'log10', 'exp', 'min', 'max',
+        'PI', 'pi', 'E', 'Infinity', 'NaN'
+      ];
+      // Remove all known function/constant names first, then check remainder
+      let check = expr;
+      for (const name of allowedNames) {
+        check = check.replaceAll(name, '');
+      }
+      // After removing known names, only digits, operators, spaces, parens, dots, commas should remain
+      if (/[a-zA-Z_]/.test(check)) {
+        return JSON.stringify({ error: "Expression contains disallowed identifiers" });
+      }
+      // Also block known dangerous patterns
+      if (/constructor|prototype|__proto__|this|global|process|require|import|eval|Function/i.test(expr)) {
+        return JSON.stringify({ error: "Expression contains disallowed keywords" });
+      }
+      const mathScope: Record<string, any> = {
+        abs: Math.abs, ceil: Math.ceil, floor: Math.floor, round: Math.round,
+        sqrt: Math.sqrt, cbrt: Math.cbrt, pow: Math.pow,
+        sin: Math.sin, cos: Math.cos, tan: Math.tan,
+        asin: Math.asin, acos: Math.acos, atan: Math.atan, atan2: Math.atan2,
+        log: Math.log, log2: Math.log2, log10: Math.log10,
+        exp: Math.exp, min: Math.min, max: Math.max,
+        PI: Math.PI, pi: Math.PI, E: Math.E, e: Math.E,
+        Infinity, NaN
+      };
+      // Freeze scope objects to prevent prototype traversal
       const keys = Object.keys(mathScope);
       const vals = Object.values(mathScope);
+      const sanitized = expr.replace(/[^0-9+\-*/().,%^ a-zA-Z_]/g, '');
       const fn = new Function(...keys, `"use strict"; return (${sanitized});`);
       const result = fn(...vals);
       if (typeof result !== 'number' || !isFinite(result)) {
