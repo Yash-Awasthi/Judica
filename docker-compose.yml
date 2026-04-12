@@ -17,7 +17,7 @@ services:
       redis:
         condition: service_healthy
     command: >
-      sh -c "npx prisma migrate deploy && node dist/index.js"
+      sh -c "npx drizzle-kit push && node dist/index.js"
     restart: unless-stopped
 
   db:
@@ -52,7 +52,7 @@ services:
     restart: unless-stopped
 
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v2.53.0
     ports:
       - "9090:9090"
     volumes:
@@ -63,7 +63,7 @@ services:
     restart: unless-stopped
 
   grafana:
-    image: grafana/grafana:latest
+    image: grafana/grafana:11.1.0
     ports:
       - "3001:3000"
     environment:

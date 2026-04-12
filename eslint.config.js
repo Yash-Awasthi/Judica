@@ -42,6 +42,6 @@ export default [
     },
   },
   {
-    ignores: ["dist/**", "node_modules/**", "prisma/**"],
+    ignores: ["dist/**", "node_modules/**"],
   },
 ];

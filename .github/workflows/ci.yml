@@ -24,7 +24,6 @@ jobs:
         with:
           node-version: 22
       - run: npm install --ignore-scripts
-      - run: npx prisma generate
       - run: npx tsc --noEmit
 
   test:
@@ -35,7 +34,6 @@ jobs:
         with:
           node-version: 22
       - run: npm install --ignore-scripts
-      - run: npx prisma generate
       - run: npx vitest run --passWithNoTests
 
   build:
@@ -47,6 +45,5 @@ jobs:
         with:
           node-version: 22
       - run: npm install --ignore-scripts
-      - run: npx prisma generate
       - run: cd frontend && npm install
       - run: npm run build --if-present

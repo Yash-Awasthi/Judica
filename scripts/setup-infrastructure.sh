@@ -331,13 +331,9 @@ WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
-COPY prisma ./prisma/
 
 # Install dependencies
 RUN npm ci --only=production && npm cache clean --force
-
-# Generate Prisma client
-RUN npx prisma generate
 
 # Production stage
 FROM node:18-alpine AS production
@@ -357,7 +353,6 @@ WORKDIR /app
 
 # Copy from builder
 COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
-COPY --from=builder --chown=nodejs:nodejs /app/prisma ./prisma
 COPY --from=builder --chown=nodejs:nodejs /app/package*.json ./
 COPY --chown=nodejs:nodejs . .
 
@@ -1023,7 +1018,7 @@ deploy_infrastructure() {
     
     # Run database migrations
     print_status "Running database migrations..."
-    docker-compose -f docker-compose.prod.yml exec -T app npx prisma migrate deploy
+    docker-compose -f docker-compose.prod.yml exec -T app npx drizzle-kit push
     
     print_success "Production infrastructure deployed"
 }
@@ -1116,7 +1111,7 @@ main() {
     echo "🚀 Quick Deploy:"
     echo "  cp .env.production .env"
     echo "  docker-compose -f docker-compose.prod.yml up -d"
-    echo "  docker-compose -f docker-compose.prod.yml exec app npx prisma migrate deploy"
+    echo "  docker-compose -f docker-compose.prod.yml exec app npx drizzle-kit push"
 }
 
 # Handle command line arguments

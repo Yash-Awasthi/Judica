@@ -614,9 +614,6 @@ aibyai/
 │   ├── router.tsx             # React Router setup
 │   └── main.tsx               # Entry point
 │
-├── prisma/
-│   └── schema.prisma          # 39 database models
-│
 ├── docker-compose.yml         # PostgreSQL + Redis + App
 ├── Dockerfile                 # Multi-stage production build
 ├── ecosystem.config.cjs       # PM2 cluster mode
@@ -909,8 +906,8 @@ cp /var/lib/redis/dump.rdb /backups/redis_$(date +%Y%m%d_%H%M%S).rdb
 | Database won't connect | `sudo systemctl status postgresql` / `psql -h localhost -U username -d ai_council` |
 | Redis won't connect | `redis-cli ping` / `redis-cli monitor` |
 | High memory usage | `docker stats` / `export NODE_OPTIONS="--max-old-space-size=4096"` |
-| Slow queries | `npx prisma studio` / `EXPLAIN ANALYZE` on slow queries |
-| Migration issues | `npx prisma migrate reset` (development only) |
+| Slow queries | `npx drizzle-kit studio` / `EXPLAIN ANALYZE` on slow queries |
+| Migration issues | `npx drizzle-kit push` (re-apply schema) |
 
 ---
 

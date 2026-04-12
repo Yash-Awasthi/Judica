@@ -395,15 +395,15 @@ async function testConfiguration() {
     
     // Test database connection
     try {
-        const { PrismaClient } = require('@prisma/client');
-        const prisma = new PrismaClient();
-        
-        await prisma.$queryRaw`SELECT 1`;
-        tests.push({ name: 'Database Connection', status: '✅ Passed' });
-        
-        await prisma.$disconnect();
+        const { Pool } = require('pg');
+        const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+
+        await pool.query('SELECT 1');
+        tests.push({ name: 'Database Connection', status: 'Passed' });
+
+        await pool.end();
     } catch (error) {
-        tests.push({ name: 'Database Connection', status: '❌ Failed', error: error.message });
+        tests.push({ name: 'Database Connection', status: 'Failed', error: error.message });
     }
     
     // Test Redis connection

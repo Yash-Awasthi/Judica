@@ -5,22 +5,19 @@ WORKDIR /app
 
 # Copy root package files and install backend dependencies
 COPY package*.json ./
-COPY prisma/ ./prisma/
-RUN npm ci && npm install prisma @prisma/client @prisma/adapter-pg pg
+RUN npm ci
 
-# FIX: install frontend dependencies before running the build.
-# Without this, `npm run build --prefix frontend` fails because
-# vite, react, etc. are not present.
+# Install frontend dependencies before running the build
 COPY frontend/package*.json ./frontend/
 RUN cd frontend && npm ci
 
 # Copy all source
 COPY tsconfig.json ./
+COPY drizzle.config.ts ./
 COPY src/ ./src/
 COPY frontend/ ./frontend/
 
-# Generate Prisma client and build everything
-RUN npx prisma generate
+# Build everything (frontend + TypeScript compile)
 RUN npm run build
 
 # 2. Production Stage
@@ -32,11 +29,7 @@ ENV NODE_ENV=production
 
 # Copy package files and install only production dependencies
 COPY package*.json ./
-COPY prisma/ ./prisma/
-RUN npm ci --omit=dev && npm install @prisma/client @prisma/adapter-pg pg
-
-# Generate Prisma client for runtime
-RUN npx prisma generate
+RUN npm ci --omit=dev
 
 # Copy built artifacts from the builder stage
 COPY --from=builder /app/dist ./dist
