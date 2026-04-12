@@ -7,8 +7,12 @@ import logger from "../lib/logger.js";
 import crypto from "crypto";
 
 // AES-256-GCM encryption for config storage
-const ENCRYPTION_KEY = process.env.MEMORY_ENCRYPTION_KEY || crypto.randomBytes(32).toString("hex");
-const KEY_BUFFER = Buffer.from(ENCRYPTION_KEY.substring(0, 64), "hex");
+// Falls back to MASTER_ENCRYPTION_KEY to ensure persistence across restarts
+const ENCRYPTION_KEY = process.env.MEMORY_ENCRYPTION_KEY || process.env.MASTER_ENCRYPTION_KEY;
+if (!ENCRYPTION_KEY) {
+  throw new Error("CRITICAL: Neither MEMORY_ENCRYPTION_KEY nor MASTER_ENCRYPTION_KEY is set. Encrypted memory configs will be unreadable after restart.");
+}
+const KEY_BUFFER = crypto.createHash("sha256").update(ENCRYPTION_KEY).digest();
 
 export function encryptConfig(plaintext: string): string {
   const iv = crypto.randomBytes(12);
