@@ -4,6 +4,25 @@ import path from "path";
 import crypto from "crypto";
 import os from "os";
 
+/**
+ * Python sandbox for executing untrusted user code.
+ *
+ * SECURITY NOTE (WF-4): This sandbox uses ulimit-based resource limits only.
+ * It does NOT provide namespace isolation (e.g., Linux namespaces via unshare).
+ * The process runs under the same UID as the server and shares the host
+ * filesystem, PID namespace, and (partially blocked) network namespace.
+ *
+ * Network access is blocked at the Python level by monkey-patching socket.socket
+ * rather than via kernel-level enforcement.  This is bypassable by ctypes or
+ * compiled extensions.
+ *
+ * For production use with truly untrusted code, consider:
+ *  - Running inside a gVisor / Firecracker micro-VM
+ *  - Using Linux user namespaces (unshare --user --net --pid --mount) if
+ *    CAP_SYS_ADMIN is available
+ *  - Using a dedicated sandboxing service (e.g., Cloudflare Workers, AWS Lambda)
+ */
+
 export interface SandboxResult {
   output: string[];
   error: string | null;
