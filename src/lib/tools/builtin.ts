@@ -2,6 +2,7 @@ import { registerTool } from "./index.js";
 import { executeCodeTool } from "./execute_code.js";
 import { env } from "../../config/env.js";
 import { registerUserSkillsAsTools } from "./skillExecutor.js";
+import { validateSafeUrl } from "../ssrf.js";
 
 // Register user skills as callable tools on startup (lazy, per-request)
 // Skills are loaded dynamically when the tool is called
@@ -90,10 +91,26 @@ registerTool(
   async (args) => {
     const url = args.url as string;
     try {
-      const response = await fetch(url, { signal: AbortSignal.timeout(10000) });
+      // Validate URL against SSRF before fetching
+      const safeUrl = await validateSafeUrl(url);
+      const response = await fetch(safeUrl, {
+        signal: AbortSignal.timeout(10000),
+        redirect: "manual", // Prevent redirect-based SSRF bypass
+      });
+      // If redirect, validate the redirect target too
+      if (response.status >= 300 && response.status < 400) {
+        const location = response.headers.get("location");
+        if (location) {
+          const safeRedirect = await validateSafeUrl(location);
+          const redirectResponse = await fetch(safeRedirect, { signal: AbortSignal.timeout(10000) });
+          const text = await redirectResponse.text();
+          const plain = text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+          return plain.slice(0, 5000);
+        }
+      }
       const text = await response.text();
       const plain = text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
-      return plain.slice(0, 5000); // Limit to 5000 chars
+      return plain.slice(0, 5000);
     } catch (err) {
       return `Failed to fetch URL: ${(err as Error).message}`;
     }
