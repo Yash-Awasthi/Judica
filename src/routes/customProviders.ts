@@ -56,7 +56,6 @@ const router = Router();
  *       401:
  *         description: Unauthorized
  */
-// ─── List all providers (built-in + custom) ──────────────────────────────────
 router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   const userId = req.user!.id;
 
@@ -173,7 +172,6 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
  *       401:
  *         description: Unauthorized
  */
-// ─── Create custom provider ──────────────────────────────────────────────────
 router.post("/custom", requireAuth, async (req: AuthRequest, res: Response) => {
   const userId = req.user!.id;
   const { name, base_url, auth_type, auth_key, auth_header_name, capabilities, models } = req.body;
@@ -280,7 +278,6 @@ router.post("/custom", requireAuth, async (req: AuthRequest, res: Response) => {
  *       404:
  *         description: Custom provider not found
  */
-// ─── Update custom provider ─────────────────────────────────────────────────
 router.put("/custom/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const userId = req.user!.id;
   const providerId = parseInt(req.params.id as string, 10);
@@ -365,7 +362,6 @@ router.put("/custom/:id", requireAuth, async (req: AuthRequest, res: Response) =
  *       404:
  *         description: Custom provider not found
  */
-// ─── Delete custom provider ─────────────────────────────────────────────────
 router.delete("/custom/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const userId = req.user!.id;
   const providerId = parseInt(req.params.id as string, 10);
@@ -422,7 +418,6 @@ router.delete("/custom/:id", requireAuth, async (req: AuthRequest, res: Response
  *       404:
  *         description: Custom provider not found
  */
-// ─── Test custom provider ───────────────────────────────────────────────────
 router.post("/custom/:id/test", requireAuth, async (req: AuthRequest, res: Response) => {
   const userId = req.user!.id;
   const providerId = parseInt(req.params.id as string, 10);
@@ -496,7 +491,6 @@ router.post("/custom/:id/test", requireAuth, async (req: AuthRequest, res: Respo
  *       404:
  *         description: Provider not found
  */
-// ─── List models for a provider ──────────────────────────────────────────────
 router.get("/:providerId/models", requireAuth, async (req: AuthRequest, res: Response) => {
   const { providerId } = req.params;
 

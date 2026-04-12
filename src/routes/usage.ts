@@ -87,7 +87,6 @@ const router = Router();
  *       401:
  *         description: Unauthorized
  */
-// ─── Get usage breakdown ─────────────────────────────────────────────────────
 router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   const userId = req.user!.id;
   const { start_date, end_date, group_by } = req.query;

@@ -1,5 +1,5 @@
 import { AgentOutput, AdversarialResult } from "./schemas.js";
-import { Provider, Message } from "./providers.js";
+import { Provider } from "./providers.js";
 import { askProvider } from "./providers.js";
 import logger from "./logger.js";
 

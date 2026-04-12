@@ -3,7 +3,6 @@ import { checkRPM } from "./rpmLimiter.js";
 import { hasAdapter } from "../adapters/registry.js";
 import logger from "../lib/logger.js";
 
-// ─── Provider Chain ──────────────────────────────────────────────────────────
 // Defines the priority order for free-tier providers.
 // Each entry specifies rate and quota limits.
 

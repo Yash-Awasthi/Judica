@@ -8,7 +8,6 @@ import { createStreamResult } from "../adapters/types.js";
 import { AppError } from "../middleware/errorHandler.js";
 import logger from "../lib/logger.js";
 
-// ─── Smart Router ────────────────────────────────────────────────────────────
 // Routes requests to the best available provider. Handles fallback on failure.
 
 export interface RouteOptions {

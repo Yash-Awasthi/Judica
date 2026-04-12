@@ -1,6 +1,5 @@
 import type { AdapterMessage } from "../adapters/types.js";
 
-// ─── Token Estimator ─────────────────────────────────────────────────────────
 // Estimate token count before sending to avoid exceeding quotas.
 // Uses heuristic (chars/4) — accurate enough for quota decisions.
 

@@ -30,7 +30,7 @@ flowchart LR
         G["Marketplace\nPrompts, workflows, personas, tools"]
         H["Observability\nTracing, LangFuse, reliability scoring"]
         I["Auth + RBAC\nOAuth2, roles, sharing"]
-        J["Infrastructure\nDocker, PM2, BullMQ, CI, PWA"]
+        J["Infrastructure\nDocker, BullMQ, CI, PWA"]
     end
 
     style COMPLETE fill:#022c22,stroke:#22c55e,color:#bbf7d0
@@ -216,7 +216,7 @@ flowchart LR
 
 ## Kubernetes & Multi-Region
 
-> **Priority: Low** — Docker Compose + PM2 covers current scale.
+> **Priority: Low** — Docker Compose covers current scale.
 
 ```mermaid
 flowchart TB

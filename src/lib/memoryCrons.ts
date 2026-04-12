@@ -9,8 +9,6 @@ const ONE_WEEK = 7 * 24 * 60 * 60 * 1000;
 let summarizationTimer: ReturnType<typeof setInterval> | null = null;
 let compactionTimer: ReturnType<typeof setInterval> | null = null;
 
-// ── Hourly: Auto-summarize conversations with >30 messages ────────────────────
-
 async function runAutoSummarization(): Promise<void> {
   logger.info("Running auto-summarization job");
 
@@ -45,8 +43,6 @@ async function runAutoSummarization(): Promise<void> {
     logger.error({ err }, "Summarization job failed");
   }
 }
-
-// ── Weekly: Memory compaction for users with >50 chunks ───────────────────────
 
 async function runWeeklyCompaction(): Promise<void> {
   logger.info("Running weekly memory compaction job");

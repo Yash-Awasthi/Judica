@@ -8,10 +8,6 @@ import { OllamaAdapter } from "./ollama.adapter.js";
 import { env } from "../config/env.js";
 import logger from "../lib/logger.js";
 
-// ─── Adapter Registry ────────────────────────────────────────────────────────
-// Central store for all provider adapters. Auto-loads built-in providers based
-// on which API keys are present in the environment.
-
 const adapters = new Map<string, IProviderAdapter>();
 
 /** Get a registered adapter by provider ID */
@@ -89,9 +85,6 @@ export function resolveProviderFromModel(model: string): string | null {
 
   return null;
 }
-
-// ─── Auto-registration ───────────────────────────────────────────────────────
-// Load built-in adapters based on environment variables.
 
 function initBuiltinAdapters(): void {
   if (env.OPENAI_API_KEY) {

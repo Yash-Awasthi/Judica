@@ -1,6 +1,3 @@
-// ─── Unified Adapter Types ───────────────────────────────────────────────────
-// One interface. All providers go through it. Zero provider-specific code in routes.
-
 export interface AdapterMessage {
   role: "system" | "user" | "assistant" | "tool";
   content: string | AdapterContentBlock[];

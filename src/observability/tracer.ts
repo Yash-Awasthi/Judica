@@ -2,7 +2,6 @@ import { randomUUID } from "crypto";
 import prisma from "../lib/db.js";
 import logger from "../lib/logger.js";
 
-// ─── Types ────────────────────────────────────────────────────────────────────
 
 export interface TraceStep {
   name: string;
@@ -25,7 +24,6 @@ export interface TraceContext {
   startTime: number;
 }
 
-// ─── Tracer API ───────────────────────────────────────────────────────────────
 
 export function startTrace(
   userId: number,
@@ -84,7 +82,6 @@ export async function endTrace(ctx: TraceContext): Promise<string> {
   }
 }
 
-// ─── Optional LangFuse ───────────────────────────────────────────────────────
 
 async function sendToLangfuse(
   ctx: TraceContext,

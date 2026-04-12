@@ -64,8 +64,6 @@ export const authLimiter = rateLimit({
   ...(redisStore ? { store: redisStore } : {}),
 });
 
-// ─── Tier 12.3: Specialized Redis-backed rate limiters ──────────────────────
-
 export const apiLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 60,

@@ -8,3 +8,5 @@ __pycache__/
 /src/generated/prisma
 dist/
 .DS_Store
+*.Identifier
+Thumbs.db

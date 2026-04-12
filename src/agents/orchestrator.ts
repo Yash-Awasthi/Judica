@@ -13,7 +13,6 @@ import { hybridSearch } from "../services/vectorStore.service.js";
 import { updateReliability, getReliabilityScores } from "../services/reliability.service.js";
 import logger from "../lib/logger.js";
 
-// ─── Types ─────────────────────────────────────────────────────────────────────
 
 export interface CouncilMember {
   id: string;
@@ -67,7 +66,6 @@ interface MemberResponse {
   usage: { prompt_tokens: number; completion_tokens: number };
 }
 
-// ─── Human gate support ────────────────────────────────────────────────────────
 
 const pendingHumanGates = new Map<
   string,
@@ -82,7 +80,6 @@ export function resolveHumanGate(gateId: string, choice: string): void {
   }
 }
 
-// ─── Orchestrator ──────────────────────────────────────────────────────────────
 
 export class DeliberationOrchestrator {
   private bus: AgentMessageBus;

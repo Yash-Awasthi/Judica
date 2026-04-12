@@ -1,6 +1,5 @@
 import logger from "../lib/logger.js";
 
-// ─── Quota Tracker ───────────────────────────────────────────────────────────
 // Track per-provider per-day usage. In-memory for now, can be backed by Redis.
 
 interface QuotaEntry {

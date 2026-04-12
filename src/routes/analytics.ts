@@ -63,7 +63,6 @@ const router = Router();
  *       401:
  *         description: Unauthorized
  */
-// ─── Analytics overview ─────────────────────────────────────────────────────
 router.get("/overview", async (req: AuthRequest, res: Response) => {
   const userId = req.userId!;
 

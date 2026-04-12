@@ -7,7 +7,6 @@ import { registerUserSkillsAsTools } from "./skillExecutor.js";
 // Skills are loaded dynamically when the tool is called
 registerUserSkillsAsTools();
 
-// ── web_search ──────────────────────────────────────────────────────────────
 registerTool(
   {
     name: "web_search",
@@ -59,7 +58,6 @@ registerTool(
   }
 );
 
-// ── execute_code ────────────────────────────────────────────────────────────
 registerTool(
   {
     name: "execute_code",
@@ -77,7 +75,6 @@ registerTool(
   }
 );
 
-// ── read_webpage ────────────────────────────────────────────────────────────
 registerTool(
   {
     name: "read_webpage",
@@ -103,7 +100,6 @@ registerTool(
   }
 );
 
-// ── calculator ──────────────────────────────────────────────────────────────
 registerTool(
   {
     name: "calculator",
@@ -146,7 +142,6 @@ registerTool(
   }
 );
 
-// ── datetime ────────────────────────────────────────────────────────────────
 registerTool(
   {
     name: "datetime",
@@ -175,7 +170,6 @@ registerTool(
   }
 );
 
-// ── wikipedia ───────────────────────────────────────────────────────────────
 registerTool(
   {
     name: "wikipedia",

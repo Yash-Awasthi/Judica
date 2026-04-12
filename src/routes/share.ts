@@ -6,7 +6,6 @@ import { AppError } from "../middleware/errorHandler.js";
 
 const router = Router();
 
-// ─── Conversation Sharing ─────────────────────────────────────────────────
 
 /**
  * @openapi
@@ -177,7 +176,6 @@ router.get("/view/:token", async (req: Request, res: Response) => {
   res.json({ conversation, chats, access: shared.access });
 });
 
-// ─── Workflow Sharing ─────────────────────────────────────────────────────
 
 /**
  * @openapi
@@ -282,7 +280,6 @@ router.get("/workflow/:token", async (req: Request, res: Response) => {
   res.json({ workflow });
 });
 
-// ─── Prompt Sharing ───────────────────────────────────────────────────────
 
 /**
  * @openapi

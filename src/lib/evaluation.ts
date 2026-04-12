@@ -337,7 +337,7 @@ export async function getUserEvaluationMetrics(userId: number, days: number = 30
     averageEfficiency,
     totalEvaluations: evaluations.length,
     improvementTrend,
-    userSatisfaction: 0 // Would be calculated from user feedback
+    userSatisfaction: 0
   };
 }
 

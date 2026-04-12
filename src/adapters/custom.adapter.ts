@@ -8,10 +8,6 @@ import { createStreamResult } from "./types.js";
 import { decrypt } from "../lib/crypto.js";
 import logger from "../lib/logger.js";
 
-// ─── Custom/Dynamic Adapter ─────────────────────────────────────────────────
-// Supports adding new OpenAI-compatible providers at runtime via the UI.
-// Uses schema_map to translate between the adapter interface and the provider's API.
-
 export interface CustomProviderConfig {
   id: string;
   name: string;

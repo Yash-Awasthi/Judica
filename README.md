@@ -231,7 +231,6 @@ mindmap
       IndexedDB
     Infrastructure
       Docker
-      PM2 Cluster
       GitHub Actions
       Workbox PWA
     Security
@@ -295,8 +294,8 @@ Returns an SSE stream: `opinion` → `peer_review` → `scored` → `done` (verd
 | Document | Description |
 |---|---|
 | **[Documentation](./docs/DOCUMENTATION.md)** | Setup, env vars, API reference, project structure, deployment, security |
-| **[API Reference](./docs/API.md)** | Detailed endpoint documentation |
 | **[Roadmap](./ROADMAP.md)** | Future plans — testing, collaboration, plugins, scaling |
+| **Interactive API Docs** | Available at `/api/docs` when the server is running |
 
 ---
 

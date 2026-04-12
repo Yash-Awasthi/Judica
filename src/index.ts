@@ -27,7 +27,7 @@ import exportRouter from "./routes/export.js";
 import ttsRouter from "./routes/tts.js";
 import { startSweepers } from "./lib/sweeper.js";
 import "./lib/tools/builtin.js";
-import "./adapters/registry.js"; // Initialize adapter registry on startup
+import "./adapters/registry.js";
 import { initSocket } from "./lib/socket.js";
 import prisma, { pool } from "./lib/db.js";
 import redis from "./lib/redis.js";
@@ -179,7 +179,6 @@ app.use("/api/queue",       requireAuth, queueRouter);
 app.use("/api/costs",       requireAuth, costsRouter);
 app.use("/api/evaluation",  requireAuth, evaluationRouter);
 
-// ── BullMQ Board (dev only) ────────────────────────────────────────────────
 if (env.NODE_ENV === "development") {
   import("@bull-board/api").then(async ({ createBullBoard, BullMQAdapter }) => {
     const { ExpressAdapter } = await import("@bull-board/express");

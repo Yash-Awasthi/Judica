@@ -1,4 +1,3 @@
-// ─── Adapters barrel export ──────────────────────────────────────────────────
 export type {
   IProviderAdapter,
   AdapterRequest,

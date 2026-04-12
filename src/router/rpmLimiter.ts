@@ -1,4 +1,3 @@
-// ─── RPM Limiter ─────────────────────────────────────────────────────────────
 // Sliding window rate limiter per provider. Tracks request timestamps.
 
 const windows = new Map<string, number[]>();

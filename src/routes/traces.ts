@@ -90,7 +90,6 @@ const router = Router();
  *       401:
  *         description: Unauthorized
  */
-// ─── List traces ────────────────────────────────────────────────────────────
 router.get("/", async (req: AuthRequest, res: Response) => {
   const userId = req.userId!;
   const {
@@ -173,7 +172,6 @@ router.get("/", async (req: AuthRequest, res: Response) => {
  *       404:
  *         description: Trace not found
  */
-// ─── Trace detail ───────────────────────────────────────────────────────────
 router.get("/:id", async (req: AuthRequest, res: Response) => {
   const userId = req.userId!;
   const trace = await prisma.trace.findFirst({

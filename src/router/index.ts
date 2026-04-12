@@ -1,4 +1,3 @@
-// ─── Router barrel export ────────────────────────────────────────────────────
 export { route, routeAndCollect } from "./smartRouter.js";
 export type { RouteOptions } from "./smartRouter.js";
 
