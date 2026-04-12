@@ -9,6 +9,55 @@ import logger from "../lib/logger.js";
 import type { ExecutionEvent } from "../workflow/types.js";
 import type { WorkflowExecutor } from "../workflow/executor.js";
 
+/**
+ * Validate that a workflow definition has well-formed node and edge structures.
+ * Throws AppError on malformed definitions to prevent runtime crashes.
+ */
+function validateWorkflowDefinition(definition: any): void {
+  const { nodes, edges } = definition;
+
+  if (nodes.length === 0) {
+    throw new AppError(400, "Workflow must contain at least one node", "WORKFLOW_EMPTY");
+  }
+
+  const nodeIds = new Set<string>();
+  for (let i = 0; i < nodes.length; i++) {
+    const node = nodes[i];
+    if (!node || typeof node !== "object") {
+      throw new AppError(400, `Node at index ${i} is not a valid object`, "WORKFLOW_NODE_INVALID");
+    }
+    if (!node.id || typeof node.id !== "string") {
+      throw new AppError(400, `Node at index ${i} is missing a valid "id" string`, "WORKFLOW_NODE_INVALID");
+    }
+    if (!node.type || typeof node.type !== "string") {
+      throw new AppError(400, `Node "${node.id}" is missing a valid "type" string`, "WORKFLOW_NODE_INVALID");
+    }
+    if (nodeIds.has(node.id)) {
+      throw new AppError(400, `Duplicate node id "${node.id}"`, "WORKFLOW_NODE_DUPLICATE");
+    }
+    nodeIds.add(node.id);
+  }
+
+  for (let i = 0; i < edges.length; i++) {
+    const edge = edges[i];
+    if (!edge || typeof edge !== "object") {
+      throw new AppError(400, `Edge at index ${i} is not a valid object`, "WORKFLOW_EDGE_INVALID");
+    }
+    if (!edge.source || typeof edge.source !== "string") {
+      throw new AppError(400, `Edge at index ${i} is missing a valid "source" string`, "WORKFLOW_EDGE_INVALID");
+    }
+    if (!edge.target || typeof edge.target !== "string") {
+      throw new AppError(400, `Edge at index ${i} is missing a valid "target" string`, "WORKFLOW_EDGE_INVALID");
+    }
+    if (!nodeIds.has(edge.source)) {
+      throw new AppError(400, `Edge at index ${i} references unknown source node "${edge.source}"`, "WORKFLOW_EDGE_INVALID");
+    }
+    if (!nodeIds.has(edge.target)) {
+      throw new AppError(400, `Edge at index ${i} references unknown target node "${edge.target}"`, "WORKFLOW_EDGE_INVALID");
+    }
+  }
+}
+
 // Active workflow runs kept in memory for SSE streaming
 export const activeRuns = new Map<
   string,
@@ -171,6 +220,8 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
       );
     }
 
+    validateWorkflowDefinition(definition);
+
     const now = new Date();
     const [workflow] = await db
       .insert(workflows)
@@ -313,6 +364,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
           "WORKFLOW_DEFINITION_INVALID",
         );
       }
+      validateWorkflowDefinition(definition);
       data.definition = definition;
       data.version = workflow.version + 1;
     }

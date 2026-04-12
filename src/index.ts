@@ -3,6 +3,7 @@ import fastifyExpress from "@fastify/express";
 import fastifyCors from "@fastify/cors";
 import fastifyCompress from "@fastify/compress";
 import fastifyCookie from "@fastify/cookie";
+import fastifyHelmet from "@fastify/helmet";
 import fastifyStatic from "@fastify/static";
 import path from "path";
 import fs from "fs";
@@ -101,6 +102,9 @@ await fastify.register(fastifyCors, {
 
 await fastify.register(fastifyCompress);
 await fastify.register(fastifyCookie);
+await fastify.register(fastifyHelmet, {
+  contentSecurityPolicy: false, // CSP is handled separately via cspNonce middleware
+});
 
 const publicPath = fs.existsSync(path.join(process.cwd(), "frontend/dist"))
   ? path.join(process.cwd(), "frontend/dist")

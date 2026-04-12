@@ -27,6 +27,9 @@
   "author": "Yash Awasthi",
   "license": "ISC",
   "description": "A production-grade multi-model AI orchestration engine with agentic tools and semantic caching.",
+  "_dependencyNotes": {
+    "redis+ioredis": "Both Redis clients are required: 'redis' is used by src/lib/redis.ts for general caching/pub-sub, 'ioredis' is required by BullMQ (src/queue/connection.ts) and rate-limit-redis (src/middleware/rateLimit.ts)."
+  },
   "dependencies": {
     "@fastify/compress": "^8.0.2",
     "@fastify/cookie": "^11.0.2",

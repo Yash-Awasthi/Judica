@@ -132,9 +132,11 @@ export class WorkflowExecutor {
 
       // ── Gather inputs from predecessor outputs ────────────────────────
       const nodeInputs: Record<string, unknown> = {};
-      let skipped = false;
+      let skippedCount = 0;
+      let activeCount = 0;
+      const preds = predecessors.get(nodeId) || [];
 
-      for (const pred of predecessors.get(nodeId) || []) {
+      for (const pred of preds) {
         const predNode = nodeMap.get(pred.source);
 
         // For CONDITION predecessors, only follow the matching branch
@@ -142,12 +144,20 @@ export class WorkflowExecutor {
           const branch = conditionBranches.get(pred.source);
           // sourceHandle indicates which branch this edge represents
           if (pred.sourceHandle && branch && pred.sourceHandle !== branch) {
-            skipped = true;
+            skippedCount++;
             continue;
           }
         }
 
+        // If a predecessor was itself skipped (empty output from a skipped branch),
+        // propagate the skip for that path
         const predOutput = contextMap.get(pred.source);
+        if (predOutput && Object.keys(predOutput).length === 0 && !nodeMap.get(pred.source)?.data.__executed) {
+          skippedCount++;
+          continue;
+        }
+
+        activeCount++;
         if (predOutput) {
           // If targetHandle is set, store under that key; otherwise merge all
           if (pred.targetHandle) {
@@ -158,8 +168,8 @@ export class WorkflowExecutor {
         }
       }
 
-      // If all predecessor paths were skipped (condition branch not taken), skip this node
-      if (skipped && Object.keys(nodeInputs).length === 0) {
+      // If ALL predecessor paths were skipped (no active branch leads here), skip this node
+      if (preds.length > 0 && activeCount === 0) {
         contextMap.set(nodeId, {});
         continue;
       }
