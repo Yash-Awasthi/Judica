@@ -63,8 +63,14 @@ export const PiiWarning: React.FC<PiiWarningProps> = ({
     );
   }
 
+  // Auto-proceed when no PII is detected (must be in useEffect, not during render)
+  useEffect(() => {
+    if (!loading && !detection?.found) {
+      onProceed();
+    }
+  }, [loading, detection, onProceed]);
+
   if (!detection?.found) {
-    onProceed();
     return null;
   }
 
