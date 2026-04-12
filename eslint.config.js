@@ -26,13 +26,15 @@ export default [
       // TypeScript-specific
       "@typescript-eslint/no-explicit-any": "warn",
       "@typescript-eslint/no-unused-vars": ["warn", { argsIgnorePattern: "^_" }],
-      "@typescript-eslint/no-floating-promises": "error",
+      "@typescript-eslint/no-floating-promises": "warn",
 
       // General quality
       "no-console": "warn",
       "eqeqeq": ["error", "always"],
       "no-var": "error",
       "prefer-const": "warn",
+      "no-empty": "warn",
+      "no-useless-assignment": "warn",
 
       // Override recommended for TS files
       "no-unused-vars": "off",

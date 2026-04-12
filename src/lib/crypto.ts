@@ -29,7 +29,7 @@ export function encrypt(text: string): string {
     return `${iv.toString("hex")}:${tag}:${encrypted}`;
   } catch (err) {
     logger.error({ err: (err as Error).message }, "Encryption failed");
-    throw new Error("Failed to encrypt sensitive data");
+    throw new Error("Failed to encrypt sensitive data", { cause: err });
   }
 }
 
@@ -53,7 +53,7 @@ export function decrypt(encryptedText: string): string {
     return decrypted;
   } catch (err) {
     logger.error({ err: (err as Error).message }, "Decryption failed");
-    throw new Error("Failed to decrypt sensitive data - check MASTER_ENCRYPTION_KEY");
+    throw new Error("Failed to decrypt sensitive data - check MASTER_ENCRYPTION_KEY", { cause: err });
   }
 }
 
