@@ -1,7 +1,8 @@
 import React from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
+import type { Easing } from "framer-motion";
 import { Volume2, Pause, Eye, EyeOff, Gavel, Timer, DollarSign } from "lucide-react";
 import type { ChatMessage } from "../types/index.js";
 
@@ -52,7 +53,7 @@ const staggerItem = {
   visible: (i: number) => ({
     opacity: 1,
     y: 0,
-    transition: { delay: i * 0.08, duration: 0.35, ease: "easeOut" }
+    transition: { delay: i * 0.08, duration: 0.35, ease: "easeOut" as Easing }
   }),
 };
 
@@ -156,7 +157,7 @@ export function MessageList({
                     </div>
 
                     {/* Opinion content */}
-                    <div className={`glass-panel p-4 text-sm text-[var(--text-secondary)] leading-relaxed ${i === msg.opinions.length - 1 && !msg.verdict ? 'streaming-cursor' : ''}`}>
+                    <div className={`glass-panel p-4 text-sm text-[var(--text-secondary)] leading-relaxed ${i === (msg.opinions?.length ?? 0) - 1 && !msg.verdict ? 'streaming-cursor' : ''}`}>
                       <ReactMarkdown
                         remarkPlugins={[remarkGfm]}
                         components={mdComponents}

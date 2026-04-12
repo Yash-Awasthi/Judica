@@ -5,7 +5,7 @@ import { useCouncilMembers } from "../hooks/useCouncilMembers";
 import { useDeliberation } from "../hooks/useDeliberation";
 import { useAuth } from "../context/AuthContext";
 import { cacheConversation, getCachedConversation } from "../components/OfflineIndicator";
-import type { Conversation, ChatMessage } from "../types/index.js";
+import type { Conversation } from "../types/index.js";
 
 interface OutletContextType {
   setIsSidebarOpen: (v: boolean) => void;

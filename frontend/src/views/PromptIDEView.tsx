@@ -43,7 +43,7 @@ export function PromptIDEView() {
   // Test state
   const [testInput, setTestInput] = useState("");
   const [testModel, setTestModel] = useState("");
-  const [testTemp, setTestTemp] = useState<number | null>(null);
+  const [testTemp, _setTestTemp] = useState<number | null>(null);
   const [testOutput, setTestOutput] = useState("");
   const [testing, setTesting] = useState(false);
   const [testLatency, setTestLatency] = useState<number | null>(null);

@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Settings2, Download, FileText, FileJson, X } from "lucide-react";
+import { Settings2, Download, FileText, FileJson } from "lucide-react";
 import { MessageList } from "./MessageList.js";
 import { InputArea } from "./InputArea.js";
 import { StreamingStatus } from "./StreamingStatus.js";
@@ -220,7 +220,7 @@ export function ChatArea({
           rounds={rounds}
           onRoundsChange={setRounds}
           members={members}
-          onAddMember={() => onUpdateMembers([...members, { id: Date.now().toString(), name: "New Member", type: "openai-compat", role: "Default", tone: "Concise" }])}
+          onAddMember={() => onUpdateMembers([...members, { id: Date.now().toString(), name: "New Member", type: "openai-compat", role: "Default", tone: "Concise", apiKey: "", model: "", active: true, customBehaviour: "" }])}
           onRemoveMember={(id) => onUpdateMembers(members.filter(m => m.id !== id))}
           onUpdateMember={(id, field, value) => onUpdateMembers(members.map(m => m.id === id ? { ...m, [field]: value } : m))}
         />

@@ -168,7 +168,7 @@ export function AnalyticsView() {
                   <YAxis tick={{ fill: "var(--text-muted)", fontSize: 10 }} stroke="var(--border-subtle)" />
                   <Tooltip
                     contentStyle={tooltipStyle}
-                    formatter={(value: number) => ["$" + value.toFixed(4), "Cost"]}
+                    formatter={(value: any) => ["$" + Number(value).toFixed(4), "Cost"]}
                   />
                   <Bar dataKey="cost" fill="var(--accent-blue)" radius={[4, 4, 0, 0]} />
                 </BarChart>
@@ -193,8 +193,8 @@ export function AnalyticsView() {
                       cx="50%"
                       cy="50%"
                       outerRadius={80}
-                      label={({ model, percent }: { model: string; percent: number }) =>
-                        `${model.split("/").pop()} ${(percent * 100).toFixed(0)}%`
+                      label={(props: any) =>
+                        `${(props.model || "").split("/").pop()} ${((props.percent || 0) * 100).toFixed(0)}%`
                       }
                       labelLine={{ stroke: "var(--border-medium)" }}
                     >

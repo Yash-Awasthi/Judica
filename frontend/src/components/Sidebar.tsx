@@ -3,7 +3,7 @@ import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Home, MessageSquarePlus, Swords, Workflow, Code2, Braces,
-  Database, GitBranch, Brain, Store, BarChart3, Activity,
+  GitBranch, Brain, Store, BarChart3, Activity,
   Shield, Settings, ChevronLeft, ChevronRight, LogOut, Trash2,
   MessageCircle, ChevronDown, ChevronUp
 } from "lucide-react";

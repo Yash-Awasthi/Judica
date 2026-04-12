@@ -1,7 +1,7 @@
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import {
-  ArrowRight, Sparkles, MessageSquare, Swords, Users,
+  ArrowRight, Sparkles, MessageSquare, Swords,
   Workflow, Code2, Search, Store, BarChart3, Database, Brain
 } from "lucide-react";
 import { HeroScene } from "./HeroScene";
@@ -18,7 +18,7 @@ const stagger = {
   },
   item: {
     initial: { opacity: 0, y: 16 },
-    animate: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } }
+    animate: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" as const } }
   }
 };
 

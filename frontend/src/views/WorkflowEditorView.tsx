@@ -61,8 +61,8 @@ function WorkflowEditorInner() {
   const { fetchWithAuth } = useAuth();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
 
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
-  const [edges, setEdges, onEdgesChange] = useEdgesState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
+  const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [workflowName, setWorkflowName] = useState("Untitled Workflow");
   const [saving, setSaving] = useState(false);

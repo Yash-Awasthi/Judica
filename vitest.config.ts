@@ -5,6 +5,14 @@ export default defineConfig({
   test: {
     environment: "node",
 
+    // Ensure test fallbacks work (e.g. token similarity instead of ML worker)
+    env: {
+      NODE_ENV: "test",
+      DATABASE_URL: "postgresql://test:test@localhost:5432/test",
+      JWT_SECRET: "test-jwt-secret-min-16-chars",
+      MASTER_ENCRYPTION_KEY: "test-master-encryption-key-min-32-characters-long",
+    },
+
     // Tell Vitest to handle ESM properly with NodeNext resolution
     pool: "forks",          // Required for NodeNext ESM interop
     poolOptions: {

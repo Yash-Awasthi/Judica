@@ -93,7 +93,7 @@ export function RootLayout() {
       <Sidebar
         conversations={conversations}
         activeId={activeConvId}
-        username={user.username || user.email || "User"}
+        username={user || "User"}
         isOpen={sidebarOpen}
         onSelect={handleConversationSelect}
         onHome={handleHome}

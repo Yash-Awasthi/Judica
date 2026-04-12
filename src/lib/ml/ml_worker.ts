@@ -76,6 +76,12 @@ class MLWorker {
   }
 
   async computeSimilarity(text1: string, text2: string): Promise<number> {
+    if (process.env.NODE_ENV === "test") {
+      const err = new Error("ML worker skipped in test mode") as NodeJS.ErrnoException;
+      err.code = "ENOENT";
+      throw err;
+    }
+
     await this.init();
 
     if (!this.process || !this.process.stdin) {

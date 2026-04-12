@@ -53,6 +53,8 @@ import tracesRouter from "./routes/traces.js";
 import analyticsRouter from "./routes/analytics.js";
 import reposRouter from "./routes/repos.js";
 import queueRouter from "./routes/queue.js";
+import costsRouter from "./routes/costs.js";
+import evaluationRouter from "./routes/evaluation.js";
 import { startWorkers, stopWorkers } from "./queue/workers.js";
 import { startMemoryCrons } from "./lib/memoryCrons.js";
 import { ingestionQueue, researchQueue, repoQueue, compactionQueue } from "./queue/queues.js";
@@ -174,6 +176,8 @@ app.use("/api/traces",      requireAuth, tracesRouter);
 app.use("/api/analytics",   requireAuth, analyticsRouter);
 app.use("/api/repos",       requireAuth, reposRouter);
 app.use("/api/queue",       requireAuth, queueRouter);
+app.use("/api/costs",       requireAuth, costsRouter);
+app.use("/api/evaluation",  requireAuth, evaluationRouter);
 
 // ── BullMQ Board (dev only) ────────────────────────────────────────────────
 if (env.NODE_ENV === "development") {
