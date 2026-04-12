@@ -8,11 +8,32 @@ interface UserLimitState {
   concurrency: number;
 }
 
+/**
+ * LIMITATION: In-memory rate limiting is not cluster-safe. In a multi-process
+ * or multi-node deployment, each instance maintains its own map, so effective
+ * limits are multiplied by the number of instances. For production clusters,
+ * replace with a Redis-backed rate limiter.
+ *
+ * A MAX_MAP_SIZE cap and periodic cleanup interval are included below to
+ * prevent unbounded memory growth from expired entries.
+ */
 const userLimits = new Map<number, UserLimitState>();
+const MAX_MAP_SIZE = 100_000;
 
 const MAX_RPM = 1000; // 1000 requests per minute per user
 const MAX_CONCURRENCY = 100; // 100 simultaneous requests per user
 const RPM_WINDOW = 60000; // 1 minute window
+
+// Periodic cleanup: evict expired entries every 5 minutes
+const CLEANUP_INTERVAL = 5 * 60 * 1000;
+setInterval(() => {
+  const now = Date.now();
+  for (const [userId, state] of userLimits) {
+    if (now - state.lastReset > RPM_WINDOW && state.concurrency === 0) {
+      userLimits.delete(userId);
+    }
+  }
+}, CLEANUP_INTERVAL).unref();
 
 export function perUserLimiter(req: AuthRequest, res: Response, next: NextFunction) {
   const userId = req.userId;
@@ -22,6 +43,12 @@ export function perUserLimiter(req: AuthRequest, res: Response, next: NextFuncti
   const now = Date.now();
 
   if (!state) {
+    // Prevent unbounded map growth
+    if (userLimits.size >= MAX_MAP_SIZE) {
+      logger.warn("Per-user rate limit map reached max size; rejecting new user");
+      res.status(429).json({ error: "Server is busy. Please try again later." });
+      return;
+    }
     state = { rpmCount: 0, lastReset: now, concurrency: 0 };
     userLimits.set(userId, state);
   }
