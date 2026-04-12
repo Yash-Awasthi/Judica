@@ -168,8 +168,11 @@ export class WorkflowExecutor {
         }
       }
 
-      // If ALL predecessor paths were skipped (no active branch leads here), skip this node
-      if (preds.length > 0 && activeCount === 0) {
+      // If ALL predecessor paths were skipped (no active branch leads here), skip this node.
+      // IMPORTANT: For diamond / merge nodes where some predecessors are skipped
+      // (e.g., the unselected branch of a condition), we should still execute
+      // as long as at least one active predecessor delivered data.
+      if (preds.length > 0 && activeCount === 0 && skippedCount > 0) {
         contextMap.set(nodeId, {});
         continue;
       }
