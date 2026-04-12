@@ -8,6 +8,37 @@ const ttsSchema = z.object({
   input: z.string().min(1).max(4000)
 });
 
+/**
+ * @openapi
+ * /api/tts:
+ *   post:
+ *     tags:
+ *       - Council
+ *     summary: Convert text to speech audio
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               text:
+ *                 type: string
+ *                 description: Text to synthesize (alias for input)
+ *               input:
+ *                 type: string
+ *                 description: Text to synthesize (1-4000 chars)
+ *     responses:
+ *       200:
+ *         description: Audio file
+ *         content:
+ *           audio/mpeg:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       400:
+ *         description: Missing or invalid text input
+ */
 router.post("/", async (req, res, next) => {
   try {
     const rawInput = req.body.text || req.body.input;

@@ -8,6 +8,43 @@ import logger from "../lib/logger.js";
 
 const router = Router();
 
+/**
+ * @openapi
+ * /api/voice/transcribe:
+ *   post:
+ *     tags:
+ *       - Council
+ *     summary: Transcribe audio to text using Whisper STT
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - audio
+ *             properties:
+ *               audio:
+ *                 type: string
+ *                 format: binary
+ *                 description: Audio file to transcribe
+ *     responses:
+ *       200:
+ *         description: Transcription result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 text:
+ *                   type: string
+ *       400:
+ *         description: Audio file required
+ *       502:
+ *         description: Transcription failed
+ *       503:
+ *         description: STT not configured
+ */
 // POST /api/voice/transcribe — Whisper STT
 router.post("/transcribe", optionalAuth, upload.single("audio"), async (req: AuthRequest, res: Response) => {
   if (!req.file) throw new AppError(400, "Audio file required", "NO_AUDIO");
@@ -38,6 +75,44 @@ router.post("/transcribe", optionalAuth, upload.single("audio"), async (req: Aut
   res.json({ text: data.text });
 });
 
+/**
+ * @openapi
+ * /api/voice/synthesize:
+ *   post:
+ *     tags:
+ *       - Council
+ *     summary: Synthesize text to speech audio
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - text
+ *             properties:
+ *               text:
+ *                 type: string
+ *                 maxLength: 4096
+ *                 description: Text to synthesize
+ *               voice:
+ *                 type: string
+ *                 description: Voice identifier
+ *     responses:
+ *       200:
+ *         description: Audio file
+ *         content:
+ *           audio/mpeg:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       400:
+ *         description: Text is required or too long
+ *       502:
+ *         description: All TTS providers failed
+ *       503:
+ *         description: TTS not configured
+ */
 // POST /api/voice/synthesize — TTS
 router.post("/synthesize", optionalAuth, async (req: AuthRequest, res: Response) => {
   const { text, voice } = req.body;

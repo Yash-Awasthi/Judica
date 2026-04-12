@@ -38,6 +38,59 @@ const LANG_EXTENSIONS: Record<string, string> = {
   css: "css",
 };
 
+/**
+ * @openapi
+ * /api/artifacts:
+ *   get:
+ *     tags:
+ *       - Sandbox
+ *     summary: List user artifacts
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: conversation_id
+ *         schema:
+ *           type: string
+ *         description: Filter by conversation ID
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *         description: Filter by artifact type
+ *     responses:
+ *       200:
+ *         description: List of artifacts
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 artifacts:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       name:
+ *                         type: string
+ *                       type:
+ *                         type: string
+ *                       language:
+ *                         type: string
+ *                         nullable: true
+ *                       conversationId:
+ *                         type: string
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                       updatedAt:
+ *                         type: string
+ *                         format: date-time
+ *       401:
+ *         description: Unauthorized
+ */
 // GET /api/artifacts — list user's artifacts
 router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   const { conversation_id, type } = req.query;
@@ -64,6 +117,34 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   res.json({ artifacts });
 });
 
+/**
+ * @openapi
+ * /api/artifacts/{id}:
+ *   get:
+ *     tags:
+ *       - Sandbox
+ *     summary: Get an artifact by ID
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Artifact ID
+ *     responses:
+ *       200:
+ *         description: Artifact details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Artifact not found
+ */
 // GET /api/artifacts/:id — get artifact
 router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const artifact = await prisma.artifact.findFirst({
@@ -73,6 +154,45 @@ router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   res.json(artifact);
 });
 
+/**
+ * @openapi
+ * /api/artifacts/{id}:
+ *   put:
+ *     tags:
+ *       - Sandbox
+ *     summary: Update an artifact
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Artifact ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *               content:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Updated artifact
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Artifact not found
+ */
 // PUT /api/artifacts/:id — update artifact
 router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const artifact = await prisma.artifact.findFirst({
@@ -92,6 +212,37 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   res.json(updated);
 });
 
+/**
+ * @openapi
+ * /api/artifacts/{id}:
+ *   delete:
+ *     tags:
+ *       - Sandbox
+ *     summary: Delete an artifact
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Artifact ID
+ *     responses:
+ *       200:
+ *         description: Artifact deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Artifact not found
+ */
 // DELETE /api/artifacts/:id — delete
 router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const artifact = await prisma.artifact.findFirst({
@@ -103,6 +254,35 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   res.json({ success: true });
 });
 
+/**
+ * @openapi
+ * /api/artifacts/{id}/download:
+ *   get:
+ *     tags:
+ *       - Sandbox
+ *     summary: Download an artifact as a file
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Artifact ID
+ *     responses:
+ *       200:
+ *         description: File download
+ *         content:
+ *           text/plain:
+ *             schema:
+ *               type: string
+ *               format: binary
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Artifact not found
+ */
 // GET /api/artifacts/:id/download — download as file
 router.get("/:id/download", requireAuth, async (req: AuthRequest, res: Response) => {
   const artifact = await prisma.artifact.findFirst({

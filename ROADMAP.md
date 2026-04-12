@@ -287,18 +287,6 @@ flowchart TB
 
 ---
 
-## Bug Fixes & Polish
-
-> **Priority: High** — Known issues in current codebase.
-
-| Issue | Location | Description |
-|---|---|---|
-| `templates.ts` stub | `src/routes/templates.ts` | 412-byte placeholder — needs full implementation or removal |
-| `userConfig` reference | `src/routes/ask.ts:80` | References undeclared variable (falls through safely but should be cleaned up) |
-| Test job passthrough | `.github/workflows/ci.yml` | `vitest run \|\| true` always passes — remove `\|\| true` once tests are written |
-
----
-
 <div align="center">
 
 **[Back to README](./README.md)**

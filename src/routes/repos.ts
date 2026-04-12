@@ -8,6 +8,46 @@ import logger from "../lib/logger.js";
 
 const router = Router();
 
+/**
+ * @openapi
+ * /api/repos:
+ *   get:
+ *     tags:
+ *       - Repositories
+ *     summary: List user's repositories
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of repositories
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       source:
+ *                         type: string
+ *                       repoUrl:
+ *                         type: string
+ *                       name:
+ *                         type: string
+ *                       indexed:
+ *                         type: boolean
+ *                       fileCount:
+ *                         type: integer
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *       401:
+ *         description: Unauthorized
+ */
 // GET / — list user's repos
 router.get("/", async (req: AuthRequest, res: Response) => {
   const userId = String(req.userId);
@@ -27,6 +67,50 @@ router.get("/", async (req: AuthRequest, res: Response) => {
   res.json({ data: repos });
 });
 
+/**
+ * @openapi
+ * /api/repos/github:
+ *   post:
+ *     tags:
+ *       - Repositories
+ *     summary: Start GitHub repository ingestion
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - owner
+ *               - repo
+ *             properties:
+ *               owner:
+ *                 type: string
+ *                 description: GitHub repository owner
+ *               repo:
+ *                 type: string
+ *                 description: GitHub repository name
+ *     responses:
+ *       202:
+ *         description: Ingestion queued
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *                 owner:
+ *                   type: string
+ *                 repo:
+ *                   type: string
+ *       400:
+ *         description: Missing owner or repo
+ *       401:
+ *         description: Unauthorized
+ */
 // POST /github — start ingestion
 router.post("/github", async (req: AuthRequest, res: Response) => {
   const userId = String(req.userId);
@@ -43,6 +127,39 @@ router.post("/github", async (req: AuthRequest, res: Response) => {
   res.status(202).json({ message: "Ingestion queued", owner, repo });
 });
 
+/**
+ * @openapi
+ * /api/repos/{id}/status:
+ *   get:
+ *     tags:
+ *       - Repositories
+ *     summary: Get repository indexing status
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Repository ID
+ *     responses:
+ *       200:
+ *         description: Repository status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 indexed:
+ *                   type: boolean
+ *                 fileCount:
+ *                   type: integer
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Repository not found
+ */
 // GET /:id/status — return indexed status
 router.get("/:id/status", async (req: AuthRequest, res: Response) => {
   const userId = String(req.userId);
@@ -59,6 +176,53 @@ router.get("/:id/status", async (req: AuthRequest, res: Response) => {
   res.json(repoRecord);
 });
 
+/**
+ * @openapi
+ * /api/repos/{id}/search:
+ *   post:
+ *     tags:
+ *       - Repositories
+ *     summary: Search repository files
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Repository ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - query
+ *             properties:
+ *               query:
+ *                 type: string
+ *                 description: Search query
+ *     responses:
+ *       200:
+ *         description: Search results
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 data:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *       400:
+ *         description: Missing query
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Repository not found
+ */
 // POST /:id/search — search repo files
 router.post("/:id/search", async (req: AuthRequest, res: Response) => {
   const userId = String(req.userId);
@@ -82,6 +246,37 @@ router.post("/:id/search", async (req: AuthRequest, res: Response) => {
   res.json({ data: results });
 });
 
+/**
+ * @openapi
+ * /api/repos/{id}:
+ *   delete:
+ *     tags:
+ *       - Repositories
+ *     summary: Delete a repository and cascade files
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Repository ID
+ *     responses:
+ *       200:
+ *         description: Repository deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Repository not found
+ */
 // DELETE /:id — delete repo + cascade files
 router.delete("/:id", async (req: AuthRequest, res: Response) => {
   const userId = String(req.userId);

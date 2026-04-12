@@ -11,6 +11,42 @@ import { AppError } from "../middleware/errorHandler.js";
 
 const router = Router();
 
+/**
+ * @openapi
+ * /api/providers:
+ *   get:
+ *     tags:
+ *       - Providers
+ *     summary: List configured providers (API keys masked)
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: List of providers with masked API keys
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 providers:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       name:
+ *                         type: string
+ *                       type:
+ *                         type: string
+ *                       model:
+ *                         type: string
+ *                       apiKey:
+ *                         type: string
+ *                         description: Masked API key
+ *       401:
+ *         description: Unauthorized
+ */
 router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
@@ -46,6 +82,68 @@ const addProviderSchema = z.object({
   }),
 });
 
+/**
+ * @openapi
+ * /api/providers:
+ *   post:
+ *     tags:
+ *       - Providers
+ *     summary: Add a new provider
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *               - type
+ *               - apiKey
+ *               - model
+ *             properties:
+ *               name:
+ *                 type: string
+ *               type:
+ *                 type: string
+ *                 enum:
+ *                   - api
+ *                   - local
+ *                   - rpa
+ *               apiKey:
+ *                 type: string
+ *               model:
+ *                 type: string
+ *               provider:
+ *                 type: string
+ *                 enum:
+ *                   - openai
+ *                   - anthropic
+ *                   - google
+ *                   - ollama
+ *                   - chatgpt
+ *                   - claude
+ *                   - deepseek
+ *                   - gemini
+ *               baseUrl:
+ *                 type: string
+ *                 format: uri
+ *     responses:
+ *       201:
+ *         description: Provider added
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 provider:
+ *                   type: object
+ *       400:
+ *         description: Validation error
+ *       401:
+ *         description: Unauthorized
+ */
 router.post("/", requireAuth, validate(addProviderSchema), async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
@@ -101,6 +199,56 @@ const testProviderSchema = z.object({
   }),
 });
 
+/**
+ * @openapi
+ * /api/providers/test:
+ *   post:
+ *     tags:
+ *       - Providers
+ *     summary: Test a provider connection
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - type
+ *               - apiKey
+ *               - model
+ *             properties:
+ *               type:
+ *                 type: string
+ *                 enum:
+ *                   - api
+ *                   - local
+ *                   - rpa
+ *               apiKey:
+ *                 type: string
+ *               model:
+ *                 type: string
+ *               baseUrl:
+ *                 type: string
+ *                 format: uri
+ *     responses:
+ *       200:
+ *         description: Test result
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                 response:
+ *                   type: string
+ *                 usage:
+ *                   type: object
+ *                 latencyMs:
+ *                   type: integer
+ *       400:
+ *         description: Test failed or validation error
+ */
 router.post("/test", validate(testProviderSchema), async (req: Request, res: Response) => {
   try {
     const { type, apiKey, model, baseUrl } = req.body;
@@ -136,6 +284,37 @@ router.post("/test", validate(testProviderSchema), async (req: Request, res: Res
   }
 });
 
+/**
+ * @openapi
+ * /api/providers/{id}:
+ *   delete:
+ *     tags:
+ *       - Providers
+ *     summary: Delete a provider
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Provider ID
+ *     responses:
+ *       200:
+ *         description: Provider deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Provider not found
+ */
 router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;

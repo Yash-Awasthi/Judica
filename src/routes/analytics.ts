@@ -4,6 +4,65 @@ import type { AuthRequest } from "../types/index.js";
 
 const router = Router();
 
+/**
+ * @openapi
+ * /api/analytics/overview:
+ *   get:
+ *     tags:
+ *       - Analytics
+ *     summary: Get analytics overview for the authenticated user
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Analytics overview including conversations, messages, tokens, costs, daily usage, model distribution, and top tools
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 totalConversations:
+ *                   type: integer
+ *                 totalMessages:
+ *                   type: integer
+ *                 totalTokensUsed:
+ *                   type: integer
+ *                 totalCostUsd:
+ *                   type: number
+ *                 avgLatencyMs:
+ *                   type: integer
+ *                 modelDistribution:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       model:
+ *                         type: string
+ *                       count:
+ *                         type: integer
+ *                 dailyUsage:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       date:
+ *                         type: string
+ *                       tokens:
+ *                         type: integer
+ *                       cost:
+ *                         type: number
+ *                 topTools:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       tool:
+ *                         type: string
+ *                       count:
+ *                         type: integer
+ *       401:
+ *         description: Unauthorized
+ */
 // ─── Analytics overview ─────────────────────────────────────────────────────
 router.get("/overview", async (req: AuthRequest, res: Response) => {
   const userId = req.userId!;

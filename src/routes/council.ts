@@ -10,6 +10,41 @@ import { AppError } from "../middleware/errorHandler.js";
 
 const router = Router();
 
+/**
+ * @openapi
+ * /api/council/archetypes:
+ *   get:
+ *     tags:
+ *       - Council
+ *     summary: List all available archetypes
+ *     responses:
+ *       200:
+ *         description: List of archetypes
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 archetypes:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       name:
+ *                         type: string
+ *                       thinkingStyle:
+ *                         type: string
+ *                       asks:
+ *                         type: string
+ *                       blindSpot:
+ *                         type: string
+ *                       icon:
+ *                         type: string
+ *                       colorBg:
+ *                         type: string
+ */
 router.get("/archetypes", (req: Request, res: Response) => {
   const archetypes = Object.values(ARCHETYPES).map((a) => ({
     id: a.id,
@@ -23,14 +58,79 @@ router.get("/archetypes", (req: Request, res: Response) => {
   res.json({ archetypes });
 });
 
+/**
+ * @openapi
+ * /api/council/summons:
+ *   get:
+ *     tags:
+ *       - Council
+ *     summary: List all available summon configurations
+ *     responses:
+ *       200:
+ *         description: List of summons
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 summons:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ */
 router.get("/summons", (req: Request, res: Response) => {
   res.json({ summons: SUMMONS });
 });
 
+/**
+ * @openapi
+ * /api/council/templates:
+ *   get:
+ *     tags:
+ *       - Council
+ *     summary: List council templates
+ *     responses:
+ *       200:
+ *         description: List of council templates
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 templates:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ */
 router.get("/templates", (req: Request, res: Response) => {
   res.json({ templates: COUNCIL_TEMPLATES });
 });
 
+/**
+ * @openapi
+ * /api/council/config:
+ *   get:
+ *     tags:
+ *       - Council
+ *     summary: Get the user's council configuration
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Council configuration
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 config:
+ *                   type: object
+ *                   nullable: true
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Failed to get council config
+ */
 router.get("/config", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
@@ -62,6 +162,75 @@ const updateConfigSchema = z.object({
   }),
 });
 
+/**
+ * @openapi
+ * /api/council/config:
+ *   put:
+ *     tags:
+ *       - Council
+ *     summary: Update the user's council configuration
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               customArchetypes:
+ *                 type: array
+ *                 items:
+ *                   type: object
+ *                   required:
+ *                     - id
+ *                     - name
+ *                     - thinkingStyle
+ *                     - asks
+ *                     - blindSpot
+ *                     - systemPrompt
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     name:
+ *                       type: string
+ *                     thinkingStyle:
+ *                       type: string
+ *                     asks:
+ *                       type: string
+ *                     blindSpot:
+ *                       type: string
+ *                     systemPrompt:
+ *                       type: string
+ *                     tools:
+ *                       type: array
+ *                       items:
+ *                         type: string
+ *                     icon:
+ *                       type: string
+ *                     colorBg:
+ *                       type: string
+ *               defaultSummon:
+ *                 type: string
+ *               defaultRounds:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 5
+ *     responses:
+ *       200:
+ *         description: Updated council configuration
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 config:
+ *                   type: object
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Failed to update council config
+ */
 router.put("/config", requireAuth, validate(updateConfigSchema), async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
@@ -80,6 +249,30 @@ router.put("/config", requireAuth, validate(updateConfigSchema), async (req: Aut
   }
 });
 
+/**
+ * @openapi
+ * /api/council/config:
+ *   delete:
+ *     tags:
+ *       - Council
+ *     summary: Delete the user's council configuration
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Council config deleted
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 message:
+ *                   type: string
+ *       401:
+ *         description: Unauthorized
+ *       500:
+ *         description: Failed to delete council config
+ */
 router.delete("/config", requireAuth, async (req: AuthRequest, res: Response) => {
   try {
     const userId = req.userId!;
@@ -95,6 +288,33 @@ router.delete("/config", requireAuth, async (req: AuthRequest, res: Response) =>
   }
 });
 
+/**
+ * @openapi
+ * /api/council/archetypes/{id}:
+ *   get:
+ *     tags:
+ *       - Council
+ *     summary: Get a specific archetype by ID
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Archetype ID
+ *     responses:
+ *       200:
+ *         description: Archetype details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 archetype:
+ *                   type: object
+ *       404:
+ *         description: Archetype not found
+ */
 router.get("/archetypes/:id", (req: Request, res: Response) => {
   const id = String(req.params.id);
   const archetype = ARCHETYPES[id];

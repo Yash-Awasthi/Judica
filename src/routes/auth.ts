@@ -13,6 +13,27 @@ import { AppError } from "../middleware/errorHandler.js";
 
 const router = Router();
 
+/**
+ * @openapi
+ * /api/auth/register:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Register a new user account
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [username, password]
+ *             properties:
+ *               username: { type: string }
+ *               password: { type: string, minLength: 8 }
+ *     responses:
+ *       201: { description: Account created, content: { application/json: { schema: { type: object, properties: { token: { type: string }, username: { type: string } } } } } }
+ *       409: { description: Username already taken }
+ *       400: { description: Validation error }
+ */
 router.post("/register", validate(authSchema), async (req, res: Response, next) => {
   try {
     const { username, password } = req.body;
@@ -39,6 +60,27 @@ router.post("/register", validate(authSchema), async (req, res: Response, next) 
   }
 });
 
+/**
+ * @openapi
+ * /api/auth/login:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Log in with username and password
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [username, password]
+ *             properties:
+ *               username: { type: string }
+ *               password: { type: string }
+ *     responses:
+ *       200: { description: Login successful, content: { application/json: { schema: { type: object, properties: { token: { type: string }, username: { type: string } } } } } }
+ *       401: { description: Invalid username or password }
+ *       400: { description: Validation error }
+ */
 router.post("/login", validate(authSchema), async (req, res: Response, next) => {
   try {
     const { username, password } = req.body;
@@ -61,6 +103,24 @@ router.post("/login", validate(authSchema), async (req, res: Response, next) => 
   }
 });
 
+/**
+ * @openapi
+ * /api/auth/logout:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Log out and revoke the current JWT token
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: header
+ *         name: Authorization
+ *         required: true
+ *         schema: { type: string }
+ *         description: Bearer token
+ *     responses:
+ *       200: { description: Logout successful, content: { application/json: { schema: { type: object, properties: { success: { type: boolean } } } } } }
+ *       401: { description: Unauthorized }
+ */
 router.post("/logout", requireAuth, async (req: AuthRequest, res: Response, next) => {
   try {
     const authHeader = req.headers.authorization;
@@ -82,6 +142,35 @@ router.post("/logout", requireAuth, async (req: AuthRequest, res: Response, next
   }
 });
 
+/**
+ * @openapi
+ * /api/auth/me:
+ *   get:
+ *     tags: [Auth]
+ *     summary: Get the authenticated user's profile
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: header
+ *         name: Authorization
+ *         required: true
+ *         schema: { type: string }
+ *         description: Bearer token
+ *     responses:
+ *       200:
+ *         description: User profile
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id: { type: string }
+ *                 username: { type: string }
+ *                 customInstructions: { type: string, nullable: true }
+ *                 createdAt: { type: string, format: date-time }
+ *       401: { description: Unauthorized }
+ *       404: { description: User not found }
+ */
 router.get("/me", requireAuth, async (req: AuthRequest, res: Response, next) => {
   try {
     const user = await prisma.user.findUnique({
@@ -96,6 +185,24 @@ router.get("/me", requireAuth, async (req: AuthRequest, res: Response, next) => 
   }
 });
 
+/**
+ * @openapi
+ * /api/auth/refresh:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Refresh the current JWT token
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: header
+ *         name: Authorization
+ *         required: true
+ *         schema: { type: string }
+ *         description: Bearer token
+ *     responses:
+ *       200: { description: Token refreshed, content: { application/json: { schema: { type: object, properties: { token: { type: string }, username: { type: string } } } } } }
+ *       401: { description: Unauthorized }
+ */
 router.post("/refresh", requireAuth, async (req: AuthRequest, res: Response, next) => {
   try {
     const token = jwt.sign(
@@ -111,6 +218,34 @@ router.post("/refresh", requireAuth, async (req: AuthRequest, res: Response, nex
   }
 });
 
+/**
+ * @openapi
+ * /api/auth/me:
+ *   patch:
+ *     tags: [Auth]
+ *     summary: Update the authenticated user's custom instructions
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: header
+ *         name: Authorization
+ *         required: true
+ *         schema: { type: string }
+ *         description: Bearer token
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [custom_instructions]
+ *             properties:
+ *               custom_instructions: { type: string, maxLength: 2000 }
+ *     responses:
+ *       200: { description: Update successful, content: { application/json: { schema: { type: object, properties: { success: { type: boolean } } } } } }
+ *       400: { description: custom_instructions must be a string }
+ *       401: { description: Unauthorized }
+ */
 router.patch("/me", requireAuth, async (req: AuthRequest, res: Response, next) => {
   try {
     const { custom_instructions } = req.body;
@@ -129,6 +264,34 @@ router.patch("/me", requireAuth, async (req: AuthRequest, res: Response, next) =
   }
 });
 
+/**
+ * @openapi
+ * /api/auth/config:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Save or update the user's council configuration
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: header
+ *         name: Authorization
+ *         required: true
+ *         schema: { type: string }
+ *         description: Bearer token
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [config]
+ *             properties:
+ *               config: { type: object, description: Council configuration object }
+ *     responses:
+ *       200: { description: Configuration saved, content: { application/json: { schema: { type: object, properties: { success: { type: boolean } } } } } }
+ *       400: { description: Validation error }
+ *       401: { description: Unauthorized }
+ */
 router.post("/config", requireAuth, validate(configSchema), async (req: AuthRequest, res: Response, next) => {
   try {
     const encrypted = encrypt(JSON.stringify(req.body.config));
@@ -145,6 +308,24 @@ router.post("/config", requireAuth, validate(configSchema), async (req: AuthRequ
   }
 });
 
+/**
+ * @openapi
+ * /api/auth/config:
+ *   get:
+ *     tags: [Auth]
+ *     summary: Retrieve the user's council configuration
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: header
+ *         name: Authorization
+ *         required: true
+ *         schema: { type: string }
+ *         description: Bearer token
+ *     responses:
+ *       200: { description: Configuration object or null if not set, content: { application/json: { schema: { type: object, nullable: true } } } }
+ *       401: { description: Unauthorized }
+ */
 router.get("/config", requireAuth, async (req: AuthRequest, res: Response, next) => {
   try {
     const row = await prisma.councilConfig.findUnique({
@@ -159,6 +340,25 @@ router.get("/config", requireAuth, async (req: AuthRequest, res: Response, next)
   }
 });
 
+/**
+ * @openapi
+ * /api/auth/config/rotate:
+ *   post:
+ *     tags: [Auth]
+ *     summary: Rotate encryption on the user's stored API keys
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: header
+ *         name: Authorization
+ *         required: true
+ *         schema: { type: string }
+ *         description: Bearer token
+ *     responses:
+ *       200: { description: Keys rotated successfully, content: { application/json: { schema: { type: object, properties: { success: { type: boolean }, message: { type: string } } } } } }
+ *       401: { description: Unauthorized }
+ *       404: { description: No configuration found to rotate }
+ */
 router.post("/config/rotate", requireAuth, async (req: AuthRequest, res: Response, next) => {
   try {
     const row = await prisma.councilConfig.findUnique({

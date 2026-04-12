@@ -9,6 +9,8 @@ import path from "path";
 import fs from "fs";
 import logger from "./lib/logger.js";
 import pinoHttp from "pino-http";
+import swaggerUi from "swagger-ui-express";
+import { swaggerSpec } from "./lib/swagger.js";
 import { askLimiter, authLimiter } from "./middleware/rateLimit.js";
 import { perUserLimiter } from "./middleware/limiter.js";
 import { errorHandler } from "./middleware/errorHandler.js";
@@ -133,6 +135,12 @@ app.get("/", (req, res) => {
   }
 });
 
+app.use("/api/docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec, {
+  customCss: ".swagger-ui .topbar { display: none }",
+  customSiteTitle: "AIBYAI API Documentation",
+}));
+app.get("/api/docs/spec.json", (_req, res) => res.json(swaggerSpec));
+
 app.use(perUserLimiter);
 
 app.use("/api/auth",      authLimiter, authRouter);
@@ -189,6 +197,23 @@ if (env.NODE_ENV === "development") {
   });
 }
 
+/**
+ * @openapi
+ * /health:
+ *   get:
+ *     tags: [Health]
+ *     summary: System health check
+ *     description: Returns health status of the application, database, and Redis
+ *     responses:
+ *       200:
+ *         description: System is healthy
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/HealthCheck'
+ *       503:
+ *         description: System is unhealthy
+ */
 app.get("/health", async (req, res) => {
   const checks: Record<string, string> = {};
   let healthy = true;

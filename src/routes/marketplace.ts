@@ -6,6 +6,73 @@ import logger from "../lib/logger.js";
 
 const router = Router();
 
+/**
+ * @openapi
+ * /marketplace:
+ *   get:
+ *     summary: List marketplace items
+ *     description: Returns a paginated list of published marketplace items with optional filtering by type, tags, search term, and sort order.
+ *     tags:
+ *       - Marketplace
+ *     parameters:
+ *       - in: query
+ *         name: type
+ *         schema:
+ *           type: string
+ *           enum: [prompt, workflow, persona, tool]
+ *         description: Filter by item type
+ *       - in: query
+ *         name: tags
+ *         schema:
+ *           type: string
+ *         description: Comma-separated list of tags to filter by
+ *       - in: query
+ *         name: sort
+ *         schema:
+ *           type: string
+ *           enum: [newest, stars, downloads]
+ *           default: newest
+ *         description: Sort order for results
+ *       - in: query
+ *         name: search
+ *         schema:
+ *           type: string
+ *         description: Search term to match against name and description
+ *       - in: query
+ *         name: page
+ *         schema:
+ *           type: integer
+ *           default: 1
+ *           minimum: 1
+ *         description: Page number for pagination
+ *       - in: query
+ *         name: limit
+ *         schema:
+ *           type: integer
+ *           default: 20
+ *           minimum: 1
+ *           maximum: 100
+ *         description: Number of items per page
+ *     responses:
+ *       200:
+ *         description: Paginated list of marketplace items
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 items:
+ *                   type: array
+ *                   items:
+ *                     $ref: '#/components/schemas/MarketplaceItem'
+ *                 total:
+ *                   type: integer
+ *                   description: Total number of matching items
+ *                 page:
+ *                   type: integer
+ *                 limit:
+ *                   type: integer
+ */
 // GET / — list marketplace items
 router.get("/", async (req: AuthRequest, res: Response) => {
   const {
@@ -56,6 +123,41 @@ router.get("/", async (req: AuthRequest, res: Response) => {
   res.json({ items, total, page: pageNum, limit: limitNum });
 });
 
+/**
+ * @openapi
+ * /marketplace/{id}:
+ *   get:
+ *     summary: Get marketplace item detail
+ *     description: Returns a single marketplace item by ID, including its most recent reviews and whether the current user has starred it.
+ *     tags:
+ *       - Marketplace
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Marketplace item ID
+ *     responses:
+ *       200:
+ *         description: Marketplace item detail with reviews and starred status
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/MarketplaceItem'
+ *                 - type: object
+ *                   properties:
+ *                     reviews:
+ *                       type: array
+ *                       items:
+ *                         $ref: '#/components/schemas/MarketplaceReview'
+ *                     starred:
+ *                       type: boolean
+ *                       description: Whether the current user has starred this item
+ *       404:
+ *         description: Item not found
+ */
 // GET /:id — item detail with reviews
 router.get("/:id", async (req: AuthRequest, res: Response) => {
   const id = String(req.params.id);
@@ -80,6 +182,56 @@ router.get("/:id", async (req: AuthRequest, res: Response) => {
   res.json({ ...item, starred });
 });
 
+/**
+ * @openapi
+ * /marketplace:
+ *   post:
+ *     summary: Publish a new marketplace item
+ *     description: Creates and publishes a new item to the marketplace. Requires authentication.
+ *     tags:
+ *       - Marketplace
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - type
+ *               - name
+ *               - description
+ *               - content
+ *             properties:
+ *               type:
+ *                 type: string
+ *                 enum: [prompt, workflow, persona, tool]
+ *                 description: The type of marketplace item
+ *               name:
+ *                 type: string
+ *                 description: Display name of the item
+ *               description:
+ *                 type: string
+ *                 description: Description of the item
+ *               content:
+ *                 type: object
+ *                 description: The item content/payload
+ *               tags:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Tags for categorization
+ *     responses:
+ *       201:
+ *         description: Item published successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/MarketplaceItem'
+ *       400:
+ *         description: Missing required fields or invalid type
+ *       404:
+ *         description: User not found
+ */
 // POST / — publish item
 router.post("/", async (req: AuthRequest, res: Response) => {
   const { type, name, description, content, tags } = req.body;
@@ -115,6 +267,60 @@ router.post("/", async (req: AuthRequest, res: Response) => {
   res.status(201).json(item);
 });
 
+/**
+ * @openapi
+ * /marketplace/{id}:
+ *   put:
+ *     summary: Update a marketplace item
+ *     description: Updates an existing marketplace item. Only the original author can update their item.
+ *     tags:
+ *       - Marketplace
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Marketplace item ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: Updated display name
+ *               description:
+ *                 type: string
+ *                 description: Updated description
+ *               content:
+ *                 type: object
+ *                 description: Updated item content/payload
+ *               tags:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Updated tags
+ *               version:
+ *                 type: string
+ *                 description: Updated version string
+ *               published:
+ *                 type: boolean
+ *                 description: Whether the item is published
+ *     responses:
+ *       200:
+ *         description: Item updated successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/MarketplaceItem'
+ *       403:
+ *         description: Not authorized to update this item
+ *       404:
+ *         description: Item not found
+ */
 // PUT /:id — update item (author only)
 router.put("/:id", async (req: AuthRequest, res: Response) => {
   const id = String(req.params.id);
@@ -144,6 +350,37 @@ router.put("/:id", async (req: AuthRequest, res: Response) => {
   res.json(updated);
 });
 
+/**
+ * @openapi
+ * /marketplace/{id}:
+ *   delete:
+ *     summary: Delete a marketplace item
+ *     description: Deletes a marketplace item. Only the original author or an admin can delete an item.
+ *     tags:
+ *       - Marketplace
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Marketplace item ID
+ *     responses:
+ *       200:
+ *         description: Item deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *       403:
+ *         description: Not authorized to delete this item
+ *       404:
+ *         description: Item not found
+ */
 // DELETE /:id — delete item (author or admin)
 router.delete("/:id", async (req: AuthRequest, res: Response) => {
   const id = String(req.params.id);
@@ -163,6 +400,40 @@ router.delete("/:id", async (req: AuthRequest, res: Response) => {
   res.json({ success: true });
 });
 
+/**
+ * @openapi
+ * /marketplace/{id}/install:
+ *   post:
+ *     summary: Install a marketplace item
+ *     description: Increments the download count and imports the item into the authenticated user's account based on its type (prompt, workflow, persona, or tool). Returns the item content.
+ *     tags:
+ *       - Marketplace
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Marketplace item ID
+ *     responses:
+ *       200:
+ *         description: Item installed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 content:
+ *                   type: object
+ *                   description: The item content/payload
+ *                 type:
+ *                   type: string
+ *                   enum: [prompt, workflow, persona, tool]
+ *                 name:
+ *                   type: string
+ *       404:
+ *         description: Item not found
+ */
 // POST /:id/install — increment downloads, import into user account, return content
 router.post("/:id/install", async (req: AuthRequest, res: Response) => {
   const id = String(req.params.id);
@@ -252,6 +523,33 @@ router.post("/:id/install", async (req: AuthRequest, res: Response) => {
   res.json({ content: item.content, type: item.type, name: item.name });
 });
 
+/**
+ * @openapi
+ * /marketplace/{id}/star:
+ *   post:
+ *     summary: Toggle star on a marketplace item
+ *     description: Stars or unstars a marketplace item for the authenticated user. If already starred, removes the star; otherwise adds one.
+ *     tags:
+ *       - Marketplace
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Marketplace item ID
+ *     responses:
+ *       200:
+ *         description: Star toggled successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 starred:
+ *                   type: boolean
+ *                   description: Whether the item is now starred by the user
+ */
 // POST /:id/star — toggle star
 router.post("/:id/star", async (req: AuthRequest, res: Response) => {
   const id = String(req.params.id);
@@ -282,6 +580,50 @@ router.post("/:id/star", async (req: AuthRequest, res: Response) => {
   }
 });
 
+/**
+ * @openapi
+ * /marketplace/{id}/reviews:
+ *   post:
+ *     summary: Add a review to a marketplace item
+ *     description: Creates a new review with a rating (1-5) and optional comment for a marketplace item.
+ *     tags:
+ *       - Marketplace
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Marketplace item ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - rating
+ *             properties:
+ *               rating:
+ *                 type: integer
+ *                 minimum: 1
+ *                 maximum: 5
+ *                 description: Rating from 1 to 5
+ *               comment:
+ *                 type: string
+ *                 description: Optional review comment
+ *     responses:
+ *       201:
+ *         description: Review created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/MarketplaceReview'
+ *       400:
+ *         description: Invalid rating
+ *       404:
+ *         description: Item not found
+ */
 // POST /:id/reviews — add review
 router.post("/:id/reviews", async (req: AuthRequest, res: Response) => {
   const itemId = String(req.params.id);
@@ -308,6 +650,31 @@ router.post("/:id/reviews", async (req: AuthRequest, res: Response) => {
   res.status(201).json(review);
 });
 
+/**
+ * @openapi
+ * /marketplace/{id}/reviews:
+ *   get:
+ *     summary: List reviews for a marketplace item
+ *     description: Returns up to 100 reviews for a marketplace item, ordered by most recent first.
+ *     tags:
+ *       - Marketplace
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Marketplace item ID
+ *     responses:
+ *       200:
+ *         description: List of reviews
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/MarketplaceReview'
+ */
 // GET /:id/reviews — list reviews
 router.get("/:id/reviews", async (req: AuthRequest, res: Response) => {
   const itemId = String(req.params.id);

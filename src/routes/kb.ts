@@ -9,7 +9,47 @@ import logger from "../lib/logger.js";
 
 const router = Router();
 
-// GET /api/kb — list user's knowledge bases
+/**
+ * @openapi
+ * /api/kb:
+ *   get:
+ *     tags:
+ *       - Knowledge Bases
+ *     summary: List knowledge bases
+ *     description: Returns all knowledge bases owned by the authenticated user.
+ *     responses:
+ *       200:
+ *         description: A list of knowledge bases
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 knowledge_bases:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       name:
+ *                         type: string
+ *                       description:
+ *                         type: string
+ *                         nullable: true
+ *                       document_count:
+ *                         type: integer
+ *                       chunk_count:
+ *                         type: integer
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *                       updatedAt:
+ *                         type: string
+ *                         format: date-time
+ *       401:
+ *         description: Unauthorized
+ */
 router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   const kbs = await prisma.knowledgeBase.findMany({
     where: { userId: req.userId! },
@@ -30,7 +70,57 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
   });
 });
 
-// POST /api/kb — create a knowledge base
+/**
+ * @openapi
+ * /api/kb:
+ *   post:
+ *     tags:
+ *       - Knowledge Bases
+ *     summary: Create a knowledge base
+ *     description: Creates a new knowledge base for the authenticated user.
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - name
+ *             properties:
+ *               name:
+ *                 type: string
+ *                 description: Name of the knowledge base
+ *               description:
+ *                 type: string
+ *                 description: Optional description of the knowledge base
+ *     responses:
+ *       201:
+ *         description: Knowledge base created successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                 name:
+ *                   type: string
+ *                 description:
+ *                   type: string
+ *                   nullable: true
+ *                 userId:
+ *                   type: string
+ *                 createdAt:
+ *                   type: string
+ *                   format: date-time
+ *                 updatedAt:
+ *                   type: string
+ *                   format: date-time
+ *       400:
+ *         description: Name is required
+ *       401:
+ *         description: Unauthorized
+ */
 router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
   const { name, description } = req.body;
   if (!name || typeof name !== "string" || name.trim().length === 0) {
@@ -48,7 +138,63 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
   res.status(201).json(kb);
 });
 
-// GET /api/kb/:id — get KB detail
+/**
+ * @openapi
+ * /api/kb/{id}:
+ *   get:
+ *     tags:
+ *       - Knowledge Bases
+ *     summary: Get knowledge base detail
+ *     description: Returns a single knowledge base with its documents.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Knowledge base ID
+ *     responses:
+ *       200:
+ *         description: Knowledge base details
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 id:
+ *                   type: string
+ *                 name:
+ *                   type: string
+ *                 description:
+ *                   type: string
+ *                   nullable: true
+ *                 chunk_count:
+ *                   type: integer
+ *                 documents:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       filename:
+ *                         type: string
+ *                       chunkCount:
+ *                         type: integer
+ *                       indexed:
+ *                         type: boolean
+ *                       indexedAt:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Knowledge base not found
+ */
 router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const kb = await prisma.knowledgeBase.findFirst({
     where: { id: req.params.id, userId: req.userId! },
@@ -68,7 +214,37 @@ router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   });
 });
 
-// DELETE /api/kb/:id — delete KB + all chunks
+/**
+ * @openapi
+ * /api/kb/{id}:
+ *   delete:
+ *     tags:
+ *       - Knowledge Bases
+ *     summary: Delete a knowledge base
+ *     description: Deletes a knowledge base and all associated vector chunks.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Knowledge base ID
+ *     responses:
+ *       200:
+ *         description: Knowledge base deleted successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Knowledge base not found
+ */
 router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const kb = await prisma.knowledgeBase.findFirst({
     where: { id: req.params.id, userId: req.userId! },
@@ -81,7 +257,65 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   res.json({ success: true });
 });
 
-// POST /api/kb/:id/documents — add document to KB
+/**
+ * @openapi
+ * /api/kb/{id}/documents:
+ *   post:
+ *     tags:
+ *       - Knowledge Bases
+ *     summary: Add a document to a knowledge base
+ *     description: Adds a previously uploaded and processed document to a knowledge base. Indexing runs in the background.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Knowledge base ID
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - upload_id
+ *             properties:
+ *               upload_id:
+ *                 type: string
+ *                 description: ID of a previously processed upload
+ *     responses:
+ *       201:
+ *         description: Document added and indexing started
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 document:
+ *                   type: object
+ *                   properties:
+ *                     id:
+ *                       type: string
+ *                     kbId:
+ *                       type: string
+ *                     uploadId:
+ *                       type: string
+ *                     filename:
+ *                       type: string
+ *                     createdAt:
+ *                       type: string
+ *                       format: date-time
+ *                 message:
+ *                   type: string
+ *                   example: Indexing started in background
+ *       400:
+ *         description: upload_id is required or upload not yet processed
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Knowledge base or upload not found
+ */
 router.post("/:id/documents", requireAuth, async (req: AuthRequest, res: Response) => {
   const { upload_id } = req.body;
   if (!upload_id) throw new AppError(400, "upload_id is required", "UPLOAD_ID_REQUIRED");
@@ -116,7 +350,58 @@ router.post("/:id/documents", requireAuth, async (req: AuthRequest, res: Respons
   res.status(201).json({ document: doc, message: "Indexing started in background" });
 });
 
-// GET /api/kb/:kbId/documents — list docs
+/**
+ * @openapi
+ * /api/kb/{id}/documents:
+ *   get:
+ *     tags:
+ *       - Knowledge Bases
+ *     summary: List documents in a knowledge base
+ *     description: Returns all documents belonging to the specified knowledge base.
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Knowledge base ID
+ *     responses:
+ *       200:
+ *         description: A list of documents
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 documents:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id:
+ *                         type: string
+ *                       kbId:
+ *                         type: string
+ *                       uploadId:
+ *                         type: string
+ *                       filename:
+ *                         type: string
+ *                       chunkCount:
+ *                         type: integer
+ *                       indexed:
+ *                         type: boolean
+ *                       indexedAt:
+ *                         type: string
+ *                         format: date-time
+ *                         nullable: true
+ *                       createdAt:
+ *                         type: string
+ *                         format: date-time
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Knowledge base not found
+ */
 router.get("/:id/documents", requireAuth, async (req: AuthRequest, res: Response) => {
   const kb = await prisma.knowledgeBase.findFirst({
     where: { id: req.params.id, userId: req.userId! },
@@ -131,7 +416,43 @@ router.get("/:id/documents", requireAuth, async (req: AuthRequest, res: Response
   res.json({ documents: docs });
 });
 
-// DELETE /api/kb/:kbId/documents/:docId — remove doc + chunks
+/**
+ * @openapi
+ * /api/kb/{kbId}/documents/{docId}:
+ *   delete:
+ *     tags:
+ *       - Knowledge Bases
+ *     summary: Remove a document from a knowledge base
+ *     description: Deletes a document and its associated vector chunks from the knowledge base.
+ *     parameters:
+ *       - in: path
+ *         name: kbId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Knowledge base ID
+ *       - in: path
+ *         name: docId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Document ID
+ *     responses:
+ *       200:
+ *         description: Document removed successfully
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 success:
+ *                   type: boolean
+ *                   example: true
+ *       401:
+ *         description: Unauthorized
+ *       404:
+ *         description: Knowledge base or document not found
+ */
 router.delete("/:kbId/documents/:docId", requireAuth, async (req: AuthRequest, res: Response) => {
   const kb = await prisma.knowledgeBase.findFirst({
     where: { id: req.params.kbId, userId: req.userId! },
