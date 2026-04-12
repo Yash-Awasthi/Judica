@@ -36,7 +36,7 @@ export class OllamaProvider extends BaseProvider {
         signal.addEventListener("abort", () => controller.abort());
       }
 
-      const response = await fetch(`${this.baseUrl}/api/generate`, {
+      const response = await this.protectedFetch(`${this.baseUrl}/api/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

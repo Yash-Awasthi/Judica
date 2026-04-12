@@ -5,15 +5,11 @@ import { Provider } from "./providers.js";
 /**
  * Circuit breaker utility for provider adapters.
  *
- * STATUS: This module IS wired into all adapter-layer classes (OpenAI, Anthropic,
- * Gemini, Groq, Ollama, OpenRouter, Custom).  Each adapter wraps its fetch call
- * with `getBreaker(provider, fetchFn).fire()`.
- *
- * It is NOT yet wired into the older concrete provider classes under
- * `lib/providers/concrete/` — those use direct `fetch` calls and rely on
- * per-request AbortController timeouts instead.  Wiring the breaker there would
- * require changing the `call()` signature to accept an injectable fetch, which
- * is a larger refactor tracked separately.
+ * STATUS: This module is wired into ALL provider classes:
+ * - Adapter layer (OpenAI, Anthropic, Gemini, Groq, Ollama, OpenRouter, Custom)
+ *   wraps fetch via `getBreaker(provider, fetchFn).fire()`.
+ * - Concrete provider layer (lib/providers/concrete/*) wraps fetch via
+ *   `BaseProvider.protectedFetch()` which delegates to getBreaker internally.
  */
 
 const breakerRegistry = new Map<string, CircuitBreaker>();
