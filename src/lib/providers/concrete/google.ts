@@ -10,13 +10,17 @@ export class GoogleProvider extends BaseProvider {
     super(config);
   }
 
-  async call({ messages, signal, maxTokens, isFallback, onChunk }: {
+  async call({ messages, signal, maxTokens, isFallback, onChunk, _depth = 0 }: {
     messages: Message[];
     signal?: AbortSignal;
     maxTokens?: number;
     isFallback?: boolean;
     onChunk?: (chunk: string) => void;
+    _depth?: number;
   }): Promise<ProviderResponse> {
+    if (_depth >= 5) {
+      throw new Error("Tool call depth limit exceeded (max 5 recursive rounds)");
+    }
     const apiHost = "https://generativelanguage.googleapis.com";
     await validateSafeUrl(apiHost);
 
@@ -135,7 +139,7 @@ export class GoogleProvider extends BaseProvider {
           { role: "tool", name, content: safeResult } as any
         ];
 
-        return this.call({ messages: nextMessages, signal, maxTokens, isFallback, onChunk });
+        return this.call({ messages: nextMessages, signal, maxTokens, isFallback, onChunk, _depth: _depth + 1 });
       }
 
       const text = part?.text || "";
