@@ -141,9 +141,19 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     const isBcryptHash = user.passwordHash.startsWith("$2a$") || user.passwordHash.startsWith("$2b$");
 
     if (isBcryptHash) {
-      // Dynamic import for legacy bcrypt verification only
-      const { default: bcrypt } = await import("bcryptjs");
-      passwordValid = await bcrypt.compare(password, user.passwordHash);
+      // Dynamic import for legacy bcrypt verification only.
+      // bcryptjs may not be installed — handle gracefully.
+      try {
+        const { default: bcrypt } = await import("bcryptjs");
+        passwordValid = await bcrypt.compare(password, user.passwordHash);
+      } catch {
+        logger.warn(
+          { username },
+          "bcryptjs is not installed — cannot verify legacy bcrypt password. " +
+          "Install bcryptjs or manually migrate this user's password to argon2id."
+        );
+        throw new AppError(401, "Invalid username or password");
+      }
     } else {
       passwordValid = await argon2.verify(user.passwordHash, password);
     }
