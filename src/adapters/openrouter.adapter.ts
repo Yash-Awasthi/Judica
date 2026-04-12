@@ -6,6 +6,7 @@ import type {
 } from "./types.js";
 import { createStreamResult } from "./types.js";
 import { getBreaker } from "../lib/breaker.js";
+import { validateSafeUrl } from "../lib/ssrf.js";
 import logger from "../lib/logger.js";
 
 const DEFAULT_TIMEOUT_MS = 60_000;
@@ -23,6 +24,8 @@ export class OpenRouterAdapter implements IProviderAdapter {
   }
 
   async generate(req: AdapterRequest): Promise<AdapterStreamResult> {
+    await validateSafeUrl(this.baseUrl);
+
     const body: Record<string, unknown> = {
       model: req.model,
       stream: true,

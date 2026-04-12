@@ -5,7 +5,23 @@ import { useCouncilMembers } from "../hooks/useCouncilMembers";
 import { useDeliberation } from "../hooks/useDeliberation";
 import { useAuth } from "../context/AuthContext";
 import { cacheConversation, getCachedConversation } from "../components/OfflineIndicator";
-import type { Conversation } from "../types/index.js";
+import type { ChatMessage, Conversation } from "../types/index.js";
+
+interface CachedChatMessage {
+  question: string;
+  verdict: string;
+  createdAt: string;
+}
+
+interface ChatHistoryResponse {
+  chats: Array<{
+    id: string;
+    question: string;
+    verdict: string;
+    createdAt: string;
+    opinions: Array<{ agent: string; text: string }>;
+  }>;
+}
 
 interface OutletContextType {
   setIsSidebarOpen: (v: boolean) => void;
@@ -43,14 +59,14 @@ export function ChatView() {
         try {
           const res = await fetchWithAuth(`/api/history/${conversationId}?limit=100`);
           if (res.ok) {
-            const data = await res.json() as { chats: any[] };
+            const data = await res.json() as ChatHistoryResponse;
             setMessages(data.chats || []);
             // Cache conversation for offline use
             const title = conversations.find(c => c.id === conversationId)?.title || "Conversation";
             cacheConversation({
               id: conversationId,
               title,
-              messages: (data.chats || []).slice(-20).map((c: any) => ({
+              messages: (data.chats || []).slice(-20).map((c) => ({
                 question: c.question,
                 verdict: c.verdict,
                 createdAt: c.createdAt,
@@ -61,13 +77,13 @@ export function ChatView() {
             // Try offline cache before giving up
             const cached = await getCachedConversation(conversationId);
             if (cached) {
-              setMessages(cached.messages.map((m, i) => ({
-                id: i,
+              setMessages(cached.messages.map((m: CachedChatMessage, i: number): ChatMessage => ({
+                id: String(i),
                 question: m.question,
                 verdict: m.verdict,
                 createdAt: m.createdAt,
                 opinions: [],
-              })) as any);
+              })));
             } else {
               navigate('/chat');
             }
@@ -77,13 +93,13 @@ export function ChatView() {
           if (conversationId) {
             const cached = await getCachedConversation(conversationId);
             if (cached) {
-              setMessages(cached.messages.map((m, i) => ({
-                id: i,
+              setMessages(cached.messages.map((m: CachedChatMessage, i: number): ChatMessage => ({
+                id: String(i),
                 question: m.question,
                 verdict: m.verdict,
                 createdAt: m.createdAt,
                 opinions: [],
-              })) as any);
+              })));
             }
           }
           console.error("Failed to load history", err);

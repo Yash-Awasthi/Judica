@@ -32,7 +32,9 @@ export const groupMemberships = pgTable(
 export const sharedConversations = pgTable("SharedConversation", {
   id: text("id").primaryKey(),
   conversationId: text("conversationId").notNull().unique(),
-  ownerId: integer("ownerId").notNull(),
+  ownerId: integer("ownerId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   shareToken: text("shareToken").notNull().unique(),
   access: text("access").default("read").notNull(),
   expiresAt: timestamp("expiresAt", { mode: "date" }),
@@ -43,7 +45,9 @@ export const sharedConversations = pgTable("SharedConversation", {
 export const sharedWorkflows = pgTable("SharedWorkflow", {
   id: text("id").primaryKey(),
   workflowId: text("workflowId").notNull().unique(),
-  ownerId: integer("ownerId").notNull(),
+  ownerId: integer("ownerId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   shareToken: text("shareToken").notNull().unique(),
   access: text("access").default("read").notNull(),
   expiresAt: timestamp("expiresAt", { mode: "date" }),
@@ -54,7 +58,9 @@ export const sharedWorkflows = pgTable("SharedWorkflow", {
 export const sharedPrompts = pgTable("SharedPrompt", {
   id: text("id").primaryKey(),
   promptId: text("promptId").notNull().unique(),
-  ownerId: integer("ownerId").notNull(),
+  ownerId: integer("ownerId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
   shareToken: text("shareToken").notNull().unique(),
   access: text("access").default("read").notNull(),
   expiresAt: timestamp("expiresAt", { mode: "date" }),

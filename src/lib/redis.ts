@@ -114,7 +114,7 @@ const redisWrapper = {
     }
   },
 
-  async ttl(key: string): Promise<number> {
+  async pttl(key: string): Promise<number> {
     try {
       const client = await getRedis();
       return await client.pTTL(key);
@@ -129,6 +129,33 @@ const redisWrapper = {
       return await client.flushAll();
     } catch {
       return "OK";
+    }
+  },
+
+  async incr(key: string): Promise<number> {
+    try {
+      const client = await getRedis();
+      return await client.incr(key);
+    } catch {
+      return 0;
+    }
+  },
+
+  async decr(key: string): Promise<number> {
+    try {
+      const client = await getRedis();
+      return await client.decr(key);
+    } catch {
+      return 0;
+    }
+  },
+
+  async expire(key: string, seconds: number): Promise<boolean> {
+    try {
+      const client = await getRedis();
+      return await client.expire(key, seconds);
+    } catch {
+      return false;
     }
   },
 };

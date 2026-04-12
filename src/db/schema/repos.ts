@@ -42,5 +42,9 @@ export const codeFiles = pgTable(
     content: text("content").notNull(),
     embedding: vector("embedding", { dimensions: 1536 }).notNull(),
   },
-  (table) => [index("CodeFile_repoId_idx").on(table.repoId)],
+  (table) => [
+    index("CodeFile_repoId_idx").on(table.repoId),
+    index("CodeFile_embedding_hnsw_idx")
+      .using("hnsw", table.embedding.op("vector_cosine_ops")),
+  ],
 );

@@ -208,7 +208,7 @@ export function CouncilConfigPanel({
                           className="flex-1 px-2 py-1.5 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-md text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-mint)]/50 transition-colors font-mono"
                         />
                         <input
-                          type="text"
+                          type="password"
                           placeholder="API Key (optional)"
                           value={member.apiKey || ""}
                           onChange={(e) => onUpdateMember(member.id, "apiKey", e.target.value)}

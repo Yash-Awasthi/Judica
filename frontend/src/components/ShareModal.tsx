@@ -38,34 +38,42 @@ export function ShareModal({ resourceType, resourceId, onClose }: ShareModalProp
     ? `${window.location.origin}/share/${shareToken}`
     : "";
 
-  const handleCopy = () => {
-    navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy to clipboard", err);
+    }
   };
 
   const handleUnshare = async () => {
-    await fetchWithAuth(`/api/share/${resourceType}/${resourceId}`, { method: "DELETE" });
-    setShareToken(null);
-    onClose();
+    try {
+      await fetchWithAuth(`/api/share/${resourceType}/${resourceId}`, { method: "DELETE" });
+      setShareToken(null);
+      onClose();
+    } catch (err) {
+      console.error("Unshare failed", err);
+    }
   };
 
   return (
     <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl shadow-xl p-6 max-w-md w-full">
+      <div className="bg-[var(--bg-surface-1)] rounded-xl shadow-xl p-6 max-w-md w-full">
         <div className="flex items-center justify-between mb-4">
-          <h3 className="font-semibold text-lg flex items-center gap-2">
+          <h3 className="font-semibold text-lg flex items-center gap-2 text-[var(--text-primary)]">
             <Link2 size={18} /> Share
           </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><X size={18} /></button>
         </div>
 
         {!shareToken ? (
           <div className="space-y-4">
             <label className="block">
-              <span className="text-sm font-medium text-gray-700">Expires</span>
+              <span className="text-sm font-medium text-[var(--text-secondary)]">Expires</span>
               <select
-                className="mt-1 w-full px-3 py-2 border rounded"
+                className="mt-1 w-full px-3 py-2 border border-[var(--border-subtle)] rounded bg-[var(--bg)] text-[var(--text-primary)]"
                 value={expiry}
                 onChange={(e) => setExpiry(e.target.value)}
               >
@@ -78,7 +86,7 @@ export function ShareModal({ resourceType, resourceId, onClose }: ShareModalProp
             <button
               onClick={handleShare}
               disabled={sharing}
-              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              className="w-full px-4 py-2 btn-pill-primary disabled:opacity-50"
             >
               {sharing ? "Creating link..." : "Create Share Link"}
             </button>
@@ -87,20 +95,20 @@ export function ShareModal({ resourceType, resourceId, onClose }: ShareModalProp
           <div className="space-y-4">
             <div className="flex items-center gap-2">
               <input
-                className="flex-1 px-3 py-2 border rounded bg-gray-50 text-sm"
+                className="flex-1 px-3 py-2 border border-[var(--border-subtle)] rounded bg-[var(--bg)] text-sm text-[var(--text-primary)]"
                 value={shareUrl}
                 readOnly
               />
               <button
                 onClick={handleCopy}
-                className="p-2 border rounded hover:bg-gray-50"
+                className="p-2 border border-[var(--border-subtle)] rounded hover:bg-[var(--glass-bg-hover)]"
               >
-                {copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} />}
+                {copied ? <Check size={16} className="text-green-600" /> : <Copy size={16} className="text-[var(--text-secondary)]" />}
               </button>
             </div>
             <button
               onClick={handleUnshare}
-              className="w-full px-4 py-2 text-sm text-red-600 border border-red-200 rounded-lg hover:bg-red-50"
+              className="w-full px-4 py-2 text-sm text-red-400 border border-red-400/20 rounded-lg hover:bg-red-400/10"
             >
               Remove Share Link
             </button>

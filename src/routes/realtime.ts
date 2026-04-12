@@ -11,8 +11,6 @@ interface CostSocket extends WebSocket {
   userId?: number;
 }
 
-const connectedUsers = new Map<number, string>();
-
 const realtimePlugin: FastifyPluginAsync = async (fastify) => {
   const wss = new WebSocketServer({ server: fastify.server });
 
@@ -30,13 +28,12 @@ const realtimePlugin: FastifyPluginAsync = async (fastify) => {
             return;
           }
           try {
-            const payload = jwt.verify(msg.token, env.JWT_SECRET) as any;
+            const payload = jwt.verify(msg.token, env.JWT_SECRET, { algorithms: ['HS256'] }) as any;
             const userId = payload.userId || payload.id || payload.sub;
             if (!userId) {
               ws.send(JSON.stringify({ event: 'error', data: { message: 'Invalid token: no userId' } }));
               return;
             }
-            connectedUsers.set(userId, '');
             ws.userId = userId;
 
             const costData = realTimeCostTracker.getRealTimeData(userId);
@@ -72,7 +69,6 @@ const realtimePlugin: FastifyPluginAsync = async (fastify) => {
 
     ws.on('close', () => {
       if (ws.userId) {
-        connectedUsers.delete(ws.userId);
         logger.info({ userId: ws.userId }, "User disconnected from real-time updates");
       }
     });

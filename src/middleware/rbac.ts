@@ -23,6 +23,8 @@ export function requireRole(...roles: string[]): RequestHandler {
   };
 }
 
+// TODO: requireOwnership is currently unused and non-functional — req.resource is never set by any middleware.
+// To make functional, load the resource from DB using route params before calling this middleware.
 export function requireOwnership(resourceField: string = "userId"): RequestHandler {
   return (req: AuthRequest, _res: Response, next: NextFunction) => {
     const resource = (req as any).resource;

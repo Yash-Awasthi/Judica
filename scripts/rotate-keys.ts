@@ -1,7 +1,7 @@
 import { eq } from "drizzle-orm";
 import { db } from "../src/lib/drizzle.js";
 import { councilConfigs } from "../src/db/schema/auth.js";
-import { decryptConfig, encryptConfig } from "../src/lib/crypto.js";
+import { decrypt, encrypt } from "../src/lib/crypto.js";
 import { pool } from "../src/lib/db.js";
 
 async function rotateKeys() {
@@ -14,10 +14,10 @@ async function rotateKeys() {
     await db.transaction(async (tx) => {
       for (const config of configs) {
         // 1. Decrypt using whatever version the key is currently locked to internally
-        const decrypted = decryptConfig(config.config);
+        const decrypted = decrypt(config.config);
 
         // 2. Re-encrypt using the CURRENT_ENCRYPTION_VERSION env variable
-        const reEncrypted = encryptConfig(decrypted);
+        const reEncrypted = encrypt(decrypted);
 
         await tx
           .update(councilConfigs)

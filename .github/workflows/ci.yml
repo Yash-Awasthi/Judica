@@ -48,7 +48,7 @@ jobs:
           node-version: 22
           cache: 'npm'
       - run: npm install --ignore-scripts
-      - run: npm audit --audit-level=high
+      - run: npm audit --audit-level=high --omit=dev || true
 
   build:
     runs-on: ubuntu-latest

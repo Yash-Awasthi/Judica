@@ -57,4 +57,6 @@ export class DeliberationController {
   }
 }
 
-export const controller = new DeliberationController();
+export function createController(): DeliberationController {
+  return new DeliberationController();
+}

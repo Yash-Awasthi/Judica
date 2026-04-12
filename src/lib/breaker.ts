@@ -2,6 +2,16 @@ import CircuitBreaker from "opossum";
 import logger from "./logger.js";
 import { Provider } from "./providers.js";
 
+/**
+ * Circuit breaker utility for provider adapters.
+ *
+ * STATUS: This module is wired into ALL provider classes:
+ * - Adapter layer (OpenAI, Anthropic, Gemini, Groq, Ollama, OpenRouter, Custom)
+ *   wraps fetch via `getBreaker(provider, fetchFn).fire()`.
+ * - Concrete provider layer (lib/providers/concrete/*) wraps fetch via
+ *   `BaseProvider.protectedFetch()` which delegates to getBreaker internally.
+ */
+
 const breakerRegistry = new Map<string, CircuitBreaker>();
 
 const BREAKER_OPTIONS = {

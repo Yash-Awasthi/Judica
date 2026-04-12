@@ -46,7 +46,7 @@ export function DebateDashboardView() {
   const [running, setRunning] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
   const [factsCount, setFactsCount] = useState(0);
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const eventSourceRef = useRef<{ close: () => void } | null>(null);
   const columnRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // Auto-scroll columns
@@ -114,7 +114,7 @@ export function DebateDashboardView() {
               try {
                 const data = JSON.parse(line.slice(6));
                 handleEvent(data);
-              } catch {}
+              } catch (e) { console.warn("SSE parse error", e); }
             }
           }
         }
@@ -124,12 +124,12 @@ export function DebateDashboardView() {
       });
 
       // Store abort controller so we can cancel on error
-      eventSourceRef.current = { close: () => abortController.abort() } as EventSource;
+      eventSourceRef.current = { close: () => abortController.abort() };
     } catch (err) {
       console.error("Debate start failed", err);
       setRunning(false);
     }
-  }, [query, running, fetchWithAuth]);
+  }, [query, running, fetchWithAuth, handleEvent]);
 
   const handleEvent = useCallback((data: Record<string, unknown>) => {
     const type = data.type as string;

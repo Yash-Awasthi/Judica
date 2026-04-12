@@ -1,11 +1,44 @@
-import { Worker } from "bullmq";
+import { Worker, Job } from "bullmq";
 import connection from "./connection.js";
+import { deadLetterQueue } from "./queues.js";
 import logger from "../lib/logger.js";
 
 let ingestionWorker: Worker;
 let repoWorker: Worker;
 let compactionWorker: Worker;
 let researchWorker: Worker;
+
+/**
+ * Move a permanently failed job to the dead-letter queue for manual inspection.
+ */
+async function moveToDeadLetterQueue(job: Job | undefined, err: Error, queueName: string) {
+  if (!job) return;
+
+  // Only move to DLQ when all retry attempts are exhausted
+  if (job.attemptsMade < (job.opts.attempts ?? 3)) return;
+
+  try {
+    await deadLetterQueue.add("dead-letter", {
+      originalQueue: queueName,
+      originalJobId: job.id,
+      originalJobName: job.name,
+      data: job.data,
+      failedReason: err.message,
+      stackTrace: job.stacktrace,
+      attemptsMade: job.attemptsMade,
+      failedAt: new Date().toISOString(),
+    });
+    logger.warn(
+      { jobId: job.id, queue: queueName, attempts: job.attemptsMade },
+      "Job moved to dead-letter queue after exhausting retries",
+    );
+  } catch (dlqErr) {
+    logger.error(
+      { jobId: job.id, queue: queueName, err: dlqErr },
+      "Failed to move job to dead-letter queue",
+    );
+  }
+}
 
 export function startWorkers() {
   ingestionWorker = new Worker(
@@ -59,7 +92,11 @@ export function startWorkers() {
   const workers = [ingestionWorker, repoWorker, researchWorker, compactionWorker];
   for (const worker of workers) {
     worker.on("failed", (job, err) => {
-      logger.error({ jobId: job?.id, queue: worker.name, err }, "Worker job failed");
+      logger.error(
+        { jobId: job?.id, queue: worker.name, err, attempt: job?.attemptsMade },
+        "Worker job failed",
+      );
+      moveToDeadLetterQueue(job, err, worker.name);
     });
     worker.on("completed", (job) => {
       logger.info({ jobId: job?.id, queue: worker.name }, "Worker job completed");

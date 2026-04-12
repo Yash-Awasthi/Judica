@@ -151,13 +151,14 @@ export async function getRecentHistory(conversationId: string): Promise<Message[
   }
 }
 
-export async function getConversationList(userId: number, limit: number = 50): Promise<Conversation[]> {
+export async function getConversationList(userId: number, limit: number = 50, offset: number = 0): Promise<Conversation[]> {
   try {
     const result = await db
       .select()
       .from(conversations)
       .where(eq(conversations.userId, userId))
       .orderBy(desc(conversations.updatedAt))
+      .offset(offset)
       .limit(limit);
     return result as Conversation[];
   } catch (err) {

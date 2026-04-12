@@ -18,6 +18,31 @@ export async function checkQuota(req: AuthRequest, res: Response, next: NextFunc
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
 
+    const existing = await db
+      .select()
+      .from(dailyUsage)
+      .where(and(eq(dailyUsage.userId, req.userId), eq(dailyUsage.date, today)))
+      .limit(1);
+
+    const currentRequests = existing[0]?.requests ?? 0;
+    const currentTokens = existing[0]?.tokens ?? 0;
+
+    if (currentRequests >= MAX_DAILY_REQUESTS || currentTokens >= MAX_DAILY_TOKENS) {
+      logger.warn({
+        userId: req.userId,
+        requests: currentRequests,
+        tokens: currentTokens,
+        requestId: (req as any).requestId
+      }, "User exceeded daily quota limit");
+      res.setHeader("X-Quota-Limit", MAX_DAILY_REQUESTS.toString());
+      res.setHeader("X-Quota-Used", currentRequests.toString());
+      res.setHeader("X-Token-Limit", MAX_DAILY_TOKENS.toString());
+      res.setHeader("X-Token-Used", currentTokens.toString());
+      res.setHeader("Retry-After", "86400");
+      res.status(429).json({ error: "Daily request or token quota exceeded. Please try again tomorrow." });
+      return;
+    }
+
     const [updatedUsage] = await db
       .insert(dailyUsage)
       .values({
@@ -35,22 +60,6 @@ export async function checkQuota(req: AuthRequest, res: Response, next: NextFunc
         },
       })
       .returning();
-
-    if (updatedUsage.requests > MAX_DAILY_REQUESTS || updatedUsage.tokens > MAX_DAILY_TOKENS) {
-      logger.warn({
-        userId: req.userId,
-        requests: updatedUsage.requests,
-        tokens: updatedUsage.tokens,
-        requestId: (req as any).requestId
-      }, "User exceeded daily quota limit");
-      res.setHeader("X-Quota-Limit", MAX_DAILY_REQUESTS.toString());
-      res.setHeader("X-Quota-Used", updatedUsage.requests.toString());
-      res.setHeader("X-Token-Limit", MAX_DAILY_TOKENS.toString());
-      res.setHeader("X-Token-Used", updatedUsage.tokens.toString());
-      res.setHeader("Retry-After", "86400");
-      res.status(429).json({ error: "Daily request or token quota exceeded. Please try again tomorrow." });
-      return;
-    }
 
     res.setHeader("X-Quota-Limit", MAX_DAILY_REQUESTS.toString());
     res.setHeader("X-Quota-Used", updatedUsage.requests.toString());

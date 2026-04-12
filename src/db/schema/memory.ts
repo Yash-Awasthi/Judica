@@ -28,7 +28,11 @@ export const memories = pgTable(
     embedding: vector("embedding", { dimensions: 1536 }).notNull(),
     createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
   },
-  (table) => [index("Memory_userId_kbId_idx").on(table.userId, table.kbId)],
+  (table) => [
+    index("Memory_userId_kbId_idx").on(table.userId, table.kbId),
+    index("Memory_embedding_hnsw_idx")
+      .using("hnsw", table.embedding.op("vector_cosine_ops")),
+  ],
 );
 
 // ─── MemoryBackend ───────────────────────────────────────────────────────────

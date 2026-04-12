@@ -133,7 +133,7 @@ export const CostTracker: React.FC = () => {
           <div className="flex justify-between text-xs">
             <span className="text-muted">Avg Tokens per Request</span>
             <span className="text-text">
-              {Math.round(costData.totalTokens / (costData.totalCost / costData.avgCostPerRequest) || 0)}
+              {(() => { const denominator = costData.avgCostPerRequest !== 0 ? costData.totalCost / costData.avgCostPerRequest : 0; return denominator !== 0 ? Math.round(costData.totalTokens / denominator) : 0; })()}
             </span>
           </div>
         </div>

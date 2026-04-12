@@ -37,8 +37,12 @@ export function getFallbackProvider(original: Provider): Provider | null {
   }
 
   return {
-    ...original, // keep name, systemPrompt, maxTokens if possible
-    ...fallbackData as Provider,
+    name: original.name,
+    type: original.type,
+    apiKey: original.apiKey,
+    model: original.model,
+    ...original,
+    ...fallbackData,
     name: `${original.name} (Fallback: ${fallbackData.model})`,
-  };
+  } as Provider;
 }

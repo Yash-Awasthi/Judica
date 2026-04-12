@@ -20,8 +20,8 @@ export class OpenAIProvider extends BaseProvider {
     onChunk?: (chunk: string) => void;
     _depth?: number;
   }): Promise<ProviderResponse> {
-    if (_depth >= 5) {
-      throw new Error("Tool call depth limit exceeded (max 5 recursive rounds)");
+    if (_depth >= 10) {
+      throw new Error("Tool call depth limit exceeded (max 10 recursive rounds)");
     }
     const url = (this.config.baseUrl || this.defaultBaseUrl).replace(/\/$/, "");
     await validateSafeUrl(url);
@@ -38,7 +38,7 @@ export class OpenAIProvider extends BaseProvider {
     }
 
     try {
-      const res = await fetch(`${url}/chat/completions`, {
+      const res = await this.protectedFetch(`${url}/chat/completions`, {
         method: "POST",
         signal: controller.signal,
         headers: {

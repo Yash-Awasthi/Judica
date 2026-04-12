@@ -4,6 +4,25 @@ import path from "path";
 import crypto from "crypto";
 import os from "os";
 
+/**
+ * Python sandbox for executing untrusted user code.
+ *
+ * SECURITY NOTE (WF-4): This sandbox uses ulimit-based resource limits only.
+ * It does NOT provide namespace isolation (e.g., Linux namespaces via unshare).
+ * The process runs under the same UID as the server and shares the host
+ * filesystem, PID namespace, and (partially blocked) network namespace.
+ *
+ * Network access is blocked at the Python level by monkey-patching socket.socket
+ * rather than via kernel-level enforcement.  This is bypassable by ctypes or
+ * compiled extensions.
+ *
+ * For production use with truly untrusted code, consider:
+ *  - Running inside a gVisor / Firecracker micro-VM
+ *  - Using Linux user namespaces (unshare --user --net --pid --mount) if
+ *    CAP_SYS_ADMIN is available
+ *  - Using a dedicated sandboxing service (e.g., Cloudflare Workers, AWS Lambda)
+ */
+
 export interface SandboxResult {
   output: string[];
   error: string | null;
@@ -19,8 +38,24 @@ export async function executePython(code: string, timeout: number = 10000): Prom
     // before user code runs. This prevents sandboxed code from making any network
     // connections. We use a Python-level approach rather than unshare --net because
     // the latter requires root/CAP_SYS_ADMIN privileges.
-    const networkBlockPreamble =
-      `import socket as _s; _s.socket = lambda *a, **k: (_ for _ in ()).throw(PermissionError("Network disabled in sandbox"))\n`;
+    // SEC-4: Comprehensive network isolation via socket monkey-patching.
+    // Blocks connect, connect_ex, bind, sendto, and sendmsg on all socket instances.
+    const networkBlockPreamble = [
+      `import socket as _original_socket`,
+      `class _BlockedSocket(_original_socket.socket):`,
+      `    def connect(self, *args, **kwargs):`,
+      `        raise PermissionError("Network access is disabled in sandbox")`,
+      `    def connect_ex(self, *args, **kwargs):`,
+      `        raise PermissionError("Network access is disabled in sandbox")`,
+      `    def bind(self, *args, **kwargs):`,
+      `        raise PermissionError("Network access is disabled in sandbox")`,
+      `    def sendto(self, *args, **kwargs):`,
+      `        raise PermissionError("Network access is disabled in sandbox")`,
+      `    def sendmsg(self, *args, **kwargs):`,
+      `        raise PermissionError("Network access is disabled in sandbox")`,
+      `_original_socket.socket = _BlockedSocket`,
+      ``,
+    ].join("\n");
     fs.writeFileSync(tmpFile, networkBlockPreamble + code, "utf-8");
 
     return await new Promise<SandboxResult>((resolve) => {

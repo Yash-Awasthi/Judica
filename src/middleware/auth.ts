@@ -1,6 +1,6 @@
 import { Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import { z } from "zod/v4";
+import { z } from "zod";
 import { env } from "../config/env.js";
 import { db } from "../lib/drizzle.js";
 import { revokedTokens } from "../db/schema/auth.js";

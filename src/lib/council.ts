@@ -9,7 +9,7 @@ import { formatAgentOutput, ScoredOpinion } from "./schemas.js";
 import { filterAndRank } from "./scoring.js";
 import { gatherOpinions, conductPeerReview, evaluateConsensus, synthesizeVerdict, conductDebateRound, OpinionResult } from "./deliberationPhases.js";
 import { PeerReview, ValidatorResult } from "./schemas.js";
-import { controller } from "./controller.js";
+import { createController } from "./controller.js";
 import { calculateCost } from "./cost.js";
 import { updateReliability, getReliabilityScores } from "../services/reliability.service.js";
 
@@ -140,6 +140,7 @@ export async function* deliberate(
   onVerdictChunk?: (chunk: string) => void,
   onMemberChunk?: (name: string, chunk: string) => void
 ): AsyncGenerator<DeliberationEvent> {
+  const controller = createController();
   const currentMessages = [...messages];
   let finalOpinions: { name: string; opinion: string }[] = [];
   let totalTokens = 0;

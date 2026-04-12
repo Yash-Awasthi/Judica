@@ -88,7 +88,7 @@ async function sweepRedisKeys(): Promise<number> {
     let swept = 0;
 
     for (const key of keys) {
-      const ttl = await redis.ttl(key);
+      const ttl = await redis.pttl(key);
       if (ttl === -1 || ttl <= 0) {
         await redis.del(key);
         swept++;

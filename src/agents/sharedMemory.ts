@@ -119,13 +119,15 @@ export async function extractAndStoreFacts(
       confidence: number;
     }>;
 
+    const validTypes = ["fact", "decision", "assumption", "contradiction"] as const;
     const stored: SharedFactData[] = [];
     for (const claim of claims.slice(0, 5)) {
+      const claimType = validTypes.includes(claim.type as any) ? claim.type as typeof validTypes[number] : "fact";
       const fact = await addFact(
         conversationId,
         claim.content,
         agentId,
-        (claim.type || "fact") as any,
+        claimType,
         claim.confidence ?? 0.7
       );
       stored.push(fact);
