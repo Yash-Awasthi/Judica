@@ -72,8 +72,6 @@ import reposPlugin from "./routes/repos.js";
 import queuePlugin from "./routes/queue.js";
 import costsPlugin from "./routes/costs.js";
 import evaluationPlugin from "./routes/evaluation.js";
-import realtimePlugin from "./routes/realtime.js";
-import archetypesPlugin from "./routes/archetypes.js";
 import { ingestionQueue, researchQueue, repoQueue, compactionQueue } from "./queue/queues.js";
 
 // ─── Build the Fastify server ───────────────────────────────────────────────
@@ -201,10 +199,6 @@ await fastify.register(costsPlugin,           { prefix: "/api/costs" });
 await fastify.register(evaluationPlugin,      { prefix: "/api/evaluation" });
 await fastify.register(askPlugin,             { prefix: "/api/ask" });
 await fastify.register(uploadsPlugin,         { prefix: "/api/uploads" });
-// realtime and archetypes routes available but not mounted in original setup
-// Uncomment to enable:
-// await fastify.register(realtimePlugin,        { prefix: "/api/realtime" });
-// await fastify.register(archetypesPlugin,      { prefix: "/api/archetypes" });
 
 // ─── Express compatibility layer ────────────────────────────────────────────
 // Only needed for swagger-ui-express and BullMQ Board (dev only).
