@@ -198,50 +198,38 @@ Workbox service worker, IndexedDB conversation caching, NetworkFirst API strateg
 
 ## Tech Stack
 
-```mermaid
-mindmap
-  root((AIBYAI))
-    Backend
-      Express 5
-      TypeScript 5.9
-      Prisma 7.6
-      BullMQ
-      Socket.IO
-    Frontend
-      React 18
-      Vite 6
-      Tailwind CSS
-      React Flow
-      Monaco Editor
-      Recharts
-    AI Providers
-      OpenAI
-      Anthropic
-      Google Gemini
-      Groq
-      Ollama
-      OpenRouter
-      Mistral
-      Cerebras
-      NVIDIA NIM
-    Data
-      PostgreSQL 16
-      pgvector
-      Redis 7
-      IndexedDB
-    Infrastructure
-      Docker
-      GitHub Actions
-      Workbox PWA
-    Security
-      Helmet
-      JWT + OAuth2
-      AES-256-GCM
-      RBAC
-      Rate Limiting
-```
+| Layer | Technology | Purpose |
+|---|---|---|
+| **Runtime** | Node.js 20+, TypeScript 5.9 | Server + type safety |
+| **API** | Express 5.2 | HTTP layer, 35 route handlers |
+| **Frontend** | React 18, Vite 6, Tailwind CSS | SPA with hot reload |
+| **Database** | PostgreSQL 16 + pgvector | Relational data + vector embeddings |
+| **Cache / Queues** | Redis 7, BullMQ | Semantic cache, rate limiting, async jobs |
+| **ORM** | Prisma 7.6 | Schema management, migrations, type-safe queries |
+| **Realtime** | Socket.IO | WebSocket streaming for deliberation events |
+| **Auth** | JWT, Passport (Google, GitHub OAuth2) | Authentication + session management |
+| **Encryption** | AES-256-GCM, bcrypt | API key vault, password hashing |
+| **Observability** | Pino, LangFuse (optional) | Structured logging, LLM tracing |
+| **Workflow UI** | XYFlow (React Flow) | Visual drag-and-drop workflow builder |
+| **Code Editor** | Monaco Editor | In-browser prompt and code editing |
+| **Charts** | Recharts | Analytics and evaluation dashboards |
+| **Sandbox** | isolated-vm, Python subprocess | Secure code execution (JS + Python) |
+| **Infrastructure** | Docker, GitHub Actions CI | Containerized deployment, automated testing |
 
-**178 backend files · 57 frontend files · 39 database models · 35 API routes · 9 LLM providers**
+### Supported LLM Providers
+
+| Provider | Type | Adapter |
+|---|---|---|
+| OpenAI (GPT-4o, o1, o3) | API | Native |
+| Anthropic (Claude 3) | API | Native |
+| Google (Gemini) | API | Native |
+| Groq (LLaMA, Mixtral) | API | Native |
+| Ollama | Local | Native |
+| OpenRouter | API | Native |
+| Mistral | API | OpenAI-compatible |
+| Cerebras | API | OpenAI-compatible |
+| NVIDIA NIM | API | OpenAI-compatible |
+| Custom providers | API | Configurable via UI (EMOF) |
 
 ---
 
