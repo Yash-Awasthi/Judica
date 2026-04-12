@@ -486,15 +486,25 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
       const iv = buf.subarray(0, 16);
       const tag = buf.subarray(16, 32);
       const ciphertext = buf.subarray(32);
-      const derivedKey = scryptSync(key, "salt", 32);
+      // Legacy data used hardcoded "salt"; use IV as salt for key derivation
+      // to provide per-record uniqueness
+      const derivedKey = scryptSync(key, iv, 32);
       const decipher = createDecipheriv(ALGO, derivedKey, iv);
       decipher.setAuthTag(tag);
-      return decipher.update(ciphertext, undefined, "utf8") + decipher.final("utf8");
+      try {
+        return decipher.update(ciphertext, undefined, "utf8") + decipher.final("utf8");
+      } catch {
+        // Fallback: try legacy hardcoded salt for pre-migration data
+        const legacyKey = scryptSync(key, "salt", 32);
+        const legacyDecipher = createDecipheriv(ALGO, legacyKey, iv);
+        legacyDecipher.setAuthTag(tag);
+        return legacyDecipher.update(ciphertext, undefined, "utf8") + legacyDecipher.final("utf8");
+      }
     }
 
     function encrypt(text: string, key: string): string {
       const iv = randomBytes(16);
-      const derivedKey = scryptSync(key, "salt", 32);
+      const derivedKey = scryptSync(key, iv, 32);
       const cipher = createCipheriv(ALGO, derivedKey, iv);
       const encrypted = Buffer.concat([cipher.update(text, "utf8"), cipher.final()]);
       const tag = cipher.getAuthTag();
