@@ -17,7 +17,7 @@ services:
       redis:
         condition: service_healthy
     command: >
-      sh -c "npx drizzle-kit push && node dist/index.js"
+      sh -c "if [ \"$NODE_ENV\" = 'development' ]; then npx drizzle-kit push; fi && node dist/index.js"
     restart: unless-stopped
 
   db:
