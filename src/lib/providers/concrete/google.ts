@@ -74,6 +74,7 @@ export class GoogleProvider extends BaseProvider {
         const decoder = new TextDecoder();
         let text = "";
         let buffer = "";
+        let streamUsage: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number } | null = null;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -97,6 +98,10 @@ export class GoogleProvider extends BaseProvider {
                   text += content;
                   onChunk(content);
                 }
+                // Capture usage metadata from Gemini response
+                if (parsed.usageMetadata) {
+                  streamUsage = parsed.usageMetadata;
+                }
               } catch (e) {
                 // ignore unparseable chunk
               }
@@ -104,17 +109,18 @@ export class GoogleProvider extends BaseProvider {
           }
         }
 
+        const estimatedCompletion = Math.ceil(text.length / 4);
         const usage = {
-          promptTokens: 0,
-          completionTokens: 0,
-          totalTokens: 0
+          promptTokens: streamUsage?.promptTokenCount || 0,
+          completionTokens: streamUsage?.candidatesTokenCount || estimatedCompletion,
+          totalTokens: streamUsage?.totalTokenCount || estimatedCompletion,
         };
 
         const cost = calculateCost(
           "google",
           this.config.model,
-          0,
-          0
+          usage.promptTokens,
+          usage.completionTokens
         );
 
         return { text: text.trim(), usage, cost, raw: { stream: true } };

@@ -69,6 +69,8 @@ export class AnthropicProvider extends BaseProvider {
         const decoder = new TextDecoder();
         let text = "";
         let buffer = "";
+        let streamInputTokens = 0;
+        let streamOutputTokens = 0;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -91,6 +93,13 @@ export class AnthropicProvider extends BaseProvider {
                   text += content;
                   onChunk(content);
                 }
+                // Capture usage from message_start and message_delta events
+                if (parsed.type === "message_start" && parsed.message?.usage) {
+                  streamInputTokens = parsed.message.usage.input_tokens || 0;
+                }
+                if (parsed.type === "message_delta" && parsed.usage) {
+                  streamOutputTokens = parsed.usage.output_tokens || 0;
+                }
               } catch (e) {
                 // ignore unparseable chunk
               }
@@ -98,17 +107,18 @@ export class AnthropicProvider extends BaseProvider {
           }
         }
 
+        const estimatedCompletion = Math.ceil(text.length / 4);
         const usage = {
-          promptTokens: 0,
-          completionTokens: 0,
-          totalTokens: 0
+          promptTokens: streamInputTokens,
+          completionTokens: streamOutputTokens || estimatedCompletion,
+          totalTokens: streamInputTokens + (streamOutputTokens || estimatedCompletion),
         };
 
         const cost = calculateCost(
           "anthropic",
           this.config.model,
-          0,
-          0
+          usage.promptTokens,
+          usage.completionTokens
         );
 
         return { text: text.trim(), usage, cost, raw: { stream: true } };

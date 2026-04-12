@@ -68,6 +68,7 @@ export class OpenAIProvider extends BaseProvider {
         const decoder = new TextDecoder();
         let text = "";
         let buffer = "";
+        let streamUsage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null = null;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -90,6 +91,10 @@ export class OpenAIProvider extends BaseProvider {
                   text += content;
                   onChunk(content);
                 }
+                // Capture usage from final chunk if available
+                if (parsed.usage) {
+                  streamUsage = parsed.usage;
+                }
               } catch (e) {
                 // ignore unparseable chunk
               }
@@ -97,17 +102,19 @@ export class OpenAIProvider extends BaseProvider {
           }
         }
 
+        // Use actual usage from stream if available, otherwise estimate from text
+        const estimatedCompletion = Math.ceil(text.length / 4);
         const usage = {
-          promptTokens: 0,
-          completionTokens: 0,
-          totalTokens: 0
+          promptTokens: streamUsage?.prompt_tokens || 0,
+          completionTokens: streamUsage?.completion_tokens || estimatedCompletion,
+          totalTokens: streamUsage?.total_tokens || estimatedCompletion,
         };
 
         const cost = calculateCost(
           this.config.type === "api" ? "openai" : this.config.type,
           this.config.model,
-          0,
-          0
+          usage.promptTokens,
+          usage.completionTokens
         );
 
         return { text: text.trim(), usage, cost, raw: { stream: true } };
