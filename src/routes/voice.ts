@@ -1,6 +1,6 @@
 import { FastifyPluginAsync } from "fastify";
 import multipart from "@fastify/multipart";
-import { fastifyOptionalAuth } from "../middleware/fastifyAuth.js";
+import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { env } from "../config/env.js";
 import { AppError } from "../middleware/errorHandler.js";
 import logger from "../lib/logger.js";
@@ -46,7 +46,7 @@ const voicePlugin: FastifyPluginAsync = async (fastify) => {
    *         description: STT not configured
    */
   // POST /api/voice/transcribe — Whisper STT
-  fastify.post("/transcribe", { preHandler: fastifyOptionalAuth }, async (request, reply) => {
+  fastify.post("/transcribe", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const file = await request.file();
     if (!file) throw new AppError(400, "Audio file required", "NO_AUDIO");
 
@@ -114,7 +114,7 @@ const voicePlugin: FastifyPluginAsync = async (fastify) => {
    *         description: TTS not configured
    */
   // POST /api/voice/synthesize — TTS
-  fastify.post("/synthesize", { preHandler: fastifyOptionalAuth }, async (request, reply) => {
+  fastify.post("/synthesize", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const { text, voice } = request.body as { text?: string; voice?: string };
     if (!text || typeof text !== "string" || text.trim().length === 0) {
       throw new AppError(400, "Text is required", "NO_TEXT");

@@ -85,6 +85,12 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
       const searchTerm = q.trim();
       const limitNum = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 50);
 
+      // Escape LIKE special characters to prevent wildcard injection
+      const escapedTerm = searchTerm
+        .replace(/\\/g, "\\\\")
+        .replace(/%/g, "\\%")
+        .replace(/_/g, "\\_");
+
       const results = await db
         .select({
           id: chats.id,
@@ -98,8 +104,8 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
           and(
             eq(chats.userId, request.userId!),
             or(
-              ilike(chats.question, `%${searchTerm}%`),
-              ilike(chats.verdict, `%${searchTerm}%`)
+              ilike(chats.question, `%${escapedTerm}%`),
+              ilike(chats.verdict, `%${escapedTerm}%`)
             )
           )
         )
