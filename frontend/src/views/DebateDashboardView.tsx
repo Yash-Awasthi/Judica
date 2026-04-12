@@ -83,20 +83,48 @@ export function DebateDashboardView() {
       const { sessionId } = await res.json();
 
       const token = localStorage.getItem("council_token") || "";
-      const es = new EventSource(`/api/council/debate/${sessionId}/stream?token=${token}`);
-      eventSourceRef.current = es;
+      // Use fetch with Authorization header instead of EventSource with token in URL
+      // to avoid leaking the token in browser history and server logs
+      const streamUrl = `/api/council/debate/${sessionId}/stream`;
+      const abortController = new AbortController();
 
-      es.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          handleEvent(data);
-        } catch {}
-      };
+      fetch(streamUrl, {
+        headers: {
+          "Accept": "text/event-stream",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
+        signal: abortController.signal,
+      }).then(async (streamRes) => {
+        if (!streamRes.ok || !streamRes.body) {
+          setRunning(false);
+          return;
+        }
+        const reader = streamRes.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
 
-      es.onerror = () => {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                handleEvent(data);
+              } catch {}
+            }
+          }
+        }
         setRunning(false);
-        es.close();
-      };
+      }).catch(() => {
+        setRunning(false);
+      });
+
+      // Store abort controller so we can cancel on error
+      eventSourceRef.current = { close: () => abortController.abort() } as EventSource;
     } catch (err) {
       console.error("Debate start failed", err);
       setRunning(false);
