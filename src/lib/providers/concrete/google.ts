@@ -37,7 +37,7 @@ export class GoogleProvider extends BaseProvider {
 
     try {
       const endpoint = onChunk ? "streamGenerateContent?alt=sse" : "generateContent";
-      const res = await fetch(
+      const res = await this.protectedFetch(
         `${apiHost}/v1beta/models/${this.config.model || "gemini-2.0-flash"}:${endpoint}`,
         {
           method: "POST",

@@ -92,7 +92,11 @@ export function startWorkers() {
   const workers = [ingestionWorker, repoWorker, researchWorker, compactionWorker];
   for (const worker of workers) {
     worker.on("failed", (job, err) => {
-      logger.error({ jobId: job?.id, queue: worker.name, err }, "Worker job failed");
+      logger.error(
+        { jobId: job?.id, queue: worker.name, err, attempt: job?.attemptsMade },
+        "Worker job failed",
+      );
+      moveToDeadLetterQueue(job, err, worker.name);
     });
     worker.on("completed", (job) => {
       logger.info({ jobId: job?.id, queue: worker.name }, "Worker job completed");
