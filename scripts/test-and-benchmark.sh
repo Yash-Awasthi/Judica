@@ -88,7 +88,7 @@ run_unit_tests() {
 run_integration_tests() {
     print_status "Running integration tests..."
     
-    if npm run test:integration; then
+    if npm run test:ci; then
         print_success "Integration tests passed"
     else
         print_error "Integration tests failed"
@@ -102,19 +102,19 @@ run_benchmarks() {
     
     # Council deliberation benchmarks
     print_status "Testing council deliberation performance..."
-    npm run benchmark:council || print_warning "Council benchmark failed"
-    
+    npm run benchmark || print_warning "Council benchmark failed"
+
     # PII detection benchmarks
     print_status "Testing PII detection performance..."
-    npm run benchmark:pii || print_warning "PII benchmark failed"
-    
+    npm run benchmark || print_warning "PII benchmark failed"
+
     # Cost tracking benchmarks
     print_status "Testing cost tracking performance..."
-    npm run benchmark:cost || print_warning "Cost benchmark failed"
-    
+    npm run benchmark || print_warning "Cost benchmark failed"
+
     # Memory usage benchmarks
     print_status "Testing memory usage..."
-    npm run benchmark:memory || print_warning "Memory benchmark failed"
+    npm run benchmark || print_warning "Memory benchmark failed"
     
     print_success "Benchmarks completed"
 }
@@ -145,7 +145,7 @@ run_security_tests() {
     npm audit --audit-level moderate
     
     # Run security linter
-    npm run lint:security || print_warning "Security linter failed"
+    npm run lint || print_warning "Security linter failed"
     
     print_success "Security tests completed"
 }
@@ -175,7 +175,7 @@ run_api_tests() {
     sleep 10
     
     # Run API tests
-    if npm run test:api; then
+    if npm run test:ci; then
         print_success "API tests passed"
     else
         print_error "API tests failed"
@@ -229,7 +229,7 @@ $([ -f "benchmark-results.json" ] && cat benchmark-results.json || echo "No benc
 
 ## Security
 - Vulnerabilities: $(npm audit --json | jq '.metadata.vulnerabilities.total' 2>/dev/null || echo "Unknown")
-- Security Issues: $(npm run lint:security -- --format=json 2>/dev/null | jq '.length' || echo "Unknown")
+- Security Issues: $(npm run lint -- --format=json 2>/dev/null | jq '.length' || echo "Unknown")
 
 EOF
     
@@ -240,9 +240,11 @@ EOF
 cleanup() {
     print_status "Cleaning up..."
     
-    # Kill any background processes
-    pkill -f "npm start" 2>/dev/null || true
-    pkill -f "node" 2>/dev/null || true
+    # Kill any background server processes started by this script
+    if [ -n "${SERVER_PID:-}" ]; then
+        kill "$SERVER_PID" 2>/dev/null || true
+        wait "$SERVER_PID" 2>/dev/null || true
+    fi
     
     # Clean up temporary files
     rm -f test-results.xml integration-results.xml benchmark-results.json
