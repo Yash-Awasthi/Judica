@@ -38,7 +38,7 @@ export class OpenAIProvider extends BaseProvider {
     }
 
     try {
-      const res = await fetch(`${url}/chat/completions`, {
+      const res = await this.protectedFetch(`${url}/chat/completions`, {
         method: "POST",
         signal: controller.signal,
         headers: {

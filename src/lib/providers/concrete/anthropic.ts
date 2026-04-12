@@ -33,7 +33,7 @@ export class AnthropicProvider extends BaseProvider {
     }
 
     try {
-      const res = await fetch(url, {
+      const res = await this.protectedFetch(url, {
         method: "POST",
         signal: controller.signal,
         headers: {
