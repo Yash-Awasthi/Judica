@@ -5,6 +5,7 @@ import type {
   AdapterStreamResult,
 } from "./types.js";
 import { createStreamResult } from "./types.js";
+import { getBreaker } from "../lib/breaker.js";
 import logger from "../lib/logger.js";
 
 interface OllamaChunk {
@@ -56,12 +57,16 @@ export class OllamaAdapter implements IProviderAdapter {
     const timeout = setTimeout(() => controller.abort(), 120000);
 
     try {
-      const res = await fetch(`${this.baseUrl}/api/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
+      const fetchChat = async () =>
+        fetch(`${this.baseUrl}/api/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+
+      const breaker = getBreaker({ name: this.providerId } as any, fetchChat);
+      const res: Response = await breaker.fire();
 
       clearTimeout(timeout);
 

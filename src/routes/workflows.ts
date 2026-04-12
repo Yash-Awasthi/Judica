@@ -12,8 +12,29 @@ import type { WorkflowExecutor } from "../workflow/executor.js";
 // Active workflow runs kept in memory for SSE streaming
 export const activeRuns = new Map<
   string,
-  { executor: WorkflowExecutor; events: ExecutionEvent[] }
+  { executor: WorkflowExecutor; events: ExecutionEvent[]; createdAt: number }
 >();
+
+/** Maximum number of concurrent active runs held in memory */
+const MAX_ACTIVE_RUNS = 500;
+/** Maximum age (ms) before an entry is evicted regardless of state */
+const ACTIVE_RUN_TTL_MS = 30 * 60 * 1000; // 30 minutes
+/** How often the sweep runs */
+const SWEEP_INTERVAL_MS = 60 * 1000; // every 60 seconds
+
+/** Periodic sweep that evicts stale entries from activeRuns */
+const _sweepInterval = setInterval(() => {
+  const now = Date.now();
+  for (const [id, entry] of activeRuns) {
+    if (now - entry.createdAt > ACTIVE_RUN_TTL_MS) {
+      activeRuns.delete(id);
+      logger.info({ runId: id }, "Evicted stale activeRuns entry (TTL exceeded)");
+    }
+  }
+}, SWEEP_INTERVAL_MS);
+
+// Allow the process to exit without waiting for the sweep timer
+if (_sweepInterval.unref) _sweepInterval.unref();
 
 const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
   /**
@@ -474,7 +495,16 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
     const { WorkflowExecutor: ExecutorClass } = await import("../workflow/executor.js");
     const executor = new ExecutorClass(workflow.definition as any, run.id, request.userId!);
 
-    activeRuns.set(run.id, { executor, events: [] });
+    // Enforce bounded map size — evict oldest entry if at capacity
+    if (activeRuns.size >= MAX_ACTIVE_RUNS) {
+      const oldestKey = activeRuns.keys().next().value;
+      if (oldestKey) {
+        activeRuns.delete(oldestKey);
+        logger.warn({ evictedRunId: oldestKey }, "Evicted oldest activeRuns entry (map at capacity)");
+      }
+    }
+
+    activeRuns.set(run.id, { executor, events: [], createdAt: Date.now() });
 
     // Run execution in background (do NOT await)
     (async () => {

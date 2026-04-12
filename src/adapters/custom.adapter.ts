@@ -7,6 +7,7 @@ import type {
 import { createStreamResult } from "./types.js";
 import { decrypt } from "../lib/crypto.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
+import { getBreaker } from "../lib/breaker.js";
 import logger from "../lib/logger.js";
 
 export interface CustomProviderConfig {
@@ -90,12 +91,16 @@ export class CustomAdapter implements IProviderAdapter {
       body.tool_choice = "auto";
     }
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(60000),
-    });
+    const fetchCustom = async () =>
+      fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(60000),
+      });
+
+    const breaker = getBreaker({ name: this.providerId } as any, fetchCustom);
+    const res: Response = await breaker.fire();
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
