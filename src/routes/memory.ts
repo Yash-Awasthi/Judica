@@ -9,7 +9,7 @@ import { getBackend, setBackend, removeBackend, encryptConfig } from "../service
 import { summarizeSession } from "../services/sessionSummary.service.js";
 import logger from "../lib/logger.js";
 
-const memoryRoutes: FastifyPluginAsync = async (fastify) => {
+const memoryPlugin: FastifyPluginAsync = async (fastify) => {
   /**
    * @openapi
    * /api/memory/compact:
@@ -305,4 +305,4 @@ const memoryRoutes: FastifyPluginAsync = async (fastify) => {
   });
 };
 
-export default memoryRoutes;
+export default memoryPlugin;

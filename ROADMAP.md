@@ -5,13 +5,33 @@
 ### What's Next
 
 [![Status](https://img.shields.io/badge/Core_Platform-Complete-22C55E?style=for-the-badge)](./README.md)
+[![Status](https://img.shields.io/badge/Migration-Complete-22C55E?style=for-the-badge)](#-completed-migrations)
 [![Status](https://img.shields.io/badge/Next_Phase-Quality_%26_Scale-3B82F6?style=for-the-badge)](#-testing--quality-assurance)
 
 </div>
 
 ---
 
-All 22 original roadmap phases and all 12 Master Execution Plan tiers are **complete**. This document tracks future work — quality improvements, new capabilities, and scaling targets.
+All 22 original roadmap phases, all 12 Master Execution Plan tiers, and the 10-task tech migration are **complete**. This document tracks future work — quality improvements, new capabilities, and scaling targets.
+
+---
+
+## Completed Migrations
+
+The following infrastructure upgrades have been completed on the `sidecamel` branch:
+
+| Migration | From | To | Status |
+|---|---|---|---|
+| Runtime | Node.js 20 | Node.js 22 LTS | Done |
+| Vector indexes | IVFFlat (default) | HNSW (m=16, ef=64) | Done |
+| Password hashing | bcrypt | argon2id (with legacy fallback) | Done |
+| Token security | Static JWT | Short-lived access + rotating refresh tokens | Done |
+| Metrics | Internal JSON only | Prometheus (prom-client) + histograms | Done |
+| Sandbox | No resource caps | isolated-vm 128MB + Python ulimit | Done |
+| WebSocket | Socket.IO | Native ws | Done |
+| Charts | Recharts | Apache ECharts | Done |
+| HTTP framework | Express 5.2 | Fastify 5 (33 native plugins) | Done |
+| ORM | Prisma 7.6 | Drizzle ORM (zero Prisma imports) | Done |
 
 ---
 
@@ -23,14 +43,14 @@ flowchart LR
         direction TB
         A["Multi-Agent Deliberation\n4+ agents, peer review, debate"]
         B["9 LLM Providers\nOpenAI, Anthropic, Gemini, Groq, Ollama..."]
-        C["RAG Pipeline\npgvector, hybrid search, KB management"]
+        C["RAG Pipeline\npgvector HNSW, hybrid search, KB management"]
         D["Workflow Engine\n10+ node types, visual canvas"]
         E["Research Mode\nMulti-step web research"]
-        F["Code Sandbox\nisolated-vm + Python"]
+        F["Code Sandbox\nisolated-vm + Python (hardened)"]
         G["Marketplace\nPrompts, workflows, personas, tools"]
-        H["Observability\nTracing, LangFuse, reliability scoring"]
-        I["Auth + RBAC\nOAuth2, roles, sharing"]
-        J["Infrastructure\nDocker, BullMQ, CI, PWA"]
+        H["Observability\nPrometheus, LangFuse, reliability scoring"]
+        I["Auth + Security\nargon2id, JWT rotation, OAuth2, RBAC"]
+        J["Infrastructure\nFastify 5, Drizzle, Node 22, Docker, CI"]
     end
 
     style COMPLETE fill:#022c22,stroke:#22c55e,color:#bbf7d0
@@ -44,8 +64,8 @@ flowchart LR
 timeline
     title AIBYAI Development Timeline
     section Quality
-        Testing Suite : Unit tests (vitest) : Integration tests (supertest) : E2E tests (Playwright)
-        API Documentation : ✅ Swagger/OpenAPI live at /api/docs
+        Testing Suite : Unit tests (vitest, 70% coverage) : Integration tests (supertest + real DB) : E2E tests (Playwright)
+        Grafana Dashboards : Wire Prometheus metrics to Grafana : Alert rules for latency and error spikes
     section Intelligence
         Agentic Memory v2 : Cross-conversation learning : Topic clustering : Automatic forgetting
         Advanced Reranking : Cohere rerank integration : Custom reranker training
@@ -62,17 +82,9 @@ timeline
 
 ---
 
-## ~~API Documentation~~ — Complete
-
-> **Status: Done** — Swagger/OpenAPI docs are live at `/api/docs`.
-
-All 35 route handlers have `@openapi` JSDoc annotations. Interactive Swagger UI is mounted at `/api/docs` with OpenAPI 3.0 spec available at `/api/docs/spec.json`.
-
----
-
 ## Testing & Quality Assurance
 
-> **Priority: High** — Test suite exists (7 test files, 97 passing tests) but coverage can expand.
+> **Priority: High** — Test suite exists (7 test files, 97 passing tests) but coverage needs expansion for the new Fastify + Drizzle codebase.
 
 ### Unit Tests
 
@@ -80,7 +92,7 @@ Target **70% statement coverage** across all services.
 
 | Area | Files | Framework |
 |---|---|---|
-| Services | `src/services/*.ts` | vitest + mocked Prisma |
+| Services | `src/services/*.ts` | vitest + mocked Drizzle |
 | Adapters | `src/adapters/*.ts` | vitest + nock (HTTP mocking) |
 | Middleware | `src/middleware/*.ts` | vitest |
 | Workflow nodes | `src/workflow/nodes/*.ts` | vitest |
@@ -92,22 +104,35 @@ Every API route: happy path + 401 + invalid input = minimum 3 tests per route.
 
 | Area | Approach |
 |---|---|
-| 35 API routes | supertest against Express app |
-| Database operations | Test Prisma against real PostgreSQL |
+| 35 API routes | `inject()` against Fastify instance |
+| Database operations | Drizzle against real PostgreSQL |
 | Queue processing | BullMQ job lifecycle testing |
 | SSE streaming | Event stream validation |
 
 ### E2E Tests
 
-Critical user flows with Playwright (already installed in the project).
+Critical user flows with Playwright.
 
 | Flow | Description |
 |---|---|
-| Authentication | Sign up, login, OAuth redirect |
+| Authentication | Sign up, login, token refresh, OAuth redirect |
 | Council deliberation | Ask question, receive streamed debate + verdict |
 | Knowledge base | Create KB, upload document, query with RAG |
 | Workflow builder | Create workflow, add nodes, execute |
 | Marketplace | Browse, install item, verify in account |
+
+---
+
+## Grafana Dashboards
+
+> **Priority: High** — Prometheus metrics are exported but no visualization layer yet.
+
+### Goals
+
+- Wire `prom-client` metrics to Grafana via Prometheus scraping
+- Create dashboards: request latency (p50/p95/p99), provider call duration, queue depth, active SSE connections, token usage per model
+- Set up alert rules: error rate spike, latency degradation, queue backlog
+- Add `docker-compose` services for Prometheus + Grafana (dev profile)
 
 ---
 
@@ -151,9 +176,9 @@ flowchart TB
 
 > **Priority: Medium** — Currently using RRF (Reciprocal Rank Fusion) only.
 
-### Planned
+### Goals
 
-- **Cohere rerank**: Integration with `rerank-english-v3.0` for hybrid search results (code exists in vectorStore.service.ts but needs the Cohere API key path)
+- **Cohere rerank**: Integration with `rerank-english-v3.0` for hybrid search results
 - **Cross-encoder reranking**: Fine-tuned model for domain-specific relevance scoring
 - **Dynamic k selection**: Automatically choose how many chunks to retrieve based on query complexity
 
@@ -163,11 +188,9 @@ flowchart TB
 
 > **Priority: Medium** — Currently single-user per session.
 
-### Vision
-
 ```mermaid
 flowchart LR
-    U1["User A"] --> WS["WebSocket Hub\nSocket.IO"]
+    U1["User A"] --> WS["WebSocket Hub\nNative ws"]
     U2["User B"] --> WS
     U3["User C"] --> WS
     WS --> COUNCIL["Shared Council\nSession"]
@@ -192,7 +215,7 @@ flowchart LR
 
 > **Priority: Low** — For third-party extensibility.
 
-### Planned Capabilities
+### Goals
 
 - **Custom tool types**: NPM package that registers new tools in the tool registry
 - **Custom workflow nodes**: Third-party node handlers with UI components
@@ -205,7 +228,7 @@ flowchart LR
 
 > **Priority: Low** — PWA covers basic mobile usage.
 
-### Planned
+### Goals
 
 - React Native client with shared API
 - Push notifications for research job completion, workflow results
@@ -257,7 +280,7 @@ flowchart TB
 
 > **Priority: Low** — Single-tenant architecture is sufficient for current use.
 
-### Planned
+### Goals
 
 - **Workspace isolation**: Separate data, configs, and billing per tenant
 - **Per-tenant quotas**: Token limits, storage limits, concurrent deliberation limits
@@ -265,6 +288,19 @@ flowchart TB
 - **Audit compliance**: SOC 2 logging format, data retention policies
 - **Data residency**: Ensure data stays in specific geographic regions
 - **SLA monitoring**: Uptime tracking, latency SLOs, automated alerting
+
+---
+
+## Remaining Express Routes
+
+> **Priority: Low** — Two routes remain on the Express compatibility layer.
+
+| Route | Reason | Path Forward |
+|---|---|---|
+| `ask.ts` | Complex SSE streaming + multiple middleware (optionalAuth, checkQuota, validate) | Convert to Fastify with `reply.raw` SSE pattern |
+| `uploads.ts` | Multer file upload middleware | Convert to `@fastify/multipart` |
+
+Both routes work correctly through `@fastify/express` — conversion is a cleanup task, not a functional requirement.
 
 ---
 

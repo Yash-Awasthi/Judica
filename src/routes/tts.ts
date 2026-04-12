@@ -1,6 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { env } from "../config/env.js";
+import { fastifyOptionalAuth } from "../middleware/fastifyAuth.js";
 import logger from "../lib/logger.js";
 
 const ttsSchema = z.object({
@@ -39,7 +40,7 @@ const ttsPlugin: FastifyPluginAsync = async (fastify) => {
    *       400:
    *         description: Missing or invalid text input
    */
-  fastify.post("/", async (request, reply) => {
+  fastify.post("/", { preHandler: fastifyOptionalAuth }, async (request, reply) => {
     const body = request.body as any;
     const rawInput = body.text || body.input;
     if (!rawInput) {

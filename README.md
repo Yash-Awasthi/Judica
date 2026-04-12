@@ -6,7 +6,7 @@
 
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18.3-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
-[![Express](https://img.shields.io/badge/Express-5.2-000000?style=for-the-badge&logo=express&logoColor=white)](https://expressjs.com/)
+[![Fastify](https://img.shields.io/badge/Fastify-5-000000?style=for-the-badge&logo=fastify&logoColor=white)](https://fastify.dev/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
@@ -78,7 +78,7 @@ sequenceDiagram
     V-->>U: Final Verdict + Confidence Score
 ```
 
-The pipeline scores each agent using `0.6 × Agreement + 0.4 × PeerRanking`, targets `≥ 0.85` consensus (cosine similarity), and weights synthesis by model reliability scores tracked across sessions.
+The pipeline scores each agent using `0.6 * Agreement + 0.4 * PeerRanking`, targets `>= 0.85` consensus (cosine similarity), and weights synthesis by model reliability scores tracked across sessions.
 
 ---
 
@@ -94,11 +94,11 @@ flowchart TB
         MK["Marketplace"]
     end
 
-    subgraph API["Express 5 API Layer"]
+    subgraph API["Fastify 5 API Layer"]
         direction LR
-        AUTH["Auth\nJWT + OAuth2"]
+        AUTH["Auth\nJWT + Refresh Tokens"]
         RATE["Rate Limiter\nRedis-backed"]
-        ROUTES["35 Route\nHandlers"]
+        ROUTES["35 Route\nPlugins"]
     end
 
     subgraph ENGINE["Deliberation Engine"]
@@ -124,7 +124,7 @@ flowchart TB
 
     subgraph DATA["Data Layer"]
         direction LR
-        PG["PostgreSQL 16\npgvector"]
+        PG["PostgreSQL 16\npgvector + HNSW"]
         RD["Redis 7\nCache + Queues"]
         BQ["BullMQ\nAsync Jobs"]
     end
@@ -153,7 +153,7 @@ flowchart TB
 Unified interface for OpenAI, Anthropic, Gemini, Groq, Ollama (local), OpenRouter, Mistral, Cerebras, and NVIDIA NIM. Add custom providers via UI — zero code changes.
 
 ### RAG Knowledge Bases
-pgvector embeddings, hybrid search (vector + BM25), document chunking, and multi-format ingestion (PDF, DOCX, XLSX, CSV, TXT, images). Attach knowledge bases to conversations for grounded responses.
+pgvector embeddings with HNSW indexes, hybrid search (vector + BM25), document chunking, and multi-format ingestion (PDF, DOCX, XLSX, CSV, TXT, images). Attach knowledge bases to conversations for grounded responses.
 
 ### Visual Workflow Engine
 Drag-and-drop builder with React Flow — 10+ node types (LLM, Tool, Condition, Loop, HTTP, Code, Human Gate). Server-side execution with real-time streaming.
@@ -162,7 +162,7 @@ Drag-and-drop builder with React Flow — 10+ node types (LLM, Tool, Condition, 
 Autonomous multi-step research: breaks queries into sub-questions, searches the web, scrapes sources, synthesizes answers, and produces cited reports. Async via BullMQ.
 
 ### Code Sandbox
-Isolated execution — JavaScript in `isolated-vm` (V8 isolate), Python in subprocess with timeout. Artifacts auto-detected from AI responses.
+Isolated execution — JavaScript in `isolated-vm` (V8 isolate, 128MB memory cap), Python in subprocess with ulimit constraints (256MB memory, 10s CPU, 32 process limit). Artifacts auto-detected from AI responses.
 
 ### Community Marketplace
 Publish and install prompts, workflows, personas, and tools. Star ratings, reviews, download tracking, one-click import.
@@ -171,7 +171,7 @@ Publish and install prompts, workflows, personas, and tools. Star ratings, revie
 Write Python functions that become tools during council deliberation. Sandboxed execution, dynamic registration.
 
 ### Observability + LLMOps
-Execution tracing with LangFuse export, model reliability scoring, analytics dashboard, per-query cost tracking with color-coded tiers.
+Prometheus metrics (latency histograms, provider call duration, queue depth, token usage), execution tracing with LangFuse export, model reliability scoring, analytics dashboard, per-query cost tracking with color-coded tiers.
 
 ### API Documentation
 Interactive Swagger UI at `/api/docs` with OpenAPI 3.0 spec. All 35 routes annotated with request/response schemas, auth requirements, and examples.
@@ -180,7 +180,7 @@ Interactive Swagger UI at `/api/docs` with OpenAPI 3.0 spec. All 35 routes annot
 Multi-provider TTS with automatic fallback (Xiaomi MiMo → CosyVoice → OpenAI). Speech-to-text input support.
 
 ### PII Detection & Redaction
-Client-side warning system with server-side PII scanning. Detects emails, phone numbers, SSNs, credit cards. One-click anonymization before sending to AI.
+Server-side PII scanning. Detects emails, phone numbers, SSNs, credit cards, API keys. Risk scoring with configurable enforcement.
 
 ### GitHub Intelligence
 Index repositories into the vector store. Code snippets are injected into council context for code-aware conversations.
@@ -188,8 +188,8 @@ Index repositories into the vector store. Code snippets are injected into counci
 ### 3-Layer Memory
 Active context, auto-generated session summaries, and long-term vector memory with compaction. Pluggable backends (pgvector, Qdrant, GetZep).
 
-### Auth + RBAC + Sharing
-JWT + OAuth2 (Google, GitHub), role-based access control, shareable conversations with expiry, admin dashboard.
+### Auth + Security
+JWT access tokens (15 min) with rotating refresh tokens (httpOnly cookie), argon2id password hashing (OWASP-recommended), OAuth2 (Google, GitHub), role-based access control, shareable conversations with expiry, admin dashboard.
 
 ### PWA + Offline
 Workbox service worker, IndexedDB conversation caching, NetworkFirst API strategy.
@@ -200,20 +200,20 @@ Workbox service worker, IndexedDB conversation caching, NetworkFirst API strateg
 
 | Layer | Technology | Purpose |
 |---|---|---|
-| **Runtime** | Node.js 20+, TypeScript 5.9 | Server + type safety |
-| **API** | Express 5.2 | HTTP layer, 35 route handlers |
+| **Runtime** | Node.js 22 LTS, TypeScript 5.9 | Server + type safety |
+| **API** | Fastify 5 | HTTP layer, 35 native route plugins |
 | **Frontend** | React 18, Vite 6, Tailwind CSS | SPA with hot reload |
-| **Database** | PostgreSQL 16 + pgvector | Relational data + vector embeddings |
+| **Database** | PostgreSQL 16 + pgvector (HNSW) | Relational data + vector embeddings |
 | **Cache / Queues** | Redis 7, BullMQ | Semantic cache, rate limiting, async jobs |
-| **ORM** | Prisma 7.6 | Schema management, migrations, type-safe queries |
-| **Realtime** | Socket.IO | WebSocket streaming for deliberation events |
-| **Auth** | JWT, Passport (Google, GitHub OAuth2) | Authentication + session management |
-| **Encryption** | AES-256-GCM, bcrypt | API key vault, password hashing |
-| **Observability** | Pino, LangFuse (optional) | Structured logging, LLM tracing |
+| **ORM** | Drizzle ORM | Type-safe SQL query builder, full SQL control |
+| **Realtime** | ws (native WebSocket) | WebSocket streaming for deliberation events |
+| **Auth** | JWT + rotating refresh tokens, Passport (Google, GitHub OAuth2) | Authentication + session management |
+| **Encryption** | AES-256-GCM, argon2id | API key vault, password hashing (OWASP-compliant) |
+| **Observability** | Pino, Prometheus (prom-client), LangFuse (optional) | Structured logging, metrics, LLM tracing |
 | **Workflow UI** | XYFlow (React Flow) | Visual drag-and-drop workflow builder |
 | **Code Editor** | Monaco Editor | In-browser prompt and code editing |
-| **Charts** | Recharts | Analytics and evaluation dashboards |
-| **Sandbox** | isolated-vm, Python subprocess | Secure code execution (JS + Python) |
+| **Charts** | Apache ECharts | Analytics and evaluation dashboards |
+| **Sandbox** | isolated-vm (128MB cap), Python subprocess (ulimit) | Secure code execution (JS + Python) |
 | **Infrastructure** | Docker, GitHub Actions CI | Containerized deployment, automated testing |
 
 ### Supported LLM Providers
@@ -245,7 +245,7 @@ cd frontend && npm install && cd ..
 cp .env.example .env
 # Add DATABASE_URL, JWT_SECRET, MASTER_ENCRYPTION_KEY, and at least one AI provider key
 
-npx prisma generate && npx prisma migrate dev --name init
+npx drizzle-kit push
 npm run dev:all
 ```
 

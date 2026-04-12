@@ -30,7 +30,7 @@
 
 ### Prerequisites
 
-- **Node.js** >= 20.0.0
+- **Node.js** >= 22.0.0 (LTS)
 - **PostgreSQL** 16 with the [pgvector](https://github.com/pgvector/pgvector) extension
 - **Redis** 7+
 - At least one AI provider API key (OpenAI, Anthropic, or Google)
@@ -52,9 +52,8 @@ cd frontend && npm install && cd ..
 cp .env.example .env
 # Edit .env — add your API keys, DATABASE_URL, and JWT_SECRET
 
-# Generate Prisma client and run migrations
-npx prisma generate
-npx prisma migrate dev --name init
+# Push database schema
+npx drizzle-kit push
 
 # Start both backend and frontend
 npm run dev:all
@@ -75,10 +74,9 @@ The backend runs on **http://localhost:3000** and the frontend on **http://local
 | `npm test` | Vitest single run |
 | `npm run test:watch` | Vitest watch mode |
 | `npm run benchmark` | Run performance benchmarks (autocannon) |
-| `npm run db:migrate` | Prisma dev migration |
-| `npm run db:migrate:prod` | Prisma production migration |
-| `npm run db:generate` | Generate Prisma client |
-| `npm run db:studio` | Open Prisma Studio GUI |
+| `npm run db:push` | Push Drizzle schema to database |
+| `npm run db:generate` | Generate Drizzle types |
+| `npm run db:studio` | Open Drizzle Studio GUI |
 
 ---
 
@@ -144,7 +142,7 @@ At least one is required. The system logs a warning at startup if none are prese
 | `LANGFUSE_PUBLIC_KEY` | LangFuse trace export (public) |
 | `SYSTEM_PROMPT` | Global system prompt override |
 | `ALLOWED_ORIGINS` | Comma-separated CORS origins |
-| `TRUST_PROXY` | Express trust proxy setting |
+| `TRUST_PROXY` | Fastify trust proxy setting |
 | `FRONTEND_URL` | Frontend URL for redirects |
 
 ---
@@ -453,9 +451,11 @@ aibyai/
 │   │   ├── realtimeCost.ts    # Live cost calculation
 │   │   ├── cache.ts           # Semantic response caching
 │   │   ├── redis.ts           # Redis client setup
-│   │   ├── db.ts              # Prisma client + connection pool
+│   │   ├── db.ts              # PostgreSQL connection pool
+│   │   ├── drizzle.ts         # Drizzle ORM client
 │   │   ├── logger.ts          # Pino logger
-│   │   ├── socket.ts          # WebSocket setup
+│   │   ├── prometheusMetrics.ts # Prometheus counters + histograms
+│   │   ├── socket.ts          # WebSocket setup (native ws)
 │   │   ├── crypto.ts          # AES-256-GCM encryption
 │   │   ├── pii.ts             # PII detection + masking
 │   │   ├── sweeper.ts         # Background maintenance
@@ -468,8 +468,9 @@ aibyai/
 │   │   │   └── read_webpage.ts # Web scraping
 │   │   └── ...                # breaker, retry, metrics, audit, etc.
 │   │
-│   ├── middleware/            # Express middleware (10 files)
-│   │   ├── auth.ts            # JWT verification + optional auth
+│   ├── middleware/            # Fastify + Express middleware (10 files)
+│   │   ├── auth.ts            # Express JWT verification (legacy routes)
+│   │   ├── fastifyAuth.ts     # Fastify JWT preHandlers (requireAuth, optionalAuth)
 │   │   ├── rbac.ts            # Role-based access control
 │   │   ├── rateLimit.ts       # Redis-backed rate limiting
 │   │   ├── limiter.ts         # Per-user rate limiting
@@ -497,7 +498,7 @@ aibyai/
 │   │   ├── queues.ts          # Queue definitions
 │   │   └── workers.ts         # Workers (ingestion, research, repo, compaction)
 │   │
-│   ├── routes/                # Express route handlers (33 files)
+│   ├── routes/                # Fastify route plugins (33 files)
 │   │   ├── ask.ts             # Council deliberation endpoint
 │   │   ├── auth.ts            # Authentication + OAuth
 │   │   ├── history.ts         # Conversation history
@@ -625,13 +626,13 @@ aibyai/
 └── package.json               # Dependencies + scripts
 ```
 
-**By the numbers:** 178 backend TypeScript files, 57 frontend React files, 39 Prisma models, 33 API routes, 16 services, 10 middleware, 9 document processors, 9 LLM provider adapters, 10 workflow node types.
+**By the numbers:** 178 backend TypeScript files, 57 frontend React files, 39 Drizzle schema tables, 33 API routes, 16 services, 10 middleware, 9 document processors, 9 LLM provider adapters, 10 workflow node types.
 
 ---
 
 ## Database Schema
 
-39 Prisma models across these domains:
+39 Drizzle schema tables across these domains:
 
 ```mermaid
 erDiagram
@@ -717,15 +718,15 @@ Configuration (`ecosystem.config.cjs`):
 
 ```bash
 npm run build
-npx prisma migrate deploy
+npx drizzle-kit push
 NODE_ENV=production node dist/index.js
 ```
 
 ### Dockerfile
 
 Multi-stage build:
-1. **Builder:** Installs deps, generates Prisma, compiles TypeScript + React
-2. **Runner:** Production deps only, non-root user, exposes port 3000
+1. **Builder:** Installs deps, compiles TypeScript + React
+2. **Runner:** Production deps only, non-root user, Node.js 22 LTS, exposes port 3000
 
 ### Nginx + SSL Reverse Proxy
 
@@ -1081,13 +1082,15 @@ Workers are defined in `src/queue/workers.ts` and started automatically with the
 
 | Layer | Implementation |
 |---|---|
-| **Authentication** | JWT (HS256) with configurable expiry. OAuth2 via Passport (Google, GitHub). |
+| **Authentication** | JWT access tokens (15 min, HS256) + rotating refresh tokens (7 day, httpOnly cookie). OAuth2 via Passport (Google, GitHub). |
+| **Password Hashing** | argon2id (OWASP-recommended, memory-hard). Legacy bcrypt hashes transparently re-hashed on login. |
 | **Authorization** | RBAC middleware: `admin`, `member`, `viewer` roles. Ownership checks on mutations. |
 | **Encryption** | AES-256-GCM for secrets at rest (provider keys, memory backend configs). scryptSync key derivation. |
 | **Rate Limiting** | Redis-backed sliding window. Per-user and per-endpoint limits. |
-| **Input Validation** | Zod schemas for all request bodies (`src/middleware/validate.ts`). |
-| **Headers** | Helmet.js (CSP with nonce, HSTS, X-Frame-Options, etc.) |
-| **PII** | Automatic PII detection before sending to AI providers. |
+| **Input Validation** | Zod schemas for all request bodies. Fastify preHandler validation. |
+| **Sandbox** | JS: isolated-vm with 128MB memory cap. Python: ulimit (256MB memory, 10s CPU, 32 procs). |
+| **Headers** | CSP with nonces, HSTS, X-Frame-Options. |
+| **PII** | Automatic PII detection with risk scoring before sending to AI providers. |
 | **CORS** | Whitelist-based origin validation. |
 | **SSRF** | URL validation preventing internal network access (`src/lib/ssrf.ts`). |
 | **Secrets** | No API keys in logs or responses. All encrypted in database. |
@@ -1112,8 +1115,8 @@ npm run test:watch
 # Run benchmarks
 npm run benchmark
 
-# Open Prisma Studio (database GUI)
-npm run db:studio
+# Open Drizzle Studio (database GUI)
+npx drizzle-kit studio
 ```
 
 ### CI Pipeline

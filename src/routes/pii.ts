@@ -1,8 +1,6 @@
 import { FastifyPluginAsync } from "fastify";
-import { Response } from "express";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
-import { AuthRequest } from "../types/index.js";
-import { detectPII, type PIIDetection } from "../lib/pii.js";
+import { detectPII } from "../lib/pii.js";
 import logger from "../lib/logger.js";
 import { AppError } from "../middleware/errorHandler.js";
 
@@ -125,57 +123,5 @@ const piiPlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 };
-
-export function piiEnforcementMiddleware(
-  req: AuthRequest,
-  res: Response,
-  next: () => void
-) {
-  const question = req.body?.question || req.body?.prompt;
-
-  if (!question || typeof question !== "string") {
-    return next();
-  }
-
-  const detection = detectPII(question);
-
-  if (detection.found) {
-    const riskScore = detection.types.reduce((score: number, type: string) => {
-      const weights: Record<string, number> = {
-        email: 30, phone: 40, ssn: 100, credit_card: 90, bank_account: 90,
-        passport: 80, apiKey: 80, ip_address: 20,
-      };
-      return score + (weights[type] || 10);
-    }, detection.riskScore);
-
-    if (riskScore >= 70) {
-      logger.warn({
-        userId: req.userId,
-        types: detection.types,
-        riskScore
-      }, "Request blocked due to high-risk PII");
-
-      return res.status(400).json({
-        error: "High-risk PII detected",
-        types: detection.types,
-        riskScore,
-        message: "Request blocked. Please remove sensitive information or use the anonymized version.",
-        anonymized: detection.anonymized,
-      });
-    }
-
-    if (riskScore >= 30) {
-      logger.info({
-        userId: req.userId,
-        types: detection.types,
-        riskScore
-      }, "Medium-risk PII detected, allowing with warning");
-
-      (req as AuthRequest & { piiWarning?: PIIDetection }).piiWarning = detection;
-    }
-  }
-
-  next();
-}
 
 export default piiPlugin;

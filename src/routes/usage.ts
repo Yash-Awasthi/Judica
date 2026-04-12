@@ -86,7 +86,7 @@ import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
  *       401:
  *         description: Unauthorized
  */
-const usageRoutes: FastifyPluginAsync = async (fastify) => {
+const usagePlugin: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     "/",
     { preHandler: fastifyRequireAuth },
@@ -182,4 +182,4 @@ const usageRoutes: FastifyPluginAsync = async (fastify) => {
   );
 };
 
-export default usageRoutes;
+export default usagePlugin;
