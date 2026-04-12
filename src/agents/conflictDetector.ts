@@ -20,13 +20,36 @@ export interface Conflict {
   severity: number; // 1-5
 }
 
+/**
+ * Sanitize user/agent text before interpolation into LLM prompts.
+ * Escapes prompt-injection-prone patterns: system instructions,
+ * role-play markers, XML/HTML tags, and markdown code fences.
+ */
+function sanitizeForPrompt(text: string): string {
+  let sanitized = text;
+  // Strip XML/HTML-style tags that could be interpreted as prompt structure
+  sanitized = sanitized.replace(/<\/?[a-zA-Z][^>]*>/g, (match) => `[tag:${match.replace(/[<>]/g, "")}]`);
+  // Neutralize role-play markers (e.g., "System:", "Assistant:", "User:")
+  sanitized = sanitized.replace(/\b(system|assistant|user|human)\s*:/gi, (match, role) => `${role} -`);
+  // Escape markdown code fences and backticks
+  sanitized = sanitized.replace(/`/g, "'");
+  // Escape double quotes
+  sanitized = sanitized.replace(/"/g, "'");
+  // Neutralize common prompt injection phrases
+  sanitized = sanitized.replace(/ignore\s+(all\s+)?previous\s+instructions/gi, "[filtered]");
+  sanitized = sanitized.replace(/you\s+are\s+now\b/gi, "[filtered]");
+  sanitized = sanitized.replace(/\bdo\s+not\s+follow\b/gi, "[filtered]");
+  return sanitized;
+}
+
 async function extractClaims(agentId: string, text: string): Promise<Claim[]> {
+  const sanitized = sanitizeForPrompt(text.substring(0, 2000));
   const result = await routeAndCollect({
     model: "auto",
     messages: [
       {
         role: "user",
-        content: `Extract 3-5 factual claims from this text as a JSON array of strings. Only return the JSON array, no other text.\n\nText: "${text.substring(0, 2000)}"`,
+        content: `Extract 3-5 factual claims from this text as a JSON array of strings. Only return the JSON array, no other text.\n\n<agent_text>${sanitized}</agent_text>`,
       },
     ],
     temperature: 0,
@@ -53,10 +76,10 @@ async function compareClaimSets(
   const prompt = `Compare these two sets of claims and identify any contradictions.
 
 Claims from Agent A:
-${claimsA.map((c) => `- ${c.claim}`).join("\n")}
+${claimsA.map((c) => `- ${sanitizeForPrompt(c.claim)}`).join("\n")}
 
 Claims from Agent B:
-${claimsB.map((c) => `- ${c.claim}`).join("\n")}
+${claimsB.map((c) => `- ${sanitizeForPrompt(c.claim)}`).join("\n")}
 
 Return a JSON array of contradictions. If none, return [].
 Format: [{ "claim_a": "...", "claim_b": "...", "contradiction_type": "factual"|"opinion"|"method", "severity": 1-5 }]

@@ -40,6 +40,8 @@ export function SkillsView() {
         const data = await res.json();
         setSkills(data.skills);
       }
+    } catch (err) {
+      console.error("Failed to load skills", err);
     } finally {
       setLoading(false);
     }
@@ -106,24 +108,32 @@ export function SkillsView() {
 
   const handleDelete = useCallback(async (id: string) => {
     if (!confirm("Delete this skill?")) return;
-    await fetchWithAuth(`/api/skills/${id}`, { method: "DELETE" });
-    setSkills((prev) => prev.filter((s) => s.id !== id));
-    if (selectedId === id) {
-      setSelectedId(null);
-      setName(""); setDescription(""); setCode(""); setParameters("{}");
-      setIsNew(false);
+    try {
+      await fetchWithAuth(`/api/skills/${id}`, { method: "DELETE" });
+      setSkills((prev) => prev.filter((s) => s.id !== id));
+      if (selectedId === id) {
+        setSelectedId(null);
+        setName(""); setDescription(""); setCode(""); setParameters("{}");
+        setIsNew(false);
+      }
+    } catch (err) {
+      console.error("Failed to delete skill", err);
     }
   }, [fetchWithAuth, selectedId]);
 
   const handleToggle = useCallback(async (skill: Skill) => {
-    const res = await fetchWithAuth(`/api/skills/${skill.id}`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ active: !skill.active }),
-    });
-    if (res.ok) {
-      const updated = await res.json();
-      setSkills((prev) => prev.map((s) => s.id === updated.id ? updated : s));
+    try {
+      const res = await fetchWithAuth(`/api/skills/${skill.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: !skill.active }),
+      });
+      if (res.ok) {
+        const updated = await res.json();
+        setSkills((prev) => prev.map((s) => s.id === updated.id ? updated : s));
+      }
+    } catch (err) {
+      console.error("Failed to toggle skill", err);
     }
   }, [fetchWithAuth]);
 

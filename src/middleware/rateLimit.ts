@@ -16,16 +16,17 @@ const commonHandler = (req: Request, res: Response, _next: NextFunction, options
 
 // Redis-backed store for clustered/multi-instance deployments
 let redisStore: RedisStore | undefined;
+let rateLimitRedisClient: any;
 try {
-  const redisClient = new (IORedis as any)(env.REDIS_URL || "redis://localhost:6379", {
+  rateLimitRedisClient = new (IORedis as any)(env.REDIS_URL || "redis://localhost:6379", {
     maxRetriesPerRequest: null,
     enableOfflineQueue: false,
     lazyConnect: true,
   });
-  redisClient.connect().catch(() => {});
+  rateLimitRedisClient.connect().catch(() => {});
 
   redisStore = new RedisStore({
-    sendCommand: (...args: string[]) => redisClient.call(...args) as any,
+    sendCommand: (...args: string[]) => rateLimitRedisClient.call(...args) as any,
     prefix: "rl:",
   });
 } catch {
@@ -42,7 +43,7 @@ const userKeyGenerator = (req: any) => {
 
 export const askLimiter = rateLimit({
   windowMs: env.RATE_LIMIT_WINDOW_MS,
-  max: 1000,
+  max: 60,
   keyGenerator: userKeyGenerator,
   message: { error: "Too many requests, slow down." },
   standardHeaders: true,
@@ -52,9 +53,12 @@ export const askLimiter = rateLimit({
   ...(redisStore ? { store: redisStore } : {}),
 });
 
+// SEC-5: Auth limiter set to 10/min to prevent brute-force credential stuffing.
+// This is deliberately low because legitimate users rarely need more than a few
+// auth attempts per minute. Failed attempts still count toward the limit.
 export const authLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
-  max: 1000,
+  max: 10,
   keyGenerator: userKeyGenerator,
   message: { error: "Too many auth attempts, try again later." },
   standardHeaders: true,
@@ -99,3 +103,11 @@ export const voiceLimiter = rateLimit({
   validate: { keyGeneratorIpFallback: false },
   ...(redisStore ? { store: redisStore } : {}),
 });
+
+export async function cleanupRateLimitRedis(): Promise<void> {
+  if (rateLimitRedisClient) {
+    try {
+      await rateLimitRedisClient.quit();
+    } catch { /* ignore */ }
+  }
+}

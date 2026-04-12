@@ -34,12 +34,20 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
           <p className="text-white/40 mb-6 max-w-sm text-sm leading-relaxed">
             {this.state.error?.message || "An unexpected error occurred."}
           </p>
-          <button
-            onClick={() => window.location.reload()}
-            className="px-6 py-2.5 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all text-white/70 text-sm font-medium"
-          >
-            Reload page
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={() => this.setState({ hasError: false, error: undefined })}
+              className="px-6 py-2.5 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all text-white/70 text-sm font-medium"
+            >
+              Try again
+            </button>
+            <button
+              onClick={() => window.location.reload()}
+              className="px-6 py-2.5 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-all text-white/70 text-sm font-medium"
+            >
+              Reload page
+            </button>
+          </div>
         </div>
       );
     }

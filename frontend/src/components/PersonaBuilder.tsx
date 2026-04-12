@@ -95,8 +95,12 @@ export function PersonaBuilder({ onSelect }: PersonaBuilderProps) {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this persona?")) return;
-    await fetchWithAuth(`/api/personas/${id}`, { method: "DELETE" });
-    loadPersonas();
+    try {
+      await fetchWithAuth(`/api/personas/${id}`, { method: "DELETE" });
+      loadPersonas();
+    } catch (err) {
+      console.error("Failed to delete persona", err);
+    }
   };
 
   const builtIn = personas.filter((p) => p.isBuiltIn);
@@ -105,7 +109,7 @@ export function PersonaBuilder({ onSelect }: PersonaBuilderProps) {
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h3 className="font-semibold text-gray-800">Personas</h3>
+        <h3 className="font-semibold text-[var(--text-primary)]">Personas</h3>
         <button
           onClick={() => { resetForm(); setShowForm(true); }}
           className="flex items-center gap-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"

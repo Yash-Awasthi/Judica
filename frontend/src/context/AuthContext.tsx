@@ -32,7 +32,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           method: "POST",
           headers: { Authorization: `Bearer ${currentToken}` }
         });
-      } catch (err) {
+      } catch (err: unknown) {
         console.error("Logout request failed", err);
       }
     }
@@ -62,25 +62,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
       const err = await res.json().catch(() => ({ error: "Login failed" }));
       throw new Error(err.error || "Login failed");
-    } catch (err: any) {
-      // If it looks like a direct token call (non-email string), fall back to token-based login
-      if (!emailOrToken.includes("@")) {
-        tokenRef.current = emailOrToken;
-        setToken(emailOrToken);
-        setUser(passwordOrUsername);
-        localStorage.setItem("council_token", emailOrToken);
-        localStorage.setItem("council_user", passwordOrUsername);
-        return;
-      }
-      throw err;
+    } catch (err: unknown) {
+      throw err instanceof Error ? err : new Error(String(err));
     }
   }, []);
 
-  const register = useCallback(async (username: string, _email: string, password: string) => {
+  const register = useCallback(async (username: string, email: string, password: string) => {
     const res = await fetch("/api/auth/register", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
+      body: JSON.stringify({ username, email, password }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: "Registration failed" }));

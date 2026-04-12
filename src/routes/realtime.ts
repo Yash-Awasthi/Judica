@@ -3,7 +3,6 @@ import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { realTimeCostTracker } from "../lib/realtimeCost.js";
 import { env } from "../config/env.js";
 import { WebSocketServer, WebSocket } from "ws";
-import { createServer } from "http";
 import logger from "../lib/logger.js";
 import { AppError } from "../middleware/errorHandler.js";
 import jwt from "jsonwebtoken";
@@ -12,74 +11,68 @@ interface CostSocket extends WebSocket {
   userId?: number;
 }
 
-const httpServer = createServer();
-const wss = new WebSocketServer({ server: httpServer });
+const realtimePlugin: FastifyPluginAsync = async (fastify) => {
+  const wss = new WebSocketServer({ server: fastify.server });
 
-const connectedUsers = new Map<number, string>();
+  wss.on('connection', (ws: CostSocket) => {
+    logger.info("User connected to real-time cost tracking");
 
-wss.on('connection', (ws: CostSocket) => {
-  logger.info("User connected to real-time cost tracking");
+    ws.on('message', (raw) => {
+      try {
+        const msg = JSON.parse(raw.toString());
 
-  ws.on('message', (raw) => {
-    try {
-      const msg = JSON.parse(raw.toString());
-
-      if (msg.type === 'authenticate') {
-        // Verify JWT token instead of trusting client-provided userId
-        if (!msg.token) {
-          ws.send(JSON.stringify({ event: 'error', data: { message: 'Authentication token required' } }));
-          return;
-        }
-        try {
-          const payload = jwt.verify(msg.token, env.JWT_SECRET) as any;
-          const userId = payload.userId || payload.id || payload.sub;
-          if (!userId) {
-            ws.send(JSON.stringify({ event: 'error', data: { message: 'Invalid token: no userId' } }));
+        if (msg.type === 'authenticate') {
+          // Verify JWT token instead of trusting client-provided userId
+          if (!msg.token) {
+            ws.send(JSON.stringify({ event: 'error', data: { message: 'Authentication token required' } }));
             return;
           }
-          connectedUsers.set(userId, '');
-          ws.userId = userId;
+          try {
+            const payload = jwt.verify(msg.token, env.JWT_SECRET, { algorithms: ['HS256'] }) as any;
+            const userId = payload.userId || payload.id || payload.sub;
+            if (!userId) {
+              ws.send(JSON.stringify({ event: 'error', data: { message: 'Invalid token: no userId' } }));
+              return;
+            }
+            ws.userId = userId;
 
-          const costData = realTimeCostTracker.getRealTimeData(userId);
+            const costData = realTimeCostTracker.getRealTimeData(userId);
+            if (costData) {
+              ws.send(JSON.stringify({ event: 'cost-update', data: costData }));
+            }
+
+            realTimeCostTracker.onAlert(userId, (alerts) => {
+              if (ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ event: 'cost-alert', data: { alerts, timestamp: new Date() } }));
+              }
+            });
+
+            logger.info({ userId }, "User authenticated for real-time updates");
+          } catch (err) {
+            ws.send(JSON.stringify({ event: 'error', data: { message: 'Invalid or expired token' } }));
+          }
+        } else if (msg.type === 'request-cost-data' && ws.userId) {
+          const costData = realTimeCostTracker.getRealTimeData(ws.userId);
           if (costData) {
             ws.send(JSON.stringify({ event: 'cost-update', data: costData }));
           }
-
-          realTimeCostTracker.onAlert(userId, (alerts) => {
-            if (ws.readyState === WebSocket.OPEN) {
-              ws.send(JSON.stringify({ event: 'cost-alert', data: { alerts, timestamp: new Date() } }));
-            }
-          });
-
-          logger.info({ userId }, "User authenticated for real-time updates");
-        } catch (err) {
-          ws.send(JSON.stringify({ event: 'error', data: { message: 'Invalid or expired token' } }));
+        } else if (msg.type === 'set-limits' && ws.userId) {
+          realTimeCostTracker.setLimits(ws.userId, msg.dailyLimit, msg.monthlyLimit);
+        } else if (msg.type === 'get-statistics' && ws.userId) {
+          const stats = realTimeCostTracker.getStatistics(ws.userId, msg.hours);
+          ws.send(JSON.stringify({ event: 'statistics-update', data: stats }));
         }
-      } else if (msg.type === 'request-cost-data' && ws.userId) {
-        const costData = realTimeCostTracker.getRealTimeData(ws.userId);
-        if (costData) {
-          ws.send(JSON.stringify({ event: 'cost-update', data: costData }));
-        }
-      } else if (msg.type === 'set-limits' && ws.userId) {
-        realTimeCostTracker.setLimits(ws.userId, msg.dailyLimit, msg.monthlyLimit);
-      } else if (msg.type === 'get-statistics' && ws.userId) {
-        const stats = realTimeCostTracker.getStatistics(ws.userId, msg.hours);
-        ws.send(JSON.stringify({ event: 'statistics-update', data: stats }));
+      } catch {
+        // Ignore invalid messages
       }
-    } catch {
-      // Ignore invalid messages
-    }
-  });
+    });
 
-  ws.on('close', () => {
-    if (ws.userId) {
-      connectedUsers.delete(ws.userId);
-      logger.info({ userId: ws.userId }, "User disconnected from real-time updates");
-    }
+    ws.on('close', () => {
+      if (ws.userId) {
+        logger.info({ userId: ws.userId }, "User disconnected from real-time updates");
+      }
+    });
   });
-});
-
-const realtimePlugin: FastifyPluginAsync = async (fastify) => {
   fastify.post("/session/start", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     try {
       const { sessionId, conversationId } = request.body as { sessionId?: string; conversationId?: string };
@@ -174,7 +167,5 @@ const realtimePlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 };
-
-export { wss, httpServer };
 
 export default realtimePlugin;

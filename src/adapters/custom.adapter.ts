@@ -7,6 +7,7 @@ import type {
 import { createStreamResult } from "./types.js";
 import { decrypt } from "../lib/crypto.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
+import { getBreaker } from "../lib/breaker.js";
 import logger from "../lib/logger.js";
 
 export interface CustomProviderConfig {
@@ -67,8 +68,9 @@ export class CustomAdapter implements IProviderAdapter {
     // Build URL
     let url = `${baseUrl}/chat/completions`;
     if (this.config.auth_type === "api_key_query") {
-      // Pass API key as header instead of URL query to avoid log exposure
-      headers["X-API-Key"] = apiKey;
+      const urlObj = new URL(url);
+      urlObj.searchParams.set("api_key", apiKey);
+      url = urlObj.toString();
     }
 
     // Build OpenAI-compatible request body
@@ -90,12 +92,16 @@ export class CustomAdapter implements IProviderAdapter {
       body.tool_choice = "auto";
     }
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(body),
-      signal: AbortSignal.timeout(60000),
-    });
+    const fetchCustom = async () =>
+      fetch(url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(60000),
+      });
+
+    const breaker = getBreaker({ name: this.providerId } as any, fetchCustom);
+    const res: Response = await breaker.fire();
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -208,11 +214,29 @@ export class CustomAdapter implements IProviderAdapter {
       const apiKey = this.getApiKey();
       const headers: Record<string, string> = {};
 
-      if (this.config.auth_type === "bearer") {
-        headers["Authorization"] = `Bearer ${apiKey}`;
+      // Apply auth based on auth_type (not just bearer)
+      switch (this.config.auth_type) {
+        case "bearer":
+          headers["Authorization"] = `Bearer ${apiKey}`;
+          break;
+        case "api_key_header":
+          headers[this.config.auth_header_name || "X-API-Key"] = apiKey;
+          break;
+        case "basic":
+          headers["Authorization"] = `Basic ${Buffer.from(apiKey).toString("base64")}`;
+          break;
+        // api_key_query handled below
       }
 
-      const res = await fetch(`${baseUrl}/models`, {
+      // SSRF validation
+      await validateSafeUrl(`${baseUrl}/models`);
+
+      const url = new URL(`${baseUrl}/models`);
+      if (this.config.auth_type === "api_key_query") {
+        url.searchParams.set("api_key", apiKey);
+      }
+
+      const res = await fetch(url.toString(), {
         headers,
         signal: AbortSignal.timeout(5000),
       });

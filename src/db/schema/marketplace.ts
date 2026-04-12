@@ -8,6 +8,7 @@ import {
   index,
   primaryKey,
 } from "drizzle-orm/pg-core";
+import { users } from "./users.js";
 
 // ─── MarketplaceItem ─────────────────────────────────────────────────────────
 export const marketplaceItems = pgTable(
@@ -18,7 +19,9 @@ export const marketplaceItems = pgTable(
     name: text("name").notNull(),
     description: text("description").notNull(),
     content: jsonb("content").notNull(),
-    authorId: text("authorId").notNull(),
+    authorId: integer("authorId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     authorName: text("authorName").notNull(),
     tags: text("tags").array().notNull(),
     downloads: integer("downloads").default(0).notNull(),
@@ -42,7 +45,9 @@ export const marketplaceReviews = pgTable(
     itemId: text("itemId")
       .notNull()
       .references(() => marketplaceItems.id, { onDelete: "cascade" }),
-    userId: text("userId").notNull(),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     rating: integer("rating").notNull(),
     comment: text("comment"),
     createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
@@ -56,8 +61,12 @@ export const marketplaceReviews = pgTable(
 export const marketplaceStars = pgTable(
   "MarketplaceStar",
   {
-    userId: text("userId").notNull(),
-    itemId: text("itemId").notNull(),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    itemId: text("itemId")
+      .notNull()
+      .references(() => marketplaceItems.id, { onDelete: "cascade" }),
   },
   (table) => [primaryKey({ columns: [table.userId, table.itemId] })],
 );
@@ -67,7 +76,9 @@ export const userSkills = pgTable(
   "UserSkill",
   {
     id: text("id").primaryKey(),
-    userId: text("userId").notNull(),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     description: text("description").notNull(),
     code: text("code").notNull(),

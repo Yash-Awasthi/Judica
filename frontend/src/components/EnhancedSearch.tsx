@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 interface SearchResult {
@@ -25,7 +25,7 @@ interface SearchFilters {
 }
 
 export const EnhancedSearch: React.FC = () => {
-  const { user } = useAuth();
+  const { user, fetchWithAuth } = useAuth();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -40,7 +40,7 @@ export const EnhancedSearch: React.FC = () => {
     totalPages: 0
   });
 
-  const performSearch = async (page = 1) => {
+  const performSearch = useCallback(async (page = 1) => {
     if (!query.trim() || !user) return;
 
     setLoading(true);
@@ -58,9 +58,9 @@ export const EnhancedSearch: React.FC = () => {
       if (filters.conversationId) params.append('filters', JSON.stringify({ conversationId: filters.conversationId }));
       if (filters.hasOpinions !== undefined) params.append('filters', JSON.stringify({ hasOpinions: filters.hasOpinions }));
 
-      const response = await fetch(`/api/history/search?${params}`);
+      const response = await fetchWithAuth(`/api/history/search?${params}`);
       const data = await response.json();
-      
+
       setResults(data.data);
       setPagination({
         page,
@@ -73,12 +73,17 @@ export const EnhancedSearch: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [query, user, filters, pagination.limit]);
+
+  const performSearchRef = useRef(performSearch);
+  useEffect(() => {
+    performSearchRef.current = performSearch;
+  }, [performSearch]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (query.trim()) {
-        performSearch(1);
+        performSearchRef.current(1);
       } else {
         setResults([]);
       }

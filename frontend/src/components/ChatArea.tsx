@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from "react";
+import { useReducer, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Settings2, Download, FileText, FileJson } from "lucide-react";
 import { MessageList } from "./MessageList.js";
@@ -31,6 +31,41 @@ const MEMBER_COLORS = [
   { bg: "#f472b6", shadow: "rgba(244,114,182,0.3)" },
 ];
 
+interface ChatAreaState {
+  input: string;
+  summon: string;
+  rounds: number;
+  useStream: boolean;
+  showExport: boolean;
+  showMemberConfig: boolean;
+  playingAudioId: string | null;
+  visibleKeyIds: Record<string, boolean>;
+}
+
+type ChatAreaAction =
+  | { type: "SET_INPUT"; payload: string }
+  | { type: "SET_SUMMON"; payload: string }
+  | { type: "SET_ROUNDS"; payload: number }
+  | { type: "SET_USE_STREAM"; payload: boolean }
+  | { type: "SET_SHOW_EXPORT"; payload: boolean }
+  | { type: "SET_SHOW_MEMBER_CONFIG"; payload: boolean }
+  | { type: "SET_PLAYING_AUDIO_ID"; payload: string | null }
+  | { type: "SET_VISIBLE_KEY_IDS"; payload: Record<string, boolean> };
+
+function chatAreaReducer(state: ChatAreaState, action: ChatAreaAction): ChatAreaState {
+  switch (action.type) {
+    case "SET_INPUT": return { ...state, input: action.payload };
+    case "SET_SUMMON": return { ...state, summon: action.payload };
+    case "SET_ROUNDS": return { ...state, rounds: action.payload };
+    case "SET_USE_STREAM": return { ...state, useStream: action.payload };
+    case "SET_SHOW_EXPORT": return { ...state, showExport: action.payload };
+    case "SET_SHOW_MEMBER_CONFIG": return { ...state, showMemberConfig: action.payload };
+    case "SET_PLAYING_AUDIO_ID": return { ...state, playingAudioId: action.payload };
+    case "SET_VISIBLE_KEY_IDS": return { ...state, visibleKeyIds: action.payload };
+    default: return state;
+  }
+}
+
 export function ChatArea({
   messages,
   isStreaming,
@@ -43,14 +78,29 @@ export function ChatArea({
   onUpdateMembers,
   isLoading = false
 }: ChatAreaProps) {
-  const [input, setInput] = useState("");
-  const [summon, setSummon] = useState(defaultSummon);
-  const [rounds, setRounds] = useState(3);
-  const [useStream, setUseStream] = useState(true);
-  const [showExport, setShowExport] = useState(false);
-  const [showMemberConfig, setShowMemberConfig] = useState(false);
-  const [playingAudioId, setPlayingAudioId] = useState<string | null>(null);
-  const [visibleKeyIds, setVisibleKeyIds] = useState<Record<string, boolean>>({});
+  const [state, dispatch] = useReducer(chatAreaReducer, {
+    input: "",
+    summon: defaultSummon,
+    rounds: 3,
+    useStream: true,
+    showExport: false,
+    showMemberConfig: false,
+    playingAudioId: null,
+    visibleKeyIds: {},
+  });
+
+  const { input, summon, rounds, useStream, showExport, showMemberConfig, playingAudioId, visibleKeyIds } = state;
+  const setInput = (v: string) => dispatch({ type: "SET_INPUT", payload: v });
+  const setSummon = (v: string) => dispatch({ type: "SET_SUMMON", payload: v });
+  const setRounds = (v: number) => dispatch({ type: "SET_ROUNDS", payload: v });
+  const setUseStream = (v: boolean) => dispatch({ type: "SET_USE_STREAM", payload: v });
+  const setShowExport = (v: boolean) => dispatch({ type: "SET_SHOW_EXPORT", payload: v });
+  const setShowMemberConfig = (v: boolean) => dispatch({ type: "SET_SHOW_MEMBER_CONFIG", payload: v });
+  const setPlayingAudioId = (v: string | null) => dispatch({ type: "SET_PLAYING_AUDIO_ID", payload: v });
+  const setVisibleKeyIds: React.Dispatch<React.SetStateAction<Record<string, boolean>>> = (v) => {
+    const value = typeof v === "function" ? v(state.visibleKeyIds) : v;
+    dispatch({ type: "SET_VISIBLE_KEY_IDS", payload: value });
+  };
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -206,6 +256,9 @@ export function ChatArea({
             getMemberColor={getMemberColor}
             visibleKeyIds={visibleKeyIds}
             setVisibleKeyIds={setVisibleKeyIds}
+            onSuggestionClick={(suggestion) => {
+              setInput(suggestion);
+            }}
           />
         )}
       </div>

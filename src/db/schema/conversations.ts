@@ -12,15 +12,22 @@ import { users } from "./users.js";
 import { vector } from "./types.js";
 
 // ─── Conversation ────────────────────────────────────────────────────────────
-export const conversations = pgTable("Conversation", {
-  id: text("id").primaryKey(),
-  userId: integer("userId").references(() => users.id, { onDelete: "cascade" }),
-  title: text("title").default("New Conversation").notNull(),
-  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt", { mode: "date" }).notNull(),
-  isPublic: boolean("isPublic").default(false).notNull(),
-  sessionSummary: text("sessionSummary"),
-});
+export const conversations = pgTable(
+  "Conversation",
+  {
+    id: text("id").primaryKey(),
+    userId: integer("userId").references(() => users.id, { onDelete: "cascade" }),
+    title: text("title").default("New Conversation").notNull(),
+    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt", { mode: "date" }).notNull(),
+    isPublic: boolean("isPublic").default(false).notNull(),
+    sessionSummary: text("sessionSummary"),
+  },
+  (table) => [
+    index("Conversation_userId_idx").on(table.userId),
+    index("Conversation_userId_updatedAt_idx").on(table.userId, table.updatedAt),
+  ],
+);
 
 // ─── Chat ────────────────────────────────────────────────────────────────────
 export const chats = pgTable(
@@ -41,10 +48,13 @@ export const chats = pgTable(
     embedding: vector("embedding"),
   },
   (table) => [
+    index("Chat_userId_idx").on(table.userId),
     index("Chat_conversationId_createdAt_idx").on(
       table.conversationId,
       table.createdAt,
     ),
+    index("Chat_embedding_hnsw_idx")
+      .using("hnsw", table.embedding.op("vector_cosine_ops")),
   ],
 );
 
@@ -96,13 +106,20 @@ export const auditLogs = pgTable(
 );
 
 // ─── SemanticCache ───────────────────────────────────────────────────────────
-export const semanticCache = pgTable("SemanticCache", {
-  id: serial("id").primaryKey(),
-  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
-  expiresAt: timestamp("expiresAt", { mode: "date" }).notNull(),
-  keyHash: text("keyHash").notNull().unique(),
-  opinions: jsonb("opinions").notNull(),
-  prompt: text("prompt").notNull(),
-  verdict: text("verdict").notNull(),
-  embedding: vector("embedding"),
-});
+export const semanticCache = pgTable(
+  "SemanticCache",
+  {
+    id: serial("id").primaryKey(),
+    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+    expiresAt: timestamp("expiresAt", { mode: "date" }).notNull(),
+    keyHash: text("keyHash").notNull().unique(),
+    opinions: jsonb("opinions").notNull(),
+    prompt: text("prompt").notNull(),
+    verdict: text("verdict").notNull(),
+    embedding: vector("embedding"),
+  },
+  (table) => [
+    index("SemanticCache_embedding_hnsw_idx")
+      .using("hnsw", table.embedding.op("vector_cosine_ops")),
+  ],
+);

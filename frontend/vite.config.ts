@@ -29,9 +29,15 @@ export default defineConfig({
         ],
       },
       workbox: {
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MiB
         runtimeCaching: [
           {
-            urlPattern: /^\/api\//,
+            urlPattern: ({ url }) => {
+              if (!url.pathname.startsWith('/api/')) return false;
+              // Never cache auth, cost, audit, or user-specific sensitive endpoints
+              const sensitive = ['/api/auth/', '/api/costs/', '/api/audit/', '/api/admin/', '/api/usage/', '/api/ask/'];
+              return !sensitive.some(prefix => url.pathname.startsWith(prefix));
+            },
             handler: 'NetworkFirst',
             options: {
               cacheName: 'api-cache',

@@ -5,7 +5,8 @@ import type {
   AdapterStreamResult,
 } from "./types.js";
 import { createStreamResult } from "./types.js";
-import logger from "../lib/logger.js";
+import { getBreaker } from "../lib/breaker.js";
+import { validateSafeUrl } from "../lib/ssrf.js";
 
 interface OllamaChunk {
   message?: { content?: string };
@@ -27,6 +28,21 @@ export class OllamaAdapter implements IProviderAdapter {
   }
 
   async generate(req: AdapterRequest): Promise<AdapterStreamResult> {
+    // Validate base URL against SSRF (blocks private IPs, localhost, cloud metadata).
+    // NOTE: Ollama is typically on localhost which validateSafeUrl blocks.
+    // For local-only deployments, operators should set ALLOW_PRIVATE_URLS=1 or
+    // use the adapter only with explicitly trusted URLs.
+    const localhostPatterns = [
+      "http://localhost:",
+      "http://127.0.0.1",
+      "http://0.0.0.0",
+      "http://[::1]",
+      "http://::1",
+    ];
+    if (!localhostPatterns.some((p) => this.baseUrl.startsWith(p))) {
+      await validateSafeUrl(this.baseUrl);
+    }
+
     const model = req.model || "llama3.2";
 
     const messages: Record<string, unknown>[] = [];
@@ -56,12 +72,16 @@ export class OllamaAdapter implements IProviderAdapter {
     const timeout = setTimeout(() => controller.abort(), 120000);
 
     try {
-      const res = await fetch(`${this.baseUrl}/api/chat`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-        signal: controller.signal,
-      });
+      const fetchChat = async () =>
+        fetch(`${this.baseUrl}/api/chat`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+          signal: controller.signal,
+        });
+
+      const breaker = getBreaker({ name: this.providerId } as any, fetchChat);
+      const res: Response = await breaker.fire();
 
       clearTimeout(timeout);
 

@@ -1,3 +1,5 @@
+import { useState } from "react";
+
 interface SkeletonLoaderProps {
   variant?: "card" | "text" | "avatar" | "chart" | "line";
   count?: number;
@@ -6,6 +8,9 @@ interface SkeletonLoaderProps {
 
 export function SkeletonLoader({ variant = "text", count = 1, className = "" }: SkeletonLoaderProps) {
   const items = Array.from({ length: count }, (_, i) => i);
+
+  const [chartBarHeights] = useState(() => Array.from({ length: 8 }, () => 30 + Math.random() * 70));
+  const [lineWidths] = useState(() => Array.from({ length: count }, () => 60 + Math.random() * 40));
 
   const renderSkeleton = (key: number) => {
     switch (variant) {
@@ -34,7 +39,7 @@ export function SkeletonLoader({ variant = "text", count = 1, className = "" }: 
                 <div
                   key={i}
                   className="skeleton flex-1 rounded-t"
-                  style={{ height: `${30 + Math.random() * 70}%` }}
+                  style={{ height: `${chartBarHeights[i]}%` }}
                 />
               ))}
             </div>
@@ -42,7 +47,7 @@ export function SkeletonLoader({ variant = "text", count = 1, className = "" }: 
         );
 
       case "line":
-        return <div key={key} className={`skeleton h-3 rounded ${className}`} style={{ width: `${60 + Math.random() * 40}%` }} />;
+        return <div key={key} className={`skeleton h-3 rounded ${className}`} style={{ width: `${lineWidths[key]}%` }} />;
 
       case "text":
       default:

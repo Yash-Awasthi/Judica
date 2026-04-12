@@ -8,6 +8,7 @@ import { db } from "../lib/drizzle.js";
 import { customProviders } from "../db/schema/council.js";
 import { eq, and } from "drizzle-orm";
 import logger from "../lib/logger.js";
+import { validateSafeUrl } from "../lib/ssrf.js";
 
 const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
   /**
@@ -178,6 +179,13 @@ const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
 
     if (!name || !base_url || !auth_type) {
       throw new AppError(400, "name, base_url, and auth_type are required", "VALIDATION_ERROR");
+    }
+
+    // Validate base_url against SSRF (block private IPs, cloud metadata, etc.)
+    try {
+      await validateSafeUrl(base_url);
+    } catch {
+      throw new AppError(400, "base_url points to a restricted or private address", "SSRF_BLOCKED");
     }
 
     if (!models || !Array.isArray(models) || models.length === 0) {

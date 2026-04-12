@@ -4,6 +4,118 @@ import { env } from "../../config/env.js";
 import { registerUserSkillsAsTools } from "./skillExecutor.js";
 import { validateSafeUrl } from "../ssrf.js";
 
+/**
+ * Safe math expression evaluator — recursive descent parser.
+ * No eval/Function usage.  Supports: +, -, *, /, %, **, parentheses,
+ * function calls (sin, cos, sqrt, etc.), and named constants (pi, E).
+ */
+function safeEvalMath(
+  expr: string,
+  fns: Record<string, (...a: number[]) => number>,
+  consts: Record<string, number>,
+): number {
+  let pos = 0;
+  const src = expr.replace(/\s+/g, "");
+
+  function peek(): string { return src[pos] || ""; }
+  function consume(ch?: string): string {
+    if (ch && src[pos] !== ch) throw new Error(`Expected '${ch}' at position ${pos}`);
+    return src[pos++];
+  }
+
+  // expression = term (('+' | '-') term)*
+  function parseExpr(): number {
+    let val = parseTerm();
+    while (peek() === "+" || peek() === "-") {
+      const op = consume();
+      const right = parseTerm();
+      val = op === "+" ? val + right : val - right;
+    }
+    return val;
+  }
+
+  // term = power (('*' | '/' | '%') power)*
+  function parseTerm(): number {
+    let val = parsePower();
+    while (peek() === "*" || peek() === "/" || peek() === "%") {
+      const op = consume();
+      const right = parsePower();
+      if (op === "*") val *= right;
+      else if (op === "/") val /= right;
+      else val %= right;
+    }
+    return val;
+  }
+
+  // power = unary ('**' | '^' unary)*  (right-associative)
+  function parsePower(): number {
+    const base = parseUnary();
+    if ((peek() === "*" && src[pos + 1] === "*") || peek() === "^") {
+      if (peek() === "*") { consume(); consume(); } else { consume(); }
+      return Math.pow(base, parsePower());
+    }
+    return base;
+  }
+
+  // unary = ('-' | '+') unary | atom
+  function parseUnary(): number {
+    if (peek() === "-") { consume(); return -parseUnary(); }
+    if (peek() === "+") { consume(); return parseUnary(); }
+    return parseAtom();
+  }
+
+  // atom = number | '(' expr ')' | identifier ( '(' args ')' )?
+  function parseAtom(): number {
+    // Parenthesized sub-expression
+    if (peek() === "(") {
+      consume("(");
+      const val = parseExpr();
+      consume(")");
+      return val;
+    }
+    // Number literal
+    if (/[0-9.]/.test(peek())) {
+      let numStr = "";
+      while (/[0-9.]/.test(peek())) numStr += consume();
+      // Support scientific notation like 1e10
+      if (peek() === "e" || peek() === "E") {
+        numStr += consume();
+        if (peek() === "+" || peek() === "-") numStr += consume();
+        while (/[0-9]/.test(peek())) numStr += consume();
+      }
+      const n = Number(numStr);
+      if (isNaN(n)) throw new Error(`Invalid number: ${numStr}`);
+      return n;
+    }
+    // Identifier (function name or constant)
+    if (/[a-zA-Z_]/.test(peek())) {
+      let name = "";
+      while (/[a-zA-Z0-9_]/.test(peek())) name += consume();
+      // Function call
+      if (peek() === "(") {
+        consume("(");
+        const fnArgs: number[] = [];
+        if (peek() !== ")") {
+          fnArgs.push(parseExpr());
+          while (peek() === ",") { consume(); fnArgs.push(parseExpr()); }
+        }
+        consume(")");
+        const fn = fns[name];
+        if (!fn) throw new Error(`Unknown function: ${name}`);
+        return fn(...fnArgs);
+      }
+      // Constant
+      if (name in consts) return consts[name];
+      throw new Error(`Unknown identifier: ${name}`);
+    }
+    throw new Error(`Unexpected character '${peek()}' at position ${pos}`);
+  }
+
+  const result = parseExpr();
+  if (pos < src.length) throw new Error(`Unexpected character '${src[pos]}' at position ${pos}`);
+  return result;
+}
+
 // Register user skills as callable tools on startup (lazy, per-request)
 // Skills are loaded dynamically when the tool is called
 registerUserSkillsAsTools();
@@ -132,43 +244,30 @@ registerTool(
   async (args) => {
     const expr = args.expression as string;
     try {
-      // Strict allowlist: only digits, math operators, parens, dots, commas, spaces,
-      // and known math function/constant names
-      const allowedNames = [
-        'abs', 'ceil', 'floor', 'round', 'sqrt', 'cbrt', 'pow',
-        'sin', 'cos', 'tan', 'asin', 'acos', 'atan', 'atan2',
-        'log', 'log2', 'log10', 'exp', 'min', 'max',
-        'PI', 'pi', 'E', 'Infinity', 'NaN'
-      ];
-      // Remove all known function/constant names first, then check remainder
-      let check = expr;
-      for (const name of allowedNames) {
-        check = check.replaceAll(name, '');
+      // Strict validation: reject anything that could be code injection
+      if (/[;{}[\]\\`$]/.test(expr)) {
+        return JSON.stringify({ error: "Expression contains disallowed characters" });
       }
-      // After removing known names, only digits, operators, spaces, parens, dots, commas should remain
-      if (/[a-zA-Z_]/.test(check)) {
-        return JSON.stringify({ error: "Expression contains disallowed identifiers" });
-      }
-      // Also block known dangerous patterns
-      if (/constructor|prototype|__proto__|this|global|process|require|import|eval|Function/i.test(expr)) {
+      if (/constructor|prototype|__proto__|this|global|process|require|import|eval|Function|window|document|fetch|setTimeout|setInterval/i.test(expr)) {
         return JSON.stringify({ error: "Expression contains disallowed keywords" });
       }
-      const mathScope: Record<string, any> = {
+
+      const mathFunctions: Record<string, (...args: number[]) => number> = {
         abs: Math.abs, ceil: Math.ceil, floor: Math.floor, round: Math.round,
         sqrt: Math.sqrt, cbrt: Math.cbrt, pow: Math.pow,
         sin: Math.sin, cos: Math.cos, tan: Math.tan,
         asin: Math.asin, acos: Math.acos, atan: Math.atan, atan2: Math.atan2,
         log: Math.log, log2: Math.log2, log10: Math.log10,
         exp: Math.exp, min: Math.min, max: Math.max,
-        PI: Math.PI, pi: Math.PI, E: Math.E, e: Math.E,
-        Infinity, NaN
       };
-      // Freeze scope objects to prevent prototype traversal
-      const keys = Object.keys(mathScope);
-      const vals = Object.values(mathScope);
-      const sanitized = expr.replace(/[^0-9+\-*/().,%^ a-zA-Z_]/g, '');
-      const fn = new Function(...keys, `"use strict"; return (${sanitized});`);
-      const result = fn(...vals);
+      const mathConstants: Record<string, number> = {
+        PI: Math.PI, pi: Math.PI, E: Math.E, e: Math.E,
+        Infinity: Infinity, NaN: NaN,
+      };
+
+      // Tokenize and evaluate using a safe recursive descent parser
+      const result = safeEvalMath(expr, mathFunctions, mathConstants);
+
       if (typeof result !== 'number' || !isFinite(result)) {
         return JSON.stringify({ error: "Expression did not evaluate to a finite number", result: String(result) });
       }

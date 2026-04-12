@@ -268,20 +268,22 @@ class RealTimeCostTracker {
     const { dailyLimit, monthlyLimit } = ledger.alerts;
 
     if (dailyLimit > 0) {
-      const dailyPercentage = (ledger.dailyTotal / dailyLimit) * 100;
+      const currentDailyTotal = ledger.dailyTotal + ledger.currentSession.totalCost;
+      const dailyPercentage = (currentDailyTotal / dailyLimit) * 100;
       if (dailyPercentage >= 90) {
-        warnings.push(`⚠️ Daily cost limit reached: ${ledger.dailyTotal.toFixed(2)} / ${dailyLimit.toFixed(2)}`);
+        warnings.push(`⚠️ Daily cost limit reached: ${currentDailyTotal.toFixed(2)} / ${dailyLimit.toFixed(2)}`);
       } else if (dailyPercentage >= 80) {
-        warnings.push(`⚠️ Approaching daily cost limit: ${ledger.dailyTotal.toFixed(2)} / ${dailyLimit.toFixed(2)}`);
+        warnings.push(`⚠️ Approaching daily cost limit: ${currentDailyTotal.toFixed(2)} / ${dailyLimit.toFixed(2)}`);
       }
     }
 
     if (monthlyLimit > 0) {
-      const monthlyPercentage = (ledger.monthlyTotal / monthlyLimit) * 100;
+      const currentMonthlyTotal = ledger.monthlyTotal + ledger.currentSession.totalCost;
+      const monthlyPercentage = (currentMonthlyTotal / monthlyLimit) * 100;
       if (monthlyPercentage >= 90) {
-        warnings.push(`🚨 Monthly cost limit reached: ${ledger.monthlyTotal.toFixed(2)} / ${monthlyLimit.toFixed(2)}`);
+        warnings.push(`🚨 Monthly cost limit reached: ${currentMonthlyTotal.toFixed(2)} / ${monthlyLimit.toFixed(2)}`);
       } else if (monthlyPercentage >= 80) {
-        warnings.push(`⚠️ Approaching monthly cost limit: ${ledger.monthlyTotal.toFixed(2)} / ${monthlyLimit.toFixed(2)}`);
+        warnings.push(`⚠️ Approaching monthly cost limit: ${currentMonthlyTotal.toFixed(2)} / ${monthlyLimit.toFixed(2)}`);
       }
     }
 
@@ -381,6 +383,10 @@ class RealTimeCostTracker {
 
 export const realTimeCostTracker = new RealTimeCostTracker();
 
-setInterval(() => {
+const costTrackerInterval = setInterval(() => {
   realTimeCostTracker.cleanup();
 }, 60 * 60 * 1000);
+
+export function cleanupCostTrackerInterval(): void {
+  clearInterval(costTrackerInterval);
+}

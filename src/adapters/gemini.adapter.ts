@@ -6,7 +6,9 @@ import type {
 } from "./types.js";
 import { createStreamResult } from "./types.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
-import logger from "../lib/logger.js";
+import { getBreaker } from "../lib/breaker.js";
+
+const DEFAULT_TIMEOUT_MS = 60_000;
 
 export class GeminiAdapter implements IProviderAdapter {
   readonly providerId = "gemini";
@@ -49,14 +51,19 @@ export class GeminiAdapter implements IProviderAdapter {
 
     const url = `${this.baseUrl}/v1beta/models/${model}:streamGenerateContent?alt=sse`;
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": this.apiKey,
-      },
-      body: JSON.stringify(body),
-    });
+    const fetchGemini = async () =>
+      fetch(url, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": this.apiKey,
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+      });
+
+    const breaker = getBreaker({ name: this.providerId } as any, fetchGemini);
+    const res: Response = await breaker.fire();
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));

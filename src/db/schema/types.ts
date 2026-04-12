@@ -13,7 +13,7 @@ export const vector = customType<{
   },
   fromDriver(value) {
     if (typeof value === "string") {
-      return value.replace(/[\[\]]/g, "").split(",").map(Number);
+      return value.replace(/[[\]]/g, "").split(",").map(Number);
     }
     return value as number[];
   },

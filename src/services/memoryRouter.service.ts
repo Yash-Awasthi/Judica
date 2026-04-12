@@ -4,34 +4,16 @@ import { eq } from "drizzle-orm";
 import { storeChunk, searchSimilar } from "./vectorStore.service.js";
 import { embed } from "./embeddings.service.js";
 import logger from "../lib/logger.js";
-import crypto from "crypto";
+import { encrypt as cryptoEncrypt, decrypt as cryptoDecrypt } from "../lib/crypto.js";
 
-// AES-256-GCM encryption for config storage
-// Falls back to MASTER_ENCRYPTION_KEY to ensure persistence across restarts
-const ENCRYPTION_KEY = process.env.MEMORY_ENCRYPTION_KEY || process.env.MASTER_ENCRYPTION_KEY;
-if (!ENCRYPTION_KEY) {
-  throw new Error("CRITICAL: Neither MEMORY_ENCRYPTION_KEY nor MASTER_ENCRYPTION_KEY is set. Encrypted memory configs will be unreadable after restart.");
-}
-const KEY_BUFFER = crypto.createHash("sha256").update(ENCRYPTION_KEY).digest();
-
+// Delegate encryption to the shared lib/crypto.ts implementation
+// to avoid maintaining two separate AES-256-GCM codepaths
 export function encryptConfig(plaintext: string): string {
-  const iv = crypto.randomBytes(12);
-  const cipher = crypto.createCipheriv("aes-256-gcm", KEY_BUFFER, iv);
-  let encrypted = cipher.update(plaintext, "utf8", "hex");
-  encrypted += cipher.final("hex");
-  const tag = cipher.getAuthTag().toString("hex");
-  return `${iv.toString("hex")}:${tag}:${encrypted}`;
+  return cryptoEncrypt(plaintext);
 }
 
 export function decryptConfig(ciphertext: string): string {
-  const [ivHex, tagHex, encrypted] = ciphertext.split(":");
-  const iv = Buffer.from(ivHex, "hex");
-  const tag = Buffer.from(tagHex, "hex");
-  const decipher = crypto.createDecipheriv("aes-256-gcm", KEY_BUFFER, iv);
-  decipher.setAuthTag(tag);
-  let decrypted = decipher.update(encrypted, "hex", "utf8");
-  decrypted += decipher.final("utf8");
-  return decrypted;
+  return cryptoDecrypt(ciphertext);
 }
 
 export interface MemoryBackendConfig {

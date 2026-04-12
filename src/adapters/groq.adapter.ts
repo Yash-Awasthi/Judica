@@ -5,7 +5,10 @@ import type {
   AdapterStreamResult,
 } from "./types.js";
 import { createStreamResult } from "./types.js";
-import logger from "../lib/logger.js";
+import { getBreaker } from "../lib/breaker.js";
+import { validateSafeUrl } from "../lib/ssrf.js";
+
+const DEFAULT_TIMEOUT_MS = 60_000;
 
 /**
  * Groq adapter — OpenAI-compatible with Groq's base URL.
@@ -20,6 +23,8 @@ export class GroqAdapter implements IProviderAdapter {
   }
 
   async generate(req: AdapterRequest): Promise<AdapterStreamResult> {
+    await validateSafeUrl(this.baseUrl);
+
     const body: Record<string, unknown> = {
       model: req.model,
       stream: true,
@@ -37,14 +42,19 @@ export class GroqAdapter implements IProviderAdapter {
       body.tool_choice = "auto";
     }
 
-    const res = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify(body),
-    });
+    const fetchChat = async () =>
+      fetch(`${this.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+      });
+
+    const breaker = getBreaker({ name: this.providerId } as any, fetchChat);
+    const res: Response = await breaker.fire();
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));

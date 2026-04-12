@@ -68,14 +68,14 @@ export function resolveProviderFromModel(model: string): string | null {
     return hasAdapter("gemini") ? "gemini" : null;
   }
 
+  // Ollama models (check first since these could also match Groq patterns)
+  if (hasAdapter("ollama") && (m.includes("llama") || m.includes("mistral") || m.includes("phi") || m.includes("qwen"))) {
+    return "ollama";
+  }
+
   // Groq models (llama, mixtral on groq)
   if (hasAdapter("groq") && (m.includes("llama") || m.includes("mixtral") || m.includes("gemma"))) {
     return "groq";
-  }
-
-  // Ollama models
-  if (hasAdapter("ollama") && (m.includes("llama") || m.includes("mistral") || m.includes("phi") || m.includes("qwen"))) {
-    return "ollama";
   }
 
   // OpenRouter models (usually contain a /)
@@ -118,17 +118,17 @@ function initBuiltinAdapters(): void {
 
   // OpenAI-compatible providers via OpenAI adapter with custom base URL
   if (env.MISTRAL_API_KEY) {
-    adapters.set("mistral", new OpenAIAdapter(env.MISTRAL_API_KEY, "https://api.mistral.ai/v1"));
+    adapters.set("mistral", new OpenAIAdapter(env.MISTRAL_API_KEY, "https://api.mistral.ai/v1", "mistral"));
     logger.debug("Mistral adapter loaded (OpenAI-compat)");
   }
 
   if (env.CEREBRAS_API_KEY) {
-    adapters.set("cerebras", new OpenAIAdapter(env.CEREBRAS_API_KEY, "https://api.cerebras.ai/v1"));
+    adapters.set("cerebras", new OpenAIAdapter(env.CEREBRAS_API_KEY, "https://api.cerebras.ai/v1", "cerebras"));
     logger.debug("Cerebras adapter loaded (OpenAI-compat)");
   }
 
   if (env.NVIDIA_API_KEY) {
-    adapters.set("nvidia", new OpenAIAdapter(env.NVIDIA_API_KEY, "https://integrate.api.nvidia.com/v1"));
+    adapters.set("nvidia", new OpenAIAdapter(env.NVIDIA_API_KEY, "https://integrate.api.nvidia.com/v1", "nvidia"));
     logger.debug("NVIDIA adapter loaded (OpenAI-compat)");
   }
 

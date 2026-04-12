@@ -3,9 +3,14 @@ import fastifyExpress from "@fastify/express";
 import fastifyCors from "@fastify/cors";
 import fastifyCompress from "@fastify/compress";
 import fastifyCookie from "@fastify/cookie";
+import fastifyHelmet from "@fastify/helmet";
 import fastifyStatic from "@fastify/static";
 import path from "path";
 import fs from "fs";
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
+const pkg = require("../package.json");
 
 import { env } from "./config/env.js";
 import logger from "./lib/logger.js";
@@ -21,25 +26,26 @@ import { registry } from "./lib/prometheusMetrics.js";
 import "./lib/tools/builtin.js";
 import "./adapters/registry.js";
 
-// Express middleware (still needed for remaining Express routes + compat layer)
-import { askLimiter } from "./middleware/rateLimit.js";
+// Express middleware (still needed for swagger-ui and BullMQ Board compat layer)
+import { cleanupRateLimitRedis } from "./middleware/rateLimit.js";
 import { perUserLimiter } from "./middleware/limiter.js";
+import { cleanupCostTrackerInterval } from "./lib/realtimeCost.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { requireAuth } from "./middleware/auth.js";
 import { requestId } from "./middleware/requestId.js";
 import { cspNonce } from "./middleware/cspNonce.js";
 import { prometheusMiddleware } from "./middleware/prometheusMiddleware.js";
 
-// Express (for compat layer)
+// Express (for swagger-ui compat layer only)
 import express from "express";
 import pinoHttp from "pino-http";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./lib/swagger.js";
 import { requestContext } from "./lib/context.js";
 
-// Express routers (remaining — not yet converted to Fastify)
-import askRouter from "./routes/ask.js";
-import uploadsRouter from "./routes/uploads.js";
+// Native Fastify plugins (all routes now converted)
+import askPlugin from "./routes/ask.js";
+import uploadsPlugin from "./routes/uploads.js";
 
 // Native Fastify plugins
 import templatesPlugin from "./routes/templates.js";
@@ -73,8 +79,6 @@ import reposPlugin from "./routes/repos.js";
 import queuePlugin from "./routes/queue.js";
 import costsPlugin from "./routes/costs.js";
 import evaluationPlugin from "./routes/evaluation.js";
-import realtimePlugin from "./routes/realtime.js";
-import archetypesPlugin from "./routes/archetypes.js";
 import { ingestionQueue, researchQueue, repoQueue, compactionQueue } from "./queue/queues.js";
 
 // ─── Build the Fastify server ───────────────────────────────────────────────
@@ -104,6 +108,9 @@ await fastify.register(fastifyCors, {
 
 await fastify.register(fastifyCompress);
 await fastify.register(fastifyCookie);
+await fastify.register(fastifyHelmet, {
+  contentSecurityPolicy: false, // CSP is handled separately via cspNonce middleware
+});
 
 const publicPath = fs.existsSync(path.join(process.cwd(), "frontend/dist"))
   ? path.join(process.cwd(), "frontend/dist")
@@ -119,8 +126,26 @@ await fastify.register(fastifyStatic, {
 
 // ─── Native Fastify routes (no Express overhead) ────────────────────────────
 
-// Prometheus metrics endpoint
-fastify.get("/metrics", async (_request, reply) => {
+// Prometheus metrics endpoint (admin-only or bearer-token gated)
+fastify.get("/metrics", async (request, reply) => {
+  // Allow access via METRICS_TOKEN env var or authenticated admin
+  const authHeader = request.headers.authorization;
+  const metricsToken = process.env.METRICS_TOKEN;
+
+  if (metricsToken && authHeader === `Bearer ${metricsToken}`) {
+    // Token-based access for Prometheus scraper
+  } else if (!metricsToken) {
+    // No token configured — restrict to localhost only
+    const ip = request.ip;
+    if (ip !== "127.0.0.1" && ip !== "::1" && ip !== "::ffff:127.0.0.1") {
+      reply.code(403);
+      return "Forbidden";
+    }
+  } else {
+    reply.code(401);
+    return "Unauthorized";
+  }
+
   try {
     reply.type(registry.contentType);
     return await registry.metrics();
@@ -162,7 +187,7 @@ fastify.get("/health", async (_request, reply) => {
     env: env.NODE_ENV,
     checks,
     providers,
-    version: "1.0.0",
+    version: pkg.version,
   };
 });
 
@@ -200,18 +225,15 @@ await fastify.register(reposPlugin,           { prefix: "/api/repos" });
 await fastify.register(queuePlugin,           { prefix: "/api/queue" });
 await fastify.register(costsPlugin,           { prefix: "/api/costs" });
 await fastify.register(evaluationPlugin,      { prefix: "/api/evaluation" });
-// realtime and archetypes routes available but not mounted in original setup
-// Uncomment to enable:
-// await fastify.register(realtimePlugin,        { prefix: "/api/realtime" });
-// await fastify.register(archetypesPlugin,      { prefix: "/api/archetypes" });
+await fastify.register(askPlugin,             { prefix: "/api/ask" });
+await fastify.register(uploadsPlugin,         { prefix: "/api/uploads" });
 
 // ─── Express compatibility layer ────────────────────────────────────────────
-// Remaining Express routers that haven't been converted yet (ask, uploads).
-// Also hosts swagger-ui, BullMQ Board, and shared Express middleware.
+// Only needed for swagger-ui-express and BullMQ Board (dev only).
 
 await fastify.register(fastifyExpress);
 
-// Express middleware chain
+// Express middleware chain (for swagger and dev tools)
 fastify.use(cspNonce);
 fastify.use((pinoHttp as any)({ logger, autoLogging: { ignore: (req: any) => req.url === '/health' } }));
 fastify.use(express.json({ limit: "200kb" }));
@@ -255,12 +277,8 @@ fastify.use("/api/docs", swaggerUi.setup(swaggerSpec, {
   customSiteTitle: "AIBYAI API Documentation",
 }));
 
-// Per-user rate limiting
+// Per-user rate limiting (Express compat for swagger/docs)
 fastify.use(perUserLimiter);
-
-// Remaining Express routers
-fastify.use("/api/ask",       askLimiter,  askRouter);
-fastify.use("/api/uploads",   requireAuth, uploadsRouter);
 
 // BullMQ Board (dev only)
 if (env.NODE_ENV === "development") {
@@ -352,6 +370,15 @@ const shutdown = async (signal: string) => {
   } catch (err) {
     logger.error({ err }, "Error closing Redis connection");
   }
+
+  try {
+    await cleanupRateLimitRedis();
+    logger.info("Rate limit Redis connection closed");
+  } catch (err) {
+    logger.error({ err }, "Error closing rate limit Redis");
+  }
+
+  cleanupCostTrackerInterval();
 
   logger.info("Server closed");
   process.exit(0);

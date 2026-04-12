@@ -7,28 +7,22 @@ import { eq } from "drizzle-orm";
 
 export function requireRole(...roles: string[]): RequestHandler {
   return async (req: AuthRequest, _res: Response, next: NextFunction) => {
-    if (!req.userId) throw new AppError(401, "Not authenticated", "AUTH_REQUIRED");
+    try {
+      if (!req.userId) throw new AppError(401, "Not authenticated", "AUTH_REQUIRED");
 
-    const [user] = await db
-      .select({ role: users.role })
-      .from(users)
-      .where(eq(users.id, req.userId))
-      .limit(1);
+      const [user] = await db
+        .select({ role: users.role })
+        .from(users)
+        .where(eq(users.id, req.userId))
+        .limit(1);
 
-    if (!user || !roles.includes(user.role)) {
-      throw new AppError(403, "Insufficient permissions", "FORBIDDEN");
+      if (!user || !roles.includes(user.role)) {
+        throw new AppError(403, "Insufficient permissions", "FORBIDDEN");
+      }
+
+      next();
+    } catch (err) {
+      next(err);
     }
-
-    next();
-  };
-}
-
-export function requireOwnership(resourceField: string = "userId"): RequestHandler {
-  return (req: AuthRequest, _res: Response, next: NextFunction) => {
-    const resource = (req as any).resource;
-    if (resource && resource[resourceField] !== req.userId) {
-      throw new AppError(403, "Not the owner", "FORBIDDEN");
-    }
-    next();
   };
 }

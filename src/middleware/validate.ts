@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import type { FastifyRequest, FastifyReply } from "fastify";
 import { z, ZodSchema } from "zod";
 
 export function validate(schema: ZodSchema) {
@@ -16,6 +17,26 @@ export function validate(schema: ZodSchema) {
     }
     req.body = result.data;
     next();
+  };
+}
+
+/**
+ * Fastify-compatible validation preHandler hook.
+ */
+export function fastifyValidate(schema: ZodSchema) {
+  return async (request: FastifyRequest, reply: FastifyReply) => {
+    const result = schema.safeParse(request.body);
+    if (!result.success) {
+      reply.code(400).send({
+        error: "Validation failed",
+        details: result.error.issues.map((e: any) => ({
+          field: e.path.join("."),
+          message: e.message,
+        })),
+      });
+      return;
+    }
+    request.body = result.data;
   };
 }
 
@@ -42,7 +63,7 @@ export const askSchema = z
       .max(15)
       .optional(),
     master: providerSchema.optional(),
-    summon: z.enum(["business", "technical", "personal", "creative", "ethical", "strategy", "default"]).optional(),
+    summon: z.enum(["business", "technical", "personal", "creative", "ethical", "strategy", "debate", "research", "default"]).optional(),
     mode: z.enum(["auto", "manual", "direct"]).default("manual"),
     maxTokens: z.number().int().min(256).max(8192).optional(),
     rounds: z.number().int().min(1).max(5).default(1),

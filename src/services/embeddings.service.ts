@@ -29,20 +29,36 @@ export async function embed(text: string): Promise<number[]> {
     const data = await res.json() as any;
     embedding = data.data[0].embedding;
   } else if (env.GOOGLE_API_KEY) {
+    const TARGET_DIMENSIONS = 1536;
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${env.GOOGLE_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: { parts: [{ text }] } }),
+        body: JSON.stringify({
+          content: { parts: [{ text }] },
+          outputDimensionality: TARGET_DIMENSIONS,
+        }),
       }
     );
     if (!res.ok) throw new Error(`Gemini embeddings failed: ${res.status} ${await res.text()}`);
     const data = await res.json() as any;
-    embedding = data.embedding.values;
-    // Gemini text-embedding-004 is 768-dim, pad to 1536 for consistency
-    if (embedding.length < 1536) {
-      embedding = [...embedding, ...new Array(1536 - embedding.length).fill(0)];
+    const rawEmbedding: number[] = data.embedding.values;
+
+    // If Gemini returns fewer dimensions than required (e.g. 768 instead of 1536),
+    // normalize the existing vector rather than zero-padding, which would distort
+    // cosine similarity. If dimensions match or exceed, just truncate.
+    if (rawEmbedding.length >= TARGET_DIMENSIONS) {
+      embedding = rawEmbedding.slice(0, TARGET_DIMENSIONS);
+    } else {
+      // Normalize the shorter vector so cosine similarity remains meaningful
+      // when compared against vectors of the target dimensionality.
+      const norm = Math.sqrt(rawEmbedding.reduce((sum, v) => sum + v * v, 0)) || 1;
+      const normalized = rawEmbedding.map(v => v / norm);
+      // Pad with zeros after normalization and re-normalize the full vector
+      const padded = [...normalized, ...new Array(TARGET_DIMENSIONS - normalized.length).fill(0)];
+      const fullNorm = Math.sqrt(padded.reduce((sum, v) => sum + v * v, 0)) || 1;
+      embedding = padded.map(v => v / fullNorm);
     }
   } else {
     throw new Error("No embedding provider available. Set OPENAI_API_KEY or GOOGLE_API_KEY.");

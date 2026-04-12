@@ -18,8 +18,8 @@ export class GoogleProvider extends BaseProvider {
     onChunk?: (chunk: string) => void;
     _depth?: number;
   }): Promise<ProviderResponse> {
-    if (_depth >= 5) {
-      throw new Error("Tool call depth limit exceeded (max 5 recursive rounds)");
+    if (_depth >= 10) {
+      throw new Error("Tool call depth limit exceeded (max 10 recursive rounds)");
     }
     const apiHost = "https://generativelanguage.googleapis.com";
     await validateSafeUrl(apiHost);
@@ -37,7 +37,7 @@ export class GoogleProvider extends BaseProvider {
 
     try {
       const endpoint = onChunk ? "streamGenerateContent?alt=sse" : "generateContent";
-      const res = await fetch(
+      const res = await this.protectedFetch(
         `${apiHost}/v1beta/models/${this.config.model || "gemini-2.0-flash"}:${endpoint}`,
         {
           method: "POST",

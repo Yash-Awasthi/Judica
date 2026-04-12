@@ -16,7 +16,11 @@ export function createGitHubStrategy() {
     },
     async (_accessToken: string, _refreshToken: string, profile: any, done: any) => {
       try {
-        const email = profile.emails?.[0]?.value || `${profile.username}@github.local`;
+        // SEC-7: Only accept verified emails from GitHub to prevent email spoofing
+        // and cross-provider account collision attacks.
+        const emailObj = profile.emails?.find((e: any) => e.verified || e.primary);
+        if (!emailObj?.value) return done(new Error("No verified email from GitHub. Please make your email public in GitHub settings."));
+        const email = emailObj.value;
 
         const [existing] = await db
           .select()
@@ -25,6 +29,9 @@ export function createGitHubStrategy() {
           .limit(1);
 
         if (existing) {
+          if (existing.passwordHash) {
+            return done(new Error("An account with this email already exists from a different sign-in method. Please use your original sign-in method."));
+          }
           return done(null, existing);
         }
 

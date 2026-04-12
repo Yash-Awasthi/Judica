@@ -50,16 +50,16 @@ const nodeTypes = {
   split: SplitNode,
 };
 
-let nodeIdCounter = 0;
-function getNodeId() {
-  return `node_${++nodeIdCounter}_${Date.now()}`;
-}
-
 function WorkflowEditorInner() {
   const { id: workflowId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { fetchWithAuth } = useAuth();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const nodeIdCounterRef = useRef(0);
+
+  function getNodeId() {
+    return `node_${++nodeIdCounterRef.current}_${Date.now()}`;
+  }
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
@@ -214,42 +214,64 @@ function WorkflowEditorInner() {
 
       const { run_id } = await res.json();
 
-      // Subscribe to SSE
+      // Subscribe to SSE using fetch with Authorization header
       const token = localStorage.getItem("council_token") || "";
-      const es = new EventSource(`/api/workflows/runs/${run_id}/stream?token=${token}`);
+      const streamUrl = `/api/workflows/runs/${run_id}/stream`;
+      const abortController = new AbortController();
 
-      es.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          switch (data.type) {
-            case "node_start":
-              setNodeStatuses((prev) => ({ ...prev, [data.nodeId]: "running" }));
-              break;
-            case "node_complete":
-              setNodeStatuses((prev) => ({ ...prev, [data.nodeId]: "done" }));
-              break;
-            case "node_error":
-              setNodeStatuses((prev) => ({ ...prev, [data.nodeId]: "error" }));
-              break;
-            case "workflow_complete":
-              setRunOutputs(data.outputs || {});
-              setRunning(false);
-              es.close();
-              break;
-            case "workflow_error":
-              setRunning(false);
-              es.close();
-              break;
-          }
-        } catch {
-          // ignore parse errors
+      fetch(streamUrl, {
+        headers: {
+          "Accept": "text/event-stream",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
+        signal: abortController.signal,
+      }).then(async (streamRes) => {
+        if (!streamRes.ok || !streamRes.body) {
+          setRunning(false);
+          return;
         }
-      };
+        const reader = streamRes.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
 
-      es.onerror = () => {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                switch (data.type) {
+                  case "node_start":
+                    setNodeStatuses((prev) => ({ ...prev, [data.nodeId]: "running" }));
+                    break;
+                  case "node_complete":
+                    setNodeStatuses((prev) => ({ ...prev, [data.nodeId]: "done" }));
+                    break;
+                  case "node_error":
+                    setNodeStatuses((prev) => ({ ...prev, [data.nodeId]: "error" }));
+                    break;
+                  case "workflow_complete":
+                    setRunOutputs(data.outputs || {});
+                    setRunning(false);
+                    break;
+                  case "workflow_error":
+                    setRunning(false);
+                    break;
+                }
+              } catch {
+                // ignore parse errors
+              }
+            }
+          }
+        }
         setRunning(false);
-        es.close();
-      };
+      }).catch(() => {
+        setRunning(false);
+      });
     } catch (err) {
       console.error("Run failed", err);
       setRunning(false);

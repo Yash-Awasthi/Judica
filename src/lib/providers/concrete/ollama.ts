@@ -1,6 +1,7 @@
 import logger from "../../logger.js";
 import { BaseProvider } from "../baseProvider.js";
 import { ProviderConfig, ProviderResponse, Message } from "../types.js";
+import { validateSafeUrl } from "../../ssrf.js";
 
 interface OllamaResponse {
   response?: string;
@@ -15,6 +16,13 @@ export class OllamaProvider extends BaseProvider {
   constructor(config: ProviderConfig) {
     super(config);
     this.baseUrl = config.baseUrl || "http://localhost:11434";
+  }
+
+  private async validateBaseUrl(url: string): Promise<void> {
+    // Allow localhost for local Ollama instances
+    const parsed = new URL(url);
+    if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") return;
+    await validateSafeUrl(url);
   }
 
   async call({ prompt, messages, signal, isFallback, onChunk }: {
@@ -36,7 +44,9 @@ export class OllamaProvider extends BaseProvider {
         signal.addEventListener("abort", () => controller.abort());
       }
 
-      const response = await fetch(`${this.baseUrl}/api/generate`, {
+      await this.validateBaseUrl(this.baseUrl);
+
+      const response = await this.protectedFetch(`${this.baseUrl}/api/generate`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -59,6 +69,8 @@ export class OllamaProvider extends BaseProvider {
         const decoder = new TextDecoder();
         let text = "";
         let buffer = "";
+        let streamPromptTokens = 0;
+        let streamCompletionTokens = 0;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -78,18 +90,26 @@ export class OllamaProvider extends BaseProvider {
                 text += parsed.response;
                 onChunk(parsed.response);
               }
+              // Capture token counts from the final chunk (done=true)
+              if (parsed.done) {
+                streamPromptTokens = parsed.prompt_eval_count || 0;
+                streamCompletionTokens = parsed.eval_count || 0;
+              }
             } catch (e) {
               // ignore unparseable chunk
             }
           }
         }
 
+        // Use actual counts from stream if available, otherwise estimate
+        const promptTokens = streamPromptTokens || Math.ceil(finalPrompt.length / 4);
+        const completionTokens = streamCompletionTokens || Math.ceil(text.length / 4);
         return {
           text: text.trim(),
           usage: {
-            promptTokens: 0,
-            completionTokens: 0,
-            totalTokens: 0
+            promptTokens,
+            completionTokens,
+            totalTokens: promptTokens + completionTokens,
           },
           cost: 0 // Local is free
         };

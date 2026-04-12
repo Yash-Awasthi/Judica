@@ -30,16 +30,51 @@ export interface CostBreakdown {
 }
 
 export const DEFAULT_COST_CONFIG: CostConfig[] = [
-  { provider: "openai", model: "gpt-4", inputTokenPrice: 0.03, outputTokenPrice: 0.06, currency: "USD" },
+  // OpenAI — current models (prices per 1K tokens)
+  { provider: "openai", model: "gpt-4o", inputTokenPrice: 0.0025, outputTokenPrice: 0.01, currency: "USD" },
+  { provider: "openai", model: "gpt-4o-2024-11-20", inputTokenPrice: 0.0025, outputTokenPrice: 0.01, currency: "USD" },
+  { provider: "openai", model: "gpt-4o-mini", inputTokenPrice: 0.00015, outputTokenPrice: 0.0006, currency: "USD" },
   { provider: "openai", model: "gpt-4-turbo", inputTokenPrice: 0.01, outputTokenPrice: 0.03, currency: "USD" },
-  { provider: "openai", model: "gpt-3.5-turbo", inputTokenPrice: 0.0015, outputTokenPrice: 0.002, currency: "USD" },
+  { provider: "openai", model: "o1", inputTokenPrice: 0.015, outputTokenPrice: 0.06, currency: "USD" },
+  { provider: "openai", model: "o1-mini", inputTokenPrice: 0.003, outputTokenPrice: 0.012, currency: "USD" },
+  { provider: "openai", model: "o1-pro", inputTokenPrice: 0.15, outputTokenPrice: 0.6, currency: "USD" },
+  { provider: "openai", model: "o3", inputTokenPrice: 0.01, outputTokenPrice: 0.04, currency: "USD" },
+  { provider: "openai", model: "o3-mini", inputTokenPrice: 0.0011, outputTokenPrice: 0.0044, currency: "USD" },
+  { provider: "openai", model: "o4-mini", inputTokenPrice: 0.0011, outputTokenPrice: 0.0044, currency: "USD" },
+  { provider: "openai", model: "gpt-4.1", inputTokenPrice: 0.002, outputTokenPrice: 0.008, currency: "USD" },
+  { provider: "openai", model: "gpt-4.1-mini", inputTokenPrice: 0.0004, outputTokenPrice: 0.0016, currency: "USD" },
+  { provider: "openai", model: "gpt-4.1-nano", inputTokenPrice: 0.0001, outputTokenPrice: 0.0004, currency: "USD" },
 
-  { provider: "anthropic", model: "claude-3-opus", inputTokenPrice: 0.015, outputTokenPrice: 0.075, currency: "USD" },
-  { provider: "anthropic", model: "claude-3-sonnet", inputTokenPrice: 0.003, outputTokenPrice: 0.015, currency: "USD" },
-  { provider: "anthropic", model: "claude-3-haiku", inputTokenPrice: 0.00025, outputTokenPrice: 0.00125, currency: "USD" },
+  // Anthropic — current models
+  { provider: "anthropic", model: "claude-opus-4-20250514", inputTokenPrice: 0.015, outputTokenPrice: 0.075, currency: "USD" },
+  { provider: "anthropic", model: "claude-sonnet-4-20250514", inputTokenPrice: 0.003, outputTokenPrice: 0.015, currency: "USD" },
+  { provider: "anthropic", model: "claude-3-7-sonnet-20250219", inputTokenPrice: 0.003, outputTokenPrice: 0.015, currency: "USD" },
+  { provider: "anthropic", model: "claude-3-5-sonnet-20241022", inputTokenPrice: 0.003, outputTokenPrice: 0.015, currency: "USD" },
+  { provider: "anthropic", model: "claude-3-5-haiku-20241022", inputTokenPrice: 0.0008, outputTokenPrice: 0.004, currency: "USD" },
+  { provider: "anthropic", model: "claude-3-opus-20240229", inputTokenPrice: 0.015, outputTokenPrice: 0.075, currency: "USD" },
+  { provider: "anthropic", model: "claude-3-haiku-20240307", inputTokenPrice: 0.00025, outputTokenPrice: 0.00125, currency: "USD" },
 
-  { provider: "google", model: "gemini-pro", inputTokenPrice: 0.0005, outputTokenPrice: 0.0015, currency: "USD" },
-  { provider: "google", model: "gemini-pro-vision", inputTokenPrice: 0.0025, outputTokenPrice: 0.0075, currency: "USD" },
+  // Google — current models
+  { provider: "google", model: "gemini-2.5-pro-preview-05-06", inputTokenPrice: 0.00125, outputTokenPrice: 0.01, currency: "USD" },
+  { provider: "google", model: "gemini-2.5-flash-preview-04-17", inputTokenPrice: 0.00015, outputTokenPrice: 0.0006, currency: "USD" },
+  { provider: "google", model: "gemini-2.0-flash", inputTokenPrice: 0.0001, outputTokenPrice: 0.0004, currency: "USD" },
+  { provider: "google", model: "gemini-2.0-flash-lite", inputTokenPrice: 0.000075, outputTokenPrice: 0.0003, currency: "USD" },
+  { provider: "google", model: "gemini-1.5-pro", inputTokenPrice: 0.00125, outputTokenPrice: 0.005, currency: "USD" },
+  { provider: "google", model: "gemini-1.5-flash", inputTokenPrice: 0.000075, outputTokenPrice: 0.0003, currency: "USD" },
+
+  // Meta (via Groq / OpenRouter)
+  { provider: "groq", model: "llama-3.3-70b-versatile", inputTokenPrice: 0.00059, outputTokenPrice: 0.00079, currency: "USD" },
+  { provider: "groq", model: "llama-3.1-8b-instant", inputTokenPrice: 0.00005, outputTokenPrice: 0.00008, currency: "USD" },
+  { provider: "groq", model: "llama-4-scout-17b-16e-instruct", inputTokenPrice: 0.00011, outputTokenPrice: 0.00034, currency: "USD" },
+  { provider: "groq", model: "llama-4-maverick-17b-128e-instruct", inputTokenPrice: 0.0005, outputTokenPrice: 0.00077, currency: "USD" },
+
+  // DeepSeek (via OpenRouter)
+  { provider: "openrouter", model: "deepseek/deepseek-chat-v3-0324", inputTokenPrice: 0.00014, outputTokenPrice: 0.00028, currency: "USD" },
+  { provider: "openrouter", model: "deepseek/deepseek-reasoner", inputTokenPrice: 0.00055, outputTokenPrice: 0.00219, currency: "USD" },
+
+  // Mistral (via OpenRouter)
+  { provider: "openrouter", model: "mistral/mistral-large-latest", inputTokenPrice: 0.002, outputTokenPrice: 0.006, currency: "USD" },
+  { provider: "openrouter", model: "mistral/mistral-small-latest", inputTokenPrice: 0.0001, outputTokenPrice: 0.0003, currency: "USD" },
 ];
 
 export function calculateCost(

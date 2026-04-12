@@ -11,16 +11,17 @@ import { executePython } from "../../sandbox/pythonSandbox.js";
  * runs via child_process with a 10s timeout, and parses stdout as JSON.
  */
 export async function executeUserSkill(
-  userId: string,
+  userId: number | string,
   skillName: string,
   inputs: Record<string, any>
 ): Promise<any> {
+  const numericUserId = typeof userId === "string" ? Number(userId) : userId;
   const [skill] = await db
     .select()
     .from(userSkills)
     .where(
       and(
-        eq(userSkills.userId, userId),
+        eq(userSkills.userId, numericUserId),
         eq(userSkills.name, skillName),
         eq(userSkills.active, true)
       )
@@ -31,13 +32,13 @@ export async function executeUserSkill(
     throw new Error(`Skill "${skillName}" not found or inactive`);
   }
 
-  return runSkillCode(skill.code, inputs, userId, skillName);
+  return runSkillCode(skill.code, inputs, String(userId), skillName);
 }
 
 function runSkillCode(
   code: string,
   inputs: Record<string, any>,
-  userId: string,
+  userId: string | number,
   skillName: string
 ): Promise<any> {
   // Build Python script: inject inputs as variables, then append skill code

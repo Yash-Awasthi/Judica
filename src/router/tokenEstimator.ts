@@ -1,41 +1,73 @@
 import type { AdapterMessage } from "../adapters/types.js";
 
 // Estimate token count before sending to avoid exceeding quotas.
-// Uses heuristic (chars/4) — accurate enough for quota decisions.
+// Uses character-based heuristics with language-aware adjustments (PRV-11).
+
+// CJK Unified Ideographs and common CJK ranges
+const CJK_REGEX = /[\u2E80-\u9FFF\uF900-\uFAFF\uFE30-\uFE4F\u{20000}-\u{2FA1F}]/u;
+
+/**
+ * Estimate tokens for a single string, adjusting for non-ASCII / CJK text.
+ *
+ * - English / Latin text: ~4 chars per token (standard BPE behaviour).
+ * - CJK text (Chinese, Japanese kanji, Korean hanja): each character is
+ *   roughly 1-2 tokens, so we use a ratio of ~1.5 chars per token.
+ * - Other non-ASCII (Cyrillic, Arabic, Devanagari, emoji, etc.) tends to
+ *   tokenise at ~2 chars per token.
+ *
+ * We classify by sampling the string and blending the ratios.
+ */
+export function estimateStringTokens(text: string): number {
+  if (text.length === 0) return 0;
+
+  let asciiChars = 0;
+  let cjkChars = 0;
+  let otherNonAsciiChars = 0;
+
+  for (const ch of text) {
+    const code = ch.codePointAt(0)!;
+    if (code <= 0x7f) {
+      asciiChars++;
+    } else if (CJK_REGEX.test(ch)) {
+      cjkChars++;
+    } else {
+      otherNonAsciiChars++;
+    }
+  }
+
+  // Estimate tokens per category
+  const asciiTokens = asciiChars / 4;
+  const cjkTokens = cjkChars / 1.5; // each CJK char ~ 1-2 tokens
+  const otherTokens = otherNonAsciiChars / 2;
+
+  return Math.ceil(asciiTokens + cjkTokens + otherTokens);
+}
 
 /**
  * Estimate total tokens for a set of messages.
- * This is a rough estimate: ~4 chars per token for English text.
  */
 export function estimateTokens(messages: AdapterMessage[]): number {
-  let totalChars = 0;
+  let totalTokens = 0;
 
   for (const m of messages) {
     if (typeof m.content === "string") {
-      totalChars += m.content.length;
+      totalTokens += estimateStringTokens(m.content);
     } else if (Array.isArray(m.content)) {
       for (const block of m.content) {
-        if (block.text) totalChars += block.text.length;
+        if (block.text) totalTokens += estimateStringTokens(block.text);
         // Images are ~85 tokens for low-res, ~765 for high-res. Use 200 as average.
-        if (block.type === "image_base64" || block.type === "image_url") totalChars += 800;
+        if (block.type === "image_base64" || block.type === "image_url") totalTokens += 200;
       }
     }
 
     // Tool calls add overhead
     if (m.tool_calls) {
       for (const tc of m.tool_calls) {
-        totalChars += tc.name.length + JSON.stringify(tc.arguments).length;
+        totalTokens += estimateStringTokens(tc.name + JSON.stringify(tc.arguments));
       }
     }
   }
 
-  // ~4 chars per token, plus overhead for message framing
-  return Math.ceil(totalChars / 4) + messages.length * 4;
-}
-
-/**
- * Estimate tokens for a single string.
- */
-export function estimateStringTokens(text: string): number {
-  return Math.ceil(text.length / 4);
+  // Add overhead for message framing
+  return totalTokens + messages.length * 4;
 }

@@ -9,7 +9,11 @@ export interface ControllerDecision {
 
 export class DeliberationController {
   private threshold = 0.85;
-  private previousMaxScore = 0;
+  private previousMaxScore: number;
+
+  constructor() {
+    this.previousMaxScore = 0;
+  }
 
   decide(round: number, maxRounds: number, consensusScore: number): ControllerDecision {
     if (consensusScore >= this.threshold) {
@@ -49,6 +53,11 @@ export class DeliberationController {
     return true;
   }
 
+  /** Reset per-deliberation state so the controller can be safely reused. */
+  reset(): void {
+    this.previousMaxScore = 0;
+  }
+
   selectTopK(scored: ScoredOpinion[], k: number = 3): ScoredOpinion[] {
     return scored
       .filter(s => s.scores.final >= 0.5) // Phase 5: Strict outlier threshold
@@ -57,4 +66,6 @@ export class DeliberationController {
   }
 }
 
-export const controller = new DeliberationController();
+export function createController(): DeliberationController {
+  return new DeliberationController();
+}

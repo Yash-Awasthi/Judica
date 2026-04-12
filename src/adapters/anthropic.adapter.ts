@@ -6,7 +6,10 @@ import type {
 } from "./types.js";
 import { createStreamResult } from "./types.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
+import { getBreaker } from "../lib/breaker.js";
 import logger from "../lib/logger.js";
+
+const DEFAULT_TIMEOUT_MS = 60_000;
 
 export class AnthropicAdapter implements IProviderAdapter {
   readonly providerId = "anthropic";
@@ -39,15 +42,20 @@ export class AnthropicAdapter implements IProviderAdapter {
       }));
     }
 
-    const res = await fetch(`${this.baseUrl}/v1/messages`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": this.apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify(body),
-    });
+    const fetchMessages = async () =>
+      fetch(`${this.baseUrl}/v1/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": this.apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+      });
+
+    const breaker = getBreaker({ name: this.providerId } as any, fetchMessages);
+    const res: Response = await breaker.fire();
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
@@ -167,7 +175,7 @@ export class AnthropicAdapter implements IProviderAdapter {
               case "content_block_stop":
                 if (currentToolId) {
                   let args: Record<string, unknown> = {};
-                  try { args = JSON.parse(currentToolArgs); } catch { /* empty */ }
+                  try { args = JSON.parse(currentToolArgs); } catch (e) { logger.debug?.({ err: e }, 'Failed to parse tool call args'); }
                   yield {
                     type: "tool_call",
                     tool_call: { id: currentToolId, name: currentToolName, arguments: args },
@@ -227,25 +235,6 @@ export class AnthropicAdapter implements IProviderAdapter {
   }
 
   async isAvailable(): Promise<boolean> {
-    try {
-      // Minimal request to check availability
-      const res = await fetch(`${this.baseUrl}/v1/messages`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": this.apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: "claude-3-haiku-20240307",
-          max_tokens: 1,
-          messages: [{ role: "user", content: "hi" }],
-        }),
-        signal: AbortSignal.timeout(10000),
-      });
-      return res.ok;
-    } catch {
-      return false;
-    }
+    return typeof this.apiKey === "string" && this.apiKey.startsWith("sk-ant-");
   }
 }

@@ -46,7 +46,7 @@ export function DebateDashboardView() {
   const [running, setRunning] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
   const [factsCount, setFactsCount] = useState(0);
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const eventSourceRef = useRef<{ close: () => void } | null>(null);
   const columnRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // Auto-scroll columns
@@ -54,54 +54,6 @@ export function DebateDashboardView() {
     const el = columnRefs.current.get(memberId);
     if (el) el.scrollTop = el.scrollHeight;
   };
-
-  // Start debate
-  const startDebate = useCallback(async () => {
-    if (!query.trim() || running) return;
-
-    setRunning(true);
-    setMembers([]);
-    setConflicts([]);
-    setExchanges([]);
-    setSynthesis(null);
-    setConsensusScore(null);
-    setConsensusBreakdown(null);
-    setFactsCount(0);
-
-    try {
-      const res = await fetchWithAuth("/api/council/debate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: query.trim() }),
-      });
-
-      if (!res.ok) {
-        setRunning(false);
-        return;
-      }
-
-      const { sessionId } = await res.json();
-
-      const token = localStorage.getItem("council_token") || "";
-      const es = new EventSource(`/api/council/debate/${sessionId}/stream?token=${token}`);
-      eventSourceRef.current = es;
-
-      es.onmessage = (event) => {
-        try {
-          const data = JSON.parse(event.data);
-          handleEvent(data);
-        } catch {}
-      };
-
-      es.onerror = () => {
-        setRunning(false);
-        es.close();
-      };
-    } catch (err) {
-      console.error("Debate start failed", err);
-      setRunning(false);
-    }
-  }, [query, running, fetchWithAuth]);
 
   const handleEvent = useCallback((data: Record<string, unknown>) => {
     const type = data.type as string;
@@ -217,7 +169,84 @@ export function DebateDashboardView() {
         eventSourceRef.current?.close();
         break;
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Start debate
+  const startDebate = useCallback(async () => {
+    if (!query.trim() || running) return;
+
+    setRunning(true);
+    setMembers([]);
+    setConflicts([]);
+    setExchanges([]);
+    setSynthesis(null);
+    setConsensusScore(null);
+    setConsensusBreakdown(null);
+    setFactsCount(0);
+
+    try {
+      const res = await fetchWithAuth("/api/council/debate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ query: query.trim() }),
+      });
+
+      if (!res.ok) {
+        setRunning(false);
+        return;
+      }
+
+      const { sessionId } = await res.json();
+
+      const token = localStorage.getItem("council_token") || "";
+      // Use fetch with Authorization header instead of EventSource with token in URL
+      // to avoid leaking the token in browser history and server logs
+      const streamUrl = `/api/council/debate/${sessionId}/stream`;
+      const abortController = new AbortController();
+
+      fetch(streamUrl, {
+        headers: {
+          "Accept": "text/event-stream",
+          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
+        },
+        signal: abortController.signal,
+      }).then(async (streamRes) => {
+        if (!streamRes.ok || !streamRes.body) {
+          setRunning(false);
+          return;
+        }
+        const reader = streamRes.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(value, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() || "";
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              try {
+                const data = JSON.parse(line.slice(6));
+                handleEvent(data);
+              } catch (e) { console.warn("SSE parse error", e); }
+            }
+          }
+        }
+        setRunning(false);
+      }).catch(() => {
+        setRunning(false);
+      });
+
+      // Store abort controller so we can cancel on error
+      eventSourceRef.current = { close: () => abortController.abort() };
+    } catch (err) {
+      console.error("Debate start failed", err);
+      setRunning(false);
+    }
+  }, [query, running, fetchWithAuth, handleEvent]);
 
   const voiceModeRef = useRef(voiceMode);
   useEffect(() => { voiceModeRef.current = voiceMode; }, [voiceMode]);

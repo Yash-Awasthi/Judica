@@ -114,10 +114,24 @@ const redisWrapper = {
     }
   },
 
-  async ttl(key: string): Promise<number> {
+  /** Returns the remaining TTL in milliseconds (uses Redis PTTL command). */
+  async pttl(key: string): Promise<number> {
     try {
       const client = await getRedis();
       return await client.pTTL(key);
+    } catch {
+      return -2;
+    }
+  },
+
+  /** Returns the remaining TTL in seconds (converts from Redis PTTL milliseconds). */
+  async ttl(key: string): Promise<number> {
+    try {
+      const client = await getRedis();
+      const ms = await client.pTTL(key);
+      // Negative values (-1 = no expiry, -2 = key missing) pass through as-is
+      if (ms < 0) return ms;
+      return Math.ceil(ms / 1000);
     } catch {
       return -2;
     }
@@ -129,6 +143,34 @@ const redisWrapper = {
       return await client.flushAll();
     } catch {
       return "OK";
+    }
+  },
+
+  async incr(key: string): Promise<number> {
+    try {
+      const client = await getRedis();
+      return await client.incr(key);
+    } catch {
+      return 0;
+    }
+  },
+
+  async decr(key: string): Promise<number> {
+    try {
+      const client = await getRedis();
+      return await client.decr(key);
+    } catch {
+      return 0;
+    }
+  },
+
+  async expire(key: string, seconds: number): Promise<boolean> {
+    try {
+      const client = await getRedis();
+      const result = await client.expire(key, seconds);
+      return Boolean(result);
+    } catch {
+      return false;
     }
   },
 };

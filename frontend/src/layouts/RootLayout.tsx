@@ -15,6 +15,7 @@ export function RootLayout() {
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [sidebarWidth, setSidebarWidth] = useState(260);
+  const [error, setError] = useState<string | null>(null);
 
   const loadConversations = useCallback(async () => {
     if (!user) return;
@@ -24,7 +25,10 @@ export function RootLayout() {
         const data = await res.json();
         setConversations(data);
       }
-    } catch { /* silent */ }
+    } catch (err) {
+      console.error("Failed to load conversations", err);
+      setError("Failed to load conversations. Please try refreshing the page.");
+    }
   }, [user, fetchWithAuth]);
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
@@ -54,7 +58,10 @@ export function RootLayout() {
           navigate("/");
         }
       }
-    } catch { /* silent */ }
+    } catch (err) {
+      console.error("Failed to delete conversation", err);
+      setError("Failed to delete conversation. Please try again.");
+    }
   }, [fetchWithAuth, activeConvId, navigate]);
 
   const handleShowMetrics = useCallback(() => {
@@ -107,6 +114,19 @@ export function RootLayout() {
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Error banner */}
+        {error && (
+          <div className="px-4 py-3 bg-red-500/10 border-b border-red-500/30 text-red-400 text-sm flex items-center justify-between">
+            <span>{error}</span>
+            <button
+              onClick={() => setError(null)}
+              className="ml-4 text-red-400 hover:text-red-300 transition-colors"
+              aria-label="Dismiss error"
+            >
+              &times;
+            </button>
+          </div>
+        )}
         {/* Mobile hamburger */}
         <div className="md:hidden px-4 py-3 flex items-center border-b border-[var(--border-subtle)] bg-[var(--bg-surface-1)]">
           <button

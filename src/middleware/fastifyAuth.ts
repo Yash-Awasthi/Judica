@@ -1,11 +1,17 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import jwt from "jsonwebtoken";
+import { z } from "zod";
 import { env } from "../config/env.js";
 import { db } from "../lib/drizzle.js";
 import { revokedTokens } from "../db/schema/auth.js";
 import { eq } from "drizzle-orm";
 import redis from "../lib/redis.js";
 import logger from "../lib/logger.js";
+
+const jwtPayloadSchema = z.object({
+  userId: z.number(),
+  username: z.string(),
+});
 
 declare module "fastify" {
   interface FastifyRequest {
@@ -28,7 +34,8 @@ export async function fastifyOptionalAuth(request: FastifyRequest, reply: Fastif
 
   try {
     const token = authHeader.split(" ")[1];
-    const payload = jwt.verify(token, env.JWT_SECRET) as any;
+    const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] });
+    const payload = jwtPayloadSchema.parse(decoded);
 
     if (await isTokenRevoked(token)) return;
 
@@ -48,7 +55,8 @@ export async function fastifyRequireAuth(request: FastifyRequest, reply: Fastify
   const token = authHeader.split(" ")[1];
 
   try {
-    const payload = jwt.verify(token, env.JWT_SECRET) as any;
+    const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] });
+    const payload = jwtPayloadSchema.parse(decoded);
 
     if (await isTokenRevoked(token)) {
       reply.code(401).send({ error: "Token revoked" });

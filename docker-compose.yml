@@ -6,32 +6,43 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=3000
-      - DATABASE_URL=postgresql://council:council123@db:5432/councildb
-      - REDIS_URL=redis://:${REDIS_PASSWORD:-council_redis_pass}@redis:6379
-      - REDIS_PASSWORD=${REDIS_PASSWORD:-council_redis_pass}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-council}:${POSTGRES_PASSWORD:-councilpass}@db:5432/${POSTGRES_DB:-councildb}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-councilpass}@redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-councilpass}
       - JWT_SECRET=${JWT_SECRET}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
+      - MASTER_ENCRYPTION_KEY=${MASTER_ENCRYPTION_KEY}
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: >
-      sh -c "npx drizzle-kit push && node dist/index.js"
+    command: ["node", "dist/index.js"]
     restart: unless-stopped
+
+  migrate:
+    build: .
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-council}:${POSTGRES_PASSWORD:-councilpass}@db:5432/${POSTGRES_DB:-councildb}
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["npx", "drizzle-kit", "push"]
+    restart: "no"
+    profiles:
+      - migrate
 
   db:
     image: pgvector/pgvector:pg16
     environment:
-      - POSTGRES_USER=council
-      - POSTGRES_PASSWORD=council123
-      - POSTGRES_DB=councildb
+      - POSTGRES_USER=${POSTGRES_USER:-council}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-councilpass}
+      - POSTGRES_DB=${POSTGRES_DB:-councildb}
     ports:
-      - "5433:5432"
+      - "127.0.0.1:5433:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U council -d councildb"]
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-council} -d ${POSTGRES_DB:-councildb}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -39,13 +50,13 @@ services:
 
   redis:
     image: redis:7-alpine
-    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-council_redis_pass}"]
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:-councilpass}"]
     ports:
-      - "6379:6379"
+      - "127.0.0.1:6379:6379"
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-council_redis_pass}", "ping"]
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-councilpass}", "ping"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -54,7 +65,7 @@ services:
   prometheus:
     image: prom/prometheus:v2.53.0
     ports:
-      - "9090:9090"
+      - "127.0.0.1:9090:9090"
     volumes:
       - ./prometheus.yml:/etc/prometheus/prometheus.yml
       - prometheus_data:/prometheus
@@ -65,11 +76,15 @@ services:
   grafana:
     image: grafana/grafana:11.1.0
     ports:
-      - "3001:3000"
+      - "127.0.0.1:3001:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
     volumes:
       - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
     depends_on:
       - prometheus
     restart: unless-stopped

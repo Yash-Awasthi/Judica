@@ -38,7 +38,7 @@ function sleep(ms: number): Promise<void> {
 }
 
 export async function ingestGitHubRepo(
-  userId: string,
+  userId: number,
   owner: string,
   repo: string
 ): Promise<string> {

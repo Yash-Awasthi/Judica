@@ -11,7 +11,7 @@ import { eq, and, or, ilike, asc, desc, count, lte, sql } from "drizzle-orm";
 import logger from "../lib/logger.js";
 
 import { AppError } from "../middleware/errorHandler.js";
-import { validate, renameConversationSchema, forkSchema } from "../middleware/validate.js";
+import { fastifyValidate, renameConversationSchema, forkSchema } from "../middleware/validate.js";
 
 function parsePagination(query: { page?: string; limit?: string }, defaultLimit = 20, maxLimit = 100) {
   const page = Math.max(1, parseInt(query.page || '1', 10));
@@ -85,6 +85,12 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
       const searchTerm = q.trim();
       const limitNum = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 50);
 
+      // Escape LIKE special characters to prevent wildcard injection
+      const escapedTerm = searchTerm
+        .replace(/\\/g, "\\\\")
+        .replace(/%/g, "\\%")
+        .replace(/_/g, "\\_");
+
       const results = await db
         .select({
           id: chats.id,
@@ -98,8 +104,8 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
           and(
             eq(chats.userId, request.userId!),
             or(
-              ilike(chats.question, `%${searchTerm}%`),
-              ilike(chats.verdict, `%${searchTerm}%`)
+              ilike(chats.question, `%${escapedTerm}%`),
+              ilike(chats.verdict, `%${escapedTerm}%`)
             )
           )
         )
@@ -175,7 +181,7 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
     const { page, limit, skip } = parsePagination(request.query as { page?: string; limit?: string });
 
     const [conversationList, totalResult] = await Promise.all([
-      getConversationList(request.userId!, limit),
+      getConversationList(request.userId!, limit, skip),
       db.select({ value: count() }).from(conversations).where(eq(conversations.userId, request.userId!))
     ]);
 
@@ -331,7 +337,7 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
    *       404:
    *         description: Conversation not found
    */
-  fastify.patch("/:id", { preHandler: [fastifyRequireAuth, validate(renameConversationSchema)] }, async (request, reply) => {
+  fastify.patch("/:id", { preHandler: [fastifyRequireAuth, fastifyValidate(renameConversationSchema)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { title } = request.body as { title: string };
 
@@ -425,7 +431,7 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
    *       404:
    *         description: Source conversation not found
    */
-  fastify.post("/:id/fork", { preHandler: [fastifyRequireAuth, validate(forkSchema)] }, async (request, reply) => {
+  fastify.post("/:id/fork", { preHandler: [fastifyRequireAuth, fastifyValidate(forkSchema)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { toChatId } = request.body as { toChatId: number };
 
@@ -451,7 +457,6 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
 
     if (!chatsToFork.length) throw new AppError(400, "No messages to fork");
 
-    const forkId = sql`gen_random_uuid()`;
     const forkRows = await db
       .insert(conversations)
       .values({

@@ -1,5 +1,6 @@
 import { Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
+import { z } from "zod";
 import { env } from "../config/env.js";
 import { db } from "../lib/drizzle.js";
 import { revokedTokens } from "../db/schema/auth.js";
@@ -7,6 +8,11 @@ import { eq } from "drizzle-orm";
 import redis from "../lib/redis.js";
 import logger from "../lib/logger.js";
 import { AuthRequest } from "../types/index.js";
+
+const jwtPayloadSchema = z.object({
+  userId: z.number(),
+  username: z.string(),
+});
 
 async function isTokenRevoked(token: string): Promise<boolean> {
   const revokedInRedis = await redis.get(`revoked:${token}`);
@@ -29,7 +35,8 @@ export async function requireAuth(req: AuthRequest, res: Response, next: NextFun
   const token = authHeader.split(" ")[1];
 
   try {
-    const payload = jwt.verify(token, env.JWT_SECRET) as any;
+    const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] });
+    const payload = jwtPayloadSchema.parse(decoded);
 
     if (await isTokenRevoked(token)) {
       res.status(401).json({ error: "Token revoked" });
@@ -53,7 +60,8 @@ export async function optionalAuth(req: AuthRequest, res: Response, next: NextFu
   const token = authHeader.split(" ")[1];
 
   try {
-    const payload = jwt.verify(token, env.JWT_SECRET) as any;
+    const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] });
+    const payload = jwtPayloadSchema.parse(decoded);
 
     if (await isTokenRevoked(token)) {
       res.status(401).json({ error: "Token revoked" });
