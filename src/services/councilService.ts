@@ -88,7 +88,13 @@ export function getDefaultMembers(count = 3): CouncilProvider[] {
   }
   
   const originalLength = providers.length;
+  const MAX_CLONE_ITERATIONS = 20;
+  let iterations = 0;
   while (providers.length < count) {
+    if (++iterations > MAX_CLONE_ITERATIONS) {
+      logger.warn({ count, originalLength, iterations }, "Council cloning hit max iteration guard");
+      break;
+    }
     const providerToClone = providers[(providers.length - originalLength) % originalLength];
     providers.push({ ...providerToClone, name: `${providerToClone.name}-${providers.length - originalLength + 1}` });
   }

@@ -46,11 +46,16 @@ async function webSearch(query: string, maxResults: number = 5): Promise<{ title
 
   if (env.SERP_API_KEY) {
     try {
+      // Send API key via header instead of URL query string to avoid
+      // leaking credentials in server logs and referer headers (BE-16)
       const serpUrl = new URL("https://serpapi.com/search.json");
       serpUrl.searchParams.set("q", query);
       serpUrl.searchParams.set("num", String(maxResults));
       const res = await fetch(serpUrl.toString(), {
-        headers: { "Authorization": `Bearer ${env.SERP_API_KEY}` },
+        headers: {
+          "X-API-KEY": env.SERP_API_KEY,
+          "Authorization": `Bearer ${env.SERP_API_KEY}`,
+        },
         signal: AbortSignal.timeout(15000),
       });
       if (res.ok) {
