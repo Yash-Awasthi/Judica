@@ -1,4 +1,4 @@
-import { FastifyPluginAsync } from "fastify";
+import { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
 import { db } from "../lib/drizzle.js";
 import { dailyUsage, users } from "../db/schema/users.js";
 import { conversations, chats } from "../db/schema/conversations.js";
@@ -6,6 +6,27 @@ import { eq, and, gte, count, sum, avg, asc, isNotNull } from "drizzle-orm";
 import logger from "../lib/logger.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
+
+async function fastifyRequireAdmin(request: FastifyRequest, reply: FastifyReply) {
+  await fastifyRequireAuth(request, reply);
+  if (reply.sent) return;
+
+  if (!request.userId) {
+    reply.code(401).send({ error: "Not authenticated" });
+    return;
+  }
+
+  const [user] = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(eq(users.id, request.userId))
+    .limit(1);
+
+  if (!user || user.role !== "admin") {
+    reply.code(403).send({ error: "Admin access required" });
+    return;
+  }
+}
 
 // ─── Plugin ─────────────────────────────────────────────────────────────────
 
@@ -160,7 +181,7 @@ const metricsPlugin: FastifyPluginAsync = async (fastify) => {
    *       401:
    *         description: Unauthorized
    */
-  fastify.get("/system", { preHandler: fastifyRequireAuth }, async (request: any, reply) => {
+  fastify.get("/system", { preHandler: fastifyRequireAdmin }, async (request: any, reply) => {
     try {
       const [totalUsersRow] = await db.select({ value: count() }).from(users);
 

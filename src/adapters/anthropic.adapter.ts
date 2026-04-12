@@ -6,7 +6,10 @@ import type {
 } from "./types.js";
 import { createStreamResult } from "./types.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
+import { getBreaker } from "../lib/breaker.js";
 import logger from "../lib/logger.js";
+
+const DEFAULT_TIMEOUT_MS = 60_000;
 
 export class AnthropicAdapter implements IProviderAdapter {
   readonly providerId = "anthropic";
@@ -39,15 +42,20 @@ export class AnthropicAdapter implements IProviderAdapter {
       }));
     }
 
-    const res = await fetch(`${this.baseUrl}/v1/messages`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-api-key": this.apiKey,
-        "anthropic-version": "2023-06-01",
-      },
-      body: JSON.stringify(body),
-    });
+    const fetchMessages = async () =>
+      fetch(`${this.baseUrl}/v1/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": this.apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+      });
+
+    const breaker = getBreaker({ name: this.providerId } as any, fetchMessages);
+    const res: Response = await breaker.fire();
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));

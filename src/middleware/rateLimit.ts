@@ -42,7 +42,7 @@ const userKeyGenerator = (req: any) => {
 
 export const askLimiter = rateLimit({
   windowMs: env.RATE_LIMIT_WINDOW_MS,
-  max: 1000,
+  max: 60,
   keyGenerator: userKeyGenerator,
   message: { error: "Too many requests, slow down." },
   standardHeaders: true,
@@ -52,9 +52,12 @@ export const askLimiter = rateLimit({
   ...(redisStore ? { store: redisStore } : {}),
 });
 
+// SEC-5: Auth limiter set to 10/min to prevent brute-force credential stuffing.
+// This is deliberately low because legitimate users rarely need more than a few
+// auth attempts per minute. Failed attempts still count toward the limit.
 export const authLimiter = rateLimit({
   windowMs: 1 * 60 * 1000,
-  max: 1000,
+  max: 10,
   keyGenerator: userKeyGenerator,
   message: { error: "Too many auth attempts, try again later." },
   standardHeaders: true,

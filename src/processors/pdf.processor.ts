@@ -1,7 +1,9 @@
 import fs from "fs";
 import type { ProcessedFile } from "./types.js";
+import { assertFileSizeLimit } from "./types.js";
 
 export async function processPDF(filePath: string): Promise<ProcessedFile> {
+  assertFileSizeLimit(filePath);
   const pdfParseModule = await import("pdf-parse");
   const pdfParse = (pdfParseModule as any).default || pdfParseModule;
   const buffer = fs.readFileSync(filePath);

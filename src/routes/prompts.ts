@@ -423,26 +423,28 @@ const promptsPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(400, "Content is required", "VERSION_CONTENT_REQUIRED");
     }
 
-    // Get current max versionNum
-    const [latest] = await db
-      .select({ maxVersion: max(promptVersions.versionNum) })
-      .from(promptVersions)
-      .where(eq(promptVersions.promptId, prompt.id));
+    // Get current max versionNum and insert in a transaction to avoid TOCTOU race
+    const [version] = await db.transaction(async (tx) => {
+      const [latest] = await tx
+        .select({ maxVersion: max(promptVersions.versionNum) })
+        .from(promptVersions)
+        .where(eq(promptVersions.promptId, prompt.id));
 
-    const nextVersion = (latest?.maxVersion ?? 0) + 1;
+      const nextVersion = (latest?.maxVersion ?? 0) + 1;
 
-    const [version] = await db
-      .insert(promptVersions)
-      .values({
-        id: randomUUID(),
-        promptId: prompt.id,
-        versionNum: nextVersion,
-        content: content.trim(),
-        model: model || null,
-        temperature: temperature ?? null,
-        notes: notes?.trim() || null,
-      })
-      .returning();
+      return tx
+        .insert(promptVersions)
+        .values({
+          id: randomUUID(),
+          promptId: prompt.id,
+          versionNum: nextVersion,
+          content: content.trim(),
+          model: model || null,
+          temperature: temperature ?? null,
+          notes: notes?.trim() || null,
+        })
+        .returning();
+    });
 
     reply.code(201);
     return version;

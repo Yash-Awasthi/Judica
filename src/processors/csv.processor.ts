@@ -1,8 +1,10 @@
 import fs from "fs";
 import Papa from "papaparse";
 import type { ProcessedFile } from "./types.js";
+import { assertFileSizeLimit } from "./types.js";
 
 export async function processCSV(filePath: string): Promise<ProcessedFile> {
+  assertFileSizeLimit(filePath);
   const raw = fs.readFileSync(filePath, "utf-8");
   const parsed = Papa.parse(raw, { header: true, skipEmptyLines: true });
   const rows = parsed.data as Record<string, string>[];

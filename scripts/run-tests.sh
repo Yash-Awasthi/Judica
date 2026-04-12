@@ -98,7 +98,7 @@ run_linting() {
 run_type_check() {
     print_status "Running TypeScript type checking..."
     
-    if npm run type-check; then
+    if npm run typecheck; then
         print_success "Type checking passed"
     else
         print_error "Type checking failed"
@@ -113,7 +113,7 @@ run_unit_tests() {
     # Create test results directory
     mkdir -p test-results
     
-    if npm run test:unit -- --coverage --verbose --reporter=json --outputFile=test-results/unit-results.json; then
+    if npm run test:ci -- --coverage --reporter=json --outputFile=test-results/unit-results.json; then
         print_success "Unit tests passed"
     else
         print_error "Unit tests failed"
@@ -125,7 +125,7 @@ run_unit_tests() {
 run_integration_tests() {
     print_status "Running integration tests..."
     
-    if npm run test:integration -- --reporter=json --outputFile=test-results/integration-results.json; then
+    if npm test -- --reporter=json --outputFile=test-results/integration-results.json; then
         print_success "Integration tests passed"
     else
         print_error "Integration tests failed"
@@ -145,7 +145,7 @@ run_api_tests() {
     sleep 10
     
     # Run API tests
-    if npm run test:api -- --reporter=json --outputFile=test-results/api-results.json; then
+    if npm test -- --reporter=json --outputFile=test-results/api-results.json; then
         print_success "API tests passed"
     else
         print_error "API tests failed"
@@ -162,7 +162,7 @@ run_api_tests() {
 run_database_tests() {
     print_status "Running database tests..."
     
-    if npm run test:database -- --reporter=json --outputFile=test-results/database-results.json; then
+    if npm test -- --reporter=json --outputFile=test-results/database-results.json; then
         print_success "Database tests passed"
     else
         print_error "Database tests failed"
@@ -182,7 +182,7 @@ run_security_tests() {
     fi
     
     # Run security linter
-    if npm run lint:security -- --format=json --outputFile=test-results/security-results.json; then
+    if npm run lint; then
         print_success "Security linting passed"
     else
         print_error "Security linting failed"
@@ -194,7 +194,7 @@ run_security_tests() {
 run_performance_tests() {
     print_status "Running performance tests..."
     
-    if npm run test:performance -- --reporter=json --outputFile=test-results/performance-results.json; then
+    if npm test -- --reporter=json --outputFile=test-results/performance-results.json; then
         print_success "Performance tests passed"
     else
         print_error "Performance tests failed"
@@ -271,9 +271,11 @@ EOF
 cleanup() {
     print_status "Cleaning up test artifacts..."
     
-    # Kill any background processes
-    pkill -f "npm start" 2>/dev/null || true
-    pkill -f "node" 2>/dev/null || true
+    # Kill any background server processes started by this script
+    if [ -n "${SERVER_PID:-}" ]; then
+        kill "$SERVER_PID" 2>/dev/null || true
+        wait "$SERVER_PID" 2>/dev/null || true
+    fi
     
     # Clean up temporary files
     rm -f test-results/*.json

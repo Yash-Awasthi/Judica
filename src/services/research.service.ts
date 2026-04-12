@@ -46,10 +46,13 @@ async function webSearch(query: string, maxResults: number = 5): Promise<{ title
 
   if (env.SERP_API_KEY) {
     try {
-      const res = await fetch(
-        `https://serpapi.com/search.json?q=${encodeURIComponent(query)}&api_key=${env.SERP_API_KEY}&num=${maxResults}`,
-        { signal: AbortSignal.timeout(15000) }
-      );
+      const serpUrl = new URL("https://serpapi.com/search.json");
+      serpUrl.searchParams.set("q", query);
+      serpUrl.searchParams.set("num", String(maxResults));
+      const res = await fetch(serpUrl.toString(), {
+        headers: { "Authorization": `Bearer ${env.SERP_API_KEY}` },
+        signal: AbortSignal.timeout(15000),
+      });
       if (res.ok) {
         const data = (await res.json()) as any;
         return (data.organic_results || []).slice(0, maxResults).map((r: any) => ({

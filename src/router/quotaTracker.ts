@@ -1,6 +1,22 @@
 import logger from "../lib/logger.js";
 
-// Track per-provider per-day usage. In-memory for now, can be backed by Redis.
+/**
+ * LIMITATION (PRV-10): Quota tracking is in-memory only.
+ *
+ * All quota counters are lost on process restart, meaning usage resets to zero
+ * whenever the server restarts. This is acceptable for now because:
+ *
+ * 1. Quotas serve as a soft safety net, not a billing-critical boundary.
+ *    Upstream providers enforce their own hard limits regardless.
+ * 2. The daily reset at midnight UTC means the maximum drift from a restart
+ *    is at most one day of uncounted usage.
+ * 3. For single-process deployments the in-memory map is the simplest correct
+ *    implementation with zero external dependencies.
+ *
+ * If persistent tracking is needed (e.g. multi-instance deployments, strict
+ * budgeting), replace the `quotas` Map below with a Redis-backed store using
+ * INCRBY + TTL-based daily expiry.
+ */
 
 interface QuotaEntry {
   requests_used: number;

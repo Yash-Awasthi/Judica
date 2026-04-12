@@ -37,7 +37,7 @@ export const memoryBackends = pgTable("MemoryBackend", {
   userId: integer("userId")
     .notNull()
     .unique()
-    .references(() => users.id),
+    .references(() => users.id, { onDelete: "cascade" }),
   type: text("type").notNull(),
   config: text("config").notNull(),
   active: boolean("active").default(true).notNull(),

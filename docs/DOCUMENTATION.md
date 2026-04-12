@@ -623,7 +623,7 @@ aibyai/
 └── package.json               # Dependencies + scripts
 ```
 
-**By the numbers:** 178 backend TypeScript files, 57 frontend React files, 39 Drizzle schema tables, 33 API routes, 16 services, 10 middleware, 9 document processors, 9 LLM provider adapters, 10 workflow node types.
+**By the numbers:** 178 backend TypeScript files, 57 frontend React files, 39 Drizzle schema tables, 31 API route plugins, 16 services, 10 middleware, 9 document processors, 7 LLM provider adapters, 10 workflow node types.
 
 ---
 

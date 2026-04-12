@@ -87,9 +87,10 @@ export function getDefaultMembers(count = 3): CouncilProvider[] {
     );
   }
   
+  const originalLength = providers.length;
   while (providers.length < count) {
-    const providerToClone = providers[providers.length % providers.length];
-    providers.push({ ...providerToClone });
+    const providerToClone = providers[(providers.length - originalLength) % originalLength];
+    providers.push({ ...providerToClone, name: `${providerToClone.name}-${providers.length - originalLength + 1}` });
   }
   
   return providers.slice(0, count);

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
 import ReactECharts from "echarts-for-react";
@@ -94,7 +94,7 @@ export function AnalyticsView() {
     );
   }
 
-  const tokenLineOption = {
+  const tokenLineOption = useMemo(() => ({
     tooltip: {
       trigger: "axis" as const,
       backgroundColor: "var(--bg-surface-1)",
@@ -123,9 +123,9 @@ export function AnalyticsView() {
       showSymbol: false,
       areaStyle: { color: "rgba(110,231,183,0.08)" },
     }],
-  };
+  }), [data.dailyUsage]);
 
-  const costBarOption = {
+  const costBarOption = useMemo(() => ({
     tooltip: {
       trigger: "axis" as const,
       backgroundColor: "var(--bg-surface-1)",
@@ -155,9 +155,9 @@ export function AnalyticsView() {
       barBorderRadius: [4, 4, 0, 0],
       itemStyle: { color: "#60a5fa" },
     }],
-  };
+  }), [data.dailyUsage]);
 
-  const pieOption = {
+  const pieOption = useMemo(() => ({
     tooltip: {
       backgroundColor: "var(--bg-surface-1)",
       borderColor: "var(--border-medium)",
@@ -185,7 +185,7 @@ export function AnalyticsView() {
         itemStyle: { shadowBlur: 10, shadowOffsetX: 0, shadowColor: "rgba(0,0,0,0.3)" },
       },
     }],
-  };
+  }), [data.modelDistribution]);
 
   return (
     <div className="h-full overflow-y-auto scrollbar-custom p-6">

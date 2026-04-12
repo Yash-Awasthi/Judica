@@ -34,16 +34,15 @@ export async function embed(text: string): Promise<number[]> {
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ content: { parts: [{ text }] } }),
+        body: JSON.stringify({
+          content: { parts: [{ text }] },
+          outputDimensionality: 1536,
+        }),
       }
     );
     if (!res.ok) throw new Error(`Gemini embeddings failed: ${res.status} ${await res.text()}`);
     const data = await res.json() as any;
     embedding = data.embedding.values;
-    // Gemini text-embedding-004 is 768-dim, pad to 1536 for consistency
-    if (embedding.length < 1536) {
-      embedding = [...embedding, ...new Array(1536 - embedding.length).fill(0)];
-    }
   } else {
     throw new Error("No embedding provider available. Set OPENAI_API_KEY or GOOGLE_API_KEY.");
   }

@@ -9,7 +9,10 @@ import type {
 import { createStreamResult } from "./types.js";
 import { calculateCost } from "../lib/cost.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
+import { getBreaker } from "../lib/breaker.js";
 import logger from "../lib/logger.js";
+
+const DEFAULT_TIMEOUT_MS = 60_000;
 
 export class OpenAIAdapter implements IProviderAdapter {
   readonly providerId = "openai";
@@ -41,14 +44,19 @@ export class OpenAIAdapter implements IProviderAdapter {
       body.tool_choice = "auto";
     }
 
-    const res = await fetch(`${this.baseUrl}/chat/completions`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${this.apiKey}`,
-      },
-      body: JSON.stringify(body),
-    });
+    const fetchChat = async () =>
+      fetch(`${this.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
+      });
+
+    const breaker = getBreaker({ name: this.providerId } as any, fetchChat);
+    const res: Response = await breaker.fire();
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));

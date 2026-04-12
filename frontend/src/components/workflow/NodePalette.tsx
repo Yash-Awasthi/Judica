@@ -1,5 +1,5 @@
 import { Brain, Wrench, GitBranch, FileText, Code, Globe, UserCheck, Repeat, ArrowRightCircle, ArrowLeftCircle, Merge, Split } from "lucide-react";
-import type { DragEvent } from "react";
+import type { DragEvent, KeyboardEvent } from "react";
 
 const NODE_GROUPS = [
   {
@@ -47,21 +47,37 @@ export function NodePalette() {
     event.dataTransfer.effectAllowed = "move";
   };
 
+  const onKeyDown = (event: KeyboardEvent, nodeType: string) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      // Dispatch a custom event that the workflow canvas can listen for
+      const customEvent = new CustomEvent("nodePaletteAdd", {
+        detail: { nodeType },
+        bubbles: true,
+      });
+      event.currentTarget.dispatchEvent(customEvent);
+    }
+  };
+
   return (
     <div className="w-56 border-r border-gray-200 bg-gray-50 p-3 overflow-y-auto">
       <h3 className="font-semibold text-sm mb-3 text-gray-700">Nodes</h3>
       {NODE_GROUPS.map((group) => (
         <div key={group.label} className="mb-4">
           <div className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">{group.label}</div>
-          <div className="space-y-1">
+          <div className="space-y-1" role="list" aria-label={group.label}>
             {group.items.map((item) => {
               const Icon = item.icon;
               return (
                 <div
                   key={item.type}
-                  className="flex items-center gap-2 px-2 py-1.5 bg-white rounded border border-gray-200 cursor-grab hover:border-blue-300 hover:shadow-sm transition-all"
+                  className="flex items-center gap-2 px-2 py-1.5 bg-white rounded border border-gray-200 cursor-grab hover:border-blue-300 hover:shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
                   draggable
+                  role="listitem"
+                  tabIndex={0}
+                  aria-label={`Add ${item.label} node`}
                   onDragStart={(e) => onDragStart(e, item.type)}
+                  onKeyDown={(e) => onKeyDown(e, item.type)}
                 >
                   <Icon size={14} className={item.color} />
                   <span className="text-xs font-medium text-gray-700">{item.label}</span>

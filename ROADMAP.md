@@ -23,14 +23,14 @@ The following infrastructure upgrades have been completed on the `sidecamel` bra
 | Migration | From | To | Status |
 |---|---|---|---|
 | Runtime | Node.js 20 | Node.js 22 LTS | Done |
-| Vector indexes | IVFFlat (default) | HNSW (m=16, ef=64) | Done |
+| Vector indexes | IVFFlat (default) | pgvector with B-tree indexes | Done |
 | Password hashing | bcrypt | argon2id (with legacy fallback) | Done |
 | Token security | Static JWT | Short-lived access + rotating refresh tokens | Done |
 | Metrics | Internal JSON only | Prometheus (prom-client) + histograms | Done |
 | Sandbox | No resource caps | isolated-vm 128MB + Python ulimit | Done |
 | WebSocket | Socket.IO | Native ws | Done |
 | Charts | Recharts | Apache ECharts | Done |
-| HTTP framework | Express 5.2 | Fastify 5 (33 native plugins) | Done |
+| HTTP framework | Express 5.2 | Fastify 5 (31 native plugins + Express compat layer for Swagger UI) | Done |
 | ORM | Prisma 7.6 | Drizzle ORM (zero Prisma imports) | Done |
 
 ---
@@ -42,8 +42,8 @@ flowchart LR
     subgraph COMPLETE["Implemented"]
         direction TB
         A["Multi-Agent Deliberation\n4+ agents, peer review, debate"]
-        B["9 LLM Providers\nOpenAI, Anthropic, Gemini, Groq, Ollama..."]
-        C["RAG Pipeline\npgvector HNSW, hybrid search, KB management"]
+        B["7 LLM Provider Adapters\nOpenAI, Anthropic, Gemini, Groq, Ollama, OpenRouter, Custom"]
+        C["RAG Pipeline\npgvector embeddings, hybrid search, KB management"]
         D["Workflow Engine\n10+ node types, visual canvas"]
         E["Research Mode\nMulti-step web research"]
         F["Code Sandbox\nisolated-vm + Python (hardened)"]
@@ -89,7 +89,7 @@ timeline
 
 ## Testing & Quality Assurance
 
-> **Priority: High** — Test suite exists (7 test files, 97 passing tests) but coverage needs expansion for the new Fastify + Drizzle codebase.
+> **Priority: High** — Test suite exists (7 test files, ~92 active tests) but coverage needs expansion for the new Fastify + Drizzle codebase.
 
 ### Unit Tests
 
@@ -393,17 +393,6 @@ flowchart TB
 - **Dependency resolution**: Marketplace items that depend on other items auto-install dependencies
 
 ---
-
-## Remaining Express Routes
-
-> **Priority: Low** — Two routes remain on the Express compatibility layer.
-
-| Route | Reason | Path Forward |
-|---|---|---|
-| `ask.ts` | Complex SSE streaming + multiple middleware (optionalAuth, checkQuota, validate) | Convert to Fastify with `reply.raw` SSE pattern |
-| `uploads.ts` | Multer file upload middleware | Convert to `@fastify/multipart` |
-
-Both routes work correctly through `@fastify/express` — conversion is a cleanup task, not a functional requirement.
 
 ---
 

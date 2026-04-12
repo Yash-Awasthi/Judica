@@ -20,7 +20,7 @@ export const groupMemberships = pgTable(
   {
     userId: integer("userId")
       .notNull()
-      .references(() => users.id),
+      .references(() => users.id, { onDelete: "cascade" }),
     groupId: text("groupId")
       .notNull()
       .references(() => userGroups.id, { onDelete: "cascade" }),

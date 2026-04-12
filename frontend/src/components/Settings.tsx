@@ -1,8 +1,14 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 export const Settings: React.FC = () => {
   const { user } = useAuth();
+
+  const [autoCouncil, setAutoCouncil] = useState(true);
+  const [debateRound, setDebateRound] = useState(true);
+  const [coldValidator, setColdValidator] = useState(true);
+  const [piiDetection, setPiiDetection] = useState(true);
+  const [autoAnonymize, setAutoAnonymize] = useState(false);
 
   return (
     <div className="h-full overflow-y-auto p-6">
@@ -27,15 +33,15 @@ export const Settings: React.FC = () => {
             <div className="space-y-3">
               <label className="flex items-center justify-between">
                 <span className="text-sm text-text-muted">Auto-Council Mode</span>
-                <input type="checkbox" className="rounded border-border" defaultChecked />
+                <input type="checkbox" className="rounded border-border" checked={autoCouncil} onChange={(e) => setAutoCouncil(e.target.checked)} />
               </label>
               <label className="flex items-center justify-between">
                 <span className="text-sm text-text-muted">Enable Debate Round</span>
-                <input type="checkbox" className="rounded border-border" defaultChecked />
+                <input type="checkbox" className="rounded border-border" checked={debateRound} onChange={(e) => setDebateRound(e.target.checked)} />
               </label>
               <label className="flex items-center justify-between">
                 <span className="text-sm text-text-muted">Cold Validator</span>
-                <input type="checkbox" className="rounded border-border" defaultChecked />
+                <input type="checkbox" className="rounded border-border" checked={coldValidator} onChange={(e) => setColdValidator(e.target.checked)} />
               </label>
             </div>
           </div>
@@ -46,11 +52,11 @@ export const Settings: React.FC = () => {
             <div className="space-y-3">
               <label className="flex items-center justify-between">
                 <span className="text-sm text-text-muted">PII Detection</span>
-                <input type="checkbox" className="rounded border-border" defaultChecked />
+                <input type="checkbox" className="rounded border-border" checked={piiDetection} onChange={(e) => setPiiDetection(e.target.checked)} />
               </label>
               <label className="flex items-center justify-between">
                 <span className="text-sm text-text-muted">Auto-anonymize High Risk</span>
-                <input type="checkbox" className="rounded border-border" />
+                <input type="checkbox" className="rounded border-border" checked={autoAnonymize} onChange={(e) => setAutoAnonymize(e.target.checked)} />
               </label>
             </div>
           </div>

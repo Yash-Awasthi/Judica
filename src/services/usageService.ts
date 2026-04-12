@@ -34,6 +34,7 @@ export async function updateDailyUsage(input: UsageUpdateInput): Promise<void> {
         target: [dailyUsage.userId, dailyUsage.date],
         set: {
           tokens: sql`${dailyUsage.tokens} + ${tokensUsed}`,
+          requests: sql`${dailyUsage.requests} + 1`,
           updatedAt: new Date(),
         },
       });

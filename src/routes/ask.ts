@@ -1,11 +1,9 @@
-import { Router, Response, NextFunction } from "express";
+import { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
 import { askCouncil } from "../lib/council.js";
 import { Message } from "../lib/providers.js";
 import logger from "../lib/logger.js";
-import { optionalAuth } from "../middleware/auth.js";
-import { AuthRequest } from "../types/index.js";
-import { checkQuota } from "../middleware/quota.js";
-import { validate, askSchema } from "../middleware/validate.js";
+import { fastifyOptionalAuth } from "../middleware/fastifyAuth.js";
+import { askSchema } from "../middleware/validate.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { getCachedResponse, setCachedResponse } from "../lib/cache.js";
 import { prepareCouncilMembers as prepareCouncilWithArchetypes, streamCouncil } from "../lib/council.js";
@@ -34,6 +32,12 @@ import { searchRepo } from "../services/repoSearch.service.js";
 import { db } from "../lib/drizzle.js";
 import { codeRepositories } from "../db/schema/repos.js";
 import { and, eq } from "drizzle-orm";
+import { dailyUsage } from "../db/schema/users.js";
+import { sql } from "drizzle-orm";
+import { DAILY_REQUEST_LIMIT, DAILY_TOKEN_LIMIT } from "../config/quotas.js";
+
+const MAX_DAILY_REQUESTS = DAILY_REQUEST_LIMIT;
+const MAX_DAILY_TOKENS = DAILY_TOKEN_LIMIT;
 
 function handleCouncilError(err: unknown): never {
   if (err instanceof CouncilServiceError) {
@@ -42,7 +46,72 @@ function handleCouncilError(err: unknown): never {
   throw err;
 }
 
-const router = Router();
+async function fastifyCheckQuota(request: FastifyRequest, reply: FastifyReply) {
+  if (!request.userId) {
+    return;
+  }
+
+  const today = new Date();
+  today.setUTCHours(0, 0, 0, 0);
+
+  const [updatedUsage] = await db
+    .insert(dailyUsage)
+    .values({
+      userId: request.userId,
+      date: today,
+      requests: 1,
+      tokens: 0,
+      updatedAt: new Date(),
+    })
+    .onConflictDoUpdate({
+      target: [dailyUsage.userId, dailyUsage.date],
+      set: {
+        requests: sql`${dailyUsage.requests} + 1`,
+        updatedAt: new Date(),
+      },
+    })
+    .returning();
+
+  if (updatedUsage.requests > MAX_DAILY_REQUESTS || updatedUsage.tokens > MAX_DAILY_TOKENS) {
+    logger.warn({
+      userId: request.userId,
+      requests: updatedUsage.requests,
+      tokens: updatedUsage.tokens,
+    }, "User exceeded daily quota limit");
+    reply
+      .header("X-Quota-Limit", MAX_DAILY_REQUESTS.toString())
+      .header("X-Quota-Used", updatedUsage.requests.toString())
+      .header("X-Token-Limit", MAX_DAILY_TOKENS.toString())
+      .header("X-Token-Used", updatedUsage.tokens.toString())
+      .header("Retry-After", "86400")
+      .code(429)
+      .send({ error: "Daily request or token quota exceeded. Please try again tomorrow." });
+    return;
+  }
+
+  reply
+    .header("X-Quota-Limit", MAX_DAILY_REQUESTS.toString())
+    .header("X-Quota-Used", updatedUsage.requests.toString())
+    .header("X-Quota-Remaining", Math.max(0, MAX_DAILY_REQUESTS - updatedUsage.requests).toString())
+    .header("X-Token-Limit", MAX_DAILY_TOKENS.toString())
+    .header("X-Token-Used", updatedUsage.tokens.toString())
+    .header("X-Token-Remaining", Math.max(0, MAX_DAILY_TOKENS - updatedUsage.tokens).toString());
+}
+
+function validateAskBody(request: FastifyRequest, reply: FastifyReply) {
+  const result = askSchema.safeParse(request.body);
+  if (!result.success) {
+    reply.code(400).send({
+      error: "Validation failed",
+      details: result.error.issues.map((e: any) => ({
+        field: e.path.join("."),
+        message: e.message,
+      })),
+    });
+    return;
+  }
+  (request as any).body = result.data;
+}
 
 /**
  * @openapi
@@ -64,9 +133,6 @@ const router = Router();
  *                   type: string
  *                   example: "Council is listening. Use POST to ask."
  */
-router.get("/", (req, res) => {
-  res.json({ message: "Council is listening. Use POST to ask." });
-});
 
 /**
  * @openapi
@@ -187,15 +253,111 @@ router.get("/", (req, res) => {
  *       429:
  *         description: Quota exceeded
  */
-router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: AuthRequest, res: Response, next: NextFunction) => {
-  const startTime = Date.now();
-  try {
-    const { question, conversationId, summon, maxTokens, rounds = 1, context, mode, userConfig } = req.body;
-    const upload_ids: string[] | undefined = req.body.upload_ids;
-    const kb_id: string | undefined = req.body.kb_id;
+
+/**
+ * @openapi
+ * /api/ask/stream:
+ *   post:
+ *     tags:
+ *       - Council
+ *     summary: Stream a council deliberation via Server-Sent Events
+ *     description: >
+ *       Submits a question to the AI council and returns the response as an SSE stream.
+ *       Events are emitted for each stage of deliberation: status updates, member token
+ *       chunks, completed opinions, peer reviews, scoring, validator results, metrics,
+ *       and a final done event containing the synthesised verdict.
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required:
+ *               - question
+ *             properties:
+ *               question:
+ *                 type: string
+ *                 description: The question to ask the council.
+ *               mode:
+ *                 type: string
+ *                 enum: [auto, manual, direct]
+ *                 description: >
+ *                   Routing mode. "auto" lets the router pick archetypes,
+ *                   "manual" uses the provided members, "direct" skips deliberation.
+ *               rounds:
+ *                 type: number
+ *                 minimum: 1
+ *                 maximum: 5
+ *                 default: 1
+ *                 description: Number of deliberation rounds (1-5).
+ *               conversationId:
+ *                 type: string
+ *                 format: uuid
+ *                 description: Optional existing conversation ID for multi-turn context.
+ *               members:
+ *                 type: array
+ *                 description: Optional array of council member configurations.
+ *                 items:
+ *                   type: object
+ *               upload_ids:
+ *                 type: array
+ *                 items:
+ *                   type: string
+ *                 description: Optional file upload IDs to include as context.
+ *               kb_id:
+ *                 type: string
+ *                 description: Optional knowledge-base ID for RAG context retrieval.
+ *               maxTokens:
+ *                 type: number
+ *                 description: Optional maximum tokens for each LLM response.
+ *               userConfig:
+ *                 type: object
+ *                 description: >
+ *                   Optional user-level council configuration overriding default members
+ *                   and master.
+ *     responses:
+ *       200:
+ *         description: SSE event stream of council deliberation
+ *         content:
+ *           text/event-stream:
+ *             schema:
+ *               type: string
+ *               description: >
+ *                 Newline-delimited SSE events. Each event has a JSON `data` field with
+ *                 a `type` property. Event types: status, member_chunk, opinion,
+ *                 peer_review, scored, validator_result, metrics, done, error.
+ *               example: |
+ *                 data: {"type":"status","message":"Deliberating..."}
+ *                 data: {"type":"member_chunk","name":"analyst","chunk":"The key issue..."}
+ *                 data: {"type":"opinion","name":"analyst","opinion":"..."}
+ *                 data: {"type":"done","verdict":"...","opinions":[...],"conversationId":"..."}
+ *       400:
+ *         description: Invalid request or council configuration error
+ *       404:
+ *         description: Conversation not found (sent as SSE error event after headers)
+ *       429:
+ *         description: Quota exceeded
+ */
+
+const askPlugin: FastifyPluginAsync = async (fastify) => {
+
+  // GET / - Health check
+  fastify.get("/", async (request, reply) => {
+    return { message: "Council is listening. Use POST to ask." };
+  });
+
+  // POST / - Ask the council (non-streaming)
+  fastify.post("/", { preHandler: [fastifyOptionalAuth, fastifyCheckQuota, validateAskBody] }, async (request, reply) => {
+    const startTime = Date.now();
+
+    const { question, conversationId, summon, maxTokens, rounds = 1, context, mode, userConfig } = request.body as any;
+    const upload_ids: string[] | undefined = (request.body as any).upload_ids;
+    const kb_id: string | undefined = (request.body as any).kb_id;
 
     let effectiveSummon: QueryType | "default" = summon || "default";
-    let effectiveMembers = req.body.members;
+    let effectiveMembers = (request.body as any).members;
     let routerDecision: ReturnType<typeof classifyQuery> | null = null;
     let effectiveRounds = rounds;
 
@@ -230,7 +392,7 @@ router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: Auth
           if (!m.apiKey) m.apiKey = resolveApiKey(m);
           return m;
         });
-        const inputMaster = req.body.master || getDefaultMaster();
+        const inputMaster = (request.body as any).master || getDefaultMaster();
         if (!inputMaster.apiKey) inputMaster.apiKey = resolveApiKey(inputMaster);
         master = inputMaster;
       }
@@ -238,7 +400,7 @@ router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: Auth
       return handleCouncilError(err);
     }
 
-    const userId = req.userId;
+    const userId = request.userId;
 
     let effectiveConversationId = conversationId;
     let messages: Message[] = [];
@@ -270,7 +432,7 @@ router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: Auth
     }
 
     // Code-aware chat: inject repo context if repo_id is attached
-    const repo_id: string | undefined = req.body.repo_id;
+    const repo_id: string | undefined = (request.body as any).repo_id;
     let codeContext = "";
     if (repo_id && userId) {
       try {
@@ -379,7 +541,7 @@ router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: Auth
       }
     }
 
-    res.json({
+    return {
       success: true,
       conversationId: effectiveConversationId,
       verdict,
@@ -390,283 +552,192 @@ router.post("/", optionalAuth, checkQuota, validate(askSchema), async (req: Auth
       citations: ragCitations.length > 0 ? ragCitations : undefined,
       artifact_id: artifactId,
       metrics: (tokensUsed > 0 || isCacheHit) ? { totalTokens: tokensUsed, totalCost: 0, hallucinationCount: 0 } : undefined
+    };
+  });
+
+  // POST /stream - SSE streaming endpoint
+  fastify.post("/stream", { preHandler: [fastifyOptionalAuth, fastifyCheckQuota, validateAskBody] }, async (request, reply) => {
+    const startTime = Date.now();
+
+    reply.raw.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive",
     });
 
-  } catch (e: any) {
-    next(e);
-  }
-});
+    try {
+      const { question, conversationId, summon, maxTokens, rounds = 1, context, mode } = request.body as any;
+      const upload_ids: string[] | undefined = (request.body as any).upload_ids;
+      const kb_id: string | undefined = (request.body as any).kb_id;
 
-/**
- * @openapi
- * /api/ask/stream:
- *   post:
- *     tags:
- *       - Council
- *     summary: Stream a council deliberation via Server-Sent Events
- *     description: >
- *       Submits a question to the AI council and returns the response as an SSE stream.
- *       Events are emitted for each stage of deliberation: status updates, member token
- *       chunks, completed opinions, peer reviews, scoring, validator results, metrics,
- *       and a final done event containing the synthesised verdict.
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - question
- *             properties:
- *               question:
- *                 type: string
- *                 description: The question to ask the council.
- *               mode:
- *                 type: string
- *                 enum: [auto, manual, direct]
- *                 description: >
- *                   Routing mode. "auto" lets the router pick archetypes,
- *                   "manual" uses the provided members, "direct" skips deliberation.
- *               rounds:
- *                 type: number
- *                 minimum: 1
- *                 maximum: 5
- *                 default: 1
- *                 description: Number of deliberation rounds (1-5).
- *               conversationId:
- *                 type: string
- *                 format: uuid
- *                 description: Optional existing conversation ID for multi-turn context.
- *               members:
- *                 type: array
- *                 description: Optional array of council member configurations.
- *                 items:
- *                   type: object
- *               upload_ids:
- *                 type: array
- *                 items:
- *                   type: string
- *                 description: Optional file upload IDs to include as context.
- *               kb_id:
- *                 type: string
- *                 description: Optional knowledge-base ID for RAG context retrieval.
- *               maxTokens:
- *                 type: number
- *                 description: Optional maximum tokens for each LLM response.
- *               userConfig:
- *                 type: object
- *                 description: >
- *                   Optional user-level council configuration overriding default members
- *                   and master.
- *     responses:
- *       200:
- *         description: SSE event stream of council deliberation
- *         content:
- *           text/event-stream:
- *             schema:
- *               type: string
- *               description: >
- *                 Newline-delimited SSE events. Each event has a JSON `data` field with
- *                 a `type` property. Event types: status, member_chunk, opinion,
- *                 peer_review, scored, validator_result, metrics, done, error.
- *               example: |
- *                 data: {"type":"status","message":"Deliberating..."}
- *                 data: {"type":"member_chunk","name":"analyst","chunk":"The key issue..."}
- *                 data: {"type":"opinion","name":"analyst","opinion":"..."}
- *                 data: {"type":"done","verdict":"...","opinions":[...],"conversationId":"..."}
- *       400:
- *         description: Invalid request or council configuration error
- *       404:
- *         description: Conversation not found (sent as SSE error event after headers)
- *       429:
- *         description: Quota exceeded
- */
-router.post("/stream", optionalAuth, checkQuota, validate(askSchema), async (req: AuthRequest, res: Response, next: NextFunction) => {
-  const startTime = Date.now();
-  res.setHeader("Content-Type", "text/event-stream");
-  res.setHeader("Cache-Control", "no-cache");
-  res.setHeader("Connection", "keep-alive");
-  res.flushHeaders();
+      let effectiveSummon: QueryType | "default" = summon || "default";
+      let effectiveMembers = (request.body as any).members;
+      let routerDecision: ReturnType<typeof classifyQuery> | null = null;
+      let effectiveRounds = rounds;
 
-  try {
-    const { question, conversationId, summon, maxTokens, rounds = 1, context, mode } = req.body;
-    const upload_ids: string[] | undefined = req.body.upload_ids;
-    const kb_id: string | undefined = req.body.kb_id;
-
-    let effectiveSummon: QueryType | "default" = summon || "default";
-    let effectiveMembers = req.body.members;
-    let routerDecision: ReturnType<typeof classifyQuery> | null = null;
-    let effectiveRounds = rounds;
-
-    if (mode === "auto") {
-      const { archetypes, result } = getAutoArchetypes(question);
-      routerDecision = result;
-      effectiveMembers = undefined; // Force use of router archetypes
-      effectiveSummon = result.fallback ? "default" : result.type;
-      logger.info({
-        question: question.slice(0, 50),
-        routerType: result.type,
-        routerConfidence: result.confidence,
-        routerArchetypes: archetypes,
-        routerFallback: result.fallback,
-        strict: true
-      }, "Stream auto-router: strict mode - ignoring user members/summon");
-    } else if (mode === "direct") {
-      logger.info({ question: question.slice(0, 50) }, "Stream Baseline Mode: Skipping council deliberation");
-      effectiveMembers = []; // Empty members list
-      effectiveRounds = 0; // Skip rounds
-    }
-
-    const resolvedMembers = (effectiveMembers || getDefaultMembers()).map((m: any) => {
-      if (!m.apiKey) m.apiKey = resolveApiKey(m);
-      return m;
-    });
-
-    const inputMaster = req.body.master || getDefaultMaster();
-    if (!inputMaster.apiKey) inputMaster.apiKey = resolveApiKey(inputMaster);
-    const master = inputMaster;
-
-    const userId = req.userId;
-
-    let effectiveConversationId = conversationId;
-    let messages: Message[] = [];
-
-    if (effectiveConversationId) {
-      const convo = await findConversationById(effectiveConversationId, userId ?? undefined);
-      if (!convo) {
-        res.write(`data: ${JSON.stringify({ type: "error", message: "Conversation not found" })}\n\n`);
-        return res.end();
+      if (mode === "auto") {
+        const { archetypes, result } = getAutoArchetypes(question);
+        routerDecision = result;
+        effectiveMembers = undefined; // Force use of router archetypes
+        effectiveSummon = result.fallback ? "default" : result.type;
+        logger.info({
+          question: question.slice(0, 50),
+          routerType: result.type,
+          routerConfidence: result.confidence,
+          routerArchetypes: archetypes,
+          routerFallback: result.fallback,
+          strict: true
+        }, "Stream auto-router: strict mode - ignoring user members/summon");
+      } else if (mode === "direct") {
+        logger.info({ question: question.slice(0, 50) }, "Stream Baseline Mode: Skipping council deliberation");
+        effectiveMembers = []; // Empty members list
+        effectiveRounds = 0; // Skip rounds
       }
-      messages = await getRecentHistory(effectiveConversationId);
-    }
 
-    if (userId && !effectiveConversationId) {
-      const newConvo = await createConversation({
-        userId,
-        title: question.slice(0, 50) + (question.length > 50 ? "..." : "")
+      const resolvedMembers = (effectiveMembers || getDefaultMembers()).map((m: any) => {
+        if (!m.apiKey) m.apiKey = resolveApiKey(m);
+        return m;
       });
-      effectiveConversationId = newConvo.id;
-    }
 
-    const councilMembers = await prepareCouncilWithArchetypes(resolvedMembers, effectiveSummon, userId);
+      const inputMaster = (request.body as any).master || getDefaultMaster();
+      if (!inputMaster.apiKey) inputMaster.apiKey = resolveApiKey(inputMaster);
+      const master = inputMaster;
 
-    let memoryContext = "";
-    if (effectiveConversationId) {
-      const relevantChats = await retrieveRelevantContext(effectiveConversationId, question, 3);
-      memoryContext = formatContextForInjection(relevantChats);
-    }
+      const userId = request.userId;
 
-    // Load file attachments and RAG context
-    const fileContext = await loadFileContext(upload_ids || [], userId || 0);
-    let ragContext = "";
-    let ragCitations: { source: string; score: number }[] = [];
-    if (kb_id && userId) {
-      const rag = await loadRAGContext(userId, question, kb_id);
-      ragContext = rag.context;
-      ragCitations = rag.citations;
-    }
+      let effectiveConversationId = conversationId;
+      let messages: Message[] = [];
 
-    const questionWithContext = buildEnrichedQuestion(question, fileContext, ragContext, memoryContext, context);
-    const currentMessages = [...messages, { role: "user" as const, content: questionWithContext }];
-
-    const controller = new AbortController();
-    req.on("close", () => {
-      logger.info("SSE client disconnected, aborting ask stream...");
-      controller.abort();
-    });
-    req.on("error", (err) => {
-      logger.error({ err }, "SSE connection error");
-      controller.abort();
-    });
-    res.on("close", () => {
-      controller.abort();
-    });
-
-    let isCacheHit = false;
-    let finalVerdict = "";
-    let finalOpinions: any[] = [];
-    let tokensUsed = 0;
-
-    const cached = await getCachedResponse(question, councilMembers, master, messages);
-    if (cached) {
-      isCacheHit = true;
-      finalVerdict = cached.verdict;
-      finalOpinions = cached.opinions as any;
-      res.write(`data: ${JSON.stringify({
-        type: "done",
-        cached: true,
-        verdict: cached.verdict,
-        opinions: cached.opinions,
-        conversationId: effectiveConversationId ?? null,
-        router: routerDecision ? formatRouterMetadata(routerDecision) : undefined,
-      })}\n\n`);
-      res.end();
-    } else {
-      logger.info({ question: question.slice(0, 80), memberCount: councilMembers.length, summon: effectiveSummon, rounds: effectiveRounds }, "Council SSE stream started");
-
-      const emitEvent = (type: string, data: any) => {
-        if (!controller.signal.aborted) {
-          const payload = type === "done"
-            ? { ...data, conversationId: effectiveConversationId ?? null }
-            : data;
-          res.write(`data: ${JSON.stringify({ type, ...payload })}\n\n`);
-          const flush = (res as any).flush;
-          if (flush) flush();
+      if (effectiveConversationId) {
+        const convo = await findConversationById(effectiveConversationId, userId ?? undefined);
+        if (!convo) {
+          reply.raw.write(`data: ${JSON.stringify({ type: "error", message: "Conversation not found" })}\n\n`);
+          reply.raw.end();
+          return;
         }
-      };
+        messages = await getRecentHistory(effectiveConversationId);
+      }
 
-      finalVerdict = await streamCouncil(
-        councilMembers,
-        master,
-        currentMessages,
-        (event, data) => {
-          if (event === "opinion") finalOpinions.push(data);
-          if (event === "done") tokensUsed = data.tokensUsed || 0;
-          emitEvent(event, data);
-        },
-        maxTokens,
-        effectiveRounds,
-        controller.signal
-      );
-
-      res.end();
-      await setCachedResponse(question, councilMembers, master, messages, finalVerdict, finalOpinions);
-
-      if (effectiveConversationId && userId && finalVerdict) {
-        await createChat({
+      if (userId && !effectiveConversationId) {
+        const newConvo = await createConversation({
           userId,
-          conversationId: effectiveConversationId,
-          question,
-          verdict: finalVerdict,
-          opinions: finalOpinions,
-          durationMs: Date.now() - startTime,
-          tokensUsed,
-          cacheHit: isCacheHit
+          title: question.slice(0, 50) + (question.length > 50 ? "..." : "")
         });
-      }
-      if (userId) {
-        await updateDailyUsage({ userId, tokensUsed, isCacheHit });
+        effectiveConversationId = newConvo.id;
       }
 
-      // Detect and save artifacts from stream verdict
-      if (finalVerdict && userId) {
-        const detected = detectArtifact(finalVerdict);
-        if (detected) {
-          await saveArtifact(userId, effectiveConversationId || null, detected);
+      const councilMembers = await prepareCouncilWithArchetypes(resolvedMembers, effectiveSummon, userId);
+
+      let memoryContext = "";
+      if (effectiveConversationId) {
+        const relevantChats = await retrieveRelevantContext(effectiveConversationId, question, 3);
+        memoryContext = formatContextForInjection(relevantChats);
+      }
+
+      // Load file attachments and RAG context
+      const fileContext = await loadFileContext(upload_ids || [], userId || 0);
+      let ragContext = "";
+      let ragCitations: { source: string; score: number }[] = [];
+      if (kb_id && userId) {
+        const rag = await loadRAGContext(userId, question, kb_id);
+        ragContext = rag.context;
+        ragCitations = rag.citations;
+      }
+
+      const questionWithContext = buildEnrichedQuestion(question, fileContext, ragContext, memoryContext, context);
+      const currentMessages = [...messages, { role: "user" as const, content: questionWithContext }];
+
+      const controller = new AbortController();
+      request.raw.on("close", () => {
+        logger.info("SSE client disconnected, aborting ask stream...");
+        controller.abort();
+      });
+      request.raw.on("error", (err) => {
+        logger.error({ err }, "SSE connection error");
+        controller.abort();
+      });
+      reply.raw.on("close", () => {
+        controller.abort();
+      });
+
+      let isCacheHit = false;
+      let finalVerdict = "";
+      let finalOpinions: any[] = [];
+      let tokensUsed = 0;
+
+      const cached = await getCachedResponse(question, councilMembers, master, messages);
+      if (cached) {
+        isCacheHit = true;
+        finalVerdict = cached.verdict;
+        finalOpinions = cached.opinions as any;
+        reply.raw.write(`data: ${JSON.stringify({
+          type: "done",
+          cached: true,
+          verdict: cached.verdict,
+          opinions: cached.opinions,
+          conversationId: effectiveConversationId ?? null,
+          router: routerDecision ? formatRouterMetadata(routerDecision) : undefined,
+        })}\n\n`);
+        reply.raw.end();
+      } else {
+        logger.info({ question: question.slice(0, 80), memberCount: councilMembers.length, summon: effectiveSummon, rounds: effectiveRounds }, "Council SSE stream started");
+
+        const emitEvent = (type: string, data: any) => {
+          if (!controller.signal.aborted) {
+            const payload = type === "done"
+              ? { ...data, conversationId: effectiveConversationId ?? null }
+              : data;
+            reply.raw.write(`data: ${JSON.stringify({ type, ...payload })}\n\n`);
+          }
+        };
+
+        finalVerdict = await streamCouncil(
+          councilMembers,
+          master,
+          currentMessages,
+          (event, data) => {
+            if (event === "opinion") finalOpinions.push(data);
+            if (event === "done") tokensUsed = data.tokensUsed || 0;
+            emitEvent(event, data);
+          },
+          maxTokens,
+          effectiveRounds,
+          controller.signal
+        );
+
+        reply.raw.end();
+        await setCachedResponse(question, councilMembers, master, messages, finalVerdict, finalOpinions);
+
+        if (effectiveConversationId && userId && finalVerdict) {
+          await createChat({
+            userId,
+            conversationId: effectiveConversationId,
+            question,
+            verdict: finalVerdict,
+            opinions: finalOpinions,
+            durationMs: Date.now() - startTime,
+            tokensUsed,
+            cacheHit: isCacheHit
+          });
+        }
+        if (userId) {
+          await updateDailyUsage({ userId, tokensUsed, isCacheHit });
+        }
+
+        // Detect and save artifacts from stream verdict
+        if (finalVerdict && userId) {
+          const detected = detectArtifact(finalVerdict);
+          if (detected) {
+            await saveArtifact(userId, effectiveConversationId || null, detected);
+          }
         }
       }
-    }
 
-  } catch (e: any) {
-    if (!res.headersSent) {
-      next(e);
-    } else {
-      res.write(`data: ${JSON.stringify({ type: "error", message: e.message })}\n\n`);
-      res.end();
+    } catch (e: any) {
+      reply.raw.write(`data: ${JSON.stringify({ type: "error", message: e.message })}\n\n`);
+      reply.raw.end();
     }
-  }
-});
+  });
+};
 
-export default router;
+export default askPlugin;
