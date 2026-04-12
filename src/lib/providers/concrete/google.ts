@@ -36,13 +36,16 @@ export class GoogleProvider extends BaseProvider {
     }));
 
     try {
-      const endpoint = onChunk ? "streamGenerateContent?alt=sse&" : "generateContent?";
+      const endpoint = onChunk ? "streamGenerateContent?alt=sse" : "generateContent";
       const res = await fetch(
-        `${apiHost}/v1beta/models/${this.config.model || "gemini-2.0-flash"}:${endpoint}key=${this.config.apiKey}`,
+        `${apiHost}/v1beta/models/${this.config.model || "gemini-2.0-flash"}:${endpoint}`,
         {
           method: "POST",
           signal: controller.signal,
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            "x-goog-api-key": this.config.apiKey,
+          },
           body: JSON.stringify({
             ...(this.config.systemPrompt
               ? { systemInstruction: { parts: [{ text: this.config.systemPrompt }] } }

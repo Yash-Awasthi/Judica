@@ -47,11 +47,14 @@ export class GeminiAdapter implements IProviderAdapter {
       ];
     }
 
-    const url = `${this.baseUrl}/v1beta/models/${model}:streamGenerateContent?alt=sse&key=${this.apiKey}`;
+    const url = `${this.baseUrl}/v1beta/models/${model}:streamGenerateContent?alt=sse`;
 
     const res = await fetch(url, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": this.apiKey,
+      },
       body: JSON.stringify(body),
     });
 
@@ -187,8 +190,11 @@ export class GeminiAdapter implements IProviderAdapter {
   async listModels(): Promise<string[]> {
     try {
       const res = await fetch(
-        `${this.baseUrl}/v1beta/models?key=${this.apiKey}`,
-        { signal: AbortSignal.timeout(10000) }
+        `${this.baseUrl}/v1beta/models`,
+        {
+          signal: AbortSignal.timeout(10000),
+          headers: { "x-goog-api-key": this.apiKey },
+        }
       );
       if (!res.ok) return [];
       const data: any = await res.json();
@@ -204,8 +210,11 @@ export class GeminiAdapter implements IProviderAdapter {
   async isAvailable(): Promise<boolean> {
     try {
       const res = await fetch(
-        `${this.baseUrl}/v1beta/models?key=${this.apiKey}`,
-        { signal: AbortSignal.timeout(5000) }
+        `${this.baseUrl}/v1beta/models`,
+        {
+          signal: AbortSignal.timeout(5000),
+          headers: { "x-goog-api-key": this.apiKey },
+        }
       );
       return res.ok;
     } catch {
