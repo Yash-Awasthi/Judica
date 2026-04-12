@@ -62,7 +62,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       }
       const err = await res.json().catch(() => ({ error: "Login failed" }));
       throw new Error(err.error || "Login failed");
-    } catch (err: any) {
+    } catch (err: unknown) {
       // If it looks like a direct token call (non-email string), fall back to token-based login
       if (!emailOrToken.includes("@")) {
         tokenRef.current = emailOrToken;
@@ -72,7 +72,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         localStorage.setItem("council_user", passwordOrUsername);
         return;
       }
-      throw err;
+      throw err instanceof Error ? err : new Error(String(err));
     }
   }, []);
 

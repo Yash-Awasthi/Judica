@@ -50,16 +50,16 @@ const nodeTypes = {
   split: SplitNode,
 };
 
-let nodeIdCounter = 0;
-function getNodeId() {
-  return `node_${++nodeIdCounter}_${Date.now()}`;
-}
-
 function WorkflowEditorInner() {
   const { id: workflowId } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { fetchWithAuth } = useAuth();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const nodeIdCounterRef = useRef(0);
+
+  function getNodeId() {
+    return `node_${++nodeIdCounterRef.current}_${Date.now()}`;
+  }
 
   const [nodes, setNodes, onNodesChange] = useNodesState<Node>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);

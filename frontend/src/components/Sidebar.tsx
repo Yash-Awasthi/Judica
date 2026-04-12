@@ -241,7 +241,15 @@ export function Sidebar({
                   conversations.slice(0, 15).map(c => (
                     <div
                       key={c.id}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => onSelect(c.id, c.title)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.preventDefault();
+                          onSelect(c.id, c.title);
+                        }
+                      }}
                       className={`group flex items-center gap-2 px-3 py-2 rounded-button cursor-pointer transition-all text-sm relative
                         ${activeId === c.id
                           ? "bg-[rgba(110,231,183,0.06)] text-[var(--text-primary)] border border-[rgba(110,231,183,0.12)]"

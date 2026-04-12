@@ -206,6 +206,9 @@ export function ChatArea({
             getMemberColor={getMemberColor}
             visibleKeyIds={visibleKeyIds}
             setVisibleKeyIds={setVisibleKeyIds}
+            onSuggestionClick={(suggestion) => {
+              setInput(suggestion);
+            }}
           />
         )}
       </div>

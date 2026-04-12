@@ -13,6 +13,7 @@ interface MessageListProps {
   getMemberColor: (name: string) => { bg: string; shadow: string };
   visibleKeyIds: Record<string, boolean>;
   setVisibleKeyIds: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  onSuggestionClick?: (suggestion: string) => void;
 }
 
 const mdComponents = {
@@ -63,7 +64,8 @@ export function MessageList({
   onPlayTTS,
   getMemberColor,
   visibleKeyIds,
-  setVisibleKeyIds
+  setVisibleKeyIds,
+  onSuggestionClick
 }: MessageListProps) {
   if (messages.length === 0) {
     return (
@@ -86,6 +88,7 @@ export function MessageList({
           ].map((suggestion) => (
             <button
               key={suggestion}
+              onClick={() => onSuggestionClick?.(suggestion)}
               className="px-4 py-2 rounded-pill bg-[var(--glass-bg)] border border-[var(--glass-border)] text-xs text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--accent-mint)]/30 hover:bg-[var(--glass-bg-hover)] transition-all duration-200"
             >
               {suggestion}
