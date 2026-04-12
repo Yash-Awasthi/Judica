@@ -21,8 +21,7 @@ import { registry } from "./lib/prometheusMetrics.js";
 import "./lib/tools/builtin.js";
 import "./adapters/registry.js";
 
-// Express middleware (still needed for remaining Express routes + compat layer)
-import { askLimiter } from "./middleware/rateLimit.js";
+// Express middleware (still needed for swagger-ui and BullMQ Board compat layer)
 import { perUserLimiter } from "./middleware/limiter.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { requireAuth } from "./middleware/auth.js";
@@ -30,16 +29,16 @@ import { requestId } from "./middleware/requestId.js";
 import { cspNonce } from "./middleware/cspNonce.js";
 import { prometheusMiddleware } from "./middleware/prometheusMiddleware.js";
 
-// Express (for compat layer)
+// Express (for swagger-ui compat layer only)
 import express from "express";
 import pinoHttp from "pino-http";
 import swaggerUi from "swagger-ui-express";
 import { swaggerSpec } from "./lib/swagger.js";
 import { requestContext } from "./lib/context.js";
 
-// Express routers (remaining — not yet converted to Fastify)
-import askRouter from "./routes/ask.js";
-import uploadsRouter from "./routes/uploads.js";
+// Native Fastify plugins (all routes now converted)
+import askPlugin from "./routes/ask.js";
+import uploadsPlugin from "./routes/uploads.js";
 
 // Native Fastify plugins
 import templatesPlugin from "./routes/templates.js";
@@ -200,18 +199,19 @@ await fastify.register(reposPlugin,           { prefix: "/api/repos" });
 await fastify.register(queuePlugin,           { prefix: "/api/queue" });
 await fastify.register(costsPlugin,           { prefix: "/api/costs" });
 await fastify.register(evaluationPlugin,      { prefix: "/api/evaluation" });
+await fastify.register(askPlugin,             { prefix: "/api/ask" });
+await fastify.register(uploadsPlugin,         { prefix: "/api/uploads" });
 // realtime and archetypes routes available but not mounted in original setup
 // Uncomment to enable:
 // await fastify.register(realtimePlugin,        { prefix: "/api/realtime" });
 // await fastify.register(archetypesPlugin,      { prefix: "/api/archetypes" });
 
 // ─── Express compatibility layer ────────────────────────────────────────────
-// Remaining Express routers that haven't been converted yet (ask, uploads).
-// Also hosts swagger-ui, BullMQ Board, and shared Express middleware.
+// Only needed for swagger-ui-express and BullMQ Board (dev only).
 
 await fastify.register(fastifyExpress);
 
-// Express middleware chain
+// Express middleware chain (for swagger and dev tools)
 fastify.use(cspNonce);
 fastify.use((pinoHttp as any)({ logger, autoLogging: { ignore: (req: any) => req.url === '/health' } }));
 fastify.use(express.json({ limit: "200kb" }));
@@ -255,12 +255,8 @@ fastify.use("/api/docs", swaggerUi.setup(swaggerSpec, {
   customSiteTitle: "AIBYAI API Documentation",
 }));
 
-// Per-user rate limiting
+// Per-user rate limiting (Express compat for swagger/docs)
 fastify.use(perUserLimiter);
-
-// Remaining Express routers
-fastify.use("/api/ask",       askLimiter,  askRouter);
-fastify.use("/api/uploads",   requireAuth, uploadsRouter);
 
 // BullMQ Board (dev only)
 if (env.NODE_ENV === "development") {
