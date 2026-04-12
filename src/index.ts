@@ -40,12 +40,12 @@ import { requestContext } from "./lib/context.js";
 import askRouter from "./routes/ask.js";
 import historyRouter from "./routes/history.js";
 import authRouter from "./routes/auth.js";
-import providersRouter from "./routes/providers.js";
+import providersPlugin from "./routes/providers.js";
 import councilRouter from "./routes/council.js";
-import metricsRouter from "./routes/metrics.js";
-import exportRouter from "./routes/export.js";
+import metricsPlugin from "./routes/metrics.js";
+import exportPlugin from "./routes/export.js";
 import ttsRouter from "./routes/tts.js";
-import templatesRouter from "./routes/templates.js";
+import templatesPlugin from "./routes/templates.js";
 import piiRouter from "./routes/pii.js";
 import customProvidersRouter from "./routes/customProviders.js";
 import usageRouter from "./routes/usage.js";
@@ -165,6 +165,11 @@ fastify.get("/health", async (_request, reply) => {
 // All existing Express routers and middleware run inside this layer.
 // This lets us migrate incrementally — move routes to native Fastify one by one.
 
+await fastify.register(templatesPlugin, { prefix: "/api/templates" });
+await fastify.register(metricsPlugin, { prefix: "/api/metrics" });
+await fastify.register(exportPlugin, { prefix: "/api/export" });
+await fastify.register(providersPlugin, { prefix: "/api/providers" });
+
 await fastify.register(fastifyExpress);
 
 // Express middleware chain
@@ -219,10 +224,6 @@ fastify.use("/api/auth",      authLimiter, authRouter);
 fastify.use("/api/ask",       askLimiter,  askRouter);
 fastify.use("/api/council",   askLimiter,  councilRouter);
 fastify.use("/api/history",   historyRouter);
-fastify.use("/api/templates", templatesRouter);
-fastify.use("/api/providers", providersRouter);
-fastify.use("/api/metrics",   metricsRouter);
-fastify.use("/api/export",    exportRouter);
 fastify.use("/api/tts",       askLimiter, ttsRouter);
 fastify.use("/api/pii",       requireAuth, piiRouter);
 fastify.use("/api/custom-providers", requireAuth, customProvidersRouter);

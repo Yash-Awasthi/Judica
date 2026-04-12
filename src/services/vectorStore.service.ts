@@ -1,4 +1,5 @@
-import prisma from "../lib/db.js";
+import { db } from "../lib/drizzle.js";
+import { sql } from "drizzle-orm";
 import { embed } from "./embeddings.service.js";
 import logger from "../lib/logger.js";
 
@@ -22,20 +23,13 @@ export async function storeChunk(
   const embedding = await embed(content);
   const vectorStr = `[${embedding.join(",")}]`;
 
-  const result = await prisma.$queryRawUnsafe<{ id: string }[]>(
-    `INSERT INTO "Memory" ("id", "userId", "kbId", "content", "chunkIndex", "sourceName", "sourceUrl", "embedding", "createdAt")
-     VALUES (gen_random_uuid()::text, $1, $2, $3, $4, $5, $6, $7::vector, NOW())
-     RETURNING "id"`,
-    userId,
-    kbId,
-    content,
-    chunkIndex,
-    sourceName || null,
-    sourceUrl || null,
-    vectorStr
-  );
+  const result = await db.execute(sql`
+    INSERT INTO "Memory" ("id", "userId", "kbId", "content", "chunkIndex", "sourceName", "sourceUrl", "embedding", "createdAt")
+    VALUES (gen_random_uuid()::text, ${userId}, ${kbId}, ${content}, ${chunkIndex}, ${sourceName || null}, ${sourceUrl || null}, ${vectorStr}::vector, NOW())
+    RETURNING "id"
+  `);
 
-  return result[0].id;
+  return (result.rows[0] as any).id;
 }
 
 // Vector similarity search using cosine distance
@@ -48,21 +42,18 @@ export async function searchSimilar(
   const queryEmbedding = await embed(query);
   const vectorStr = `[${queryEmbedding.join(",")}]`;
 
-  const kbFilter = kbId ? `AND "kbId" = '${kbId}'` : "";
+  const kbCondition = kbId ? sql`AND "kbId" = ${kbId}` : sql``;
 
-  const results = await prisma.$queryRawUnsafe<MemoryChunk[]>(
-    `SELECT "id", "content", "sourceName" as "sourceName", "sourceUrl" as "sourceUrl",
-            1 - ("embedding" <=> $1::vector) AS score
-     FROM "Memory"
-     WHERE "userId" = $2 ${kbFilter}
-     ORDER BY score DESC
-     LIMIT $3`,
-    vectorStr,
-    userId,
-    limit
-  );
+  const results = await db.execute(sql`
+    SELECT "id", "content", "sourceName", "sourceUrl",
+           1 - ("embedding" <=> ${vectorStr}::vector) AS score
+    FROM "Memory"
+    WHERE "userId" = ${userId} ${kbCondition}
+    ORDER BY score DESC
+    LIMIT ${limit}
+  `);
 
-  return results;
+  return results.rows as unknown as MemoryChunk[];
 }
 
 // BM25 keyword search using PostgreSQL full-text search
@@ -72,22 +63,19 @@ export async function keywordSearch(
   kbId?: string | null,
   limit: number = 10
 ): Promise<MemoryChunk[]> {
-  const kbFilter = kbId ? `AND "kbId" = '${kbId}'` : "";
+  const kbCondition = kbId ? sql`AND "kbId" = ${kbId}` : sql``;
 
-  const results = await prisma.$queryRawUnsafe<MemoryChunk[]>(
-    `SELECT "id", "content", "sourceName" as "sourceName", "sourceUrl" as "sourceUrl",
-            ts_rank("tsv", plainto_tsquery('english', $1)) AS score
-     FROM "Memory"
-     WHERE "userId" = $2 ${kbFilter}
-       AND "tsv" @@ plainto_tsquery('english', $1)
-     ORDER BY score DESC
-     LIMIT $3`,
-    query,
-    userId,
-    limit
-  );
+  const results = await db.execute(sql`
+    SELECT "id", "content", "sourceName", "sourceUrl",
+           ts_rank("tsv", plainto_tsquery('english', ${query})) AS score
+    FROM "Memory"
+    WHERE "userId" = ${userId} ${kbCondition}
+      AND "tsv" @@ plainto_tsquery('english', ${query})
+    ORDER BY score DESC
+    LIMIT ${limit}
+  `);
 
-  return results;
+  return results.rows as unknown as MemoryChunk[];
 }
 
 // Hybrid search: vector + keyword with Reciprocal Rank Fusion
@@ -138,19 +126,16 @@ export async function hybridSearch(
 
 // Delete all chunks for a knowledge base
 export async function deleteKBChunks(kbId: string): Promise<number> {
-  const result = await prisma.$executeRawUnsafe(
-    `DELETE FROM "Memory" WHERE "kbId" = $1`,
-    kbId
-  );
-  return result;
+  const result = await db.execute(sql`
+    DELETE FROM "Memory" WHERE "kbId" = ${kbId}
+  `);
+  return result.rowCount ?? 0;
 }
 
 // Delete chunks for a specific document
 export async function deleteDocChunks(kbId: string, sourceName: string): Promise<number> {
-  const result = await prisma.$executeRawUnsafe(
-    `DELETE FROM "Memory" WHERE "kbId" = $1 AND "sourceName" = $2`,
-    kbId,
-    sourceName
-  );
-  return result;
+  const result = await db.execute(sql`
+    DELETE FROM "Memory" WHERE "kbId" = ${kbId} AND "sourceName" = ${sourceName}
+  `);
+  return result.rowCount ?? 0;
 }

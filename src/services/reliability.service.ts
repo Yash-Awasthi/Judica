@@ -1,4 +1,6 @@
-import prisma from "../lib/db.js";
+import { eq, inArray } from "drizzle-orm";
+import { db } from "../lib/drizzle.js";
+import { modelReliability } from "../db/schema/traces.js";
 import logger from "../lib/logger.js";
 
 /**
@@ -43,9 +45,12 @@ export async function updateReliability(
 
     // Upsert each model's reliability
     for (const [model, deltas] of modelUpdates.entries()) {
-      const existing = await prisma.modelReliability.findUnique({
-        where: { model },
-      });
+      const rows = await db
+        .select()
+        .from(modelReliability)
+        .where(eq(modelReliability.model, model))
+        .limit(1);
+      const existing = rows[0];
 
       const totalResponses = (existing?.totalResponses ?? 0) + deltas.totalResponses;
       const agreedWith = (existing?.agreedWith ?? 0) + deltas.agreedWith;
@@ -58,23 +63,27 @@ export async function updateReliability(
       const errorScore = 1 - toolErrors / (totalResponses + 1);
       const avgConfidence = agreementScore * 0.7 + errorScore * 0.3;
 
-      await prisma.modelReliability.upsert({
-        where: { model },
-        create: {
+      await db
+        .insert(modelReliability)
+        .values({
           model,
           totalResponses,
           agreedWith,
           contradicted,
           toolErrors,
           avgConfidence,
-        },
-        update: {
-          totalResponses,
-          agreedWith,
-          contradicted,
-          avgConfidence,
-        },
-      });
+          updatedAt: new Date(),
+        })
+        .onConflictDoUpdate({
+          target: modelReliability.model,
+          set: {
+            totalResponses,
+            agreedWith,
+            contradicted,
+            avgConfidence,
+            updatedAt: new Date(),
+          },
+        });
     }
   } catch (err) {
     logger.error({ err }, "Failed to update model reliability scores");
@@ -90,9 +99,10 @@ export async function getReliabilityScores(
   const result = new Map<string, { avgConfidence: number; totalResponses: number }>();
   if (models.length === 0) return result;
 
-  const rows = await prisma.modelReliability.findMany({
-    where: { model: { in: models } },
-  });
+  const rows = await db
+    .select()
+    .from(modelReliability)
+    .where(inArray(modelReliability.model, models));
 
   for (const row of rows) {
     result.set(row.model, {
