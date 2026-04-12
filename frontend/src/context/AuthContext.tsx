@@ -32,7 +32,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
           method: "POST",
           headers: { Authorization: `Bearer ${currentToken}` }
         });
-      } catch (err) {
+      } catch (err: unknown) {
         console.error("Logout request failed", err);
       }
     }

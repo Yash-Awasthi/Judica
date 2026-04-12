@@ -50,6 +50,14 @@ export const PiiWarning: React.FC<PiiWarningProps> = ({
     checkPii();
   }, [text]);
 
+  // Auto-proceed when no PII is detected — useEffect must be called
+  // before any conditional returns to satisfy React's rules of hooks
+  useEffect(() => {
+    if (!loading && !detection?.found) {
+      onProceed();
+    }
+  }, [loading, detection, onProceed]);
+
   if (loading) {
     return (
       <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
@@ -62,13 +70,6 @@ export const PiiWarning: React.FC<PiiWarningProps> = ({
       </div>
     );
   }
-
-  // Auto-proceed when no PII is detected (must be in useEffect, not during render)
-  useEffect(() => {
-    if (!loading && !detection?.found) {
-      onProceed();
-    }
-  }, [loading, detection, onProceed]);
 
   if (!detection?.found) {
     return null;
