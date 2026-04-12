@@ -45,7 +45,7 @@ timeline
     title AIBYAI Development Timeline
     section Quality
         Testing Suite : Unit tests (vitest) : Integration tests (supertest) : E2E tests (Playwright)
-        API Documentation : Swagger/OpenAPI : Auto-generated API.md
+        API Documentation : ✅ Swagger/OpenAPI live at /api/docs
     section Intelligence
         Agentic Memory v2 : Cross-conversation learning : Topic clustering : Automatic forgetting
         Advanced Reranking : Cohere rerank integration : Custom reranker training
@@ -62,9 +62,17 @@ timeline
 
 ---
 
+## ~~API Documentation~~ — Complete
+
+> **Status: Done** — Swagger/OpenAPI docs are live at `/api/docs`.
+
+All 35 route handlers have `@openapi` JSDoc annotations. Interactive Swagger UI is mounted at `/api/docs` with OpenAPI 3.0 spec available at `/api/docs/spec.json`.
+
+---
+
 ## Testing & Quality Assurance
 
-> **Priority: High** — The platform is feature-complete but test coverage is minimal.
+> **Priority: High** — Test suite exists (7 test files, 97 passing tests) but coverage can expand.
 
 ### Unit Tests
 
@@ -84,7 +92,7 @@ Every API route: happy path + 401 + invalid input = minimum 3 tests per route.
 
 | Area | Approach |
 |---|---|
-| 33 API routes | supertest against Express app |
+| 35 API routes | supertest against Express app |
 | Database operations | Test Prisma against real PostgreSQL |
 | Queue processing | BullMQ job lifecycle testing |
 | SSE streaming | Event stream validation |
@@ -100,33 +108,6 @@ Critical user flows with Playwright (already installed in the project).
 | Knowledge base | Create KB, upload document, query with RAG |
 | Workflow builder | Create workflow, add nodes, execute |
 | Marketplace | Browse, install item, verify in account |
-
----
-
-## API Documentation
-
-> **Priority: High** — No auto-generated docs exist yet.
-
-```mermaid
-flowchart LR
-    A["JSDoc annotations\non route handlers"] --> B["swagger-jsdoc\nparses annotations"]
-    B --> C["OpenAPI 3.0\nspec.json"]
-    C --> D["swagger-ui-express\nGET /api/docs"]
-    C --> E["Auto-generated\nAPI.md"]
-
-    style A fill:#1e293b,stroke:#8b5cf6,color:#e2e8f0
-    style B fill:#1e293b,stroke:#8b5cf6,color:#e2e8f0
-    style C fill:#1e293b,stroke:#f59e0b,color:#e2e8f0
-    style D fill:#1e293b,stroke:#22c55e,color:#e2e8f0
-    style E fill:#1e293b,stroke:#22c55e,color:#e2e8f0
-```
-
-### Deliverables
-
-- Swagger UI mounted at `/api/docs` (protected by auth)
-- OpenAPI 3.0 spec at `/api/docs/spec.json`
-- Static `docs/API.md` auto-generated from spec
-- JSDoc `@param`, `@returns`, `@throws` on all public service functions
 
 ---
 

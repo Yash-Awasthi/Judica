@@ -1,6 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 import { env } from "../config/env.js";
+import logger from "../lib/logger.js";
 
 const router = Router();
 
@@ -75,7 +76,7 @@ router.post("/", async (req, res, next) => {
         voice: "random"
       });
     } catch (e1: any) {
-      console.warn("TTS Attempt 1 (xiaomi/MiMo-TTS-v2) failed:", e1.message);
+      logger.warn({ err: e1.message }, "TTS Attempt 1 (xiaomi/MiMo-TTS-v2) failed");
       try {
         audioBuffer = await attemptTTS("https://api.siliconflow.cn/v1/audio/speech", {
           model: "FunAudioLLM/CosyVoice2-0.5B",
@@ -83,7 +84,7 @@ router.post("/", async (req, res, next) => {
           voice: "alex"
         });
       } catch (e2: any) {
-        console.warn("TTS Attempt 2 (CosyVoice) failed:", e2.message);
+        logger.warn({ err: e2.message }, "TTS Attempt 2 (CosyVoice) failed");
         audioBuffer = await attemptTTS("https://api.chatanywhere.tech/v1/audio/speech", {
           model: "tts-1",
           input: parsed.data.input,

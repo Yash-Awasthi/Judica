@@ -98,7 +98,7 @@ flowchart TB
         direction LR
         AUTH["Auth\nJWT + OAuth2"]
         RATE["Rate Limiter\nRedis-backed"]
-        ROUTES["33 Route\nHandlers"]
+        ROUTES["35 Route\nHandlers"]
     end
 
     subgraph ENGINE["Deliberation Engine"]
@@ -173,6 +173,15 @@ Write Python functions that become tools during council deliberation. Sandboxed 
 ### Observability + LLMOps
 Execution tracing with LangFuse export, model reliability scoring, analytics dashboard, per-query cost tracking with color-coded tiers.
 
+### API Documentation
+Interactive Swagger UI at `/api/docs` with OpenAPI 3.0 spec. All 35 routes annotated with request/response schemas, auth requirements, and examples.
+
+### Voice & Text-to-Speech
+Multi-provider TTS with automatic fallback (Xiaomi MiMo → CosyVoice → OpenAI). Speech-to-text input support.
+
+### PII Detection & Redaction
+Client-side warning system with server-side PII scanning. Detects emails, phone numbers, SSNs, credit cards. One-click anonymization before sending to AI.
+
 ### GitHub Intelligence
 Index repositories into the vector store. Code snippets are injected into council context for code-aware conversations.
 
@@ -233,7 +242,7 @@ mindmap
       Rate Limiting
 ```
 
-**178 backend files · 57 frontend files · 39 database models · 33 API routes · 9 LLM providers**
+**178 backend files · 57 frontend files · 39 database models · 35 API routes · 9 LLM providers**
 
 ---
 
@@ -247,7 +256,7 @@ npm install
 cd frontend && npm install && cd ..
 
 cp .env.example .env
-# Add DATABASE_URL, JWT_SECRET, and at least one AI provider key
+# Add DATABASE_URL, JWT_SECRET, MASTER_ENCRYPTION_KEY, and at least one AI provider key
 
 npx prisma generate && npx prisma migrate dev --name init
 npm run dev:all
@@ -277,7 +286,7 @@ curl -X POST http://localhost:3000/api/ask \
 
 Returns an SSE stream: `opinion` → `peer_review` → `scored` → `done` (verdict + confidence score)
 
-> **Full API reference with all 33 endpoints:** [docs/DOCUMENTATION.md](./docs/DOCUMENTATION.md#api-reference)
+> **Full API reference with all 35 endpoints:** [docs/DOCUMENTATION.md](./docs/DOCUMENTATION.md#api-reference) | **Interactive docs:** `/api/docs`
 
 ---
 
