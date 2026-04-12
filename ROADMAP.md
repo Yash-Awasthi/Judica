@@ -64,20 +64,25 @@ flowchart LR
 timeline
     title AIBYAI Development Timeline
     section Quality
-        Testing Suite : Unit tests (vitest, 70% coverage) : Integration tests (supertest + real DB) : E2E tests (Playwright)
-        Grafana Dashboards : Wire Prometheus metrics to Grafana : Alert rules for latency and error spikes
+        Testing Suite : Unit tests (80% coverage) : Integration tests (Fastify inject + real DB) : E2E tests (Playwright)
+        Grafana Dashboards : Wire Prometheus to Grafana : Alert rules for latency and errors
     section Intelligence
-        Agentic Memory v2 : Cross-conversation learning : Topic clustering : Automatic forgetting
-        Advanced Reranking : Cohere rerank integration : Custom reranker training
-        Multi-turn Research : Iterative research with follow-ups : Source quality scoring
+        Agentic Memory v2 : Cross-conversation learning : Topic clustering : Automatic forgetting : Episodic memory
+        Agent Specialization : Domain-specific agents : Self-improving personas : Confidence calibration
+        Advanced RAG : Cohere reranking : Parent-child chunking : HyDE query expansion : Multi-index search
+    section Autonomy
+        Autonomous Agents : Goal decomposition : Tool chains : Long-running tasks : Human-in-the-loop gates
+        Code Generation : Full-stack scaffolding : PR review agent : Test generation : Refactoring assistant
+        Multi-Modal Council : Image analysis agents : Audio/video understanding : Visual output generation
     section Platform
+        MCP Integration : MCP server mode : MCP client mode : Tool marketplace federation
         Real-time Collaboration : Multi-user deliberation : Live cursors : Shared councils
-        Plugin SDK : Third-party tool integration : Webhook triggers : Custom node types
-        Mobile App : React Native client : Push notifications : Voice-first interface
+        Plugin SDK : Third-party tools : Custom workflow nodes : Webhook triggers : Middleware hooks
+        Mobile App : React Native : Push notifications : Voice-first : Haptic feedback
     section Scale
         Kubernetes : Horizontal auto-scaling : Multi-region : Health-based routing
-        Multi-tenant : Workspace isolation : Per-tenant quotas : SSO (SAML)
-        Enterprise : Audit compliance : Data residency : SLA monitoring
+        Multi-Tenant Enterprise : Workspace isolation : SSO (SAML/OIDC) : Audit compliance : Data residency
+        Marketplace v2 : Revenue sharing : Verified publishers : Usage analytics : Dependency resolution
 ```
 
 ---
@@ -88,7 +93,7 @@ timeline
 
 ### Unit Tests
 
-Target **70% statement coverage** across all services.
+Target **80% statement coverage** across all services.
 
 | Area | Files | Framework |
 |---|---|---|
@@ -181,6 +186,87 @@ flowchart TB
 - **Cohere rerank**: Integration with `rerank-english-v3.0` for hybrid search results
 - **Cross-encoder reranking**: Fine-tuned model for domain-specific relevance scoring
 - **Dynamic k selection**: Automatically choose how many chunks to retrieve based on query complexity
+- **Parent-child chunking**: Retrieve parent context when child chunk matches for better context windows
+- **Query expansion**: Automatic query rewriting and HyDE (Hypothetical Document Embeddings) for improved recall
+- **Multi-index search**: Search across knowledge bases, code repos, and conversation history simultaneously
+
+---
+
+## Agent Specialization & Self-Improvement
+
+> **Priority: High** — Agents use static archetypes today.
+
+- **Domain-specific agents**: Pre-trained archetypes for legal, medical, financial, and engineering domains with specialized vocabulary and reasoning patterns
+- **Self-improving personas**: Agents track their own accuracy over time and adjust reasoning strategies based on past performance
+- **Agent collaboration protocols**: Agents can delegate sub-tasks to other agents, forming dynamic chains
+- **Confidence calibration**: Agents learn to produce well-calibrated confidence scores through feedback loops
+- **Archetype evolution**: User interaction patterns gradually shift archetype weights and behavior
+
+---
+
+## Autonomous Agent Mode
+
+> **Priority: High** — Currently agents only respond to single queries.
+
+```mermaid
+flowchart TB
+    USER["User Goal"] --> PLAN["Planning Agent\nDecompose into subtasks"]
+    PLAN --> T1["Task 1\nResearch"]
+    PLAN --> T2["Task 2\nCode Generation"]
+    PLAN --> T3["Task 3\nValidation"]
+    T1 --> TOOLS1["Web Search\nRAG Query\nRepo Analysis"]
+    T2 --> TOOLS2["Sandbox\nFile System\nGit Operations"]
+    T3 --> TOOLS3["Test Runner\nCode Review\nBenchmark"]
+    T1 --> MERGE["Merge & Report"]
+    T2 --> MERGE
+    T3 --> MERGE
+    MERGE --> USER
+
+    style USER fill:#1e293b,stroke:#f59e0b,color:#e2e8f0
+    style PLAN fill:#1e293b,stroke:#3b82f6,color:#e2e8f0
+    style MERGE fill:#1e293b,stroke:#22c55e,color:#e2e8f0
+```
+
+- **Goal decomposition**: User provides a high-level goal; planning agent breaks it into executable subtasks
+- **Tool chains**: Agents can sequence tools (search, analyze, code, test, deploy) without user intervention
+- **Long-running tasks**: Background agents that work for hours on complex research or code generation
+- **Human-in-the-loop checkpoints**: Configurable approval gates before irreversible actions
+- **Progress streaming**: Real-time task progress via SSE with intermediate artifacts
+
+---
+
+## Multi-Modal Council
+
+> **Priority: Medium** — Currently text-only deliberation.
+
+- **Image analysis agents**: Council members that can analyze images, charts, diagrams, and screenshots
+- **Audio/video understanding**: Process audio transcripts and video frames as council input
+- **Document OCR**: Extract and reason over scanned documents, handwritten notes, whiteboards
+- **Visual output generation**: Agents can produce diagrams, charts, and visual explanations as part of their responses
+- **Cross-modal reasoning**: Agents reference visual evidence when debating text-based claims
+
+---
+
+## MCP Integration (Model Context Protocol)
+
+> **Priority: Medium** — Enables AIBYAI as a tool server for external agents.
+
+- **MCP server mode**: Expose AIBYAI's deliberation engine as an MCP tool — any MCP-compatible client can invoke a council
+- **MCP client mode**: AIBYAI agents can call external MCP servers for specialized capabilities (databases, APIs, file systems)
+- **Tool marketplace federation**: Browse and install tools from the MCP ecosystem directly into AIBYAI workflows
+- **Dynamic tool discovery**: Agents automatically discover and use available MCP tools based on task requirements
+
+---
+
+## Code Generation & Review
+
+> **Priority: Medium** — Sandbox exists but no autonomous code generation.
+
+- **Full-stack scaffolding**: Describe an app in natural language and council generates project structure, components, API routes, database schema
+- **PR review agent**: Automated code review with multi-perspective analysis (security agent, performance agent, style agent)
+- **Test generation**: Given a function or module, generate comprehensive test suites with edge cases
+- **Refactoring assistant**: Council analyzes codebase and suggests refactoring with before/after diffs
+- **Documentation generation**: Produce API docs, architecture diagrams, and inline documentation from code analysis
 
 ---
 
@@ -221,6 +307,7 @@ flowchart LR
 - **Custom workflow nodes**: Third-party node handlers with UI components
 - **Webhook triggers**: Fire webhooks on deliberation events (verdict, conflict, etc.)
 - **Provider plugins**: Package-based provider adapters (beyond current EMOF UI approach)
+- **Middleware hooks**: Plugin into the deliberation pipeline (pre-process, post-process, custom scoring)
 
 ---
 
@@ -231,9 +318,10 @@ flowchart LR
 ### Goals
 
 - React Native client with shared API
-- Push notifications for research job completion, workflow results
+- Push notifications for research job completion, workflow results, background agent updates
 - Voice-first interaction mode (STT input, TTS output by default)
 - Offline mode with syncing (extending current IndexedDB approach)
+- Haptic feedback for deliberation milestones
 
 ---
 
@@ -285,9 +373,24 @@ flowchart TB
 - **Workspace isolation**: Separate data, configs, and billing per tenant
 - **Per-tenant quotas**: Token limits, storage limits, concurrent deliberation limits
 - **SSO**: SAML 2.0 and OpenID Connect for enterprise identity providers
-- **Audit compliance**: SOC 2 logging format, data retention policies
+- **Audit compliance**: SOC 2 logging format, data retention policies, GDPR data export
 - **Data residency**: Ensure data stays in specific geographic regions
 - **SLA monitoring**: Uptime tracking, latency SLOs, automated alerting
+
+---
+
+## Marketplace v2
+
+> **Priority: Low** — Current marketplace is functional but basic.
+
+### Goals
+
+- **Revenue sharing**: Creators earn from paid marketplace items
+- **Verified publishers**: Trust badges for vetted creators
+- **Usage analytics**: Track installs, active usage, retention per item
+- **Collections & categories**: Curated bundles (e.g. "Legal Pack", "Code Review Kit")
+- **Versioning with changelogs**: Semantic versioning, automatic update notifications
+- **Dependency resolution**: Marketplace items that depend on other items auto-install dependencies
 
 ---
 
