@@ -144,7 +144,7 @@ const providersPlugin: FastifyPluginAsync = async (fastify) => {
    *       - Providers
    *     summary: Test a provider connection
    */
-  fastify.post("/test", async (request, reply) => {
+  fastify.post("/test", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const parsed = testProviderBody.safeParse(request.body);
     if (!parsed.success) {
       reply.code(400);

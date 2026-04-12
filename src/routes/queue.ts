@@ -81,8 +81,8 @@ const queuePlugin: FastifyPluginAsync = async (fastify) => {
    *       401:
    *         description: Unauthorized
    */
-  // GET /stats — queue stats
-  fastify.get("/stats", async (request, reply) => {
+  // GET /stats — queue stats (admin only)
+  fastify.get("/stats", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const [ingestion, research, repo, compaction] = await Promise.all([
       getQueueStats(ingestionQueue),
       getQueueStats(researchQueue),
