@@ -727,6 +727,190 @@ Multi-stage build:
 1. **Builder:** Installs deps, generates Prisma, compiles TypeScript + React
 2. **Runner:** Production deps only, non-root user, exposes port 3000
 
+### Nginx + SSL Reverse Proxy
+
+For production, place Nginx in front of the app:
+
+```nginx
+server {
+    listen 443 ssl http2;
+    server_name your-domain.com;
+
+    ssl_certificate /etc/nginx/ssl/cert.pem;
+    ssl_certificate_key /etc/nginx/ssl/key.pem;
+
+    location / {
+        proxy_pass http://app:3000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+server {
+    listen 80;
+    server_name your-domain.com;
+    return 301 https://$server_name$request_uri;
+}
+```
+
+For load balancing across multiple instances:
+
+```nginx
+upstream aibyai {
+    server app1:3000;
+    server app2:3000;
+    server app3:3000;
+}
+
+server {
+    location / {
+        proxy_pass http://aibyai;
+    }
+
+    location /static/ {
+        expires 1y;
+        add_header Cache-Control "public, immutable";
+    }
+}
+```
+
+### Kubernetes Deployment
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aibyai
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: aibyai
+  template:
+    metadata:
+      labels:
+        app: aibyai
+    spec:
+      containers:
+      - name: aibyai
+        image: aibyai:latest
+        ports:
+        - containerPort: 3000
+        env:
+        - name: NODE_ENV
+          value: "production"
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: aibyai-hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: aibyai
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+```
+
+### Local AI Setup
+
+#### Ollama
+
+```bash
+curl -fsSL https://ollama.ai/install.sh | sh
+ollama pull llama2 && ollama pull codellama && ollama pull mistral
+ollama serve
+```
+
+Set `OLLAMA_BASE_URL=http://localhost:11434` in `.env`.
+
+#### LM Studio
+
+1. Download [LM Studio](https://lmstudio.ai/), load a model, start the server on port 1234
+2. Set `LM_STUDIO_ENDPOINT=http://localhost:1234` in `.env`
+
+#### llama.cpp
+
+```bash
+git clone https://github.com/ggerganov/llama.cpp && cd llama.cpp && make
+./main -m model.gguf --host 0.0.0.0 --port 8080
+```
+
+### Database Optimization
+
+```sql
+-- Recommended indexes for performance
+CREATE INDEX CONCURRENTLY "chat_created_at_idx" ON "Chat"("createdAt");
+CREATE INDEX CONCURRENTLY "audit_log_user_created_idx" ON "AuditLog"("userId", "createdAt");
+CREATE INDEX CONCURRENTLY "evaluation_session_idx" ON "Evaluation"("sessionId");
+
+-- Run periodically
+VACUUM ANALYZE;
+```
+
+### Redis Tuning
+
+```bash
+redis-cli CONFIG SET maxmemory 2gb
+redis-cli CONFIG SET maxmemory-policy allkeys-lru
+```
+
+### Backup & Recovery
+
+**Database:**
+
+```bash
+#!/bin/bash
+BACKUP_DIR="/backups/aibyai"
+DATE=$(date +%Y%m%d_%H%M%S)
+mkdir -p $BACKUP_DIR
+pg_dump ai_council | gzip > "$BACKUP_DIR/backup_$DATE.sql.gz"
+find $BACKUP_DIR -name "*.sql.gz" -mtime +7 -delete
+```
+
+Schedule with `crontab -e`: `0 2 * * * /path/to/backup-db.sh`
+
+**Redis:**
+
+```bash
+redis-cli CONFIG SET save "900 1 300 10 60 10000"
+redis-cli BGSAVE
+cp /var/lib/redis/dump.rdb /backups/redis_$(date +%Y%m%d_%H%M%S).rdb
+```
+
+### Troubleshooting
+
+| Issue | Check |
+|---|---|
+| Database won't connect | `sudo systemctl status postgresql` / `psql -h localhost -U username -d ai_council` |
+| Redis won't connect | `redis-cli ping` / `redis-cli monitor` |
+| High memory usage | `docker stats` / `export NODE_OPTIONS="--max-old-space-size=4096"` |
+| Slow queries | `npx prisma studio` / `EXPLAIN ANALYZE` on slow queries |
+| Migration issues | `npx prisma migrate reset` (development only) |
+
 ---
 
 ## Provider Adapters
