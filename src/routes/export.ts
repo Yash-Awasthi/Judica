@@ -54,11 +54,11 @@ router.get("/conversation/:id", requireAuth, async (req: AuthRequest, res: Respo
         userId,
       },
       include: {
-        chats: {
+        Chat: {
           orderBy: { createdAt: "asc" },
         },
       },
-    }) as { id: string; title: string; createdAt: Date; updatedAt: Date; chats: { id: number; question: string; verdict: string | null; opinions: unknown; durationMs: number | null; tokensUsed: number | null; createdAt: Date }[] } | null;
+    }) as any;
 
     if (!conversation) {
       return res.status(404).json({ error: "Conversation not found" });
@@ -71,7 +71,7 @@ router.get("/conversation/:id", requireAuth, async (req: AuthRequest, res: Respo
         title: conversation.title,
         createdAt: conversation.createdAt,
         updatedAt: conversation.updatedAt,
-        chats: conversation.chats.map((chat: { id: number; question: string; verdict: string | null; opinions: unknown; durationMs: number | null; tokensUsed: number | null; createdAt: Date }) => ({
+        chats: conversation.Chat.map((chat: { id: number; question: string; verdict: string | null; opinions: unknown; durationMs: number | null; tokensUsed: number | null; createdAt: Date }) => ({
           id: chat.id,
           question: chat.question,
           verdict: chat.verdict,
@@ -132,23 +132,23 @@ router.get("/all", requireAuth, async (req: AuthRequest, res: Response) => {
     const conversations = await prisma.conversation.findMany({
       where: { userId },
       include: {
-        chats: {
+        Chat: {
           orderBy: { createdAt: "asc" },
         },
       },
       orderBy: { createdAt: "desc" },
-    });
+    }) as any;
 
     const exportData = {
       exportedAt: new Date().toISOString(),
       totalConversations: conversations.length,
-      totalChats: conversations.reduce((sum: number, c: { chats: { length: number } }) => sum + c.chats.length, 0),
-      conversations: conversations.map((conv: { id: string; title: string; createdAt: Date; updatedAt: Date; chats: { id: number; question: string; verdict: string | null; opinions: unknown; durationMs: number | null; tokensUsed: number | null; createdAt: Date }[] }) => ({
+      totalChats: conversations.reduce((sum: number, c: any) => sum + (c.chats?.length || c.Chat?.length || 0), 0),
+      conversations: conversations.map((conv: any) => ({
         id: conv.id,
         title: conv.title,
         createdAt: conv.createdAt,
         updatedAt: conv.updatedAt,
-        chats: conv.chats.map((chat: { id: number; question: string; verdict: string | null; opinions: unknown; durationMs: number | null; tokensUsed: number | null; createdAt: Date }) => ({
+        chats: conv.Chat.map((chat: { id: number; question: string; verdict: string | null; opinions: unknown; durationMs: number | null; tokensUsed: number | null; createdAt: Date }) => ({
           id: chat.id,
           question: chat.question,
           verdict: chat.verdict,
@@ -210,11 +210,11 @@ router.get("/conversation/:id/markdown", requireAuth, async (req: AuthRequest, r
         userId,
       },
       include: {
-        chats: {
+        Chat: {
           orderBy: { createdAt: "asc" },
         },
       },
-    }) as { id: string; title: string; createdAt: Date; updatedAt: Date; chats: { id: number; question: string; verdict: string | null; opinions: unknown; durationMs: number | null; tokensUsed: number | null; createdAt: Date }[] } | null;
+    }) as any;
 
     if (!conversation) {
       return res.status(404).json({ error: "Conversation not found" });

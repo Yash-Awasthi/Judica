@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
+import { motion } from "framer-motion";
 import { Database, HardDrive, Trash2, Zap, RefreshCw } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { AnimatedCounter } from "../components/AnimatedCounter";
 
 interface BackendInfo {
   type: string;
@@ -14,6 +16,11 @@ interface MemoryStats {
   chunkCount: number;
   estimatedStorageMB: number;
 }
+
+const stagger = {
+  container: { animate: { transition: { staggerChildren: 0.08 } } },
+  item: { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0, transition: { duration: 0.3 } } },
+};
 
 export function MemorySettingsView() {
   const { fetchWithAuth } = useAuth();
@@ -117,139 +124,140 @@ export function MemorySettingsView() {
   };
 
   return (
-    <div className="max-w-3xl mx-auto p-6">
-      <h1 className="text-2xl font-bold text-gray-800 mb-6">Memory Settings</h1>
+    <div className="h-full overflow-y-auto scrollbar-custom p-6">
+      <motion.div
+        variants={stagger.container}
+        initial="initial"
+        animate="animate"
+        className="max-w-3xl mx-auto space-y-6"
+      >
+        <motion.div variants={stagger.item}>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">Memory Settings</h1>
+          <p className="text-sm text-[var(--text-muted)] mt-0.5">Configure how your AI agents store and retrieve long-term memory</p>
+        </motion.div>
 
-      {/* Stats */}
-      <div className="bg-white rounded-lg border p-4 mb-6">
-        <h2 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
-          <Database size={16} /> Memory Statistics
-        </h2>
-        <div className="grid grid-cols-2 gap-4">
-          <div className="bg-gray-50 rounded p-3">
-            <div className="text-2xl font-bold text-blue-600">{stats.chunkCount}</div>
-            <div className="text-sm text-gray-500">Memory Chunks</div>
+        {/* Stats */}
+        <motion.div variants={stagger.item} className="surface-card p-5">
+          <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
+            <Database size={16} className="text-[var(--accent-mint)]" /> Memory Statistics
+          </h2>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="glass-panel rounded-card p-4">
+              <div className="text-2xl font-bold text-[var(--accent-blue)]">
+                <AnimatedCounter value={stats.chunkCount} />
+              </div>
+              <div className="text-xs text-[var(--text-muted)] mt-1">Memory Chunks</div>
+            </div>
+            <div className="glass-panel rounded-card p-4">
+              <div className="text-2xl font-bold text-[var(--accent-mint)]">{stats.estimatedStorageMB} MB</div>
+              <div className="text-xs text-[var(--text-muted)] mt-1">Estimated Storage</div>
+            </div>
           </div>
-          <div className="bg-gray-50 rounded p-3">
-            <div className="text-2xl font-bold text-green-600">{stats.estimatedStorageMB} MB</div>
-            <div className="text-sm text-gray-500">Estimated Storage</div>
-          </div>
-        </div>
-      </div>
+        </motion.div>
 
-      {/* Backend Selector */}
-      <div className="bg-white rounded-lg border p-4 mb-6">
-        <h2 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
-          <HardDrive size={16} /> Memory Backend
-        </h2>
-        <div className="mb-3">
-          <div className="text-sm text-gray-500 mb-2">
-            Current: <span className="font-medium text-gray-700">{backend.type}</span>
-            {backend.active && <span className="ml-2 text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded">Active</span>}
-          </div>
-        </div>
-
-        <div className="space-y-3">
-          <label className="block">
-            <span className="text-sm font-medium text-gray-700">Backend Type</span>
-            <select
-              className="mt-1 w-full px-3 py-2 border rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
-              value={selectedType}
-              onChange={(e) => setSelectedType(e.target.value)}
-            >
-              <option value="local">Local (pgvector) - Default</option>
-              <option value="qdrant">Qdrant</option>
-              <option value="getzep">GetZep</option>
-              <option value="google_drive">Google Drive</option>
-            </select>
-          </label>
-
-          {selectedType !== "local" && (
-            <>
-              <label className="block">
-                <span className="text-sm font-medium text-gray-700">URL</span>
-                <input
-                  className="mt-1 w-full px-3 py-2 border rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
-                  value={configUrl}
-                  onChange={(e) => setConfigUrl(e.target.value)}
-                  placeholder={selectedType === "qdrant" ? "http://localhost:6333" : "https://..."}
-                />
-              </label>
-              <label className="block">
-                <span className="text-sm font-medium text-gray-700">API Key</span>
-                <input
-                  type="password"
-                  className="mt-1 w-full px-3 py-2 border rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
-                  value={configApiKey}
-                  onChange={(e) => setConfigApiKey(e.target.value)}
-                  placeholder={backend.hasApiKey ? "••••••• (already set)" : "Enter API key"}
-                />
-              </label>
-              {selectedType === "qdrant" && (
-                <label className="block">
-                  <span className="text-sm font-medium text-gray-700">Collection Name</span>
-                  <input
-                    className="mt-1 w-full px-3 py-2 border rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
-                    value={configCollection}
-                    onChange={(e) => setConfigCollection(e.target.value)}
-                    placeholder="my_collection"
-                  />
-                </label>
+        {/* Backend Selector */}
+        <motion.div variants={stagger.item} className="surface-card p-5">
+          <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
+            <HardDrive size={16} className="text-[var(--accent-blue)]" /> Memory Backend
+          </h2>
+          <div className="mb-4">
+            <div className="text-xs text-[var(--text-secondary)] mb-2">
+              Current: <span className="font-semibold text-[var(--text-primary)]">{backend.type}</span>
+              {backend.active && (
+                <span className="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[rgba(110,231,183,0.08)] text-[var(--accent-mint)] border border-[rgba(110,231,183,0.15)]">Active</span>
               )}
-            </>
-          )}
-
-          <button
-            onClick={handleSaveBackend}
-            disabled={saving}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
-          >
-            {saving ? "Saving..." : "Save Backend"}
-          </button>
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div className="bg-white rounded-lg border p-4">
-        <h2 className="font-semibold text-gray-700 mb-3 flex items-center gap-2">
-          <Zap size={16} /> Actions
-        </h2>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
-            <div>
-              <div className="text-sm font-medium">Compact Memory</div>
-              <div className="text-xs text-gray-500">Merge similar old memories to save space</div>
             </div>
-            <button
-              onClick={handleCompact}
-              disabled={compacting}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-            >
-              <RefreshCw size={14} className={compacting ? "animate-spin" : ""} />
-              {compacting ? "Compacting..." : "Compact"}
-            </button>
           </div>
 
-          {compactResult && (
-            <div className="p-3 bg-green-50 rounded text-sm text-green-700">
-              Compacted {compactResult.originalCount} chunks into {compactResult.compactedCount} groups
-            </div>
-          )}
-
-          <div className="flex items-center justify-between p-3 bg-red-50 rounded">
+          <div className="space-y-4">
             <div>
-              <div className="text-sm font-medium text-red-700">Clear All Memory</div>
-              <div className="text-xs text-red-500">Permanently delete all memory chunks</div>
+              <label className="block text-[10px] font-bold text-[var(--text-muted)] mb-1.5 uppercase tracking-widest">Backend Type</label>
+              <select className="input-base" value={selectedType} onChange={(e) => setSelectedType(e.target.value)}>
+                <option value="local">Local (pgvector) - Default</option>
+                <option value="qdrant">Qdrant</option>
+                <option value="getzep">GetZep</option>
+                <option value="google_drive">Google Drive</option>
+              </select>
             </div>
-            <button
-              onClick={handleClearAll}
-              className="flex items-center gap-1 px-3 py-1.5 text-sm bg-red-600 text-white rounded hover:bg-red-700"
-            >
-              <Trash2 size={14} /> Clear All
+
+            {selectedType !== "local" && (
+              <>
+                <div>
+                  <label className="block text-[10px] font-bold text-[var(--text-muted)] mb-1.5 uppercase tracking-widest">URL</label>
+                  <input
+                    className="input-base"
+                    value={configUrl}
+                    onChange={(e) => setConfigUrl(e.target.value)}
+                    placeholder={selectedType === "qdrant" ? "http://localhost:6333" : "https://..."}
+                  />
+                </div>
+                <div>
+                  <label className="block text-[10px] font-bold text-[var(--text-muted)] mb-1.5 uppercase tracking-widest">API Key</label>
+                  <input
+                    type="password"
+                    className="input-base"
+                    value={configApiKey}
+                    onChange={(e) => setConfigApiKey(e.target.value)}
+                    placeholder={backend.hasApiKey ? "••••••• (already set)" : "Enter API key"}
+                  />
+                </div>
+                {selectedType === "qdrant" && (
+                  <div>
+                    <label className="block text-[10px] font-bold text-[var(--text-muted)] mb-1.5 uppercase tracking-widest">Collection Name</label>
+                    <input className="input-base" value={configCollection} onChange={(e) => setConfigCollection(e.target.value)} placeholder="my_collection" />
+                  </div>
+                )}
+              </>
+            )}
+
+            <button onClick={handleSaveBackend} disabled={saving} className="btn-pill-primary text-sm px-4 py-2 disabled:opacity-50">
+              {saving ? "Saving..." : "Save Backend"}
             </button>
           </div>
-        </div>
-      </div>
+        </motion.div>
+
+        {/* Actions */}
+        <motion.div variants={stagger.item} className="surface-card p-5">
+          <h2 className="text-sm font-semibold text-[var(--text-primary)] mb-4 flex items-center gap-2">
+            <Zap size={16} className="text-[var(--accent-gold)]" /> Actions
+          </h2>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between p-4 glass-panel rounded-card">
+              <div>
+                <div className="text-sm font-semibold text-[var(--text-primary)]">Compact Memory</div>
+                <div className="text-xs text-[var(--text-muted)] mt-0.5">Merge similar old memories to save space</div>
+              </div>
+              <button
+                onClick={handleCompact}
+                disabled={compacting}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-button bg-[rgba(110,231,183,0.08)] text-[var(--accent-mint)] border border-[rgba(110,231,183,0.15)] hover:bg-[rgba(110,231,183,0.15)] transition-colors disabled:opacity-50"
+              >
+                <RefreshCw size={14} className={compacting ? "animate-spin" : ""} />
+                {compacting ? "Compacting..." : "Compact"}
+              </button>
+            </div>
+
+            {compactResult && (
+              <div className="p-3 rounded-card bg-[rgba(110,231,183,0.06)] border border-[rgba(110,231,183,0.12)] text-sm text-[var(--accent-mint)]">
+                Compacted {compactResult.originalCount} chunks into {compactResult.compactedCount} groups
+              </div>
+            )}
+
+            <div className="flex items-center justify-between p-4 rounded-card border border-red-400/15 bg-red-400/5">
+              <div>
+                <div className="text-sm font-semibold text-red-400">Clear All Memory</div>
+                <div className="text-xs text-red-400/60 mt-0.5">Permanently delete all memory chunks</div>
+              </div>
+              <button
+                onClick={handleClearAll}
+                className="flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-button bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors"
+              >
+                <Trash2 size={14} /> Clear All
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }

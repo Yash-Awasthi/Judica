@@ -195,7 +195,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
 // GET /api/research/:id — get job detail
 router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const job = await prisma.researchJob.findFirst({
-    where: { id: req.params.id, userId: req.userId! },
+    where: { id: req.params.id as string, userId: req.userId! },
   });
   if (!job) throw new AppError(404, "Research job not found", "RESEARCH_NOT_FOUND");
   res.json(job);
@@ -234,7 +234,7 @@ router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 // GET /api/research/:id/stream — SSE streaming
 router.get("/:id/stream", requireAuth, async (req: AuthRequest, res: Response) => {
   const job = await prisma.researchJob.findFirst({
-    where: { id: req.params.id, userId: req.userId! },
+    where: { id: req.params.id as string, userId: req.userId! },
   });
   if (!job) throw new AppError(404, "Research job not found", "RESEARCH_NOT_FOUND");
 
@@ -338,7 +338,7 @@ router.get("/:id/stream", requireAuth, async (req: AuthRequest, res: Response) =
 // DELETE /api/research/:id — delete job
 router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const job = await prisma.researchJob.findFirst({
-    where: { id: req.params.id, userId: req.userId! },
+    where: { id: req.params.id as string, userId: req.userId! },
   });
   if (!job) throw new AppError(404, "Research job not found", "RESEARCH_NOT_FOUND");
 

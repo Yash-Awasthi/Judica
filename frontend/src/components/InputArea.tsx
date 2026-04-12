@@ -1,86 +1,96 @@
-import React, { useRef } from "react";
+import { useRef, useEffect } from "react";
+import { Send, Zap, ZapOff } from "lucide-react";
 
 interface InputAreaProps {
   input: string;
-  setInput: (value: string) => void;
-  isStreaming: boolean;
+  setInput: (val: string) => void;
   useStream: boolean;
-  setUseStream: (value: boolean) => void;
+  setUseStream: (val: boolean) => void;
+  isStreaming: boolean;
   onSend: () => void;
   placeholder?: string;
 }
 
 export function InputArea({
-  input, setInput, isStreaming, useStream, setUseStream, onSend, placeholder
+  input,
+  setInput,
+  useStream,
+  setUseStream,
+  isStreaming,
+  onSend,
+  placeholder,
 }: InputAreaProps) {
-  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  const handleSend = () => {
-    if (!input.trim() || isStreaming) return;
-    setInput("");
-    if (inputRef.current) inputRef.current.style.height = "auto";
-    onSend();
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
-      handleSend();
+      onSend();
     }
   };
 
-  const handleInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setInput(e.target.value);
-    e.target.style.height = "auto";
-    e.target.style.height = Math.min(e.target.scrollHeight, 130) + "px";
-  };
+  // Auto-resize textarea
+  useEffect(() => {
+    const el = textareaRef.current;
+    if (el) {
+      el.style.height = "auto";
+      el.style.height = Math.min(el.scrollHeight, 160) + "px";
+    }
+  }, [input]);
 
   return (
-    <div className="p-4 pt-2 w-full max-w-3xl mx-auto">
-      <div className="relative group">
+    <div className="w-full max-w-3xl mx-auto px-4">
+      <div className="relative surface-card rounded-2xl p-2 flex items-end gap-2 transition-all focus-within:shadow-glow-sm">
+        {/* Stream toggle */}
+        <button
+          onClick={() => setUseStream(!useStream)}
+          className={`shrink-0 p-2 rounded-xl transition-all duration-200 ${
+            useStream
+              ? "text-[var(--accent-mint)] bg-[rgba(110,231,183,0.08)]"
+              : "text-[var(--text-muted)] hover:text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)]"
+          }`}
+          title={useStream ? "Streaming enabled" : "Streaming disabled"}
+        >
+          {useStream ? <Zap size={16} /> : <ZapOff size={16} />}
+        </button>
+
+        {/* Textarea */}
         <textarea
-          ref={inputRef}
+          ref={textareaRef}
           value={input}
-          onChange={handleInput}
+          onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={placeholder || "Ask the council anything..."}
-          disabled={isStreaming}
-          className="w-full px-5 py-4 pr-28 bg-[#0a0a0a] border border-white/[0.08] group-hover:border-white/[0.15] rounded-2xl text-[15px] leading-relaxed text-text placeholder-text-dim focus:outline-none focus:border-accent/40 focus:ring-1 focus:ring-accent/10 transition-all resize-none shadow-lg"
+          placeholder={placeholder}
           rows={1}
-          style={{ minHeight: "60px", maxHeight: "200px" }}
+          className="flex-1 bg-transparent text-[var(--text-primary)] text-sm placeholder:text-[var(--text-muted)] outline-none resize-none max-h-40 py-2 leading-relaxed"
         />
-        <div className="absolute right-2 bottom-2 flex items-center gap-1.5">
-          <button
-            onClick={() => setUseStream(!useStream)}
-            className={`p-2.5 rounded-xl transition-all ${
-              useStream
-                ? "text-accent bg-accent/5 hover:bg-accent/10"
-                : "text-text-muted hover:text-text hover:bg-white/[0.06]"
-            }`}
-            title={useStream ? "Streaming enabled" : "Streaming disabled"}
-          >
-            <span className="material-symbols-outlined text-[18px]">
-              {useStream ? "waves" : "bolt"}
-            </span>
-          </button>
-          <button
-            onClick={handleSend}
-            disabled={!input.trim() || isStreaming}
-            className={`flex items-center justify-center p-2.5 rounded-xl transition-all duration-300 ${
-              isStreaming || !input.trim()
-                ? "bg-white/[0.04] text-white/30 cursor-not-allowed"
-                : "bg-accent text-[#000000] hover:bg-accent/90 hover:scale-105 shadow-glow-sm"
-            }`}
-          >
-            {isStreaming ? (
-              <div className="w-[18px] h-[18px] border-[2px] border-white/20 border-t-white/80 rounded-full animate-spin" />
-            ) : (
-              <span className="material-symbols-outlined text-[20px] font-medium leading-none">
-                arrow_upward
-              </span>
-            )}
-          </button>
-        </div>
+
+        {/* Send button */}
+        <button
+          onClick={onSend}
+          disabled={!input.trim() || isStreaming}
+          className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 ${
+            input.trim() && !isStreaming
+              ? "bg-[var(--accent-mint)] text-black shadow-glow-sm hover:shadow-glow"
+              : "bg-[var(--glass-bg)] text-[var(--text-muted)]"
+          } disabled:opacity-40`}
+        >
+          {isStreaming ? (
+            <span className="w-4 h-4 border-2 border-current border-t-transparent rounded-full animate-spin" />
+          ) : (
+            <Send size={15} />
+          )}
+        </button>
+      </div>
+
+      {/* Bottom hint */}
+      <div className="flex items-center justify-between px-2 mt-2">
+        <p className="text-[10px] text-[var(--text-muted)]">
+          <kbd className="px-1 py-0.5 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded text-[9px] font-mono">Enter</kbd> to send • <kbd className="px-1 py-0.5 bg-[var(--glass-bg)] border border-[var(--glass-border)] rounded text-[9px] font-mono">Shift+Enter</kbd> new line
+        </p>
+        <p className="text-[10px] text-[var(--text-muted)]">
+          {useStream ? "⚡ Streaming" : "Batch mode"}
+        </p>
       </div>
     </div>
   );

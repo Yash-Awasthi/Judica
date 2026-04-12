@@ -28,13 +28,13 @@ async function runAutoSummarization(): Promise<void> {
     });
 
     for (const convo of conversations) {
-      const msgCount = await prisma.message.count({
+      const msgCount = await (prisma as any).message.count({
         where: { conversationId: convo.id },
       });
 
       if (msgCount > 30) {
         try {
-          await summarizeSession(convo.id, convo.userId);
+          await summarizeSession(convo.id, convo.userId as number);
           logger.info({ conversationId: convo.id }, "Auto-summarized conversation");
         } catch (err) {
           logger.error({ err, conversationId: convo.id }, "Auto-summarization failed");

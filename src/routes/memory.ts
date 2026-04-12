@@ -294,7 +294,7 @@ router.delete("/backend", requireAuth, async (req: AuthRequest, res: Response) =
  */
 // POST /summarize/:conversationId — manually trigger session summary
 router.post("/summarize/:conversationId", requireAuth, async (req: AuthRequest, res: Response) => {
-  const summary = await summarizeSession(String(req.params.conversationId), req.userId!);
+  const summary = await summarizeSession(String(req.params.conversationId as string), req.userId!);
   res.json({ summary });
 });
 

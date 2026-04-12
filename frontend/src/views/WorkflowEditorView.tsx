@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef, useMemo, useEffect } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ReactFlow,
   Background,
@@ -305,33 +306,47 @@ function WorkflowEditorInner() {
       const status = nodeStatuses[n.id];
       if (!status) return n;
       const className =
-        status === "running" ? "ring-2 ring-blue-500 ring-offset-2 rounded-lg" :
-        status === "done" ? "ring-2 ring-green-500 ring-offset-2 rounded-lg" :
+        status === "running" ? "ring-2 ring-[var(--accent-blue)] ring-offset-2 rounded-lg" :
+        status === "done" ? "ring-2 ring-[var(--accent-mint)] ring-offset-2 rounded-lg" :
         status === "error" ? "ring-2 ring-red-500 ring-offset-2 rounded-lg" : "";
       return { ...n, className };
     });
   }, [nodes, nodeStatuses]);
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full bg-[var(--bg)]">
       {/* Top bar */}
-      <div className="flex items-center gap-3 px-4 py-2 border-b border-gray-200 bg-white">
+      <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-1)]">
         <input
-          className="text-lg font-semibold bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-400 focus:outline-none px-1 py-0.5 min-w-[200px]"
+          className="text-lg font-semibold bg-transparent text-[var(--text-primary)] border-b border-transparent hover:border-[var(--border-subtle)] focus:border-[var(--accent-mint)] focus:outline-none px-1 py-0.5 min-w-[200px]"
           value={workflowName}
           onChange={(e) => setWorkflowName(e.target.value)}
         />
         <div className="flex-1" />
-        <button onClick={handleSave} disabled={saving} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50">
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold btn-pill-primary disabled:opacity-50"
+        >
           <Save size={14} /> {saving ? "Saving..." : "Save"}
         </button>
-        <button onClick={handleRunStart} disabled={running || !savedId} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50">
+        <button
+          onClick={handleRunStart}
+          disabled={running || !savedId}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-button bg-[rgba(110,231,183,0.08)] text-[var(--accent-mint)] border border-[rgba(110,231,183,0.15)] hover:bg-[rgba(110,231,183,0.15)] transition-colors disabled:opacity-50"
+        >
           <Play size={14} /> {running ? "Running..." : "Run"}
         </button>
-        <button onClick={handleExport} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 border">
+        <button
+          onClick={handleExport}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-button bg-[var(--glass-bg)] text-[var(--text-secondary)] border border-[var(--glass-border)] hover:bg-[var(--glass-bg-hover)] transition-colors"
+        >
           <Download size={14} /> Export
         </button>
-        <button onClick={handleImport} className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 border">
+        <button
+          onClick={handleImport}
+          className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-button bg-[var(--glass-bg)] text-[var(--text-secondary)] border border-[var(--glass-border)] hover:bg-[var(--glass-bg-hover)] transition-colors"
+        >
           <Upload size={14} /> Import
         </button>
       </div>
@@ -364,40 +379,73 @@ function WorkflowEditorInner() {
       </div>
 
       {/* Output panel */}
-      {runOutputs && (
-        <div className="border-t border-gray-200 bg-gray-50 p-4 max-h-48 overflow-y-auto">
-          <div className="flex items-center justify-between mb-2">
-            <h4 className="text-sm font-semibold text-gray-700">Workflow Output</h4>
-            <button onClick={() => setRunOutputs(null)} className="text-gray-400 hover:text-gray-600"><X size={14} /></button>
-          </div>
-          <pre className="text-xs bg-white p-3 rounded border overflow-x-auto">{JSON.stringify(runOutputs, null, 2)}</pre>
-        </div>
-      )}
+      <AnimatePresence>
+        {runOutputs && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="border-t border-[var(--border-subtle)] bg-[var(--bg-surface-1)] overflow-hidden"
+          >
+            <div className="p-4 max-h-48 overflow-y-auto scrollbar-custom">
+              <div className="flex items-center justify-between mb-2">
+                <h4 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest">Workflow Output</h4>
+                <button onClick={() => setRunOutputs(null)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+                  <X size={14} />
+                </button>
+              </div>
+              <pre className="text-xs bg-[var(--code-bg)] text-[var(--text-secondary)] p-3 rounded-card border border-[var(--code-border)] overflow-x-auto font-mono">{JSON.stringify(runOutputs, null, 2)}</pre>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Run Inputs Modal */}
-      {showRunModal && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full">
-            <h3 className="font-semibold text-lg mb-4">Workflow Inputs</h3>
-            <div className="space-y-3">
-              {inputDefs.map((inp) => (
-                <label key={inp.name} className="block">
-                  <span className="text-sm font-medium text-gray-700">{inp.name} ({inp.type})</span>
-                  <input
-                    className="mt-1 w-full px-3 py-2 border rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
-                    value={runInputs[inp.name] || ""}
-                    onChange={(e) => setRunInputs((p) => ({ ...p, [inp.name]: e.target.value }))}
-                  />
-                </label>
-              ))}
-            </div>
-            <div className="flex justify-end gap-2 mt-4">
-              <button onClick={() => setShowRunModal(false)} className="px-4 py-2 text-sm text-gray-600 hover:bg-gray-100 rounded">Cancel</button>
-              <button onClick={() => executeRun(runInputs)} className="px-4 py-2 text-sm bg-green-600 text-white rounded hover:bg-green-700">Run</button>
-            </div>
-          </div>
-        </div>
-      )}
+      <AnimatePresence>
+        {showRunModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="surface-card shadow-2xl p-6 max-w-md w-full mx-4"
+            >
+              <h3 className="font-semibold text-lg text-[var(--text-primary)] mb-4">Workflow Inputs</h3>
+              <div className="space-y-3">
+                {inputDefs.map((inp) => (
+                  <label key={inp.name} className="block">
+                    <span className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest">{inp.name} ({inp.type})</span>
+                    <input
+                      className="input-base mt-1"
+                      value={runInputs[inp.name] || ""}
+                      onChange={(e) => setRunInputs((p) => ({ ...p, [inp.name]: e.target.value }))}
+                    />
+                  </label>
+                ))}
+              </div>
+              <div className="flex justify-end gap-2 mt-5">
+                <button
+                  onClick={() => setShowRunModal(false)}
+                  className="px-4 py-2 text-sm text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)] rounded-button transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => executeRun(runInputs)}
+                  className="px-4 py-2 text-sm font-semibold btn-pill-primary"
+                >
+                  Run
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -1,134 +1,139 @@
+import { useState, useEffect, useCallback } from "react";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import { Sidebar } from "../components/Sidebar";
 import { AuthScreen } from "../components/AuthScreen";
 import { OfflineIndicator } from "../components/OfflineIndicator";
-import { useState, useCallback, useEffect } from "react";
-import { useAuth } from "../context/AuthContext";
-import type { Conversation, UserMetrics } from "../types/index.js";
+import { PageTransition } from "../components/PageTransition";
+import type { Conversation } from "../types/index.js";
 
 export function RootLayout() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [sidebarWidth, setSidebarWidth] = useState<number>(() => {
-    const saved = localStorage.getItem("council_sidebar_width");
-    return saved ? parseInt(saved, 10) : 264;
-  });
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-
-  const { token, user: username, logout, fetchWithAuth } = useAuth();
+  const { user, fetchWithAuth, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-
-  const activeConvoId = location.pathname.startsWith('/chat/')
-    ? location.pathname.split('/').pop() || null
-    : null;
-
-  useEffect(() => {
-    localStorage.setItem("council_sidebar_width", sidebarWidth.toString());
-  }, [sidebarWidth]);
+  const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [activeConvId, setActiveConvId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarWidth, setSidebarWidth] = useState(260);
 
   const loadConversations = useCallback(async () => {
-    if (!token) return;
+    if (!user) return;
     try {
-      const res = await fetchWithAuth("/api/history?limit=50");
+      const res = await fetchWithAuth("/api/conversations");
       if (res.ok) {
-        const data = await res.json() as { data: Conversation[] };
-        setConversations(data.data || []);
+        const data = await res.json();
+        setConversations(data);
       }
-    } catch (err) {
-      console.error("Failed to load conversations", err);
-    }
-  }, [fetchWithAuth, token]);
+    } catch { /* silent */ }
+  }, [user, fetchWithAuth]);
 
-  useEffect(() => {
-    loadConversations();
-  }, [loadConversations]);
+  useEffect(() => { loadConversations(); }, [loadConversations]);
 
-  const handleLogout = useCallback(async () => {
-    await logout();
-  }, [logout]);
-
-  const handleSelectConversation = (id: string, _title?: string) => {
+  const handleConversationSelect = useCallback((id: string, _title: string) => {
+    setActiveConvId(id);
     navigate(`/chat/${id}`);
-    setIsSidebarOpen(false);
-  };
+  }, [navigate]);
 
-  const handleNewConversation = () => {
-    navigate('/chat');
-    setIsSidebarOpen(false);
-  };
+  const handleNewChat = useCallback(() => {
+    setActiveConvId(null);
+    navigate("/chat");
+  }, [navigate]);
 
-  const handleHome = () => {
-    navigate('/');
-    setIsSidebarOpen(false);
-  };
+  const handleHome = useCallback(() => {
+    setActiveConvId(null);
+    navigate("/");
+  }, [navigate]);
 
-  const handleDeleteConversation = async (id: string) => {
+  const handleDelete = useCallback(async (id: string) => {
     try {
-      const res = await fetchWithAuth(`/api/history/${id}`, {
-        method: "DELETE"
-      });
+      const res = await fetchWithAuth(`/api/conversations/${id}`, { method: "DELETE" });
       if (res.ok) {
-        setConversations(prev => prev.filter(c => c.id !== id));
-        if (activeConvoId === id) {
-          handleHome();
+        setConversations((prev) => prev.filter((c) => c.id !== id));
+        if (activeConvId === id) {
+          setActiveConvId(null);
+          navigate("/");
         }
       }
-    } catch (err) {
-      console.error("Failed to delete conversation", err);
+    } catch { /* silent */ }
+  }, [fetchWithAuth, activeConvId, navigate]);
+
+  const handleShowMetrics = useCallback(() => {
+    navigate("/metrics");
+  }, [navigate]);
+
+  // Update active ID when navigating via URL
+  useEffect(() => {
+    const match = location.pathname.match(/\/chat\/(.+)/);
+    if (match) {
+      setActiveConvId(match[1]);
+    } else if (location.pathname === "/" || location.pathname === "/chat") {
+      setActiveConvId(null);
     }
-  };
+  }, [location.pathname]);
 
-  const handleShowMetrics = () => {
-    navigate('/metrics');
-    setIsSidebarOpen(false);
-  };
-
-  const handleLogin = (newToken: string) => {
-    // The AuthContext probably needs to be updated with the token.
-    // AuthContext uses localStorage, so we'll just set it and let context pick it up, or maybe it sets it.
-    // Actually the AuthScreen itself does:
-    // localStorage.setItem("council_token", data.token);
-    // onLogin(data.token);
-    // Since AuthContext might need to re-render, we can just reload the page.
-    window.location.reload();
-  };
-
-  if (!token) {
-    return <AuthScreen onLogin={handleLogin} />;
+  if (!user) {
+    return <AuthScreen />;
   }
 
   return (
-    <div
-      className="flex h-screen overflow-hidden bg-bg text-text font-sans"
-      style={{ "--sidebar-w": `${sidebarWidth}px` } as React.CSSProperties}
-    >
-      <OfflineIndicator />
-      {/* Mobile overlay */}
-      {isSidebarOpen && (
+    <div className="flex h-screen overflow-hidden bg-[var(--bg)] relative">
+      {/* Ambient background orbs — only render in dark mode */}
+      <div className="bg-orb-mint w-[500px] h-[500px] top-[-10%] left-[20%] animate-drift hidden dark:block" />
+      <div className="bg-orb-blue w-[400px] h-[400px] bottom-[-5%] right-[15%] animate-drift-slow hidden dark:block" />
+
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-black/70 z-30 md:hidden backdrop-blur-sm"
-          onClick={() => setIsSidebarOpen(false)}
+          className="fixed inset-0 bg-black/50 z-30 md:hidden"
+          onClick={() => setSidebarOpen(false)}
         />
       )}
 
+      {/* Sidebar */}
       <Sidebar
         conversations={conversations}
-        activeId={activeConvoId}
-        username={username || ""}
-        isOpen={isSidebarOpen}
-        onSelect={handleSelectConversation}
+        activeId={activeConvId}
+        username={user.username || user.email || "User"}
+        isOpen={sidebarOpen}
+        onSelect={handleConversationSelect}
         onHome={handleHome}
-        onNew={handleNewConversation}
-        onDelete={handleDeleteConversation}
-        onLogout={handleLogout}
+        onNew={handleNewChat}
+        onDelete={handleDelete}
+        onLogout={logout}
         onShowMetrics={handleShowMetrics}
         width={sidebarWidth}
         onWidthChange={setSidebarWidth}
       />
 
-      <main className="flex-1 flex flex-col min-w-0 bg-[#000000] relative">
-        <Outlet context={{ isSidebarOpen, setIsSidebarOpen, activeConvoId, loadConversations, conversations }} />
+      {/* Main Content */}
+      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        {/* Mobile hamburger */}
+        <div className="md:hidden px-4 py-3 flex items-center border-b border-[var(--border-subtle)] bg-[var(--bg-surface-1)]">
+          <button
+            onClick={() => setSidebarOpen(!sidebarOpen)}
+            className="p-2 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)] transition-colors"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <line x1="3" y1="6" x2="21" y2="6" />
+              <line x1="3" y1="12" x2="21" y2="12" />
+              <line x1="3" y1="18" x2="21" y2="18" />
+            </svg>
+          </button>
+          <span className="ml-3 text-sm font-bold text-[var(--text-primary)]">
+            AIBY<span className="text-[var(--accent-mint)]">AI</span>
+          </span>
+        </div>
+
+        {/* Page content with transition */}
+        <div className="flex-1 overflow-hidden">
+          <PageTransition className="h-full" key={location.pathname}>
+            <Outlet context={{ loadConversations, setActiveConvId, setIsSidebarOpen: setSidebarOpen, conversations }} />
+          </PageTransition>
+        </div>
       </main>
+
+      {/* Offline indicator */}
+      <OfflineIndicator />
     </div>
   );
 }

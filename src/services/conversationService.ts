@@ -56,7 +56,7 @@ export async function createConversation(input: CreateConversationInput): Promis
         userId: input.userId,
         title: input.title,
         isPublic: input.isPublic ?? false,
-      }
+      } as any
     });
     return conversation;
   } catch (err) {

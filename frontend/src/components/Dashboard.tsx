@@ -1,194 +1,255 @@
+import { useNavigate } from "react-router-dom";
+import { motion } from "framer-motion";
+import {
+  ArrowRight, Sparkles, MessageSquare, Swords, Users,
+  Workflow, Code2, Search, Store, BarChart3, Database, Brain
+} from "lucide-react";
+import { HeroScene } from "./HeroScene";
+import { TiltCard } from "./TiltCard";
+import { AnimatedCounter } from "./AnimatedCounter";
 
 interface DashboardProps {
-  onSelectTemplate: (summon: string) => void;
+  onStartChat?: (templateId?: string) => void;
 }
 
-const templates = [
+const stagger = {
+  container: {
+    animate: { transition: { staggerChildren: 0.06 } }
+  },
+  item: {
+    initial: { opacity: 0, y: 16 },
+    animate: { opacity: 1, y: 0, transition: { duration: 0.4, ease: "easeOut" } }
+  }
+};
+
+const COUNCIL_TEMPLATES = [
   {
     id: "debate",
     title: "Debate Council",
-    subtitle: "Dialectic Analysis",
-    description: "Members argue opposing sides. Features the Devil's Advocate, Conventionalist, and Pragmatist for rigorous stress testing.",
-    icon: "balance",
-    color: "from-teal-500/10 to-cyan-600/5",
-    border: "border-teal-500/15",
-    iconBg: "bg-teal-500/10 border-teal-500/20",
-    iconColor: "text-teal-400",
-    tags: ["Opposition", "Stress Test"],
-    summon: "debate"
+    description: "Structured adversarial debate with thesis and antithesis positions",
+    icon: <Swords size={20} />,
+    color: "var(--accent-coral)",
+    gradient: "from-red-500/10 to-orange-500/10",
+    borderColor: "hover:border-[var(--accent-coral)]",
+    roles: ["Advocate", "Critic", "Moderator", "Judge"],
   },
   {
     id: "research",
-    title: "Research Council",
-    subtitle: "Knowledge Synthesis",
-    description: "Multi-angle deep analysis. Features the Data Analyst, Critic, and Synthesizer for evidence-backed conclusions.",
-    icon: "database",
-    color: "from-blue-500/10 to-indigo-600/5",
-    border: "border-blue-500/15",
-    iconBg: "bg-blue-500/10 border-blue-500/20",
-    iconColor: "text-blue-400",
-    tags: ["Evidence", "Fact-Check"],
-    summon: "research"
+    title: "Research Panel",
+    description: "Deep analysis with literature review and methodology critique",
+    icon: <Search size={20} />,
+    color: "var(--accent-blue)",
+    gradient: "from-blue-500/10 to-cyan-500/10",
+    borderColor: "hover:border-[var(--accent-blue)]",
+    roles: ["Researcher", "Analyst", "Statistician", "Reviewer"],
   },
   {
     id: "technical",
-    title: "Technical Council",
-    subtitle: "Engineering Audit",
-    description: "Engineering & architecture decisions. Security, Performance, and DX experts provide comprehensive system assessment.",
-    icon: "terminal",
-    color: "from-violet-500/10 to-purple-600/5",
-    border: "border-violet-500/15",
-    iconBg: "bg-violet-500/10 border-violet-500/20",
-    iconColor: "text-violet-400",
-    tags: ["Infrastructure", "Security"],
-    summon: "technical"
+    title: "Technical Review",
+    description: "Architecture decisions, code review, and system design analysis",
+    icon: <Code2 size={20} />,
+    color: "var(--accent-mint)",
+    gradient: "from-emerald-500/10 to-teal-500/10",
+    borderColor: "hover:border-[var(--accent-mint)]",
+    roles: ["Architect", "DevOps", "Security", "QA"],
   },
   {
     id: "creative",
-    title: "Creative Council",
-    subtitle: "Ideation Hub",
-    description: "Brainstorming & creative problem solving. Visionary, Minimalist, and Storyteller for unconventional breakthroughs.",
-    icon: "auto_awesome",
-    color: "from-amber-500/10 to-orange-600/5",
-    border: "border-amber-500/15",
-    iconBg: "bg-amber-500/10 border-amber-500/20",
-    iconColor: "text-amber-400",
-    tags: ["Narrative", "Aesthetics"],
-    summon: "creative"
-  }
+    title: "Creative Workshop",
+    description: "Brainstorming, narrative development, and creative synthesis",
+    icon: <Sparkles size={20} />,
+    color: "var(--accent-gold)",
+    gradient: "from-amber-500/10 to-yellow-500/10",
+    borderColor: "hover:border-[var(--accent-gold)]",
+    roles: ["Ideator", "Storyteller", "Critic", "Synthesizer"],
+  },
 ];
 
-const stats = [
-  { label: "AI Models", value: "10+", icon: "hub" },
-  { label: "Deliberation Rounds", value: "1–5", icon: "repeat" },
-  { label: "Export Formats", value: "MD / JSON", icon: "download" },
+const QUICK_LINKS = [
+  { to: "/workflows", icon: <Workflow size={18} />, label: "Workflows", desc: "Build agent pipelines" },
+  { to: "/prompts", icon: <Code2 size={18} />, label: "Prompt IDE", desc: "Test & version prompts" },
+  { to: "/debate", icon: <Swords size={18} />, label: "Debate Arena", desc: "Live agent debates" },
+  { to: "/marketplace", icon: <Store size={18} />, label: "Marketplace", desc: "Community resources" },
+  { to: "/repos", icon: <Database size={18} />, label: "Knowledge", desc: "Repos & memory" },
+  { to: "/analytics", icon: <BarChart3 size={18} />, label: "Analytics", desc: "Usage & costs" },
 ];
 
-export function Dashboard({ onSelectTemplate }: DashboardProps) {
+const HOW_IT_WORKS = [
+  { step: "01", title: "Ask", desc: "Submit your question to the council" },
+  { step: "02", title: "Deliberate", desc: "AI agents analyze independently" },
+  { step: "03", title: "Review", desc: "Agents peer-review each other" },
+  { step: "04", title: "Converge", desc: "Mathematical consensus synthesis" },
+];
+
+export function Dashboard({ onStartChat }: DashboardProps) {
+  const navigate = useNavigate();
+
   return (
-    <div className="flex-1 min-h-screen relative flex flex-col items-center overflow-y-auto scrollbar-custom">
+    <div className="h-full overflow-y-auto scrollbar-custom">
+      <motion.div
+        variants={stagger.container}
+        initial="initial"
+        animate="animate"
+        className="max-w-6xl mx-auto px-6 py-8 space-y-16"
+      >
+        {/* ━━━━━ HERO SECTION ━━━━━ */}
+        <motion.section variants={stagger.item} className="relative grid grid-cols-1 lg:grid-cols-2 gap-8 items-center min-h-[400px]">
+          {/* Left — Copy */}
+          <div className="space-y-6 z-10">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-pill bg-[var(--glass-bg)] border border-[var(--glass-border)] text-xs text-[var(--text-secondary)]">
+              <Brain size={12} className="text-[var(--accent-mint)]" />
+              <span>Multi-Agent Deliberative Intelligence</span>
+            </div>
 
-      {/* Content */}
-      <div className="max-w-4xl w-full px-6 md:px-10 pt-20 pb-32 flex flex-col items-center relative z-10">
+            <h1 className="text-display text-[var(--text-primary)]">
+              Where AI<br />
+              <span className="gradient-text">Minds Converge</span>
+            </h1>
 
-        {/* Hero Section */}
-        <section className="text-center mb-16 animate-fade-in">
-          {/* Overline badge */}
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-accent/5 border border-accent/15 mb-8">
-            <span className="status-dot bg-accent text-accent animate-pulse" />
-            <span className="text-[10px] font-black uppercase tracking-[0.25em] text-accent">
-              Multi-Model Deliberation Engine
-            </span>
+            <p className="text-lg text-[var(--text-secondary)] leading-relaxed max-w-lg">
+              4+ AI agents debate, critique, and synthesize answers through structured
+              deliberation — reaching mathematical consensus on your most complex questions.
+            </p>
+
+            <div className="flex flex-wrap gap-3 pt-2">
+              <button
+                onClick={() => onStartChat?.()}
+                className="btn-pill-primary text-base px-7 py-3"
+              >
+                <MessageSquare size={18} />
+                Start Deliberation
+              </button>
+              <button
+                onClick={() => navigate("/debate")}
+                className="btn-pill-ghost text-base px-7 py-3"
+              >
+                <Swords size={18} />
+                Debate Arena
+              </button>
+            </div>
           </div>
 
-          <h1 className="text-5xl md:text-7xl font-black tracking-tight mb-4 leading-none">
-            <span className="shimmer-text">AI COUNCIL</span>
-          </h1>
-          <h2 className="text-lg font-semibold tracking-tight text-text-muted mb-5">
-            The Digital Magistrate
-          </h2>
-          <p className="text-text-dim max-w-md mx-auto text-sm leading-relaxed">
-            Summon a council of diverse AI minds to deliberate on your question.
-            Receive a synthesized multi-perspective verdict in seconds.
-          </p>
+          {/* Right — 3D Hero */}
+          <div className="relative h-[350px] lg:h-[420px]">
+            <HeroScene className="w-full h-full" />
+            {/* Glow overlay */}
+            <div className="absolute inset-0 pointer-events-none bg-gradient-to-l from-transparent via-transparent to-[var(--bg)] lg:bg-none" />
+          </div>
+        </motion.section>
 
-          {/* Quick stats row */}
-          <div className="flex items-center justify-center gap-6 mt-8">
-            {stats.map(({ label, value, icon }) => (
-              <div key={label} className="flex items-center gap-2 text-text-muted">
-                <span className="material-symbols-outlined text-accent/60 text-base">{icon}</span>
-                <span className="text-xs font-bold">{value}</span>
-                <span className="text-xs text-text-dim hidden sm:inline">{label}</span>
+        {/* ━━━━━ STATS STRIP ━━━━━ */}
+        <motion.section variants={stagger.item}>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { label: "AI Providers", value: 9, suffix: "+" },
+              { label: "Parallel Agents", value: 4, suffix: "+" },
+              { label: "Deliberation Rounds", value: 5, prefix: "1-" },
+              { label: "Avg Consensus", value: 85, suffix: "%" },
+            ].map((stat, i) => (
+              <div key={i} className="glass-panel px-5 py-4 text-center">
+                <div className="text-2xl font-bold text-[var(--text-primary)]">
+                  {stat.prefix}
+                  <AnimatedCounter value={stat.value} suffix={stat.suffix} />
+                </div>
+                <p className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mt-1 font-semibold">{stat.label}</p>
               </div>
             ))}
           </div>
-        </section>
+        </motion.section>
 
-        {/* Council type grid */}
-        <section className="w-full mb-8">
-          <div className="text-[10px] font-black uppercase tracking-[0.2em] text-text-dim mb-4 px-1">
-            Summon a Council
+        {/* ━━━━━ COUNCIL TEMPLATES ━━━━━ */}
+        <motion.section variants={stagger.item}>
+          <div className="flex items-center justify-between mb-6">
+            <div>
+              <h2 className="text-xl font-bold text-[var(--text-primary)] tracking-tight">Council Templates</h2>
+              <p className="text-sm text-[var(--text-muted)] mt-0.5">Pre-configured agent councils for common use cases</p>
+            </div>
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {templates.map((template, i) => (
-              <button
-                key={template.id}
-                onClick={() => onSelectTemplate(template.summon)}
-                className={`
-                  group relative flex flex-col items-start p-5 rounded-2xl text-left overflow-hidden
-                  bg-gradient-to-br ${template.color}
-                  border ${template.border}
-                  hover:brightness-125 transition-all duration-300
-                  animate-slide-up
-                `}
-                style={{ animationDelay: `${i * 80}ms` }}
-              >
-                {/* Top row */}
-                <div className="flex items-center gap-3 mb-3">
-                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center border ${template.iconBg}`}>
-                    <span
-                      className={`material-symbols-outlined ${template.iconColor}`}
-                      style={{ fontSize: '20px' }}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {COUNCIL_TEMPLATES.map((tmpl) => (
+              <TiltCard key={tmpl.id}>
+                <button
+                  onClick={() => onStartChat?.(tmpl.id)}
+                  className={`surface-card w-full text-left p-5 group transition-all duration-300 ${tmpl.borderColor}`}
+                >
+                  {/* Top bar accent */}
+                  <div className="h-0.5 rounded-full mb-4 w-12" style={{ background: tmpl.color }} />
+
+                  <div className="flex items-start gap-4">
+                    <div
+                      className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0"
+                      style={{ backgroundColor: `color-mix(in srgb, ${tmpl.color} 12%, transparent)`, color: tmpl.color }}
                     >
-                      {template.icon}
-                    </span>
+                      {tmpl.icon}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h3 className="text-sm font-semibold text-[var(--text-primary)] group-hover:text-[var(--accent-mint)] transition-colors">
+                        {tmpl.title}
+                      </h3>
+                      <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">{tmpl.description}</p>
+                      <div className="flex flex-wrap gap-1.5 mt-3">
+                        {tmpl.roles.map((role) => (
+                          <span key={role} className="px-2 py-0.5 text-[9px] uppercase tracking-wider font-semibold rounded-pill bg-[var(--glass-bg)] border border-[var(--glass-border)] text-[var(--text-muted)]">
+                            {role}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                    <ArrowRight size={16} className="text-[var(--text-muted)] group-hover:text-[var(--accent-mint)] group-hover:translate-x-1 transition-all shrink-0 mt-1" />
                   </div>
-                  <div>
-                    <h3 className="font-bold text-text tracking-tight text-sm">{template.title}</h3>
-                    <p className={`text-[9px] ${template.iconColor} uppercase font-black tracking-[0.2em]`}>
-                      {template.subtitle}
-                    </p>
-                  </div>
-                </div>
-
-                {/* Description */}
-                <p className="text-xs text-text-muted leading-relaxed mb-4">
-                  {template.description}
-                </p>
-
-                {/* Tags + Arrow */}
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex gap-1.5">
-                    {template.tags.map(tag => (
-                      <span
-                        key={tag}
-                        className="px-2 py-0.5 rounded-full bg-white/[0.04] border border-white/[0.05] text-[9px] text-text-dim font-bold uppercase tracking-wider"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
-                  <span
-                    className={`material-symbols-outlined text-sm opacity-0 group-hover:opacity-100 transition-all duration-200 group-hover:translate-x-0.5 ${template.iconColor}`}
-                  >
-                    arrow_forward
-                  </span>
-                </div>
-              </button>
+                </button>
+              </TiltCard>
             ))}
           </div>
-        </section>
+        </motion.section>
 
-        {/* Custom prompt hint */}
-        <div className="glass-panel rounded-2xl px-6 py-4 w-full text-center animate-fade-in" style={{ animationDelay: '400ms' }}>
-          <p className="text-xs text-text-muted">
-            Or start a{" "}
-            <button
-              onClick={() => onSelectTemplate("default")}
-              className="text-accent hover:text-accent-2 transition-colors font-bold underline underline-offset-2 decoration-accent/30"
-            >
-              General Council
-            </button>
-            {" "}— freely configure your own council members and custom personas.
-          </p>
-        </div>
-      </div>
+        {/* ━━━━━ HOW IT WORKS ━━━━━ */}
+        <motion.section variants={stagger.item}>
+          <h2 className="text-xl font-bold text-[var(--text-primary)] tracking-tight mb-6">How It Works</h2>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {HOW_IT_WORKS.map((step, i) => (
+              <div key={i} className="glass-panel p-5 relative">
+                <span className="text-3xl font-black text-[var(--accent-mint)] opacity-15">{step.step}</span>
+                <h3 className="text-sm font-bold text-[var(--text-primary)] mt-2">{step.title}</h3>
+                <p className="text-xs text-[var(--text-muted)] mt-1 leading-relaxed">{step.desc}</p>
+                {i < HOW_IT_WORKS.length - 1 && (
+                  <div className="hidden md:block absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 z-10">
+                    <ArrowRight size={14} className="text-[var(--accent-mint)] opacity-30" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </motion.section>
 
-      {/* Background decorative elements */}
-      <div className="fixed inset-0 pointer-events-none -z-10 bg-black overflow-hidden">
-        <div className="absolute top-[-15%] left-[10%] w-[700px] h-[700px] bg-accent/3 blur-[150px] rounded-full animate-glow-pulse" />
-        <div className="absolute bottom-[-10%] right-[5%] w-[500px] h-[500px] bg-accent-3/4 blur-[120px] rounded-full animate-glow-pulse" style={{ animationDelay: '2s' }} />
-      </div>
+        {/* ━━━━━ QUICK LINKS ━━━━━ */}
+        <motion.section variants={stagger.item}>
+          <h2 className="text-xl font-bold text-[var(--text-primary)] tracking-tight mb-6">Explore</h2>
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            {QUICK_LINKS.map((link) => (
+              <TiltCard key={link.to} tiltAmount={2}>
+                <button
+                  onClick={() => navigate(link.to)}
+                  className="surface-card w-full text-left p-4 group hover:border-[var(--accent-mint)] transition-all"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl bg-[rgba(110,231,183,0.06)] border border-[rgba(110,231,183,0.1)] flex items-center justify-center text-[var(--accent-mint)] group-hover:bg-[rgba(110,231,183,0.1)] transition-colors shrink-0">
+                      {link.icon}
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-semibold text-[var(--text-primary)]">{link.label}</h3>
+                      <p className="text-[10px] text-[var(--text-muted)]">{link.desc}</p>
+                    </div>
+                  </div>
+                </button>
+              </TiltCard>
+            ))}
+          </div>
+        </motion.section>
+
+        {/* Bottom padding */}
+        <div className="h-8" />
+      </motion.div>
     </div>
   );
 }

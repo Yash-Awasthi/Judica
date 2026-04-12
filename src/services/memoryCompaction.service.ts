@@ -40,7 +40,7 @@ export async function compact(userId: number): Promise<CompactionResult> {
     select: {
       id: true,
       content: true,
-      embedding: true,
+      // embedding: true,
       kbId: true,
       sourceName: true,
     },
@@ -53,7 +53,7 @@ export async function compact(userId: number): Promise<CompactionResult> {
   // Embed all chunks
   const chunksWithEmbeddings: MemoryChunkWithEmbedding[] = [];
   for (const mem of oldMemories) {
-    const embeddingRaw = mem.embedding as unknown;
+    const embeddingRaw = (mem as any).embedding as unknown;
     let embedding: number[];
     if (Array.isArray(embeddingRaw)) {
       embedding = embeddingRaw as number[];
@@ -121,7 +121,7 @@ export async function compact(userId: number): Promise<CompactionResult> {
     const kbId = cluster[0].kbId;
     await storeChunk(
       userId,
-      kbId || undefined,
+      kbId || null,
       compactedText,
       0,
       `compacted_${Date.now()}`,

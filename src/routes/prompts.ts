@@ -215,7 +215,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
 // GET /:id — get prompt detail with latest version
 router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const prompt = await prisma.prompt.findFirst({
-    where: { id: String(req.params.id), userId: req.userId! },
+    where: { id: String(req.params.id as string), userId: req.userId! },
     include: {
       versions: {
         orderBy: { versionNum: "desc" },
@@ -264,7 +264,7 @@ router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 // DELETE /:id — delete prompt (cascades versions)
 router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const prompt = await prisma.prompt.findFirst({
-    where: { id: String(req.params.id), userId: req.userId! },
+    where: { id: String(req.params.id as string), userId: req.userId! },
   });
   if (!prompt) throw new AppError(404, "Prompt not found", "PROMPT_NOT_FOUND");
 
@@ -309,7 +309,7 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 // GET /:id/versions — list all versions for prompt
 router.get("/:id/versions", requireAuth, async (req: AuthRequest, res: Response) => {
   const prompt = await prisma.prompt.findFirst({
-    where: { id: String(req.params.id), userId: req.userId! },
+    where: { id: String(req.params.id as string), userId: req.userId! },
   });
   if (!prompt) throw new AppError(404, "Prompt not found", "PROMPT_NOT_FOUND");
 
@@ -376,7 +376,7 @@ router.get("/:id/versions", requireAuth, async (req: AuthRequest, res: Response)
 // POST /:id/versions — create new version
 router.post("/:id/versions", requireAuth, async (req: AuthRequest, res: Response) => {
   const prompt = await prisma.prompt.findFirst({
-    where: { id: String(req.params.id), userId: req.userId! },
+    where: { id: String(req.params.id as string), userId: req.userId! },
   });
   if (!prompt) throw new AppError(404, "Prompt not found", "PROMPT_NOT_FOUND");
 
@@ -448,11 +448,11 @@ router.post("/:id/versions", requireAuth, async (req: AuthRequest, res: Response
 // GET /:id/versions/:versionNum — get specific version
 router.get("/:id/versions/:versionNum", requireAuth, async (req: AuthRequest, res: Response) => {
   const prompt = await prisma.prompt.findFirst({
-    where: { id: String(req.params.id), userId: req.userId! },
+    where: { id: String(req.params.id as string), userId: req.userId! },
   });
   if (!prompt) throw new AppError(404, "Prompt not found", "PROMPT_NOT_FOUND");
 
-  const versionNum = parseInt(String(req.params.versionNum), 10);
+  const versionNum = parseInt(String(req.params.versionNum as string), 10);
   if (isNaN(versionNum)) {
     throw new AppError(400, "Invalid version number", "INVALID_VERSION_NUM");
   }

@@ -162,7 +162,7 @@ router.post("/", async (req: AuthRequest, res: Response) => {
  */
 // PUT /:id — update skill (owner only)
 router.put("/:id", async (req: AuthRequest, res: Response) => {
-  const id = String(req.params.id);
+  const id = String(req.params.id as string);
   const skill = await prisma.userSkill.findUnique({ where: { id } });
 
   if (!skill) {
@@ -223,7 +223,7 @@ router.put("/:id", async (req: AuthRequest, res: Response) => {
  */
 // DELETE /:id — delete skill (owner only)
 router.delete("/:id", async (req: AuthRequest, res: Response) => {
-  const id = String(req.params.id);
+  const id = String(req.params.id as string);
   const skill = await prisma.userSkill.findUnique({ where: { id } });
 
   if (!skill) {
@@ -287,7 +287,7 @@ router.delete("/:id", async (req: AuthRequest, res: Response) => {
  */
 // POST /:id/test — test execute skill with sample inputs
 router.post("/:id/test", async (req: AuthRequest, res: Response) => {
-  const id = String(req.params.id);
+  const id = String(req.params.id as string);
   const skill = await prisma.userSkill.findUnique({ where: { id } });
 
   if (!skill) {

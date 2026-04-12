@@ -299,7 +299,7 @@ router.post("/config", requireAuth, validate(configSchema), async (req: AuthRequ
     await prisma.councilConfig.upsert({
       where: { userId: req.userId! },
       update: { config: encrypted },
-      create: { userId: req.userId!, config: encrypted },
+      create: { userId: req.userId!, config: encrypted } as any,
     });
 
     res.json({ success: true });

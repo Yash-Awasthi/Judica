@@ -58,7 +58,7 @@ router.get("/", (req, res) => {
  *         description: Template not found
  */
 router.get("/:id", (req, res) => {
-  const template = TEMPLATES.find(t => t.id === req.params.id);
+  const template = TEMPLATES.find(t => t.id === req.params.id as string);
   if (!template) {
     res.status(404).json({ error: "Template not found" });
     return;

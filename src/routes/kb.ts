@@ -62,7 +62,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
       id: kb.id,
       name: kb.name,
       description: kb.description,
-      document_count: kb._count.documents,
+      document_count: (kb as any)._count?.documents,
       chunk_count: kb._count.memories,
       createdAt: kb.createdAt,
       updatedAt: kb.updatedAt,
@@ -197,7 +197,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
  */
 router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const kb = await prisma.knowledgeBase.findFirst({
-    where: { id: req.params.id, userId: req.userId! },
+    where: { id: req.params.id as string, userId: req.userId! },
     include: {
       documents: {
         orderBy: { createdAt: "desc" },
@@ -247,7 +247,7 @@ router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
  */
 router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const kb = await prisma.knowledgeBase.findFirst({
-    where: { id: req.params.id, userId: req.userId! },
+    where: { id: req.params.id as string, userId: req.userId! },
   });
   if (!kb) throw new AppError(404, "Knowledge base not found", "KB_NOT_FOUND");
 
@@ -321,7 +321,7 @@ router.post("/:id/documents", requireAuth, async (req: AuthRequest, res: Respons
   if (!upload_id) throw new AppError(400, "upload_id is required", "UPLOAD_ID_REQUIRED");
 
   const kb = await prisma.knowledgeBase.findFirst({
-    where: { id: req.params.id, userId: req.userId! },
+    where: { id: req.params.id as string, userId: req.userId! },
   });
   if (!kb) throw new AppError(404, "Knowledge base not found", "KB_NOT_FOUND");
 
@@ -404,7 +404,7 @@ router.post("/:id/documents", requireAuth, async (req: AuthRequest, res: Respons
  */
 router.get("/:id/documents", requireAuth, async (req: AuthRequest, res: Response) => {
   const kb = await prisma.knowledgeBase.findFirst({
-    where: { id: req.params.id, userId: req.userId! },
+    where: { id: req.params.id as string, userId: req.userId! },
   });
   if (!kb) throw new AppError(404, "Knowledge base not found", "KB_NOT_FOUND");
 
@@ -455,12 +455,12 @@ router.get("/:id/documents", requireAuth, async (req: AuthRequest, res: Response
  */
 router.delete("/:kbId/documents/:docId", requireAuth, async (req: AuthRequest, res: Response) => {
   const kb = await prisma.knowledgeBase.findFirst({
-    where: { id: req.params.kbId, userId: req.userId! },
+    where: { id: req.params.kbId as string, userId: req.userId! },
   });
   if (!kb) throw new AppError(404, "Knowledge base not found", "KB_NOT_FOUND");
 
   const doc = await prisma.kBDocument.findFirst({
-    where: { id: req.params.docId, kbId: kb.id },
+    where: { id: req.params.docId as string, kbId: kb.id },
   });
   if (!doc) throw new AppError(404, "Document not found", "DOC_NOT_FOUND");
 

@@ -59,7 +59,7 @@ const router = Router();
 // POST /conversations/:id — share a conversation
 router.post("/conversations/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const convo = await prisma.conversation.findFirst({
-    where: { id: String(req.params.id), userId: req.userId! },
+    where: { id: String(req.params.id as string), userId: req.userId! },
   });
   if (!convo) throw new AppError(404, "Conversation not found", "NOT_FOUND");
 
@@ -114,7 +114,7 @@ router.post("/conversations/:id", requireAuth, async (req: AuthRequest, res: Res
 // DELETE /conversations/:id — unshare
 router.delete("/conversations/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   await prisma.sharedConversation.deleteMany({
-    where: { conversationId: String(req.params.id), ownerId: req.userId! },
+    where: { conversationId: String(req.params.id as string), ownerId: req.userId! },
   });
   res.json({ success: true });
 });
@@ -158,7 +158,7 @@ router.delete("/conversations/:id", requireAuth, async (req: AuthRequest, res: R
 // GET /view/:token — public view (no auth)
 router.get("/view/:token", async (req: Request, res: Response) => {
   const shared = await prisma.sharedConversation.findUnique({
-    where: { shareToken: String(req.params.token) },
+    where: { shareToken: String(req.params.token as string) },
   });
   if (!shared) throw new AppError(404, "Share not found", "SHARE_NOT_FOUND");
   if (shared.expiresAt && shared.expiresAt < new Date()) {
@@ -222,7 +222,7 @@ router.get("/view/:token", async (req: Request, res: Response) => {
  */
 router.post("/workflows/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const wf = await prisma.workflow.findFirst({
-    where: { id: String(req.params.id), userId: req.userId! },
+    where: { id: String(req.params.id as string), userId: req.userId! },
   });
   if (!wf) throw new AppError(404, "Workflow not found", "NOT_FOUND");
 
@@ -273,7 +273,7 @@ router.post("/workflows/:id", requireAuth, async (req: AuthRequest, res: Respons
  */
 router.get("/workflow/:token", async (req: Request, res: Response) => {
   const shared = await prisma.sharedWorkflow.findUnique({
-    where: { shareToken: String(req.params.token) },
+    where: { shareToken: String(req.params.token as string) },
   });
   if (!shared) throw new AppError(404, "Not found", "SHARE_NOT_FOUND");
   if (shared.expiresAt && shared.expiresAt < new Date()) throw new AppError(410, "Expired", "SHARE_EXPIRED");
@@ -327,7 +327,7 @@ router.get("/workflow/:token", async (req: Request, res: Response) => {
  */
 router.post("/prompts/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const prompt = await prisma.prompt.findFirst({
-    where: { id: String(req.params.id), userId: req.userId! },
+    where: { id: String(req.params.id as string), userId: req.userId! },
   });
   if (!prompt) throw new AppError(404, "Prompt not found", "NOT_FOUND");
 
@@ -378,7 +378,7 @@ router.post("/prompts/:id", requireAuth, async (req: AuthRequest, res: Response)
  */
 router.get("/prompt/:token", async (req: Request, res: Response) => {
   const shared = await prisma.sharedPrompt.findUnique({
-    where: { shareToken: String(req.params.token) },
+    where: { shareToken: String(req.params.token as string) },
   });
   if (!shared) throw new AppError(404, "Not found", "SHARE_NOT_FOUND");
   if (shared.expiresAt && shared.expiresAt < new Date()) throw new AppError(410, "Expired", "SHARE_EXPIRED");

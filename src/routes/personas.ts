@@ -195,7 +195,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
 // PUT /:id — update custom persona
 router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const persona = await prisma.customPersona.findFirst({
-    where: { id: String(req.params.id), userId: req.userId! },
+    where: { id: String(req.params.id as string), userId: req.userId! },
   });
   if (!persona) throw new AppError(404, "Persona not found", "PERSONA_NOT_FOUND");
 
@@ -251,7 +251,7 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 // DELETE /:id — delete custom persona
 router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const persona = await prisma.customPersona.findFirst({
-    where: { id: String(req.params.id), userId: req.userId! },
+    where: { id: String(req.params.id as string), userId: req.userId! },
   });
   if (!persona) throw new AppError(404, "Persona not found", "PERSONA_NOT_FOUND");
 

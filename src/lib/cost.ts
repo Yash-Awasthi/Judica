@@ -93,7 +93,7 @@ export async function trackTokenUsage(
         date: today,
         requests: 1,
         tokens: totalTokens
-      }
+      } as any
     });
     
     logger.info({
@@ -175,7 +175,7 @@ export async function getOrganizationCostSummary(days: number = 30): Promise<{
       date: { gte: startDate }
     },
     include: {
-      user: {
+      User: {
         select: { id: true }
       }
     },

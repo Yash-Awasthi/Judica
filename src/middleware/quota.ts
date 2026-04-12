@@ -19,7 +19,7 @@ export async function checkQuota(req: AuthRequest, res: Response, next: NextFunc
     const updatedUsage = await prisma.dailyUsage.upsert({
       where: { userId_date: { userId: req.userId, date: today } },
       update: { requests: { increment: 1 } },
-      create: { userId: req.userId, date: today, requests: 1 },
+      create: { userId: req.userId, date: today, requests: 1 } as any,
     });
 
     if (updatedUsage.requests > MAX_DAILY_REQUESTS || updatedUsage.tokens > MAX_DAILY_TOKENS) {

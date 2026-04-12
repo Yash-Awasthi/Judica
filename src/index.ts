@@ -99,7 +99,7 @@ app.use(cors({
 }));
 
 app.use(compression());
-app.use(pinoHttp({ logger, autoLogging: { ignore: (req) => req.url === '/health' } }));
+app.use((pinoHttp as any)({ logger, autoLogging: { ignore: (req: any) => req.url === '/health' } }));
 app.use(express.json({ limit: "200kb" }));
 
 app.use(requestId);

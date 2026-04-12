@@ -134,7 +134,7 @@ async function sendToLangfuse(
       }
     }
 
-    await langfuse.shutdownAsync();
+    await (langfuse as any).shutdownAsync();
   } catch {
     // Langfuse is optional — never break if it's not installed or fails
   }

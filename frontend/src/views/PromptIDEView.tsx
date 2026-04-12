@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from "react";
+import { motion } from "framer-motion";
 import Editor from "@monaco-editor/react";
-import { Plus, Play, Save, ChevronDown, ChevronRight, Clock, Trash2, Search } from "lucide-react";
+import { Plus, Play, Save, ChevronDown, ChevronRight, Clock, Trash2, Search, FileText } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useTheme } from "../context/ThemeContext";
 
 interface PromptItem {
   id: string;
@@ -23,6 +25,7 @@ interface PromptVersion {
 
 export function PromptIDEView() {
   const { fetchWithAuth } = useAuth();
+  const { theme } = useTheme();
 
   // State
   const [prompts, setPrompts] = useState<PromptItem[]>([]);
@@ -211,46 +214,46 @@ export function PromptIDEView() {
   );
 
   return (
-    <div className="flex h-full bg-gray-50">
+    <div className="flex h-full bg-[var(--bg)] overflow-hidden">
       {/* Left: Prompt List */}
-      <div className="w-64 border-r border-gray-200 bg-white flex flex-col">
-        <div className="p-3 border-b border-gray-200">
+      <div className="w-64 border-r border-[var(--border-subtle)] bg-[var(--bg-surface-1)] flex flex-col">
+        <div className="p-3 border-b border-[var(--border-subtle)]">
           <button
             onClick={createPrompt}
-            className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700"
+            className="w-full flex items-center justify-center gap-2 px-3 py-2 btn-pill-primary text-sm"
           >
             <Plus size={14} /> New Prompt
           </button>
         </div>
         <div className="px-3 py-2">
           <div className="relative">
-            <Search size={14} className="absolute left-2 top-2.5 text-gray-400" />
+            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)]" />
             <input
-              className="w-full pl-7 pr-2 py-1.5 text-sm border rounded focus:outline-none focus:ring-1 focus:ring-blue-400"
+              className="input-base pl-8 text-xs"
               placeholder="Search..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
           </div>
         </div>
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto scrollbar-custom">
           {filteredPrompts.map((p) => (
             <div
               key={p.id}
-              className={`px-3 py-2 cursor-pointer border-b border-gray-100 flex items-center justify-between group ${
-                selectedId === p.id ? "bg-blue-50" : "hover:bg-gray-50"
+              className={`px-3 py-2.5 cursor-pointer border-b border-[var(--border-subtle)] flex items-center justify-between group transition-colors ${
+                selectedId === p.id ? "bg-[rgba(110,231,183,0.06)]" : "hover:bg-[var(--glass-bg-hover)]"
               }`}
               onClick={() => selectPrompt(p.id)}
             >
               <div className="min-w-0">
-                <div className="text-sm font-medium text-gray-800 truncate">{p.name}</div>
-                <div className="text-xs text-gray-400">
+                <div className="text-sm font-medium text-[var(--text-primary)] truncate">{p.name}</div>
+                <div className="text-[10px] text-[var(--text-muted)] font-mono">
                   v{p.versions?.[0]?.versionNum || 1}
                 </div>
               </div>
               <button
                 onClick={(e) => { e.stopPropagation(); deletePrompt(p.id); }}
-                className="opacity-0 group-hover:opacity-100 p-1 text-gray-400 hover:text-red-500"
+                className="opacity-0 group-hover:opacity-100 p-1 text-[var(--text-muted)] hover:text-red-400 transition-colors"
               >
                 <Trash2 size={12} />
               </button>
@@ -263,18 +266,14 @@ export function PromptIDEView() {
       <div className="flex-1 flex flex-col min-w-0">
         {selectedId ? (
           <>
-            <div className="px-4 py-3 border-b border-gray-200 bg-white flex items-center gap-3">
+            <div className="px-4 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-1)] flex items-center gap-3">
               <input
-                className="text-lg font-semibold bg-transparent border-b border-transparent hover:border-gray-300 focus:border-blue-400 focus:outline-none px-1 flex-1"
+                className="text-lg font-semibold bg-transparent text-[var(--text-primary)] border-b border-transparent hover:border-[var(--border-subtle)] focus:border-[var(--accent-mint)] focus:outline-none px-1 flex-1"
                 value={promptName}
                 onChange={(e) => setPromptName(e.target.value)}
               />
-              <div className="flex items-center gap-2 text-sm text-gray-500">
-                <select
-                  className="px-2 py-1 border rounded text-sm"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                >
+              <div className="flex items-center gap-2 text-sm text-[var(--text-muted)]">
+                <select className="input-base text-xs py-1 px-2" value={model} onChange={(e) => setModel(e.target.value)}>
                   <option value="auto">auto</option>
                   <option value="gpt-4o">gpt-4o</option>
                   <option value="gpt-4o-mini">gpt-4o-mini</option>
@@ -282,10 +281,10 @@ export function PromptIDEView() {
                   <option value="claude-haiku-4-20250414">claude-haiku-4</option>
                   <option value="gemini-2.0-flash">gemini-2.0-flash</option>
                 </select>
-                <span className="text-xs text-gray-400">T:{temperature}</span>
+                <span className="text-[10px] text-[var(--text-muted)] font-mono">T:{temperature}</span>
                 <input
                   type="range" min="0" max="2" step="0.1"
-                  className="w-20"
+                  className="w-20 accent-[var(--accent-mint)]"
                   value={temperature}
                   onChange={(e) => setTemperature(parseFloat(e.target.value))}
                 />
@@ -297,7 +296,7 @@ export function PromptIDEView() {
                 language="markdown"
                 value={content}
                 onChange={(val) => setContent(val || "")}
-                theme="vs-light"
+                theme={theme === 'dark' ? 'vs-dark' : 'vs-light'}
                 options={{
                   minimap: { enabled: false },
                   fontSize: 14,
@@ -310,32 +309,29 @@ export function PromptIDEView() {
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-gray-400">
+          <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
-              <p className="text-lg mb-2">Select a prompt to edit</p>
-              <p className="text-sm">or create a new one</p>
+              <FileText size={48} className="mx-auto mb-3 text-[var(--text-muted)] opacity-20" />
+              <p className="text-sm text-[var(--text-secondary)]">Select a prompt to edit</p>
+              <p className="text-xs text-[var(--text-muted)] mt-1">or create a new one</p>
             </div>
           </div>
         )}
       </div>
 
       {/* Right: Test Panel + Versions */}
-      <div className="w-80 border-l border-gray-200 bg-white flex flex-col">
+      <div className="w-80 border-l border-[var(--border-subtle)] bg-[var(--bg-surface-1)] flex flex-col">
         {/* Test Panel */}
-        <div className="p-4 border-b border-gray-200 flex-shrink-0">
-          <h3 className="font-semibold text-sm text-gray-700 mb-3">Test</h3>
+        <div className="p-4 border-b border-[var(--border-subtle)] flex-shrink-0">
+          <h3 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest mb-3">Test</h3>
           <textarea
-            className="w-full px-3 py-2 text-sm border rounded resize-none h-20 focus:outline-none focus:ring-1 focus:ring-blue-400"
+            className="w-full px-3 py-2 text-sm bg-[var(--code-bg)] border border-[var(--code-border)] rounded-card resize-none h-20 focus:outline-none focus:border-[rgba(110,231,183,0.3)] text-[var(--text-primary)] scrollbar-custom"
             placeholder="Test input (replaces {{input}})..."
             value={testInput}
             onChange={(e) => setTestInput(e.target.value)}
           />
           <div className="flex items-center gap-2 mt-2">
-            <select
-              className="flex-1 px-2 py-1 text-xs border rounded"
-              value={testModel}
-              onChange={(e) => setTestModel(e.target.value)}
-            >
+            <select className="input-base flex-1 text-xs py-1" value={testModel} onChange={(e) => setTestModel(e.target.value)}>
               <option value="">Use default</option>
               <option value="gpt-4o">gpt-4o</option>
               <option value="gpt-4o-mini">gpt-4o-mini</option>
@@ -345,7 +341,7 @@ export function PromptIDEView() {
             <button
               onClick={runTest}
               disabled={testing || !selectedId}
-              className="flex items-center gap-1 px-3 py-1 text-sm bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+              className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold rounded-button bg-[rgba(110,231,183,0.08)] text-[var(--accent-mint)] border border-[rgba(110,231,183,0.15)] hover:bg-[rgba(110,231,183,0.15)] transition-colors disabled:opacity-50"
             >
               <Play size={12} /> {testing ? "..." : "Run"}
             </button>
@@ -353,19 +349,23 @@ export function PromptIDEView() {
           {(testLatency !== null || testUsage) && (
             <div className="flex gap-2 mt-2">
               {testLatency !== null && (
-                <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">{testLatency}ms</span>
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[rgba(96,165,250,0.08)] text-[var(--accent-blue)] border border-[rgba(96,165,250,0.12)]">{testLatency}ms</span>
               )}
               {testUsage && (
-                <span className="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded">
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-pill bg-[var(--glass-bg)] text-[var(--text-secondary)] border border-[var(--glass-border)]">
                   {testUsage.prompt_tokens || 0}+{testUsage.completion_tokens || 0} tokens
                 </span>
               )}
             </div>
           )}
           {testOutput && (
-            <div className="mt-3 bg-gray-50 border rounded p-3 text-xs max-h-48 overflow-y-auto whitespace-pre-wrap">
+            <motion.div
+              initial={{ opacity: 0, y: 6 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-3 bg-[var(--code-bg)] border border-[var(--code-border)] rounded-card p-3 text-xs max-h-48 overflow-y-auto whitespace-pre-wrap text-[var(--text-secondary)] scrollbar-custom font-mono"
+            >
               {testOutput}
-            </div>
+            </motion.div>
           )}
         </div>
 
@@ -373,16 +373,16 @@ export function PromptIDEView() {
         <div className="flex-1 overflow-y-auto flex flex-col">
           <button
             onClick={() => setShowVersions(!showVersions)}
-            className="flex items-center gap-1 px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50 border-b"
+            className="flex items-center gap-1.5 px-4 py-2.5 text-xs font-bold text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)] border-b border-[var(--border-subtle)] uppercase tracking-widest transition-colors"
           >
             {showVersions ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             <Clock size={14} /> Version History
           </button>
           {showVersions && selectedId && (
-            <div className="flex-1 overflow-y-auto">
-              <div className="p-3 border-b border-gray-100">
+            <div className="flex-1 overflow-y-auto scrollbar-custom">
+              <div className="p-3 border-b border-[var(--border-subtle)]">
                 <input
-                  className="w-full px-2 py-1 text-sm border rounded mb-2"
+                  className="input-base text-xs mb-2"
                   placeholder="Version notes (optional)"
                   value={saveNotes}
                   onChange={(e) => setSaveNotes(e.target.value)}
@@ -390,7 +390,7 @@ export function PromptIDEView() {
                 <button
                   onClick={saveVersion}
                   disabled={saving || !content}
-                  className="w-full flex items-center justify-center gap-1 px-3 py-1.5 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50"
+                  className="w-full flex items-center justify-center gap-1.5 px-3 py-2 text-xs font-semibold btn-pill-primary disabled:opacity-50"
                 >
                   <Save size={12} /> {saving ? "Saving..." : "Save Version"}
                 </button>
@@ -398,15 +398,15 @@ export function PromptIDEView() {
               {versions.map((v) => (
                 <div
                   key={v.id}
-                  className="px-3 py-2 border-b border-gray-100 cursor-pointer hover:bg-blue-50"
+                  className="px-3 py-2.5 border-b border-[var(--border-subtle)] cursor-pointer hover:bg-[var(--glass-bg-hover)] transition-colors"
                   onClick={() => loadVersion(v.versionNum)}
                 >
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium">v{v.versionNum}</span>
-                    <span className="text-xs text-gray-400">{new Date(v.createdAt).toLocaleString()}</span>
+                    <span className="text-xs font-semibold text-[var(--text-primary)]">v{v.versionNum}</span>
+                    <span className="text-[10px] text-[var(--text-muted)]">{new Date(v.createdAt).toLocaleString()}</span>
                   </div>
-                  {v.notes && <div className="text-xs text-gray-500 mt-0.5">{v.notes}</div>}
-                  {v.model && <div className="text-xs text-gray-400 mt-0.5">{v.model}</div>}
+                  {v.notes && <div className="text-[10px] text-[var(--text-secondary)] mt-0.5">{v.notes}</div>}
+                  {v.model && <div className="text-[10px] text-[var(--text-muted)] mt-0.5 font-mono">{v.model}</div>}
                 </div>
               ))}
             </div>

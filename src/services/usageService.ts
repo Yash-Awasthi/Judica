@@ -25,7 +25,7 @@ export async function updateDailyUsage(input: UsageUpdateInput): Promise<void> {
       await prisma.dailyUsage.upsert({
         where: { userId_date: { userId, date: today } },
         update: { tokens: { increment: tokensUsed } },
-        create: { userId, date: today, tokens: tokensUsed, requests: 1 }
+        create: { userId, date: today, tokens: tokensUsed, requests: 1 } as any
       });
     } catch (err) {
       logger.error({ err, userId, tokensUsed }, "Failed to update daily tokens");

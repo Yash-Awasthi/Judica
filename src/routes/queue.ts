@@ -145,13 +145,13 @@ router.get(
       compaction: compactionQueue,
     };
 
-    const queue = queues[req.params.queueName];
+    const queue = queues[req.params.queueName as string];
     if (!queue) {
       res.status(404).json({ error: "Queue not found" });
       return;
     }
 
-    const job = await queue.getJob(req.params.jobId);
+    const job = await queue.getJob(req.params.jobId as string);
     if (!job) {
       res.status(404).json({ error: "Job not found" });
       return;
@@ -234,13 +234,13 @@ router.delete(
       compaction: compactionQueue,
     };
 
-    const queue = queues[req.params.queueName];
+    const queue = queues[req.params.queueName as string];
     if (!queue) {
       res.status(404).json({ error: "Queue not found" });
       return;
     }
 
-    const job = await queue.getJob(req.params.jobId);
+    const job = await queue.getJob(req.params.jobId as string);
     if (!job) {
       res.status(404).json({ error: "Job not found" });
       return;

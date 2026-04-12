@@ -160,7 +160,7 @@ router.get("/", async (req: AuthRequest, res: Response) => {
  */
 // GET /:id — item detail with reviews
 router.get("/:id", async (req: AuthRequest, res: Response) => {
-  const id = String(req.params.id);
+  const id = String(req.params.id as string);
   const item = await prisma.marketplaceItem.findUnique({
     where: { id },
     include: { reviews: { orderBy: { createdAt: "desc" }, take: 50 } },
@@ -323,7 +323,7 @@ router.post("/", async (req: AuthRequest, res: Response) => {
  */
 // PUT /:id — update item (author only)
 router.put("/:id", async (req: AuthRequest, res: Response) => {
-  const id = String(req.params.id);
+  const id = String(req.params.id as string);
   const item = await prisma.marketplaceItem.findUnique({ where: { id } });
 
   if (!item) {
@@ -383,7 +383,7 @@ router.put("/:id", async (req: AuthRequest, res: Response) => {
  */
 // DELETE /:id — delete item (author or admin)
 router.delete("/:id", async (req: AuthRequest, res: Response) => {
-  const id = String(req.params.id);
+  const id = String(req.params.id as string);
   const item = await prisma.marketplaceItem.findUnique({ where: { id } });
 
   if (!item) {
@@ -436,7 +436,7 @@ router.delete("/:id", async (req: AuthRequest, res: Response) => {
  */
 // POST /:id/install — increment downloads, import into user account, return content
 router.post("/:id/install", async (req: AuthRequest, res: Response) => {
-  const id = String(req.params.id);
+  const id = String(req.params.id as string);
   const userId = req.userId!;
 
   const item = await prisma.marketplaceItem.update({
@@ -552,7 +552,7 @@ router.post("/:id/install", async (req: AuthRequest, res: Response) => {
  */
 // POST /:id/star — toggle star
 router.post("/:id/star", async (req: AuthRequest, res: Response) => {
-  const id = String(req.params.id);
+  const id = String(req.params.id as string);
   const userId = String(req.userId);
 
   const existing = await prisma.marketplaceStar.findUnique({
@@ -626,7 +626,7 @@ router.post("/:id/star", async (req: AuthRequest, res: Response) => {
  */
 // POST /:id/reviews — add review
 router.post("/:id/reviews", async (req: AuthRequest, res: Response) => {
-  const itemId = String(req.params.id);
+  const itemId = String(req.params.id as string);
   const { rating, comment } = req.body;
 
   if (!rating || rating < 1 || rating > 5) {
@@ -677,7 +677,7 @@ router.post("/:id/reviews", async (req: AuthRequest, res: Response) => {
  */
 // GET /:id/reviews — list reviews
 router.get("/:id/reviews", async (req: AuthRequest, res: Response) => {
-  const itemId = String(req.params.id);
+  const itemId = String(req.params.id as string);
 
   const reviews = await prisma.marketplaceReview.findMany({
     where: { itemId },

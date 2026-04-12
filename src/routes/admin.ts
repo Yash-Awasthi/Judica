@@ -116,7 +116,7 @@ router.put("/users/:id/role", requireAuth, requireRole("admin"), async (req: Aut
   }
 
   const user = await prisma.user.update({
-    where: { id: parseInt(String(req.params.id)) },
+    where: { id: parseInt(String(req.params.id as string)) },
     data: { role },
     select: { id: true, email: true, role: true },
   });
@@ -278,7 +278,7 @@ router.post("/groups/:id/members", requireAuth, requireRole("admin"), async (req
   if (!userId) throw new AppError(400, "userId required", "USER_ID_REQUIRED");
 
   await prisma.groupMembership.create({
-    data: { userId: parseInt(userId), groupId: String(req.params.id) },
+    data: { userId: parseInt(userId), groupId: String(req.params.id as string) },
   });
 
   res.json({ success: true });
@@ -327,8 +327,8 @@ router.delete("/groups/:id/members/:userId", requireAuth, requireRole("admin"), 
   await prisma.groupMembership.delete({
     where: {
       userId_groupId: {
-        userId: parseInt(String(req.params.userId)),
-        groupId: String(req.params.id),
+        userId: parseInt(String(req.params.userId as string)),
+        groupId: String(req.params.id as string),
       },
     },
   });

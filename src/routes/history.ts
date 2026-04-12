@@ -255,13 +255,12 @@ router.get("/:id", requireAuth, async (req: AuthRequest, res: Response, next) =>
 
     const conversation = await prisma.conversation.findFirst({
       where: { id: id as string, userId: req.userId! },
-      include: {
-        chats: {
+      include: { Chat: {
           orderBy: { createdAt: "asc" },
           skip,
           take: limit,
         },
-        _count: { select: { chats: true } }
+        _count: { select: { Chat: true } }
       }
     });
 
@@ -269,7 +268,7 @@ router.get("/:id", requireAuth, async (req: AuthRequest, res: Response, next) =>
       throw new AppError(404, "Conversation not found");
     }
 
-    const totalChats = (conversation as { _count: { chats: number } })._count.chats;
+    const totalChats = (conversation as { _count: { Chat: number } })._count.Chat;
 
     res.json({
       ...conversation,
@@ -432,19 +431,19 @@ router.post("/:id/fork", requireAuth, validate(forkSchema), async (req: AuthRequ
 
     const source = await prisma.conversation.findFirst({
       where: { id: id as string, userId: req.userId! },
-      include: { chats: { orderBy: { createdAt: "asc" } } }
+      include: { Chat: { orderBy: { createdAt: "asc" } } }
     });
 
     if (!source) throw new AppError(404, "Source conversation not found");
 
-    const chatsToFork = (source as { chats: Array<{ id: number }> }).chats.filter((c: { id: number }) => c.id <= Number(toChatId));
+    const chatsToFork = (source as { Chat: Array<{ id: number }> }).Chat.filter((c: { id: number }) => c.id <= Number(toChatId));
     if (!chatsToFork.length) throw new AppError(400, "No messages to fork");
 
     const fork = await prisma.conversation.create({
       data: {
         userId: req.userId!,
         title: `Fork of: ${source.title}`,
-      }
+      } as any
     });
 
     await prisma.chat.createMany({
@@ -504,7 +503,7 @@ router.get("/shared/:id", async (req: Request, res: Response, next) => {
     const { id } = req.params;
     const conversation = await prisma.conversation.findFirst({
       where: { id: id as string, isPublic: true },
-      include: { chats: { orderBy: { createdAt: "asc" } } }
+      include: { Chat: { orderBy: { createdAt: "asc" } } }
     });
 
     if (!conversation) {

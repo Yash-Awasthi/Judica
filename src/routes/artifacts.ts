@@ -148,7 +148,7 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
 // GET /api/artifacts/:id — get artifact
 router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const artifact = await prisma.artifact.findFirst({
-    where: { id: req.params.id, userId: req.userId! },
+    where: { id: req.params.id as string, userId: req.userId! },
   });
   if (!artifact) throw new AppError(404, "Artifact not found", "ARTIFACT_NOT_FOUND");
   res.json(artifact);
@@ -196,7 +196,7 @@ router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 // PUT /api/artifacts/:id — update artifact
 router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const artifact = await prisma.artifact.findFirst({
-    where: { id: req.params.id, userId: req.userId! },
+    where: { id: req.params.id as string, userId: req.userId! },
   });
   if (!artifact) throw new AppError(404, "Artifact not found", "ARTIFACT_NOT_FOUND");
 
@@ -246,7 +246,7 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 // DELETE /api/artifacts/:id — delete
 router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const artifact = await prisma.artifact.findFirst({
-    where: { id: req.params.id, userId: req.userId! },
+    where: { id: req.params.id as string, userId: req.userId! },
   });
   if (!artifact) throw new AppError(404, "Artifact not found", "ARTIFACT_NOT_FOUND");
 
@@ -286,7 +286,7 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 // GET /api/artifacts/:id/download — download as file
 router.get("/:id/download", requireAuth, async (req: AuthRequest, res: Response) => {
   const artifact = await prisma.artifact.findFirst({
-    where: { id: req.params.id, userId: req.userId! },
+    where: { id: req.params.id as string, userId: req.userId! },
   });
   if (!artifact) throw new AppError(404, "Artifact not found", "ARTIFACT_NOT_FOUND");
 

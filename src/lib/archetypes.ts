@@ -45,7 +45,7 @@ export async function upsertUserArchetype(
   archetype: UserArchetypeInput,
   archetypeId?: string
 ): Promise<Archetype> {
-  const data = {
+  const data: any = {
     userId,
     archetypeId: archetypeId || `custom_${Date.now()}`,
     name: archetype.name,

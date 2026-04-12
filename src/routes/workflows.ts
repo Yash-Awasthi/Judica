@@ -187,7 +187,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
 // GET /:id — get workflow by ID
 router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const workflow = await prisma.workflow.findFirst({
-    where: { id: String(req.params.id), userId: req.userId! },
+    where: { id: String(req.params.id as string), userId: req.userId! },
   });
   if (!workflow) throw new AppError(404, "Workflow not found", "WORKFLOW_NOT_FOUND");
 
@@ -252,7 +252,7 @@ router.get("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 // PUT /:id — update workflow
 router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const workflow = await prisma.workflow.findFirst({
-    where: { id: String(req.params.id), userId: req.userId! },
+    where: { id: String(req.params.id as string), userId: req.userId! },
   });
   if (!workflow) throw new AppError(404, "Workflow not found", "WORKFLOW_NOT_FOUND");
 
@@ -316,7 +316,7 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 // DELETE /:id — delete workflow
 router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const workflow = await prisma.workflow.findFirst({
-    where: { id: String(req.params.id), userId: req.userId! },
+    where: { id: String(req.params.id as string), userId: req.userId! },
   });
   if (!workflow) throw new AppError(404, "Workflow not found", "WORKFLOW_NOT_FOUND");
 
@@ -356,7 +356,7 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 // POST /:id/publish — publish workflow
 router.post("/:id/publish", requireAuth, async (req: AuthRequest, res: Response) => {
   const workflow = await prisma.workflow.findFirst({
-    where: { id: String(req.params.id), userId: req.userId! },
+    where: { id: String(req.params.id as string), userId: req.userId! },
   });
   if (!workflow) throw new AppError(404, "Workflow not found", "WORKFLOW_NOT_FOUND");
 
@@ -413,7 +413,7 @@ router.post("/:id/publish", requireAuth, async (req: AuthRequest, res: Response)
 // POST /:id/run — execute workflow
 router.post("/:id/run", requireAuth, async (req: AuthRequest, res: Response) => {
   const workflow = await prisma.workflow.findFirst({
-    where: { id: String(req.params.id), userId: req.userId! },
+    where: { id: String(req.params.id as string), userId: req.userId! },
   });
   if (!workflow) throw new AppError(404, "Workflow not found", "WORKFLOW_NOT_FOUND");
 
@@ -505,7 +505,7 @@ router.post("/:id/run", requireAuth, async (req: AuthRequest, res: Response) => 
 // GET /:id/runs — list runs for workflow
 router.get("/:id/runs", requireAuth, async (req: AuthRequest, res: Response) => {
   const workflow = await prisma.workflow.findFirst({
-    where: { id: String(req.params.id), userId: req.userId! },
+    where: { id: String(req.params.id as string), userId: req.userId! },
   });
   if (!workflow) throw new AppError(404, "Workflow not found", "WORKFLOW_NOT_FOUND");
 
@@ -549,7 +549,7 @@ router.get("/:id/runs", requireAuth, async (req: AuthRequest, res: Response) => 
 // GET /runs/:runId — get run status
 router.get("/runs/:runId", requireAuth, async (req: AuthRequest, res: Response) => {
   const run = await prisma.workflowRun.findFirst({
-    where: { id: String(req.params.runId), userId: req.userId! },
+    where: { id: String(req.params.runId as string), userId: req.userId! },
   });
   if (!run) throw new AppError(404, "Workflow run not found", "WORKFLOW_RUN_NOT_FOUND");
 
@@ -588,7 +588,7 @@ router.get("/runs/:runId", requireAuth, async (req: AuthRequest, res: Response) 
 // GET /runs/:runId/stream — SSE endpoint for run events
 router.get("/runs/:runId/stream", requireAuth, async (req: AuthRequest, res: Response) => {
   const run = await prisma.workflowRun.findFirst({
-    where: { id: String(req.params.runId), userId: req.userId! },
+    where: { id: String(req.params.runId as string), userId: req.userId! },
   });
   if (!run) throw new AppError(404, "Workflow run not found", "WORKFLOW_RUN_NOT_FOUND");
 
@@ -693,7 +693,7 @@ router.get("/runs/:runId/stream", requireAuth, async (req: AuthRequest, res: Res
 // POST /runs/:runId/gate — resume human gate
 router.post("/runs/:runId/gate", requireAuth, async (req: AuthRequest, res: Response) => {
   const run = await prisma.workflowRun.findFirst({
-    where: { id: String(req.params.runId), userId: req.userId! },
+    where: { id: String(req.params.runId as string), userId: req.userId! },
   });
   if (!run) throw new AppError(404, "Workflow run not found", "WORKFLOW_RUN_NOT_FOUND");
 

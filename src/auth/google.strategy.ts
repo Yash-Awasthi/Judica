@@ -20,7 +20,7 @@ export function createGoogleStrategy() {
         if (!user) {
           user = await prisma.user.create({
             data: {
-              email,
+              email: email ?? undefined,
               username: profile.displayName || email.split("@")[0],
               passwordHash: "", // OAuth user, no password
               role: "member",
@@ -28,7 +28,7 @@ export function createGoogleStrategy() {
           });
         }
 
-        done(null, user);
+        done(null, user as any);
       } catch (err) {
         done(err as Error);
       }

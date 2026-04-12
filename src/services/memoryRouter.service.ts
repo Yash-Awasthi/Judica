@@ -82,7 +82,7 @@ export async function routedStoreChunk(
 
   // Default: local pgvector
   if (!backend || backend.type === "local") {
-    return storeChunk(userId, kbId, content, chunkIndex, sourceName, sourceUrl);
+    return storeChunk(userId, kbId || null, content, chunkIndex, sourceName, sourceUrl);
   }
 
   if (backend.type === "qdrant") {
@@ -110,14 +110,14 @@ export async function routedStoreChunk(
       return id;
     } catch (err) {
       logger.error({ err, userId }, "Qdrant store failed, falling back to local");
-      return storeChunk(userId, kbId, content, chunkIndex, sourceName, sourceUrl);
+      return storeChunk(userId, kbId || null, content, chunkIndex, sourceName, sourceUrl);
     }
   }
 
   if (backend.type === "getzep") {
     try {
       const { ZepClient } = await import("@getzep/zep-js");
-      const client = await ZepClient.init(backend.url || "", backend.apiKey);
+      const client = await (ZepClient as any).init(backend.url || "", backend.apiKey);
       const sessionId = backend.sessionId || `user_${userId}`;
 
       await client.memory.add(sessionId, [
@@ -127,12 +127,12 @@ export async function routedStoreChunk(
       return `zep_${sessionId}_${Date.now()}`;
     } catch (err) {
       logger.error({ err, userId }, "Zep store failed, falling back to local");
-      return storeChunk(userId, kbId, content, chunkIndex, sourceName, sourceUrl);
+      return storeChunk(userId, kbId || null, content, chunkIndex, sourceName, sourceUrl);
     }
   }
 
   // Fallback
-  return storeChunk(userId, kbId, content, chunkIndex, sourceName, sourceUrl);
+  return storeChunk(userId, kbId || null, content, chunkIndex, sourceName, sourceUrl);
 }
 
 // Routed search: dispatches to correct backend

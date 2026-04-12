@@ -177,7 +177,7 @@ router.get("/", async (req: AuthRequest, res: Response) => {
 router.get("/:id", async (req: AuthRequest, res: Response) => {
   const userId = req.userId!;
   const trace = await prisma.trace.findFirst({
-    where: { id: req.params.id, userId },
+    where: { id: req.params.id as string, userId },
   });
 
   if (!trace) {

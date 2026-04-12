@@ -53,10 +53,10 @@ router.get("/", requireAuth, async (req: AuthRequest, res: Response) => {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { councilConfig: true },
+      select: { CouncilConfig: true },
     });
 
-    const config = user?.councilConfig?.config as any;
+    const config = (user as any)?.CouncilConfig?.config as any;
     const providers = config?.providers || [];
 
     const maskedProviders = providers.map((p: any) => ({
@@ -153,10 +153,10 @@ router.post("/", requireAuth, validate(addProviderSchema), async (req: AuthReque
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { councilConfig: true },
+      select: { CouncilConfig: true },
     });
 
-    const currentConfig = (user?.councilConfig?.config as any) || {};
+    const currentConfig = ((user as any)?.CouncilConfig?.config as any) || {};
     const providers = currentConfig.providers || [];
 
     const newProvider = {
@@ -175,7 +175,7 @@ router.post("/", requireAuth, validate(addProviderSchema), async (req: AuthReque
     await prisma.councilConfig.upsert({
       where: { userId },
       update: { config: { ...currentConfig, providers } },
-      create: { userId, config: { ...currentConfig, providers } },
+      create: { userId, config: { ...currentConfig, providers } } as any,
     });
 
     res.status(201).json({
@@ -322,10 +322,10 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 
     const user = await prisma.user.findUnique({
       where: { id: userId },
-      select: { councilConfig: true },
+      select: { CouncilConfig: true },
     });
 
-    const currentConfig = (user?.councilConfig?.config as any) || {};
+    const currentConfig = ((user as any)?.CouncilConfig?.config as any) || {};
     const providers = currentConfig.providers || [];
 
     const filteredProviders = providers.filter((p: any) => p.id !== id);
@@ -337,7 +337,7 @@ router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
     await prisma.councilConfig.upsert({
       where: { userId },
       update: { config: { ...currentConfig, providers: filteredProviders } },
-      create: { userId, config: { ...currentConfig, providers: filteredProviders } },
+      create: { userId, config: { ...currentConfig, providers: filteredProviders } } as any,
     });
 
     res.json({ message: "Provider deleted" });

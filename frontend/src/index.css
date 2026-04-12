@@ -2,6 +2,76 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ============================================================
+   DESIGN TOKENS — Dual Theme CSS Custom Properties
+   ============================================================ */
+
+/* Dark Mode (default) — AMOLED depth */
+:root,
+.dark {
+  --bg:             #000000;
+  --bg-surface-1:   #0A0A0A;
+  --bg-surface-2:   #111111;
+  --bg-surface-3:   #1A1A1A;
+  --border-subtle:  #1F1F1F;
+  --border-medium:  #2A2A2A;
+  --text-primary:   #F5F5F5;
+  --text-secondary: #A0A0A0;
+  --text-muted:     #666666;
+  --accent-mint:    #6EE7B7;
+  --accent-blue:    #93C5FD;
+  --accent-coral:   #FCA5A5;
+  --accent-gold:    #FCD34D;
+  --glass-bg:       rgba(255,255,255,0.03);
+  --glass-border:   rgba(255,255,255,0.06);
+  --glass-bg-hover: rgba(255,255,255,0.06);
+  --card-shadow:    0 4px 24px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  --card-shadow-hover: 0 8px 32px -8px rgba(0, 0, 0, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  --selection-bg:   rgba(110, 231, 183, 0.25);
+  --scrollbar-thumb: rgba(255, 255, 255, 0.1);
+  --scrollbar-thumb-hover: rgba(255, 255, 255, 0.2);
+  --input-bg:       rgba(0, 0, 0, 0.4);
+  --input-border:   rgba(255, 255, 255, 0.1);
+  --input-focus-border: rgba(110, 231, 183, 0.5);
+  --input-focus-bg: rgba(0, 0, 0, 0.6);
+  --code-bg:        rgba(255, 255, 255, 0.04);
+  --code-border:    rgba(255, 255, 255, 0.08);
+}
+
+/* Light Mode — Warm paper */
+.light {
+  --bg:             #FAF9F6;
+  --bg-surface-1:   #FFFFFF;
+  --bg-surface-2:   #FFF8F0;
+  --bg-surface-3:   #F0F7FF;
+  --border-subtle:  #F0EDE8;
+  --border-medium:  #E0DCD5;
+  --text-primary:   #1A1A1A;
+  --text-secondary: #5C5C5C;
+  --text-muted:     #9C9C9C;
+  --accent-mint:    #059669;
+  --accent-blue:    #2563EB;
+  --accent-coral:   #DC2626;
+  --accent-gold:    #D97706;
+  --glass-bg:       rgba(255,255,255,0.7);
+  --glass-border:   rgba(0,0,0,0.06);
+  --glass-bg-hover: rgba(255,255,255,0.85);
+  --card-shadow:    0 1px 3px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06);
+  --card-shadow-hover: 0 4px 12px rgba(0,0,0,0.06), 0 16px 40px rgba(0,0,0,0.08);
+  --selection-bg:   rgba(5, 150, 105, 0.2);
+  --scrollbar-thumb: rgba(0, 0, 0, 0.15);
+  --scrollbar-thumb-hover: rgba(0, 0, 0, 0.25);
+  --input-bg:       #FFFFFF;
+  --input-border:   var(--border-medium);
+  --input-focus-border: var(--accent-mint);
+  --input-focus-bg: #FFFFFF;
+  --code-bg:        #F5F3EF;
+  --code-border:    var(--border-subtle);
+}
+
+/* ============================================================
+   BASE LAYER
+   ============================================================ */
 @layer base {
   *, *::before, *::after {
     box-sizing: border-box;
@@ -15,42 +85,76 @@
   }
 
   body {
-    @apply bg-bg text-text min-h-screen;
-    font-family: 'Inter', system-ui, sans-serif;
+    background-color: var(--bg);
+    color: var(--text-primary);
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
     letter-spacing: -0.015em;
-    selection-color: rgba(94, 234, 212, 0.3);
-    background-image: none; /* Removed the radial gradients to match Manus/Deer Flow's cleaner look */
+    min-height: 100vh;
+    transition: background-color 0.3s ease, color 0.3s ease;
   }
 
   ::selection {
-    background-color: rgba(94, 234, 212, 0.25);
-    color: #f1f5f9;
+    background-color: var(--selection-bg);
+    color: var(--text-primary);
+  }
+
+  /* Heading defaults */
+  h1, h2, h3, h4, h5, h6 {
+    color: var(--text-primary);
+    letter-spacing: -0.02em;
   }
 }
 
+/* ============================================================
+   COMPONENT LAYER
+   ============================================================ */
 @layer components {
-  /* Glass panel — base component for cards/panels */
+
+  /* ---- Glass Panel ---- */
   .glass-panel {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.03) 0%, rgba(255, 255, 255, 0.01) 100%);
+    background: var(--glass-bg);
     backdrop-filter: blur(16px);
     -webkit-backdrop-filter: blur(16px);
-    border: 1px solid rgba(255, 255, 255, 0.06);
-    box-shadow: 0 4px 24px -12px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--card-shadow);
+    border-radius: 16px;
   }
 
   .glass-panel-hover {
-    @apply glass-panel transition-all duration-300;
+    @apply glass-panel;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .glass-panel-hover:hover {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, rgba(255, 255, 255, 0.02) 100%);
-    border-color: rgba(94, 234, 212, 0.25);
-    box-shadow: 0 8px 32px -8px rgba(94, 234, 212, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.1);
-    transform: translateY(-2px);
+    background: var(--glass-bg-hover);
+    border-color: var(--accent-mint);
+    box-shadow: var(--card-shadow-hover);
+    transform: translateY(-2px) scale(1.005);
   }
 
-  /* Accent gradient text */
+  /* ---- Surface Cards ---- */
+  .surface-card {
+    background: var(--bg-surface-1);
+    border: 1px solid var(--border-subtle);
+    border-radius: 16px;
+    box-shadow: var(--card-shadow);
+    transition: all 0.2s ease;
+  }
+  .surface-card:hover {
+    border-color: var(--border-medium);
+    box-shadow: var(--card-shadow-hover);
+    transform: translateY(-1px);
+  }
+
+  /* ---- Gradient Text ---- */
   .gradient-text {
-    background: linear-gradient(135deg, #5eead4 0%, #2dd4bf 40%, #a5f3fc 100%);
+    background: linear-gradient(135deg, var(--accent-mint) 0%, var(--accent-blue) 50%, var(--accent-gold) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .gradient-text-mint {
+    background: linear-gradient(135deg, var(--accent-mint) 0%, #34d399 100%);
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
@@ -59,11 +163,11 @@
   .shimmer-text {
     background: linear-gradient(
       90deg,
-      #5eead4 0%,
-      #a5f3fc 25%,
-      #5eead4 50%,
-      #2dd4bf 75%,
-      #5eead4 100%
+      var(--accent-mint) 0%,
+      var(--accent-blue) 25%,
+      var(--accent-gold) 50%,
+      var(--accent-blue) 75%,
+      var(--accent-mint) 100%
     );
     background-size: 200% auto;
     -webkit-background-clip: text;
@@ -72,62 +176,126 @@
     animation: shimmer 3s linear infinite;
   }
 
-  /* Verdict highlight box */
+  /* ---- Verdict Box ---- */
   .verdict-box {
-    background: linear-gradient(145deg, rgba(94, 234, 212, 0.06) 0%, rgba(15, 118, 110, 0.04) 100%);
-    border: 1px solid rgba(94, 234, 212, 0.18);
-    box-shadow: 0 0 60px -20px rgba(94, 234, 212, 0.12), inset 0 1px 0 rgba(94, 234, 212, 0.05);
+    background: linear-gradient(145deg, rgba(110,231,183,0.06) 0%, rgba(5,150,105,0.04) 100%);
+    border: 1px solid rgba(110,231,183,0.18);
+    box-shadow: 0 0 60px -20px rgba(110,231,183,0.12), inset 0 1px 0 rgba(110,231,183,0.05);
+    border-radius: 16px;
   }
 
-  /* Active nav item */
+  /* ---- Nav Active ---- */
   .nav-item-active {
-    @apply text-accent bg-accent/5 border border-accent/10;
+    color: var(--accent-mint);
+    background: rgba(110, 231, 183, 0.08);
+    border-radius: 12px;
   }
 
-  /* Glow dot indicator */
+  /* ---- Status Dot ---- */
   .status-dot {
     @apply w-1.5 h-1.5 rounded-full;
     box-shadow: 0 0 6px currentColor;
   }
 
-  /* Input base */
+  /* ---- Input Base ---- */
   .input-base {
-    @apply w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3 text-sm text-text outline-none
-           placeholder:text-white/20 transition-all duration-300 shadow-inner;
-    backdrop-filter: blur(8px);
+    width: 100%;
+    background: var(--input-bg);
+    border: 1px solid var(--input-border);
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    font-size: 0.875rem;
+    color: var(--text-primary);
+    outline: none;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .input-base::placeholder {
+    color: var(--text-muted);
   }
   .input-base:focus {
-    border-color: rgba(94, 234, 212, 0.5);
-    background: rgba(0,0,0,0.6);
-    box-shadow: 0 0 20px -5px rgba(94, 234, 212, 0.15), inset 0 1px 2px rgba(0,0,0,0.5);
+    border-color: var(--input-focus-border);
+    background: var(--input-focus-bg);
+    box-shadow: 0 0 0 3px rgba(110, 231, 183, 0.1);
   }
 
-  /* Member avatar */
+  /* ---- Member Avatar ---- */
   .member-avatar {
-    @apply w-8 h-8 rounded-lg flex items-center justify-center text-[11px] font-black text-black uppercase flex-shrink-0;
+    @apply w-8 h-8 rounded-full flex items-center justify-center text-[11px] font-black uppercase flex-shrink-0;
     font-feature-settings: "case";
   }
-}
 
-@layer components {
+  /* ---- Pill Button ---- */
+  .btn-pill {
+    @apply inline-flex items-center justify-center gap-2 font-semibold transition-all duration-200;
+    border-radius: 9999px;
+    padding: 0.625rem 1.5rem;
+    font-size: 0.875rem;
+  }
+  .btn-pill:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.05);
+  }
+  .btn-pill:active {
+    transform: translateY(0) scale(0.98);
+  }
+
+  .btn-pill-primary {
+    @apply btn-pill;
+    background: var(--accent-mint);
+    color: #000000;
+  }
+  .btn-pill-primary:hover {
+    box-shadow: 0 0 20px -5px var(--accent-mint);
+  }
+
+  .btn-pill-ghost {
+    @apply btn-pill;
+    background: transparent;
+    color: var(--text-primary);
+    border: 1px solid var(--border-medium);
+  }
+  .btn-pill-ghost:hover {
+    background: var(--glass-bg);
+    border-color: var(--accent-mint);
+  }
+
+  /* ---- Streaming Cursor ---- */
   .streaming-cursor::after {
     content: '▋';
     display: inline;
     animation: blink 1s step-end infinite;
-    color: rgba(94, 234, 212, 0.6);
+    color: var(--accent-mint);
+    opacity: 0.6;
     font-weight: 200;
   }
 
   @keyframes blink {
     50% { opacity: 0; }
   }
+
+  /* ---- Skeleton Shimmer ---- */
+  .skeleton {
+    background: linear-gradient(
+      90deg,
+      var(--border-subtle) 25%,
+      var(--border-medium) 50%,
+      var(--border-subtle) 75%
+    );
+    background-size: 200% 100%;
+    animation: shimmer 1.5s ease-in-out infinite;
+    border-radius: 8px;
+  }
 }
 
+/* ============================================================
+   UTILITY LAYER
+   ============================================================ */
 @layer utilities {
-  /* Scrollbar */
+
+  /* ---- Scrollbar ---- */
   .scrollbar-custom {
     scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+    scrollbar-color: var(--scrollbar-thumb) transparent;
   }
   .scrollbar-custom::-webkit-scrollbar {
     width: 5px;
@@ -137,14 +305,14 @@
     background: transparent;
   }
   .scrollbar-custom::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
+    background: var(--scrollbar-thumb);
     border-radius: 999px;
   }
   .scrollbar-custom::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.2);
+    background: var(--scrollbar-thumb-hover);
   }
 
-  /* Noise overlay (decorative) */
+  /* ---- Noise Overlay ---- */
   .noise::after {
     content: '';
     position: absolute;
@@ -155,14 +323,59 @@
     opacity: 0.4;
   }
 
-  /* Glow variants */
+  /* ---- Glow Accent ---- */
   .glow-accent {
-    box-shadow: 0 0 30px -8px rgba(94, 234, 212, 0.3);
+    box-shadow: 0 0 30px -8px var(--accent-mint);
   }
 
-  /* Truncate with fade */
+  /* ---- Fade Truncate ---- */
   .fade-truncate {
     mask-image: linear-gradient(to right, black 80%, transparent 100%);
     -webkit-mask-image: linear-gradient(to right, black 80%, transparent 100%);
   }
+
+  /* ---- Background Gradient Orbs ---- */
+  .bg-orb {
+    position: fixed;
+    border-radius: 50%;
+    pointer-events: none;
+    filter: blur(120px);
+    z-index: -1;
+  }
+  .bg-orb-mint {
+    @apply bg-orb;
+    background: var(--accent-mint);
+    opacity: 0.04;
+  }
+  .bg-orb-blue {
+    @apply bg-orb;
+    background: var(--accent-blue);
+    opacity: 0.04;
+  }
+  .bg-orb-gold {
+    @apply bg-orb;
+    background: var(--accent-gold);
+    opacity: 0.03;
+  }
 }
+
+/* ============================================================
+   REDUCED MOTION
+   ============================================================ */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .shimmer-text,
+  .skeleton {
+    animation: none !important;
+  }
+}
+
+/* ============================================================
+   GOOGLE FONTS IMPORT
+   ============================================================ */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');

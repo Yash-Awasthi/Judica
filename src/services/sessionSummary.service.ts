@@ -7,7 +7,7 @@ export async function summarizeSession(
   userId: number
 ): Promise<string> {
   // Get last 20 messages
-  const messages = await prisma.message.findMany({
+  const messages = await (prisma as any).message.findMany({
     where: { conversationId },
     orderBy: { createdAt: "desc" },
     take: 20,
@@ -45,7 +45,7 @@ export async function summarizeSession(
 }
 
 export async function autoSummarize(conversationId: string, userId: number): Promise<void> {
-  const count = await prisma.message.count({ where: { conversationId } });
+  const count = await (prisma as any).message.count({ where: { conversationId } });
 
   if (count > 30) {
     const conversation = await prisma.conversation.findUnique({

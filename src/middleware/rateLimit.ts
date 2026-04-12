@@ -3,7 +3,8 @@ import { Request, Response, NextFunction } from "express";
 import { env } from "../config/env.js";
 import logger from "../lib/logger.js";
 import { RedisStore } from "rate-limit-redis";
-import IORedis from "ioredis";
+import IORedisDefault from "ioredis";
+const IORedis = IORedisDefault.default || IORedisDefault;
 
 const commonHandler = (req: Request, res: Response, _next: NextFunction, options: any) => {
   logger.warn({
@@ -16,7 +17,7 @@ const commonHandler = (req: Request, res: Response, _next: NextFunction, options
 // Redis-backed store for clustered/multi-instance deployments
 let redisStore: RedisStore | undefined;
 try {
-  const redisClient = new IORedis(env.REDIS_URL || "redis://localhost:6379", {
+  const redisClient = new (IORedis as any)(env.REDIS_URL || "redis://localhost:6379", {
     maxRetriesPerRequest: null,
     enableOfflineQueue: false,
     lazyConnect: true,

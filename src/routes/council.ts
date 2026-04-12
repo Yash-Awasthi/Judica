@@ -239,7 +239,7 @@ router.put("/config", requireAuth, validate(updateConfigSchema), async (req: Aut
     const updated = await prisma.councilConfig.upsert({
       where: { userId },
       update: { config },
-      create: { userId, config },
+      create: { userId, config } as any,
     });
 
     res.json({ config: updated.config });
@@ -316,7 +316,7 @@ router.delete("/config", requireAuth, async (req: AuthRequest, res: Response) =>
  *         description: Archetype not found
  */
 router.get("/archetypes/:id", (req: Request, res: Response) => {
-  const id = String(req.params.id);
+  const id = String(req.params.id as string);
   const archetype = ARCHETYPES[id];
 
   if (!archetype) {

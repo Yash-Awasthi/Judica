@@ -273,8 +273,7 @@ router.get("/conversation/:id", requireAuth, async (req: AuthRequest, res: Respo
         id: String(id),
         userId,
       },
-      include: {
-        chats: {
+      include: { Chat: {
           select: {
             tokensUsed: true,
             durationMs: true,
@@ -282,21 +281,21 @@ router.get("/conversation/:id", requireAuth, async (req: AuthRequest, res: Respo
           },
         },
       },
-    }) as { id: string; title: string; createdAt: Date; updatedAt: Date; chats: { tokensUsed: number | null; durationMs: number | null; createdAt: Date }[] } | null;
+    }) as any;
 
     if (!conversation) {
       return res.status(404).json({ error: "Conversation not found" });
     }
 
-    const totalTokens = conversation.chats.reduce((sum: number, c: { tokensUsed: number | null }) => sum + (c.tokensUsed || 0), 0);
-    const avgDuration = conversation.chats.length > 0
-      ? conversation.chats.reduce((sum: number, c: { durationMs: number | null }) => sum + (c.durationMs || 0), 0) / conversation.chats.length
+    const totalTokens = conversation.Chat.reduce((sum: number, c: { tokensUsed: number | null }) => sum + (c.tokensUsed || 0), 0);
+    const avgDuration = conversation.Chat.length > 0
+      ? conversation.Chat.reduce((sum: number, c: { durationMs: number | null }) => sum + (c.durationMs || 0), 0) / conversation.Chat.length
       : 0;
 
     res.json({
       conversationId: id,
       title: conversation.title,
-      totalChats: conversation.chats.length,
+      totalChats: conversation.Chat.length,
       totalTokens,
       avgDurationMs: Math.round(avgDuration),
       createdAt: conversation.createdAt,

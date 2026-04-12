@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
-import { Users, Shield, BarChart3, Plus, Trash2 } from "lucide-react";
+import { motion } from "framer-motion";
+import { Users, Shield, BarChart3, Plus, Trash2, MessageSquare } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { AnimatedCounter } from "../components/AnimatedCounter";
 
 interface UserRow {
   id: number;
@@ -21,6 +23,11 @@ interface Stats {
   totalConversations: number;
   totalMessages: number;
 }
+
+const stagger = {
+  container: { animate: { transition: { staggerChildren: 0.08 } } },
+  item: { initial: { opacity: 0, y: 12 }, animate: { opacity: 1, y: 0, transition: { duration: 0.3 } } },
+};
 
 export function AdminView() {
   const { fetchWithAuth } = useAuth();
@@ -85,94 +92,134 @@ export function AdminView() {
   };
 
   return (
-    <div className="max-w-6xl mx-auto p-6 space-y-6">
-      <h1 className="text-2xl font-bold text-gray-800">Admin Panel</h1>
+    <div className="h-full overflow-y-auto scrollbar-custom p-6">
+      <motion.div
+        variants={stagger.container}
+        initial="initial"
+        animate="animate"
+        className="max-w-6xl mx-auto space-y-6"
+      >
+        <motion.div variants={stagger.item}>
+          <h1 className="text-2xl font-bold text-[var(--text-primary)] tracking-tight">Admin Panel</h1>
+          <p className="text-sm text-[var(--text-muted)] mt-0.5">Manage users, groups, and platform settings</p>
+        </motion.div>
 
-      {/* Stats */}
-      {stats && (
-        <div className="grid grid-cols-3 gap-4">
-          <div className="bg-white rounded-lg border p-4">
-            <div className="flex items-center gap-2 text-gray-500 mb-1"><Users size={16} /> Users</div>
-            <div className="text-3xl font-bold text-blue-600">{stats.totalUsers}</div>
-          </div>
-          <div className="bg-white rounded-lg border p-4">
-            <div className="flex items-center gap-2 text-gray-500 mb-1"><BarChart3 size={16} /> Conversations</div>
-            <div className="text-3xl font-bold text-green-600">{stats.totalConversations}</div>
-          </div>
-          <div className="bg-white rounded-lg border p-4">
-            <div className="flex items-center gap-2 text-gray-500 mb-1"><BarChart3 size={16} /> Messages</div>
-            <div className="text-3xl font-bold text-purple-600">{stats.totalMessages}</div>
-          </div>
-        </div>
-      )}
-
-      {/* Users Table */}
-      <div className="bg-white rounded-lg border">
-        <div className="px-4 py-3 border-b flex items-center gap-2">
-          <Shield size={16} className="text-gray-500" />
-          <h2 className="font-semibold text-gray-700">Users</h2>
-        </div>
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="text-left px-4 py-2 text-gray-500 font-medium">Email</th>
-              <th className="text-left px-4 py-2 text-gray-500 font-medium">Username</th>
-              <th className="text-left px-4 py-2 text-gray-500 font-medium">Role</th>
-              <th className="text-left px-4 py-2 text-gray-500 font-medium">Joined</th>
-            </tr>
-          </thead>
-          <tbody>
-            {users.map((u) => (
-              <tr key={u.id} className="border-t hover:bg-gray-50">
-                <td className="px-4 py-2">{u.email}</td>
-                <td className="px-4 py-2">{u.username}</td>
-                <td className="px-4 py-2">
-                  <select
-                    className="px-2 py-1 border rounded text-sm"
-                    value={u.role}
-                    onChange={(e) => changeRole(u.id, e.target.value)}
-                  >
-                    <option value="admin">admin</option>
-                    <option value="member">member</option>
-                    <option value="viewer">viewer</option>
-                  </select>
-                </td>
-                <td className="px-4 py-2 text-gray-400">{new Date(u.createdAt).toLocaleDateString()}</td>
-              </tr>
+        {/* Stats */}
+        {stats && (
+          <motion.div variants={stagger.item} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            {[
+              { icon: <Users size={18} />, label: "Users", value: stats.totalUsers, color: "var(--accent-blue)" },
+              { icon: <BarChart3 size={18} />, label: "Conversations", value: stats.totalConversations, color: "var(--accent-mint)" },
+              { icon: <MessageSquare size={18} />, label: "Messages", value: stats.totalMessages, color: "#a78bfa" },
+            ].map(({ icon, label, value, color }) => (
+              <div key={label} className="surface-card p-5">
+                <div className="flex items-center gap-2 mb-2" style={{ color }}>
+                  {icon}
+                  <span className="text-xs text-[var(--text-muted)] font-semibold uppercase tracking-wider">{label}</span>
+                </div>
+                <div className="text-3xl font-bold text-[var(--text-primary)]">
+                  <AnimatedCounter value={value} />
+                </div>
+              </div>
             ))}
-          </tbody>
-        </table>
-      </div>
+          </motion.div>
+        )}
 
-      {/* Groups */}
-      <div className="bg-white rounded-lg border">
-        <div className="px-4 py-3 border-b flex items-center justify-between">
-          <h2 className="font-semibold text-gray-700">Groups</h2>
-          <div className="flex gap-2">
-            <input className="px-2 py-1 border rounded text-sm" placeholder="Group name" value={newGroupName} onChange={(e) => setNewGroupName(e.target.value)} />
-            <button onClick={createGroup} className="flex items-center gap-1 px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"><Plus size={14} /> Create</button>
+        {/* Users Table */}
+        <motion.div variants={stagger.item} className="surface-card overflow-hidden">
+          <div className="px-5 py-4 border-b border-[var(--border-subtle)] flex items-center gap-2">
+            <Shield size={16} className="text-[var(--accent-mint)]" />
+            <h2 className="text-sm font-semibold text-[var(--text-primary)]">Users</h2>
           </div>
-        </div>
-        <div className="p-4 space-y-3">
-          {groups.map((g) => (
-            <div key={g.id} className="border rounded p-3">
-              <div className="font-medium text-gray-700 mb-2">{g.name}</div>
-              <div className="flex flex-wrap gap-2 mb-2">
-                {g.members.map((m) => (
-                  <span key={m.user.id} className="flex items-center gap-1 bg-gray-100 px-2 py-1 rounded text-xs">
-                    {m.user.email}
-                    <button onClick={() => removeMember(g.id, m.user.id)} className="text-red-400 hover:text-red-600"><Trash2 size={10} /></button>
-                  </span>
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="bg-[var(--glass-bg)]">
+                  <th className="text-left px-5 py-3 text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-widest">Email</th>
+                  <th className="text-left px-5 py-3 text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-widest">Username</th>
+                  <th className="text-left px-5 py-3 text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-widest">Role</th>
+                  <th className="text-left px-5 py-3 text-[10px] text-[var(--text-muted)] font-bold uppercase tracking-widest">Joined</th>
+                </tr>
+              </thead>
+              <tbody>
+                {users.map((u) => (
+                  <tr key={u.id} className="border-t border-[var(--border-subtle)] hover:bg-[var(--glass-bg-hover)] transition-colors">
+                    <td className="px-5 py-3 text-[var(--text-primary)]">{u.email}</td>
+                    <td className="px-5 py-3 text-[var(--text-secondary)]">{u.username}</td>
+                    <td className="px-5 py-3">
+                      <select
+                        className="input-base text-xs py-1 px-2"
+                        value={u.role}
+                        onChange={(e) => changeRole(u.id, e.target.value)}
+                      >
+                        <option value="admin">admin</option>
+                        <option value="member">member</option>
+                        <option value="viewer">viewer</option>
+                      </select>
+                    </td>
+                    <td className="px-5 py-3 text-[var(--text-muted)] text-xs">{new Date(u.createdAt).toLocaleDateString()}</td>
+                  </tr>
                 ))}
-              </div>
-              <div className="flex gap-2">
-                <input className="px-2 py-1 border rounded text-xs" placeholder="User ID" value={selectedGroup === g.id ? addUserId : ""} onChange={(e) => { setSelectedGroup(g.id); setAddUserId(e.target.value); }} />
-                <button onClick={() => addMember(g.id)} className="px-2 py-1 text-xs bg-green-600 text-white rounded">Add</button>
-              </div>
+              </tbody>
+            </table>
+          </div>
+        </motion.div>
+
+        {/* Groups */}
+        <motion.div variants={stagger.item} className="surface-card overflow-hidden">
+          <div className="px-5 py-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-[var(--text-primary)]">Groups</h2>
+            <div className="flex gap-2">
+              <input
+                className="input-base text-xs py-1.5 w-40"
+                placeholder="Group name"
+                value={newGroupName}
+                onChange={(e) => setNewGroupName(e.target.value)}
+              />
+              <button
+                onClick={createGroup}
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-semibold btn-pill-primary"
+              >
+                <Plus size={14} /> Create
+              </button>
             </div>
-          ))}
-        </div>
-      </div>
+          </div>
+          <div className="p-5 space-y-3">
+            {groups.length === 0 && (
+              <p className="text-[var(--text-muted)] text-xs text-center py-4 italic">No groups created yet</p>
+            )}
+            {groups.map((g) => (
+              <div key={g.id} className="glass-panel rounded-card p-4">
+                <div className="text-sm font-semibold text-[var(--text-primary)] mb-2">{g.name}</div>
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {g.members.map((m) => (
+                    <span key={m.user.id} className="flex items-center gap-1.5 bg-[var(--glass-bg)] border border-[var(--glass-border)] px-2.5 py-1 rounded-pill text-xs text-[var(--text-secondary)]">
+                      {m.user.email}
+                      <button onClick={() => removeMember(g.id, m.user.id)} className="text-[var(--text-muted)] hover:text-red-400 transition-colors">
+                        <Trash2 size={10} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    className="input-base text-xs py-1 w-32"
+                    placeholder="User ID"
+                    value={selectedGroup === g.id ? addUserId : ""}
+                    onChange={(e) => { setSelectedGroup(g.id); setAddUserId(e.target.value); }}
+                  />
+                  <button
+                    onClick={() => addMember(g.id)}
+                    className="px-3 py-1 text-xs font-semibold rounded-button bg-[rgba(110,231,183,0.08)] text-[var(--accent-mint)] border border-[rgba(110,231,183,0.15)] hover:bg-[rgba(110,231,183,0.15)] transition-colors"
+                  >
+                    Add
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </motion.div>
+      </motion.div>
     </div>
   );
 }

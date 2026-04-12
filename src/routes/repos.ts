@@ -164,7 +164,7 @@ router.post("/github", async (req: AuthRequest, res: Response) => {
 router.get("/:id/status", async (req: AuthRequest, res: Response) => {
   const userId = String(req.userId);
   const repoRecord = await prisma.codeRepository.findFirst({
-    where: { id: req.params.id, userId },
+    where: { id: req.params.id as string, userId },
     select: { indexed: true, fileCount: true },
   });
 
@@ -234,7 +234,7 @@ router.post("/:id/search", async (req: AuthRequest, res: Response) => {
   }
 
   const repoRecord = await prisma.codeRepository.findFirst({
-    where: { id: req.params.id, userId },
+    where: { id: req.params.id as string, userId },
   });
 
   if (!repoRecord) {
@@ -242,7 +242,7 @@ router.post("/:id/search", async (req: AuthRequest, res: Response) => {
     return;
   }
 
-  const results = await searchRepo(req.params.id, query);
+  const results = await searchRepo(req.params.id as string, query);
   res.json({ data: results });
 });
 
@@ -282,7 +282,7 @@ router.delete("/:id", async (req: AuthRequest, res: Response) => {
   const userId = String(req.userId);
 
   const repoRecord = await prisma.codeRepository.findFirst({
-    where: { id: req.params.id, userId },
+    where: { id: req.params.id as string, userId },
   });
 
   if (!repoRecord) {
@@ -290,7 +290,7 @@ router.delete("/:id", async (req: AuthRequest, res: Response) => {
     return;
   }
 
-  await prisma.codeRepository.delete({ where: { id: req.params.id } });
+  await prisma.codeRepository.delete({ where: { id: req.params.id as string } });
   res.json({ message: "Repository deleted" });
 });
 

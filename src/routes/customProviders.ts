@@ -283,7 +283,7 @@ router.post("/custom", requireAuth, async (req: AuthRequest, res: Response) => {
 // ─── Update custom provider ─────────────────────────────────────────────────
 router.put("/custom/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const userId = req.user!.id;
-  const providerId = parseInt(req.params.id, 10);
+  const providerId = parseInt(req.params.id as string, 10);
 
   const existing = await prisma.customProvider.findFirst({
     where: { id: providerId, userId },
@@ -368,7 +368,7 @@ router.put("/custom/:id", requireAuth, async (req: AuthRequest, res: Response) =
 // ─── Delete custom provider ─────────────────────────────────────────────────
 router.delete("/custom/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const userId = req.user!.id;
-  const providerId = parseInt(req.params.id, 10);
+  const providerId = parseInt(req.params.id as string, 10);
 
   const existing = await prisma.customProvider.findFirst({
     where: { id: providerId, userId },
@@ -425,7 +425,7 @@ router.delete("/custom/:id", requireAuth, async (req: AuthRequest, res: Response
 // ─── Test custom provider ───────────────────────────────────────────────────
 router.post("/custom/:id/test", requireAuth, async (req: AuthRequest, res: Response) => {
   const userId = req.user!.id;
-  const providerId = parseInt(req.params.id, 10);
+  const providerId = parseInt(req.params.id as string, 10);
 
   const existing = await prisma.customProvider.findFirst({
     where: { id: providerId, userId },
@@ -500,7 +500,7 @@ router.post("/custom/:id/test", requireAuth, async (req: AuthRequest, res: Respo
 router.get("/:providerId/models", requireAuth, async (req: AuthRequest, res: Response) => {
   const { providerId } = req.params;
 
-  const adapter = getAdapterOrNull(providerId);
+  const adapter = getAdapterOrNull(providerId as string);
   if (!adapter) {
     throw new AppError(404, `Provider "${providerId}" not found`, "NOT_FOUND");
   }

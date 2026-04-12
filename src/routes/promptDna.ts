@@ -171,7 +171,7 @@ router.post("/", requireAuth, async (req: AuthRequest, res: Response) => {
 // PUT /:id — update PromptDNA
 router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const dna = await prisma.promptDNA.findFirst({
-    where: { id: String(req.params.id), userId: req.userId! },
+    where: { id: String(req.params.id as string), userId: req.userId! },
   });
   if (!dna) throw new AppError(404, "PromptDNA not found", "DNA_NOT_FOUND");
 
@@ -226,7 +226,7 @@ router.put("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
 // DELETE /:id — delete PromptDNA
 router.delete("/:id", requireAuth, async (req: AuthRequest, res: Response) => {
   const dna = await prisma.promptDNA.findFirst({
-    where: { id: String(req.params.id), userId: req.userId! },
+    where: { id: String(req.params.id as string), userId: req.userId! },
   });
   if (!dna) throw new AppError(404, "PromptDNA not found", "DNA_NOT_FOUND");
 
