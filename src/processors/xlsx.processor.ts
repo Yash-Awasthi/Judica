@@ -1,6 +1,8 @@
 import type { ProcessedFile } from "./types.js";
 import fs from "fs";
 
+// TODO: xlsx 0.18.5 has known security advisories (CVE-2024-22363 and others).
+// Replace with 'exceljs' when possible. See: https://github.com/SheetJS/sheetjs/issues
 export async function processXLSX(filePath: string): Promise<ProcessedFile> {
   const XLSX = await import("xlsx");
   const buffer = fs.readFileSync(filePath);
