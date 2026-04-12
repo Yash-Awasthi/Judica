@@ -18,8 +18,8 @@ export class GoogleProvider extends BaseProvider {
     onChunk?: (chunk: string) => void;
     _depth?: number;
   }): Promise<ProviderResponse> {
-    if (_depth >= 5) {
-      throw new Error("Tool call depth limit exceeded (max 5 recursive rounds)");
+    if (_depth >= 10) {
+      throw new Error("Tool call depth limit exceeded (max 10 recursive rounds)");
     }
     const apiHost = "https://generativelanguage.googleapis.com";
     await validateSafeUrl(apiHost);

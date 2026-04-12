@@ -150,7 +150,7 @@ flowchart TB
 4+ AI agents with distinct archetypes (Empiricist, Strategist, Historian, Architect, Skeptic) debate in structured rounds with peer review, adversarial critique, and deterministic consensus scoring. A cold validator independently checks the final verdict for hallucinations.
 
 ### 7 LLM Provider Adapters
-Unified interface for OpenAI, Anthropic, Gemini, Groq, Ollama (local), OpenRouter, and custom providers. Add custom providers via UI — zero code changes. Compatible with OpenAI-API-compatible services (Mistral, Cerebras, NVIDIA NIM) through the OpenRouter or Custom adapter.
+Unified interface for OpenAI, Anthropic, Gemini, Groq, Ollama (local), OpenRouter, and custom providers. Add custom providers via UI — zero code changes. Compatible with OpenAI-API-compatible services (Mistral, Cerebras, NVIDIA NIM) through the OpenRouter or Custom adapter. All adapters include request timeouts, SSRF validation, and tool-call depth limiting.
 
 ### RAG Knowledge Bases
 pgvector embeddings with hybrid search (vector similarity + BM25 text ranking), document chunking, and multi-format ingestion (PDF, DOCX, XLSX, CSV, TXT, images). Attach knowledge bases to conversations for grounded responses.
@@ -162,7 +162,7 @@ Drag-and-drop builder with React Flow — 10+ node types (LLM, Tool, Condition, 
 Autonomous multi-step research: breaks queries into sub-questions, searches the web, scrapes sources, synthesizes answers, and produces cited reports. Async via BullMQ.
 
 ### Code Sandbox
-Isolated execution — JavaScript in `isolated-vm` (V8 isolate, 128MB memory cap), Python in subprocess with ulimit constraints and network isolation (256MB memory, 10s CPU, 32 process limit, no outbound network). Artifacts auto-detected from AI responses.
+Isolated execution — JavaScript in `isolated-vm` (V8 isolate, 128MB memory cap), Python in subprocess with ulimit constraints (256MB memory, 10s CPU, 32 process limit). Environment variables are filtered to prevent secret leakage. Safe math evaluation replaces eval() for expression parsing.
 
 ### Community Marketplace
 Publish and install prompts, workflows, personas, and tools. Star ratings, reviews, download tracking, one-click import.
@@ -347,17 +347,16 @@ AIBYAI implements defense-in-depth security measures:
 
 | Layer | Implementation |
 |---|---|
-| **Authentication** | JWT access tokens (15 min TTL) + rotating httpOnly refresh tokens, argon2id password hashing (OWASP params) |
-| **OAuth2** | Google + GitHub with verified email enforcement, cross-provider collision protection |
+| **Authentication** | JWT access tokens (15 min TTL, algorithm-pinned) + rotating httpOnly refresh tokens, argon2id password hashing (OWASP params), Zod-validated JWT payloads |
+| **OAuth2** | Google + GitHub with verified email enforcement, cross-provider email collision protection |
 | **Authorization** | Role-based access control (member/admin), per-route auth guards |
-| **Rate Limiting** | Redis-backed rate limiting: 10/min auth, 60/min API, 10/min sandbox, 20/min voice |
-| **Input Validation** | Zod schemas for JWT payloads, request bodies; LIKE wildcard escaping |
-| **SSRF Protection** | URL validation on all outbound HTTP (workflow nodes, tools, custom adapters) |
-| **Code Sandbox** | JS: V8 isolate (128MB cap) via isolated-vm. Python: subprocess with ulimit + network isolation |
-| **Encryption** | AES-256-GCM for API key vault, persistent encryption keys |
+| **Rate Limiting** | In-memory rate limiting: 15/min auth, 60/min API, 10/min sandbox, 20/min voice. Redis-backed limiter recommended for multi-instance deployments |
+| **Input Validation** | Zod schemas for JWT payloads and request bodies; LIKE wildcard escaping; safe math parser (no eval) |
+| **SSRF Protection** | URL validation on outbound HTTP (workflow nodes, tools, adapters) via `lib/ssrf.ts` |
+| **Code Sandbox** | JS: V8 isolate (128MB cap) via isolated-vm. Python: subprocess with ulimit constraints (256MB memory, 10s CPU, 32 processes). Env vars filtered. |
+| **Encryption** | AES-256-GCM for API key vault, persistent encryption keys validated at startup |
 | **CSP** | Content-Security-Policy with per-request nonces |
-| **Circuit Breaker** | Opossum circuit breaker on all LLM adapter calls with timeout enforcement |
-| **Upload Security** | MIME type allowlist, file size limits (100MB), path traversal protection |
+| **Upload Security** | MIME type allowlist, file size limits, path traversal protection, authentication required |
 
 ---
 

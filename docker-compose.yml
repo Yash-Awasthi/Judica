@@ -16,9 +16,20 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-    command: >
-      sh -c "if [ \"$NODE_ENV\" = 'development' ]; then npx drizzle-kit push; fi && node dist/index.js"
+    command: ["node", "dist/index.js"]
     restart: unless-stopped
+
+  migrate:
+    build: .
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-council}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-councildb}
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["npx", "drizzle-kit", "push"]
+    restart: "no"
+    profiles:
+      - migrate
 
   db:
     image: pgvector/pgvector:pg16

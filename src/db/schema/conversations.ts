@@ -48,6 +48,7 @@ export const chats = pgTable(
     embedding: vector("embedding"),
   },
   (table) => [
+    index("Chat_userId_idx").on(table.userId),
     index("Chat_conversationId_createdAt_idx").on(
       table.conversationId,
       table.createdAt,

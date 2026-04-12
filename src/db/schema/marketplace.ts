@@ -57,7 +57,9 @@ export const marketplaceStars = pgTable(
   "MarketplaceStar",
   {
     userId: text("userId").notNull(),
-    itemId: text("itemId").notNull(),
+    itemId: text("itemId")
+      .notNull()
+      .references(() => marketplaceItems.id, { onDelete: "cascade" }),
   },
   (table) => [primaryKey({ columns: [table.userId, table.itemId] })],
 );
