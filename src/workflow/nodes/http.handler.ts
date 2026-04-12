@@ -1,10 +1,14 @@
 import type { NodeHandler } from "../types.js";
+import { validateSafeUrl } from "../../lib/ssrf.js";
 
 export const httpHandler: NodeHandler = async (ctx) => {
-  const url = ctx.nodeData.url as string;
+  const rawUrl = ctx.nodeData.url as string;
   const method = ((ctx.nodeData.method as string) || "GET").toUpperCase();
   const headers = (ctx.nodeData.headers as Record<string, string>) ?? {};
   const body = ctx.nodeData.body as string | Record<string, unknown> | undefined;
+
+  // Validate URL against SSRF (blocks private IPs, localhost, cloud metadata)
+  const url = await validateSafeUrl(rawUrl);
 
   const fetchOptions: RequestInit = {
     method,
