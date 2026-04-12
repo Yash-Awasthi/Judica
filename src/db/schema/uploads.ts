@@ -52,17 +52,24 @@ export const knowledgeBases = pgTable(
 );
 
 // ─── KBDocument ──────────────────────────────────────────────────────────────
-export const kbDocuments = pgTable("KBDocument", {
-  id: text("id").primaryKey(),
-  kbId: text("kbId")
-    .notNull()
-    .references(() => knowledgeBases.id, { onDelete: "cascade" }),
-  uploadId: text("uploadId")
-    .notNull()
-    .references(() => uploads.id, { onDelete: "cascade" }),
-  filename: text("filename").notNull(),
-  chunkCount: integer("chunkCount").default(0).notNull(),
-  indexed: boolean("indexed").default(false).notNull(),
-  indexedAt: timestamp("indexedAt", { mode: "date" }),
-  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
-});
+export const kbDocuments = pgTable(
+  "KBDocument",
+  {
+    id: text("id").primaryKey(),
+    kbId: text("kbId")
+      .notNull()
+      .references(() => knowledgeBases.id, { onDelete: "cascade" }),
+    uploadId: text("uploadId")
+      .notNull()
+      .references(() => uploads.id, { onDelete: "cascade" }),
+    filename: text("filename").notNull(),
+    chunkCount: integer("chunkCount").default(0).notNull(),
+    indexed: boolean("indexed").default(false).notNull(),
+    indexedAt: timestamp("indexedAt", { mode: "date" }),
+    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("KBDocument_kbId_idx").on(table.kbId),
+    index("KBDocument_uploadId_idx").on(table.uploadId),
+  ],
+);

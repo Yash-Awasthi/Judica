@@ -6,19 +6,28 @@ import {
   integer,
   index,
 } from "drizzle-orm/pg-core";
+import { users } from "./users.js";
 import { vector } from "./types.js";
 
 // ─── CodeRepository ──────────────────────────────────────────────────────────
-export const codeRepositories = pgTable("CodeRepository", {
-  id: text("id").primaryKey(),
-  userId: text("userId").notNull(),
-  source: text("source").notNull(),
-  repoUrl: text("repoUrl"),
-  name: text("name").notNull(),
-  indexed: boolean("indexed").default(false).notNull(),
-  fileCount: integer("fileCount").default(0).notNull(),
-  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
-});
+export const codeRepositories = pgTable(
+  "CodeRepository",
+  {
+    id: text("id").primaryKey(),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    source: text("source").notNull(),
+    repoUrl: text("repoUrl"),
+    name: text("name").notNull(),
+    indexed: boolean("indexed").default(false).notNull(),
+    fileCount: integer("fileCount").default(0).notNull(),
+    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("CodeRepository_userId_idx").on(table.userId),
+  ],
+);
 
 // ─── CodeFile ────────────────────────────────────────────────────────────────
 export const codeFiles = pgTable(

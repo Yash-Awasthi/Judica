@@ -86,29 +86,94 @@ export class ValidationModule {
   }
 
   /**
+   * Safely evaluates a simple arithmetic expression without eval().
+   * Supports +, -, *, /, parentheses, and decimal numbers.
+   */
+  private safeMathEval(expr: string): number | null {
+    const tokens: string[] = [];
+    const sanitized = expr.replace(/\s+/g, "");
+    // Tokenize: numbers (including decimals) and operators
+    const tokenRegex = /(\d+\.?\d*|[+\-*/()])/g;
+    let m;
+    while ((m = tokenRegex.exec(sanitized)) !== null) {
+      tokens.push(m[1]);
+    }
+    // Rebuild and verify it matches original (no extra chars)
+    if (tokens.join("") !== sanitized) return null;
+
+    let pos = 0;
+    const peek = () => tokens[pos];
+    const consume = () => tokens[pos++];
+
+    const parseExpr = (): number => {
+      let result = parseTerm();
+      while (peek() === "+" || peek() === "-") {
+        const op = consume();
+        const right = parseTerm();
+        result = op === "+" ? result + right : result - right;
+      }
+      return result;
+    };
+
+    const parseTerm = (): number => {
+      let result = parseFactor();
+      while (peek() === "*" || peek() === "/") {
+        const op = consume();
+        const right = parseFactor();
+        result = op === "*" ? result * right : result / right;
+      }
+      return result;
+    };
+
+    const parseFactor = (): number => {
+      if (peek() === "(") {
+        consume(); // (
+        const result = parseExpr();
+        consume(); // )
+        return result;
+      }
+      // Handle unary minus
+      if (peek() === "-") {
+        consume();
+        return -parseFactor();
+      }
+      const token = consume();
+      const num = parseFloat(token);
+      if (isNaN(num)) throw new Error("Invalid token");
+      return num;
+    };
+
+    try {
+      const result = parseExpr();
+      if (pos !== tokens.length) return null; // leftover tokens
+      return result;
+    } catch {
+      return null;
+    }
+  }
+
+  /**
    * Extracts and verifies mathematical identities.
    */
   private checkMathIntegrity(output: AgentOutput): ValidationResult {
     const errors: string[] = [];
     const combined = output.answer + " " + output.reasoning;
-    
+
     // Look for simple arithmetic: 5 + 5 = 10
     const mathRegex = /([\d\s+\-*/().]+)\s*=\s*([\d\s+\-*/().]+)/g;
     let match;
-    
+
     while ((match = mathRegex.exec(combined)) !== null) {
       const expression = match[1].trim();
       const result = match[2].trim();
-      
+
       try {
         // Sanitize: only allow numbers and basic math operators
         if (/^[\d\s+\-*/().]+$/.test(expression) && /^[\d\s+\-*/().]+$/.test(result)) {
-          // eslint-disable-next-line no-eval
-          const calc = eval(expression);
-          // eslint-disable-next-line no-eval
-          const expected = eval(result);
-          
-          if (Math.abs(calc - expected) > 0.0001) {
+          const calc = this.safeMathEval(expression);
+          const expected = this.safeMathEval(result);
+
+          if (calc !== null && expected !== null && Math.abs(calc - expected) > 0.0001) {
             errors.push(`Math error: ${expression} does not equal ${result} (calculated ${calc})`);
           }
         }
@@ -138,11 +203,16 @@ export class ValidationModule {
       
       // Heuristic syntax check for JS-like languages
       if (code.includes("const ") || code.includes("function") || code.includes("import ")) {
-        try {
-          // In a real production system, this should use a real parser like Esprima or Acorn
-          new Function(code); 
-        } catch (err) {
-          errors.push(`Potential syntax error in code block: ${(err as Error).message}`);
+        // Static heuristic checks instead of compiling untrusted code
+        const braceOpen = (code.match(/{/g) || []).length;
+        const braceClose = (code.match(/}/g) || []).length;
+        if (braceOpen !== braceClose) {
+          errors.push(`Potential syntax error in code block: mismatched braces (${braceOpen} open, ${braceClose} close)`);
+        }
+        const parenOpen = (code.match(/\(/g) || []).length;
+        const parenClose = (code.match(/\)/g) || []).length;
+        if (parenOpen !== parenClose) {
+          errors.push(`Potential syntax error in code block: mismatched parentheses (${parenOpen} open, ${parenClose} close)`);
         }
       }
     }
