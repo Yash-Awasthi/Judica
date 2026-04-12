@@ -6,6 +6,7 @@ import type {
 } from "./types.js";
 import { createStreamResult } from "./types.js";
 import { decrypt } from "../lib/crypto.js";
+import { validateSafeUrl } from "../lib/ssrf.js";
 import logger from "../lib/logger.js";
 
 export interface CustomProviderConfig {
@@ -44,6 +45,8 @@ export class CustomAdapter implements IProviderAdapter {
 
   async generate(req: AdapterRequest): Promise<AdapterStreamResult> {
     const baseUrl = this.config.base_url.replace(/\/$/, "");
+    // Validate base URL against SSRF (blocks private IPs, localhost, cloud metadata)
+    await validateSafeUrl(baseUrl);
     const apiKey = this.getApiKey();
 
     // Build headers based on auth type
@@ -64,7 +67,8 @@ export class CustomAdapter implements IProviderAdapter {
     // Build URL
     let url = `${baseUrl}/chat/completions`;
     if (this.config.auth_type === "api_key_query") {
-      url += `?key=${encodeURIComponent(apiKey)}`;
+      // Pass API key as header instead of URL query to avoid log exposure
+      headers["X-API-Key"] = apiKey;
     }
 
     // Build OpenAI-compatible request body
