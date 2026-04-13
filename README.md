@@ -101,13 +101,13 @@ flowchart TB
         DEBATE["Debate Dashboard\nReal-time Deliberation View"]
         MARKET["Marketplace\nPrompts, Workflows, Personas"]
         ANALYTICS["Analytics\nECharts Dashboards"]
-        SETTINGS["Settings\nPersistent Preferences"]
+        SETTINGS["Settings\nClient-side Preferences"]
     end
 
     subgraph GATEWAY["API Gateway — Fastify 5"]
         direction TB
         AUTH["Auth Layer\nJWT (HS256, 15min) + Refresh Tokens\nOAuth2 (Google, GitHub)\nZod-validated payloads"]
-        RATE["Rate Limiter\nRedis-backed distributed\n15/min auth, 60/min API"]
+        RATE["Rate Limiter\nRedis-backed distributed\n10/min auth, 60/min API"]
         RBAC["RBAC\nmember / admin roles"]
         CSP["Security\nCSP nonces, SSRF filter,\npath traversal protection"]
         ROUTES["35 Route Plugins\nSwagger UI at /api/docs"]
@@ -201,7 +201,7 @@ Drag-and-drop builder with React Flow — 12 node types (LLM, Tool, Condition, L
 Autonomous multi-step research: breaks queries into sub-questions, searches the web, scrapes sources, synthesizes answers, and produces cited reports. Async via BullMQ with dead-letter queue for failed jobs.
 
 ### Code Sandbox
-Isolated execution — JavaScript in `isolated-vm` (V8 isolate, 128MB cap), Python in subprocess with ulimit constraints (256MB memory, 10s CPU, 32 processes) and socket-level network blocking. Environment variables filtered to prevent secret leakage. Safe math evaluation — no eval().
+Isolated execution — JavaScript in `isolated-vm` (V8 isolate, 128MB cap), Python in subprocess with ulimit constraints (256MB memory, 10s CPU, 32 processes) and socket-level network blocking. Environment variables filtered to prevent secret leakage. Safe math evaluation — no eval(). Note: Python sandbox uses process-level isolation only; kernel-level namespace isolation (nsjail/bubblewrap) is not yet implemented.
 
 ### Community Marketplace
 Publish and install prompts, workflows, personas, and tools. Star ratings, reviews, download tracking, one-click import. Foreign key integrity and atomic star toggles.
@@ -346,11 +346,11 @@ aibyai/
 | **Authentication** | JWT (HS256-pinned, 15 min TTL, Zod-validated) + rotating httpOnly refresh tokens + argon2id (OWASP params) |
 | **OAuth2** | Google + GitHub with verified email enforcement, cross-provider collision protection |
 | **Authorization** | RBAC (member/admin), per-route auth guards, admin-only metrics/stats |
-| **Rate Limiting** | Redis-backed distributed: 15/min auth, 60/min API, 10/min sandbox. In-memory fallback if Redis unavailable |
+| **Rate Limiting** | Redis-backed distributed: 10/min auth, 60/min API, 10/min sandbox, 20/min voice. In-memory fallback if Redis unavailable |
 | **Input Validation** | Zod schemas on all payloads; LIKE wildcard escaping; safe math parser (no eval/Function) |
 | **SSRF Protection** | `lib/ssrf.ts` on all outbound HTTP — workflow nodes, tools, adapters, read_webpage |
-| **Code Sandbox** | JS: V8 isolate (128MB). Python: ulimit + socket-level network blocking. Env vars filtered. |
-| **Encryption** | AES-256-GCM vault, per-record random IV/salt, key validation at startup |
+| **Code Sandbox** | JS: V8 isolate (128MB). Python: ulimit + socket-level network blocking + env filtering. Process-level isolation only — no kernel namespaces. |
+| **Encryption** | AES-256-GCM with per-record IV-derived key (via scrypt). Single shared implementation in `lib/crypto.ts`. Key validation at startup |
 | **CSP** | Content-Security-Policy with per-request nonces |
 | **Resilience** | Circuit breaker on all provider calls, exponential backoff retry, dead-letter queue |
 | **Upload Security** | MIME allowlist, size limits, path traversal protection, auth required |
