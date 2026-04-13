@@ -141,10 +141,11 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     const isBcryptHash = user.passwordHash.startsWith("$2a$") || user.passwordHash.startsWith("$2b$");
 
     if (isBcryptHash) {
-      // Dynamic import for legacy bcrypt verification only.
-      // bcryptjs may not be installed — handle gracefully.
+      // Legacy bcrypt hashes: argon2.verify does not support bcrypt, so we
+      // attempt a dynamic import of bcryptjs (optional dependency).
       try {
-        const { default: bcrypt } = await import("bcryptjs");
+        const bcryptjs = await import("bcryptjs" as string);
+        const bcrypt = bcryptjs.default ?? bcryptjs;
         passwordValid = await bcrypt.compare(password, user.passwordHash);
       } catch {
         logger.warn(

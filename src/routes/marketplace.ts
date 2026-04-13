@@ -213,7 +213,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
         .from(marketplaceStars)
         .where(
           and(
-            eq(marketplaceStars.userId, String(request.userId)),
+            eq(marketplaceStars.userId, request.userId!),
             eq(marketplaceStars.itemId, id)
           )
         )
@@ -306,7 +306,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
         description,
         content,
         tags: tags || [],
-        authorId: String(request.userId),
+        authorId: request.userId!,
         authorName: user.username,
         published: true,
         createdAt: now,
@@ -386,7 +386,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
     if (!item) {
       throw new AppError(404, "Item not found", "ITEM_NOT_FOUND");
     }
-    if (item.authorId !== String(request.userId)) {
+    if (item.authorId !== request.userId) {
       throw new AppError(403, "Not authorized to update this item", "FORBIDDEN");
     }
 
@@ -459,7 +459,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
       .from(users)
       .where(eq(users.id, request.userId!))
       .limit(1);
-    if (item.authorId !== String(request.userId) && user?.role !== "admin") {
+    if (item.authorId !== request.userId && user?.role !== "admin") {
       throw new AppError(403, "Not authorized to delete this item", "FORBIDDEN");
     }
 
@@ -572,7 +572,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
           if (content.code) {
             await db.insert(userSkills).values({
               id: randomUUID(),
-              userId: String(userId),
+              userId: userId,
               name: content.name || item.name,
               description: content.description || item.description,
               code: content.code,
@@ -621,7 +621,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
   // POST /:id/star — toggle star (atomic using ON CONFLICT and transaction)
   fastify.post("/:id/star", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const { id } = request.params as { id: string };
-    const userId = String(request.userId);
+    const userId = request.userId!;
 
     const result = await db.transaction(async (tx) => {
       // Attempt to insert; if the row already exists, delete it instead
@@ -726,7 +726,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
       .values({
         id: randomUUID(),
         itemId,
-        userId: String(request.userId),
+        userId: request.userId!,
         rating: Math.round(rating),
         comment: comment || null,
       })

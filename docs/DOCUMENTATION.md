@@ -1001,16 +1001,24 @@ A quality control mechanism that prevents round degradation. If a debate round p
 ## RAG Pipeline
 
 ```mermaid
-flowchart LR
-    A["Upload\nPDF/DOCX/CSV"] --> B["Process\nsrc/processors/"]
-    B --> C["Chunk\nchunker.service.ts"]
-    C --> D["Embed\nembeddings.service.ts"]
+flowchart TB
+    subgraph INGEST["Ingestion Pipeline"]
+        direction LR
+        A["Upload\nPDF/DOCX/CSV"] --> B["Process\nsrc/processors/"]
+        B --> C["Chunk\nchunker.service.ts"]
+        C --> D["Embed\nembeddings.service.ts"]
+    end
+
     D --> E["Store\nvectorStore.service.ts"]
     E --> F["pgvector\n1536-dim"]
 
-    G["User Query"] --> H["Embed Query"]
-    H --> I["Hybrid Search\nVector + BM25"]
-    I --> F
+    subgraph RETRIEVAL["Retrieval Pipeline"]
+        direction LR
+        G["User Query"] --> H["Embed Query"]
+        H --> I["Hybrid Search\nVector + BM25"]
+    end
+
+    F --> I
     I --> J["Inject Context\nmessageBuilder.service.ts"]
     J --> K["Council\nDeliberation"]
 

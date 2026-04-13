@@ -13,7 +13,7 @@ export function createGoogleStrategy() {
       clientSecret: env.GOOGLE_CLIENT_SECRET,
       callbackURL: `${env.OAUTH_CALLBACK_BASE_URL}/api/auth/google/callback`,
     },
-    async (_accessToken, _refreshToken, profile, done) => {
+    async (_accessToken: string, _refreshToken: string, profile: { emails?: Array<{ value?: string; verified?: boolean }>; displayName?: string }, done: (error: Error | null, user?: any) => void) => {
       try {
         // SEC-7: Verify email presence and verification status to prevent
         // account takeover via unverified email claims.

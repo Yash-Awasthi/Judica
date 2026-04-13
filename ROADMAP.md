@@ -15,12 +15,13 @@
 
 ## Phase 1: Production Hardening (Q2 2026)
 
-> **Status: In Progress** — Security hardened. Testing and performance remain.
+> **Status: In Progress** — Security remediation complete. Testing, performance, and observability remain.
 
 ### Remaining Work
 
 **Testing**
 - E2E tests with Playwright — 5 critical user flows (signup → deliberation → KB upload → workflow → marketplace)
+- Rewrite route-level integration tests to use `fastify.inject()` against the real app instead of local mocks
 - Expand statement coverage from current baseline to 80%+ across all services
 - Contract tests for SSE streaming format (verify event shapes for all deliberation stages)
 - Load testing with autocannon: target 200 concurrent deliberations, < 2s p95 latency
@@ -37,6 +38,10 @@
 - Structured error tracking with correlation IDs across request lifecycle
 - Provider health dashboard — per-provider availability, latency distribution, cost per 1K tokens
 - Dead letter queue monitoring panel in Grafana
+
+**Known Limitations**
+- Python code sandbox uses process-level isolation (ulimit + socket monkey-patching) only. Kernel-level namespace isolation (nsjail, bubblewrap, or container-per-execution) is needed for untrusted code in production.
+- User settings (autoCouncil, debateRound, coldValidator, piiDetection) are stored client-side in localStorage only. Backend persistence requires a new endpoint and DB table.
 
 ---
 

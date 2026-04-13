@@ -1,6 +1,7 @@
 import { db } from "../lib/drizzle.js";
 import { artifacts } from "../db/schema/research.js";
 import logger from "../lib/logger.js";
+import { randomUUID } from "crypto";
 
 export interface DetectedArtifact {
   name: string;
@@ -113,6 +114,7 @@ export async function saveArtifact(
   artifact: DetectedArtifact
 ): Promise<string> {
   const [record] = await db.insert(artifacts).values({
+    id: randomUUID(),
     userId,
     conversationId,
     name: artifact.name,

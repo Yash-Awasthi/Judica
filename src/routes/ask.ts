@@ -442,7 +442,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
           .where(
             and(
               eq(codeRepositories.id, repo_id),
-              eq(codeRepositories.userId, String(userId)),
+              eq(codeRepositories.userId, userId!),
               eq(codeRepositories.indexed, true)
             )
           )

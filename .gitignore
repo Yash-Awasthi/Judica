@@ -9,3 +9,6 @@ dist/
 .DS_Store
 *.Identifier
 Thumbs.db
+
+# Test coverage reports
+coverage/

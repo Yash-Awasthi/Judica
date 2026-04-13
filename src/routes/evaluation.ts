@@ -1,12 +1,11 @@
 import { FastifyPluginAsync } from "fastify";
-import { db } from "../lib/drizzle.js";
-import { evaluations } from "../db/schema/users.js";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import {
   evaluateCouncilSession,
   getUserEvaluationMetrics,
   benchmarkCouncilPerformance
 } from "../lib/evaluation.js";
+import { AgentOutput } from "../lib/schemas.js";
 import { AppError } from "../middleware/errorHandler.js";
 
 // ─── Plugin ─────────────────────────────────────────────────────────────────
@@ -23,10 +22,10 @@ const evaluationPlugin: FastifyPluginAsync = async (fastify) => {
     } = request.body as {
       sessionId?: string;
       conversationId?: string;
-      agentOutputs?: unknown;
+      agentOutputs?: AgentOutput[];
       totalTokens?: number;
       duration?: number;
-      userFeedback?: unknown;
+      userFeedback?: number;
     };
 
     if (!sessionId || !conversationId || !agentOutputs || !totalTokens || !duration) {

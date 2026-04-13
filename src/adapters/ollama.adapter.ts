@@ -7,7 +7,6 @@ import type {
 import { createStreamResult } from "./types.js";
 import { getBreaker } from "../lib/breaker.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
-import logger from "../lib/logger.js";
 
 interface OllamaChunk {
   message?: { content?: string };

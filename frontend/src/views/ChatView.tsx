@@ -60,7 +60,17 @@ export function ChatView() {
           const res = await fetchWithAuth(`/api/history/${conversationId}?limit=100`);
           if (res.ok) {
             const data = await res.json() as ChatHistoryResponse;
-            setMessages(data.chats || []);
+            setMessages((data.chats || []).map((c) => ({
+              id: c.id,
+              question: c.question,
+              verdict: c.verdict,
+              createdAt: c.createdAt,
+              opinions: c.opinions?.map((o) => ({
+                name: o.agent,
+                archetype: o.agent,
+                opinion: o.text,
+              })),
+            })));
             // Cache conversation for offline use
             const title = conversations.find(c => c.id === conversationId)?.title || "Conversation";
             cacheConversation({

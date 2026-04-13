@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 interface SearchResult {
@@ -75,17 +75,22 @@ export const EnhancedSearch: React.FC = () => {
     }
   }, [query, user, filters, pagination.limit]);
 
+  const performSearchRef = useRef(performSearch);
+  useEffect(() => {
+    performSearchRef.current = performSearch;
+  }, [performSearch]);
+
   useEffect(() => {
     const timeoutId = setTimeout(() => {
       if (query.trim()) {
-        performSearch(1);
+        performSearchRef.current(1);
       } else {
         setResults([]);
       }
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [query, filters, performSearch]);
+  }, [query, filters]);
 
   const handlePageChange = (newPage: number) => {
     performSearch(newPage);

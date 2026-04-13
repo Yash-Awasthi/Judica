@@ -175,7 +175,7 @@ export class AnthropicAdapter implements IProviderAdapter {
               case "content_block_stop":
                 if (currentToolId) {
                   let args: Record<string, unknown> = {};
-                  try { args = JSON.parse(currentToolArgs); } catch (e) { logger.debug?.('Failed to parse tool call args', e); }
+                  try { args = JSON.parse(currentToolArgs); } catch (e) { logger.debug?.({ err: e }, 'Failed to parse tool call args'); }
                   yield {
                     type: "tool_call",
                     tool_call: { id: currentToolId, name: currentToolName, arguments: args },

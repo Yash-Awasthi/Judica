@@ -37,7 +37,7 @@ const skillsPlugin: FastifyPluginAsync = async (fastify) => {
     const skills = await db
       .select()
       .from(userSkills)
-      .where(eq(userSkills.userId, String(request.userId)))
+      .where(eq(userSkills.userId, request.userId!))
       .orderBy(desc(userSkills.createdAt));
 
     return { skills };
@@ -109,7 +109,7 @@ const skillsPlugin: FastifyPluginAsync = async (fastify) => {
       .insert(userSkills)
       .values({
         id,
-        userId: String(request.userId),
+        userId: request.userId!,
         name: name.trim(),
         description: description.trim(),
         code,
@@ -185,7 +185,7 @@ const skillsPlugin: FastifyPluginAsync = async (fastify) => {
     if (!skill) {
       throw new AppError(404, "Skill not found", "SKILL_NOT_FOUND");
     }
-    if (skill.userId !== String(request.userId)) {
+    if (skill.userId !== request.userId) {
       throw new AppError(403, "Not authorized to update this skill", "FORBIDDEN");
     }
 
@@ -258,7 +258,7 @@ const skillsPlugin: FastifyPluginAsync = async (fastify) => {
     if (!skill) {
       throw new AppError(404, "Skill not found", "SKILL_NOT_FOUND");
     }
-    if (skill.userId !== String(request.userId)) {
+    if (skill.userId !== request.userId) {
       throw new AppError(403, "Not authorized to delete this skill", "FORBIDDEN");
     }
 
@@ -326,14 +326,14 @@ const skillsPlugin: FastifyPluginAsync = async (fastify) => {
     if (!skill) {
       throw new AppError(404, "Skill not found", "SKILL_NOT_FOUND");
     }
-    if (skill.userId !== String(request.userId)) {
+    if (skill.userId !== request.userId) {
       throw new AppError(403, "Not authorized to test this skill", "FORBIDDEN");
     }
 
     const { inputs } = request.body as { inputs?: Record<string, unknown> };
 
     try {
-      const result = await executeUserSkill(String(request.userId), skill.name, inputs || {});
+      const result = await executeUserSkill(request.userId!, skill.name, inputs || {});
       return { success: true, result };
     } catch (err: any) {
       return { success: false, error: err.message };

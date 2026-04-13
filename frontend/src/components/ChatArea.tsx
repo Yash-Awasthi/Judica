@@ -97,7 +97,10 @@ export function ChatArea({
   const setShowExport = (v: boolean) => dispatch({ type: "SET_SHOW_EXPORT", payload: v });
   const setShowMemberConfig = (v: boolean) => dispatch({ type: "SET_SHOW_MEMBER_CONFIG", payload: v });
   const setPlayingAudioId = (v: string | null) => dispatch({ type: "SET_PLAYING_AUDIO_ID", payload: v });
-  const setVisibleKeyIds = (v: Record<string, boolean>) => dispatch({ type: "SET_VISIBLE_KEY_IDS", payload: v });
+  const setVisibleKeyIds: React.Dispatch<React.SetStateAction<Record<string, boolean>>> = (v) => {
+    const value = typeof v === "function" ? v(state.visibleKeyIds) : v;
+    dispatch({ type: "SET_VISIBLE_KEY_IDS", payload: value });
+  };
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 

@@ -127,11 +127,10 @@ export function validateArchetype(data: UserArchetypeInput): { valid: boolean; e
     errors.push("System prompt must be at least 20 characters long");
   }
 
-  if (data.name.length > 100) {
+  if (data.name && data.name.length > 100) {
     errors.push("Name must be less than 100 characters");
   }
-
-  if (data.systemPrompt.length > 5000) {
+  if (data.systemPrompt && data.systemPrompt.length > 5000) {
     errors.push("System prompt must be less than 5000 characters");
   }
 

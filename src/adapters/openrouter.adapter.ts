@@ -7,7 +7,6 @@ import type {
 import { createStreamResult } from "./types.js";
 import { getBreaker } from "../lib/breaker.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
-import logger from "../lib/logger.js";
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 
