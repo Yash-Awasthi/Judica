@@ -31,10 +31,6 @@ export function getFallbackProvider(original: Provider): Provider | null {
   }
 
   return {
-    name: original.name,
-    type: original.type,
-    apiKey: original.apiKey,
-    model: original.model,
     ...original,
     ...fallbackData,
     name: `${original.name} (Fallback: ${fallbackData.model})`,

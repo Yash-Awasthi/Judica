@@ -214,7 +214,7 @@ export class RPAProvider extends BaseProvider {
         return { text, usage };
       } catch (err) {
         if (signal?.aborted) throw err;
-        if (attempt === 2) throw new Error(`RPA failed after 2 attempts: ${(err as Error).message}`);
+        if (attempt === 2) throw new Error(`RPA failed after 2 attempts: ${(err as Error).message}`, { cause: err });
         await new Promise(r => setTimeout(r, 2000));
       }
     }
