@@ -330,7 +330,7 @@ aibyai/
 │   ├── context/            # Auth + Theme contexts
 │   ├── views/              # Page views (15 views)
 │   └── router.tsx          # React Router with 404 catch-all
-├── tests/                  # 21 test files (unit + integration + benchmarks)
+├── tests/                  # Unit tests (auth, RBAC, rate limiting, SSRF, validation)
 ├── grafana/                # Auto-provisioned dashboards + datasources
 ├── docker-compose.yml      # PostgreSQL + Redis + Prometheus + Grafana
 ├── Dockerfile              # Multi-stage build with HEALTHCHECK
