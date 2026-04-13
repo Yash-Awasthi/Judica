@@ -14,12 +14,8 @@ export default defineConfig({
     },
 
     // Tell Vitest to handle ESM properly with NodeNext resolution
-    pool: "forks",          // Required for NodeNext ESM interop
-    poolOptions: {
-      forks: {
-        singleFork: true,   // Prevents module state leaking between test files
-      },
-    },
+    pool: "forks",
+    singleFork: true,
 
     // Give each test file a clean module registry
     isolate: true,
