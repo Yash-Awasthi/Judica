@@ -95,70 +95,46 @@ sequenceDiagram
 ```mermaid
 flowchart TB
     subgraph CLIENT["Frontend"]
-        direction LR
-        CHAT["Chat UI\nStreaming SSE"]
-        WORKFLOW["Workflow Canvas\nReact Flow\n12 Node Types"]
-        DEBATE["Debate Dashboard\nReal-time\nDeliberation View"]
-        MARKET["Marketplace\nPrompts, Workflows\nPersonas"]
-        ANALYTICS["Analytics\nECharts\nDashboards"]
-        SETTINGS["Settings\nClient-side\nPreferences"]
+        direction TB
+        CHAT["Chat UI"] ~~~ WORKFLOW["Workflow Canvas"] ~~~ DEBATE["Debate Dashboard"]
+        MARKET["Marketplace"] ~~~ ANALYTICS["Analytics"] ~~~ SETTINGS["Settings"]
     end
 
     subgraph GATEWAY["API Gateway — Fastify 5"]
-        direction LR
-        AUTH["Auth Layer\nJWT + OAuth2\nZod-validated"]
-        RATE["Rate Limiter\nRedis-backed\nDistributed"]
-        RBAC["RBAC\nmember / admin\nroles"]
-        CSP["Security\nCSP nonces\nSSRF filter"]
-        ROUTES["35 Route Plugins\nSwagger UI\nat /api/docs"]
+        direction TB
+        AUTH["Auth · JWT + OAuth2"] ~~~ RATE["Rate Limiter · Redis"] ~~~ RBAC["RBAC"]
+        CSP["Security · CSP + SSRF"] ~~~ ROUTES["35 Route Plugins"]
     end
 
     subgraph ENGINE["Deliberation Engine"]
-        direction LR
-        QROUTER["Query Router\nAuto-classify\nSelect archetypes"]
-        PARALLEL["Agent Pool\n4+ concurrent\nConfigurable"]
-        CONFLICT["Conflict Detector\nCosine similarity\nThresholds"]
-        DEBATE_R["Debate Manager\nPeer review\nAdversarial critique"]
-        SCORING["ML Scoring\nAgreement +\nPeerRanking"]
-        SYNTH["Synthesizer\nWeighted\nconsensus merge"]
-        COLD["Cold Validator\nHallucination\ncheck"]
+        direction TB
+        QROUTER["Query Router"] ~~~ PARALLEL["Agent Pool · 4+"] ~~~ CONFLICT["Conflict Detector"]
+        DEBATE_R["Debate Manager"] ~~~ SCORING["ML Scoring"] ~~~ SYNTH["Synthesizer"]
+        COLD["Cold Validator"]
     end
 
     subgraph TOOLS["Tools & Processing"]
-        direction LR
-        SANDBOX["Code Sandbox\nJS: isolated-vm\nPython: ulimit"]
-        RAG["RAG Pipeline\npgvector + HNSW\nHybrid search"]
-        RESEARCH["Deep Research\nWeb search\nSynthesis"]
-        PROCESSORS["File Processors\nPDF, DOCX, XLSX\nCSV, TXT, Images"]
-        SKILLS["User Skills\nPython tools\nSandboxed"]
-        TTS["Voice / TTS\nMulti-provider\nSTT support"]
-        PII["PII Scanner\nRisk scoring\nRedaction"]
+        direction TB
+        SANDBOX["Code Sandbox"] ~~~ RAG["RAG Pipeline"] ~~~ RESEARCH["Deep Research"]
+        PROCESSORS["File Processors"] ~~~ SKILLS["User Skills"] ~~~ TTS["Voice / TTS"]
+        PII["PII Scanner"]
     end
 
-    subgraph PROVIDERS["LLM Providers — Circuit-Breaker Protected"]
-        direction LR
-        OAI["OpenAI\nGPT-4o, o1\no3, o4"]
-        ANT["Anthropic\nClaude 3.5\nClaude 4"]
-        GEM["Gemini\n2.0 Flash\n2.5 Pro"]
-        GRQ["Groq\nLLaMA\nMixtral"]
-        OLL["Ollama\nLocal\nmodels"]
-        ORT["OpenRouter\nMulti-model\ngateway"]
-        CUST["Custom\nOpenAI-compat\nAPI"]
+    subgraph PROVIDERS["LLM Providers"]
+        direction TB
+        OAI["OpenAI"] ~~~ ANT["Anthropic"] ~~~ GEM["Gemini"] ~~~ GRQ["Groq"]
+        OLL["Ollama"] ~~~ ORT["OpenRouter"] ~~~ CUST["Custom"]
     end
 
     subgraph DATA["Data Layer"]
-        direction LR
-        PG["PostgreSQL 16\npgvector + HNSW\nDrizzle ORM"]
-        RD["Redis 7\nSemantic cache\nRate limiting\nSession state"]
-        BULL["BullMQ\nAsync jobs\nRetry + DLQ\nBackoff"]
+        direction TB
+        PG["PostgreSQL 16 + pgvector"] ~~~ RD["Redis 7"] ~~~ BULL["BullMQ"]
     end
 
     subgraph OBSERVE["Observability"]
-        direction LR
-        PROM["Prometheus\nprom-client\nmetrics"]
-        GRAF["Grafana\nAuto-provisioned\ndashboards"]
-        PINO["Pino Logger\nStructured\nJSON"]
-        LANG["LangFuse\nLLM trace\nexport"]
+        direction TB
+        PROM["Prometheus"] ~~~ GRAF["Grafana"]
+        PINO["Pino Logger"] ~~~ LANG["LangFuse"]
     end
 
     CLIENT --> GATEWAY
@@ -167,10 +143,8 @@ flowchart TB
     ENGINE --> TOOLS
     TOOLS --> DATA
     ENGINE --> DATA
-    BULL --> DATA
     OBSERVE -.-> GATEWAY
     OBSERVE -.-> ENGINE
-    OBSERVE -.-> PROVIDERS
 
     style CLIENT fill:#0f172a,stroke:#3b82f6,color:#e2e8f0
     style GATEWAY fill:#0f172a,stroke:#8b5cf6,color:#e2e8f0
