@@ -15,7 +15,7 @@ vi.mock("dns", async (importOriginal) => {
   };
 });
 
-import { isPrivateIP, validateSafeUrl } from "../src/lib/ssrf.js";
+import { isPrivateIP, validateSafeUrl } from "../../src/lib/ssrf.js";
 
 // ── Helper: make dns.lookup resolve to a given IP ────────────────────
 function mockDnsLookup(ip: string) {
@@ -28,15 +28,6 @@ function mockDnsLookup(ip: string) {
       if (cb) {
         cb(null, [{ address: ip, family: 4 }]);
       }
-    }
-  );
-}
-
-function mockDnsLookupError() {
-  (dns.lookup as any).mockImplementation(
-    (_hostname: string, _opts: any, cb?: Function) => {
-      if (typeof _opts === "function") cb = _opts;
-      if (cb) cb(new Error("getaddrinfo ENOTFOUND"));
     }
   );
 }

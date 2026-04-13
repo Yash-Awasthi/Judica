@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from "vitest";
 
-vi.mock("../src/lib/logger.js", () => ({
+vi.mock("../../src/lib/logger.js", () => ({
   default: {
     debug: vi.fn(),
     info: vi.fn(),
@@ -9,11 +9,9 @@ vi.mock("../src/lib/logger.js", () => ({
   },
 }));
 
-import { ValidationModule } from "../src/lib/validation.js";
+import { ValidationModule } from "../../src/lib/validation.js";
 
 // ── Access safeMathEval via the public checkMathIntegrity path.
-// safeMathEval is private, so we test it indirectly through the
-// ValidationModule's math check, or we use a cheeky cast to access it directly.
 const vm = new ValidationModule();
 const safeMathEval = (vm as any).safeMathEval.bind(vm);
 
@@ -109,7 +107,7 @@ describe("Validation — checkMathIntegrity via validate()", () => {
       confidence: 0.9,
     });
 
-    const mathResult = results.find((r) => r.type === "mathematical");
+    const mathResult = results.find((r: any) => r.type === "mathematical");
     expect(mathResult).toBeDefined();
     expect(mathResult!.valid).toBe(false);
     expect(mathResult!.errors.length).toBeGreaterThan(0);
@@ -124,9 +122,72 @@ describe("Validation — checkMathIntegrity via validate()", () => {
       confidence: 0.9,
     });
 
-    const mathResult = results.find((r) => r.type === "mathematical");
+    const mathResult = results.find((r: any) => r.type === "mathematical");
     expect(mathResult).toBeDefined();
     expect(mathResult!.valid).toBe(true);
+  });
+
+  it('should pass a correct math claim: 3*4 = 12', () => {
+    const output = { answer: '3*4 = 12', reasoning: '', key_points: [], assumptions: [], confidence: 1.0 };
+    const result = (vm as any).checkMathIntegrity(output);
+    expect(result.valid).toBe(true);
+  });
+
+  it('should flag code syntax errors', () => {
+    const output = {
+      answer: '```javascript\nfunction test() {\n if (true) return 1;\n```', // missing closing brace
+      reasoning: 'Testing code',
+      key_points: [], assumptions: [], confidence: 1.0
+    };
+    const result = (vm as any).checkCodeIntegrity(output);
+    expect(result.valid).toBe(false);
+    expect(result.errors[0]).toContain('mismatched braces');
+  });
+
+  it('should flag unpopulated fact patterns', () => {
+    const output = {
+      answer: 'Answer',
+      reasoning: 'See [Source] for details.',
+      key_points: [], assumptions: [], confidence: 1.0
+    };
+    const result = (vm as any).checkFactPattern(output);
+    expect(result.valid).toBe(false);
+    expect(result.errors[0]).toContain('unpopulated citation placeholders');
+  });
+
+  it('should flag logic flips in chain of thought', () => {
+    const output = {
+      answer: 'Answer',
+      reasoning: '1. It is not true.\n2. It is true.',
+      key_points: [], assumptions: [], confidence: 1.0
+    };
+    const result = (vm as any).checkChainOfThoughtConsistency(output);
+    expect(result.valid).toBe(false);
+    expect(result.errors[0]).toContain('Logic flip detected');
+  });
+
+  it('should flag numerical dependency issues in steps', () => {
+    const output = {
+      answer: 'Answer',
+      reasoning: 'Step 1: The value is 42.\nStep 2: The result is 100.', // 42 is lost
+      key_points: [], assumptions: [], confidence: 1.0
+    };
+    const result = (vm as any).checkStepDependency(output);
+    expect(result.valid).toBe(false);
+    expect(result.errors[0]).toContain('numerical dependency issue');
+  });
+
+  it('should run full validation and validateText', async () => {
+    const output = {
+      answer: '5+5=10',
+      reasoning: 'reasoning',
+      key_points: [], assumptions: [], confidence: 1.0
+    };
+    const results = await vm.validate(output);
+    expect(results).toHaveLength(6);
+    
+    const textResults = await vm.validateText('5+5=10');
+    expect(textResults).toHaveLength(6);
   });
 });
 
@@ -141,9 +202,8 @@ describe("Validation — checkLogicalConsistency", () => {
       confidence: 0.5,
     });
 
-    const logical = results.find((r) => r.type === "logical");
+    const logical = results.find((r: any) => r.type === "logical");
     expect(logical).toBeDefined();
-    // The first logical result is from checkLogicalConsistency
     expect(logical!.errors.length).toBeGreaterThan(0);
   });
 });

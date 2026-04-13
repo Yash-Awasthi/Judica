@@ -29,6 +29,15 @@ export default defineConfig({
 
     // How long a single test can run before timeout
     testTimeout: 30_000,
+
+    // Code coverage settings
+    coverage: {
+      provider: "v8",
+      reporter: ["text", "json", "html"],
+      include: ["src/**/*.ts"],
+      exclude: ["src/**/*.test.ts", "src/types/**", "src/**/index.ts", "src/db/schema/**"],
+      all: true,
+    },
   },
   resolve: {
     alias: {

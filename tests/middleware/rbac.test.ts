@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import type { Response, NextFunction } from "express";
-import type { AuthRequest } from "../src/types/index.js";
+import type { Response } from "express";
+import type { AuthRequest } from "../../src/types/index.js";
 
 vi.mock("dotenv/config", () => ({}));
 
@@ -11,7 +11,7 @@ const mockDbChain = {
   limit: vi.fn().mockResolvedValue([]),
 };
 
-vi.mock("../src/lib/drizzle.js", () => ({
+vi.mock("../../src/lib/drizzle.js", () => ({
   db: {
     select: (...a: any[]) => mockDbChain.select(...a),
     from: (...a: any[]) => mockDbChain.from(...a),
@@ -19,13 +19,13 @@ vi.mock("../src/lib/drizzle.js", () => ({
     limit: (...a: any[]) => mockDbChain.limit(...a),
   },
 }));
-vi.mock("../src/db/schema/users.js", () => ({ users: { id: "id", role: "role" } }));
+vi.mock("../../src/db/schema/users.js", () => ({ users: { id: "id", role: "role" } }));
 vi.mock("drizzle-orm", () => ({ eq: vi.fn((...args: any[]) => args) }));
-vi.mock("../src/lib/logger.js", () => ({
+vi.mock("../../src/lib/logger.js", () => ({
   default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-import { requireRole } from "../src/middleware/rbac.js";
+import { requireRole } from "../../src/middleware/rbac.js";
 
 function makeReq(userId?: number): AuthRequest {
   return { userId } as AuthRequest;
