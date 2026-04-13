@@ -1,4 +1,5 @@
 import { Request, Response, NextFunction } from "express";
+import type { FastifyRequest, FastifyReply } from "fastify";
 import { z, ZodSchema } from "zod";
 
 export function validate(schema: ZodSchema) {
@@ -16,6 +17,26 @@ export function validate(schema: ZodSchema) {
     }
     req.body = result.data;
     next();
+  };
+}
+
+/**
+ * Fastify-compatible validation preHandler hook.
+ */
+export function fastifyValidate(schema: ZodSchema) {
+  return async (request: FastifyRequest, reply: FastifyReply) => {
+    const result = schema.safeParse(request.body);
+    if (!result.success) {
+      reply.code(400).send({
+        error: "Validation failed",
+        details: result.error.issues.map((e: any) => ({
+          field: e.path.join("."),
+          message: e.message,
+        })),
+      });
+      return;
+    }
+    request.body = result.data;
   };
 }
 

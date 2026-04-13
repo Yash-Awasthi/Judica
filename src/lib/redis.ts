@@ -167,7 +167,8 @@ const redisWrapper = {
   async expire(key: string, seconds: number): Promise<boolean> {
     try {
       const client = await getRedis();
-      return await client.expire(key, seconds);
+      const result = await client.expire(key, seconds);
+      return Boolean(result);
     } catch {
       return false;
     }

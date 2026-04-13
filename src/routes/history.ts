@@ -11,7 +11,7 @@ import { eq, and, or, ilike, asc, desc, count, lte, sql } from "drizzle-orm";
 import logger from "../lib/logger.js";
 
 import { AppError } from "../middleware/errorHandler.js";
-import { validate, renameConversationSchema, forkSchema } from "../middleware/validate.js";
+import { fastifyValidate, renameConversationSchema, forkSchema } from "../middleware/validate.js";
 
 function parsePagination(query: { page?: string; limit?: string }, defaultLimit = 20, maxLimit = 100) {
   const page = Math.max(1, parseInt(query.page || '1', 10));
@@ -337,7 +337,7 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
    *       404:
    *         description: Conversation not found
    */
-  fastify.patch("/:id", { preHandler: [fastifyRequireAuth, validate(renameConversationSchema)] }, async (request, reply) => {
+  fastify.patch("/:id", { preHandler: [fastifyRequireAuth, fastifyValidate(renameConversationSchema)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { title } = request.body as { title: string };
 
@@ -431,7 +431,7 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
    *       404:
    *         description: Source conversation not found
    */
-  fastify.post("/:id/fork", { preHandler: [fastifyRequireAuth, validate(forkSchema)] }, async (request, reply) => {
+  fastify.post("/:id/fork", { preHandler: [fastifyRequireAuth, fastifyValidate(forkSchema)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { toChatId } = request.body as { toChatId: number };
 

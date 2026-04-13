@@ -2,6 +2,8 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { Response, NextFunction } from "express";
 import type { AuthRequest } from "../src/types/index.js";
 
+vi.mock("dotenv/config", () => ({}));
+
 const mockDbChain = {
   select: vi.fn().mockReturnThis(),
   from: vi.fn().mockReturnThis(),

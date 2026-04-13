@@ -32,7 +32,7 @@ export abstract class BaseProvider {
     // Give the function a name for the breaker registry key
     Object.defineProperty(fetchFn, "name", { value: "fetch" });
     const breaker = getBreaker({ name: this.name } as any, fetchFn);
-    return breaker.fire() as Promise<Response>;
+    return await breaker.fire() as Response;
   }
 
   protected maskConfig() {

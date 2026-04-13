@@ -50,7 +50,7 @@ import logger from "../lib/logger.js";
 const reposPlugin: FastifyPluginAsync = async (fastify) => {
   // GET / — list user's repos
   fastify.get("/", { preHandler: fastifyRequireAuth }, async (request) => {
-    const userId = String(request.userId);
+    const userId = request.userId!;
     const repos = await db
       .select({
         id: codeRepositories.id,
@@ -114,7 +114,7 @@ const reposPlugin: FastifyPluginAsync = async (fastify) => {
    */
   // POST /github — start ingestion
   fastify.post("/github", { preHandler: fastifyRequireAuth }, async (request, reply) => {
-    const userId = String(request.userId);
+    const userId = request.userId!;
     const { owner, repo } = request.body as { owner?: string; repo?: string };
 
     if (!owner || !repo) {
@@ -164,7 +164,7 @@ const reposPlugin: FastifyPluginAsync = async (fastify) => {
    */
   // GET /:id/status — return indexed status
   fastify.get("/:id/status", { preHandler: fastifyRequireAuth }, async (request, reply) => {
-    const userId = String(request.userId);
+    const userId = request.userId!;
     const { id } = request.params as { id: string };
 
     const [repoRecord] = await db
@@ -233,7 +233,7 @@ const reposPlugin: FastifyPluginAsync = async (fastify) => {
    */
   // POST /:id/search — search repo files
   fastify.post("/:id/search", { preHandler: fastifyRequireAuth }, async (request, reply) => {
-    const userId = String(request.userId);
+    const userId = request.userId!;
     const { id } = request.params as { id: string };
     const { query } = request.body as { query?: string };
 
@@ -290,7 +290,7 @@ const reposPlugin: FastifyPluginAsync = async (fastify) => {
    */
   // DELETE /:id — delete repo + cascade files
   fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
-    const userId = String(request.userId);
+    const userId = request.userId!;
     const { id } = request.params as { id: string };
 
     const [repoRecord] = await db
