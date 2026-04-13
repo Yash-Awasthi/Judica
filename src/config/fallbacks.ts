@@ -2,8 +2,6 @@ import { Provider } from "../lib/providers.js";
 
 import { env } from "./env.js";
 
-export const MODEL_FALLBACK_MAP: Record<string, Partial<Provider>> = {};
-
 export const FALLBACK_MAP: Record<string, Partial<Provider>> = {
   "api": {
     type: "api",
@@ -26,11 +24,7 @@ export const FALLBACK_MAP: Record<string, Partial<Provider>> = {
 };
 
 export function getFallbackProvider(original: Provider): Provider | null {
-  let fallbackData = MODEL_FALLBACK_MAP[original.model];
-
-  if (!fallbackData) {
-    fallbackData = FALLBACK_MAP[original.type];
-  }
+  let fallbackData = FALLBACK_MAP[original.type];
 
   if (!fallbackData || !fallbackData.apiKey) {
     return null;

@@ -114,10 +114,24 @@ const redisWrapper = {
     }
   },
 
+  /** Returns the remaining TTL in milliseconds (uses Redis PTTL command). */
   async pttl(key: string): Promise<number> {
     try {
       const client = await getRedis();
       return await client.pTTL(key);
+    } catch {
+      return -2;
+    }
+  },
+
+  /** Returns the remaining TTL in seconds (converts from Redis PTTL milliseconds). */
+  async ttl(key: string): Promise<number> {
+    try {
+      const client = await getRedis();
+      const ms = await client.pTTL(key);
+      // Negative values (-1 = no expiry, -2 = key missing) pass through as-is
+      if (ms < 0) return ms;
+      return Math.ceil(ms / 1000);
     } catch {
       return -2;
     }

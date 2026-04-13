@@ -280,7 +280,7 @@ export class ValidationModule {
   private checkStepDependency(output: AgentOutput): ValidationResult {
     const errors: string[] = [];
     const steps = output.reasoning.split(/\d+\.|\n/).map(s => s.trim()).filter(s => s.length > 5);
-    
+
     // Look for numbers mentioned in previous step being changed in next step without reason
     for (let i = 1; i < steps.length; i++) {
       const numsPrev = (steps[i - 1].match(/\d+(\.\d+)?/g) || []) as string[];
@@ -288,14 +288,18 @@ export class ValidationModule {
 
       if (numsPrev.length > 0 && numsCurr.length > 0) {
         const lastNum = numsPrev[numsPrev.length - 1];
-        if (lastNum && numsCurr.includes(lastNum)) continue; 
+        if (lastNum && numsCurr.includes(lastNum)) continue;
+        // The final number from the previous step is not carried forward — possible dependency gap
+        errors.push(
+          `Step ${i + 1} may have a numerical dependency issue: value '${numsPrev[numsPrev.length - 1]}' from step ${i} is not referenced in the next step.`
+        );
       }
     }
 
     return {
       valid: errors.length === 0,
       errors: errors,
-      confidence_adjustment: 0, // Informational for now, unless explicit contradiction
+      confidence_adjustment: errors.length > 0 ? -0.1 : 0,
       type: "logical"
     };
   }

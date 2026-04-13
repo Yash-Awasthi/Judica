@@ -30,8 +30,6 @@ export interface OrchestrationInput {
   members: CouncilMember[];
   attachmentContext?: string; // pre-processed file/document text
   kbId?: string;
-  researchMode?: boolean;
-  tools?: string[];
   humanGates?: boolean;
   userId?: number;
   promptDna?: {
@@ -72,8 +70,22 @@ const HUMAN_GATE_TIMEOUT_MS = 5 * 60 * 1000;
 
 const pendingHumanGates = new Map<
   string,
-  { resolve: (choice: string) => void; promise: Promise<string>; timer: ReturnType<typeof setTimeout> }
+  { resolve: (choice: string) => void; promise: Promise<string>; timer: ReturnType<typeof setTimeout>; createdAt: number }
 >();
+
+// Periodic cleanup for orphaned gates (in case timeout fails)
+const GATE_CLEANUP_INTERVAL_MS = 60_000;
+const gateCleanupInterval = setInterval(() => {
+  const now = Date.now();
+  for (const [id, gate] of pendingHumanGates) {
+    if (now - gate.createdAt > HUMAN_GATE_TIMEOUT_MS + 10_000) {
+      clearTimeout(gate.timer);
+      gate.resolve("Dismiss conflicts and synthesize");
+      pendingHumanGates.delete(id);
+    }
+  }
+}, GATE_CLEANUP_INTERVAL_MS);
+gateCleanupInterval.unref();
 
 export function resolveHumanGate(gateId: string, choice: string): void {
   const gate = pendingHumanGates.get(gateId);
@@ -342,7 +354,7 @@ export class DeliberationOrchestrator {
           pendingHumanGates.delete(gateId);
         }
       }, HUMAN_GATE_TIMEOUT_MS);
-      pendingHumanGates.set(gateId, { resolve: gateResolve, promise: gatePromise, timer: gateTimer });
+      pendingHumanGates.set(gateId, { resolve: gateResolve, promise: gatePromise, timer: gateTimer, createdAt: Date.now() });
 
       yield {
         type: "human_gate_pending",

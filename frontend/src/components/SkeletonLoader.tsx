@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useState } from "react";
 
 interface SkeletonLoaderProps {
   variant?: "card" | "text" | "avatar" | "chart" | "line";
@@ -9,8 +9,8 @@ interface SkeletonLoaderProps {
 export function SkeletonLoader({ variant = "text", count = 1, className = "" }: SkeletonLoaderProps) {
   const items = Array.from({ length: count }, (_, i) => i);
 
-  const chartBarHeights = useMemo(() => Array.from({ length: 8 }, () => 30 + Math.random() * 70), []);
-  const lineWidths = useMemo(() => Array.from({ length: count }, () => 60 + Math.random() * 40), [count]);
+  const [chartBarHeights] = useState(() => Array.from({ length: 8 }, () => 30 + Math.random() * 70));
+  const [lineWidths] = useState(() => Array.from({ length: count }, () => 60 + Math.random() * 40));
 
   const renderSkeleton = (key: number) => {
     switch (variant) {

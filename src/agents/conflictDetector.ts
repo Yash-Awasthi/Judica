@@ -20,8 +20,26 @@ export interface Conflict {
   severity: number; // 1-5
 }
 
+/**
+ * Sanitize user/agent text before interpolation into LLM prompts.
+ * Escapes prompt-injection-prone patterns: system instructions,
+ * role-play markers, XML/HTML tags, and markdown code fences.
+ */
 function sanitizeForPrompt(text: string): string {
-  return text.replace(/`/g, "'").replace(/"/g, "'");
+  let sanitized = text;
+  // Strip XML/HTML-style tags that could be interpreted as prompt structure
+  sanitized = sanitized.replace(/<\/?[a-zA-Z][^>]*>/g, (match) => `[tag:${match.replace(/[<>]/g, "")}]`);
+  // Neutralize role-play markers (e.g., "System:", "Assistant:", "User:")
+  sanitized = sanitized.replace(/\b(system|assistant|user|human)\s*:/gi, (match, role) => `${role} -`);
+  // Escape markdown code fences and backticks
+  sanitized = sanitized.replace(/`/g, "'");
+  // Escape double quotes
+  sanitized = sanitized.replace(/"/g, "'");
+  // Neutralize common prompt injection phrases
+  sanitized = sanitized.replace(/ignore\s+(all\s+)?previous\s+instructions/gi, "[filtered]");
+  sanitized = sanitized.replace(/you\s+are\s+now\b/gi, "[filtered]");
+  sanitized = sanitized.replace(/\bdo\s+not\s+follow\b/gi, "[filtered]");
+  return sanitized;
 }
 
 async function extractClaims(agentId: string, text: string): Promise<Claim[]> {

@@ -1,6 +1,4 @@
 import { FastifyPluginAsync } from "fastify";
-import { db } from "../lib/drizzle.js";
-import { evaluations } from "../db/schema/users.js";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import {
   evaluateCouncilSession,

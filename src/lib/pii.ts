@@ -9,13 +9,13 @@ export interface PIIDetection {
 
 const PII_PATTERNS: { type: string; pattern: RegExp; severity: 'low' | 'medium' | 'high' }[] = [
   { type: "ssn", pattern: /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/g, severity: "high" },
-  { type: "credit_card", pattern: /\b(?:\d{4}[-\s]?){3}\d{4}\b/g, severity: "high" },
+  { type: "credit_card", pattern: /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g, severity: "high" },
   { type: "bank_account", pattern: /\b(?:AC|Account)\s*:?\s*\d{8,17}\b/gi, severity: "high" },
   { type: "passport", pattern: /\b[A-Z]{1,2}\d{7,9}\b/g, severity: "high" },
 
   { type: "email", pattern: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, severity: "medium" },
   { type: "phone", pattern: /(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, severity: "medium" },
-  { type: "address", pattern: /\d+\s+([A-Z][a-z]*\s*){1,3}(Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Boulevard|Blvd)\b/gi, severity: "medium" },
+  { type: "address", pattern: /\d+\s+[A-Za-z]+(?:\s[A-Za-z]+){0,2}\s+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Boulevard|Blvd)\b/gi, severity: "medium" },
   { type: "date_of_birth", pattern: /\b(?:0[1-9]|1[0-2])[-/](?:0[1-9]|[12]\d|3[01])[-/](?:19|20)\d{2}\b/g, severity: "medium" },
   { type: "driver_license", pattern: /\b[A-Z]{1,2}\d{6,8}\b/g, severity: "medium" },
 
@@ -25,20 +25,15 @@ const PII_PATTERNS: { type: string; pattern: RegExp; severity: 'low' | 'medium' 
   { type: "company", pattern: /\b(?:Inc|LLC|Corp|Ltd)\.?\s+[A-Z][a-z]+\b/g, severity: "low" },
 ];
 
-const COMPILED_PATTERNS: { type: string; regex: RegExp; severity: 'low' | 'medium' | 'high' }[] = PII_PATTERNS.map(p => ({
-  type: p.type,
-  regex: new RegExp(p.pattern.source, p.pattern.flags),
-  severity: p.severity
-}));
-
 export function detectPII(text: string): PIIDetection {
   const matches: PIIDetection["matches"] = [];
   const types = new Set<string>();
   let riskScore = 0;
 
-  for (const { type, regex, severity } of COMPILED_PATTERNS) {
+  for (const { type, pattern, severity } of PII_PATTERNS) {
+    pattern.lastIndex = 0;
     let match;
-    while ((match = regex.exec(text)) !== null) {
+    while ((match = pattern.exec(text)) !== null) {
       matches.push({
         type,
         value: match[0],

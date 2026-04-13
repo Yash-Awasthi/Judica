@@ -15,13 +15,14 @@ import logger from "../lib/logger.js";
 const DEFAULT_TIMEOUT_MS = 60_000;
 
 export class OpenAIAdapter implements IProviderAdapter {
-  readonly providerId = "openai";
+  readonly providerId: string;
   private baseUrl: string;
   private apiKey: string;
 
-  constructor(apiKey: string, baseUrl = "https://api.openai.com/v1") {
+  constructor(apiKey: string, baseUrl = "https://api.openai.com/v1", providerId = "openai") {
     this.apiKey = apiKey;
     this.baseUrl = baseUrl.replace(/\/$/, "");
+    this.providerId = providerId;
   }
 
   async generate(req: AdapterRequest): Promise<AdapterStreamResult> {

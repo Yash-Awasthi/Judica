@@ -457,7 +457,6 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
 
     if (!chatsToFork.length) throw new AppError(400, "No messages to fork");
 
-    const forkId = sql`gen_random_uuid()`;
     const forkRows = await db
       .insert(conversations)
       .values({

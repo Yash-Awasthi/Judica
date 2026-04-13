@@ -118,17 +118,17 @@ function initBuiltinAdapters(): void {
 
   // OpenAI-compatible providers via OpenAI adapter with custom base URL
   if (env.MISTRAL_API_KEY) {
-    adapters.set("mistral", new OpenAIAdapter(env.MISTRAL_API_KEY, "https://api.mistral.ai/v1"));
+    adapters.set("mistral", new OpenAIAdapter(env.MISTRAL_API_KEY, "https://api.mistral.ai/v1", "mistral"));
     logger.debug("Mistral adapter loaded (OpenAI-compat)");
   }
 
   if (env.CEREBRAS_API_KEY) {
-    adapters.set("cerebras", new OpenAIAdapter(env.CEREBRAS_API_KEY, "https://api.cerebras.ai/v1"));
+    adapters.set("cerebras", new OpenAIAdapter(env.CEREBRAS_API_KEY, "https://api.cerebras.ai/v1", "cerebras"));
     logger.debug("Cerebras adapter loaded (OpenAI-compat)");
   }
 
   if (env.NVIDIA_API_KEY) {
-    adapters.set("nvidia", new OpenAIAdapter(env.NVIDIA_API_KEY, "https://integrate.api.nvidia.com/v1"));
+    adapters.set("nvidia", new OpenAIAdapter(env.NVIDIA_API_KEY, "https://integrate.api.nvidia.com/v1", "nvidia"));
     logger.debug("NVIDIA adapter loaded (OpenAI-compat)");
   }
 
