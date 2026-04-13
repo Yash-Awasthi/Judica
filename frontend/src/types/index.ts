@@ -33,6 +33,7 @@ export interface ChatMessage {
   id: string;
   question: string;
   verdict?: string;
+  createdAt?: string;
   opinions?: Opinion[];
   peerReviews?: PeerReview[];
   scored?: ScoredOpinion[];
