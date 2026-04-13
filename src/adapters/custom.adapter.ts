@@ -68,8 +68,9 @@ export class CustomAdapter implements IProviderAdapter {
     // Build URL
     let url = `${baseUrl}/chat/completions`;
     if (this.config.auth_type === "api_key_query") {
-      // Pass API key as header instead of URL query to avoid log exposure
-      headers["X-API-Key"] = apiKey;
+      const urlObj = new URL(url);
+      urlObj.searchParams.set("api_key", apiKey);
+      url = urlObj.toString();
     }
 
     // Build OpenAI-compatible request body

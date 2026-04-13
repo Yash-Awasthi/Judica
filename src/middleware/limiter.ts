@@ -76,8 +76,8 @@ async function redisLimiter(userId: number, res: Response, next: NextFunction): 
     }
 
     if (rpmCount > MAX_RPM) {
-      const ttl = await redis.ttl(rpmKey); // returns ms
-      const retryAfter = ttl > 0 ? Math.ceil(ttl / 1000) : RPM_WINDOW_SECS;
+      const ttl = await redis.ttl(rpmKey); // returns seconds
+      const retryAfter = ttl > 0 ? ttl : RPM_WINDOW_SECS;
       logger.warn({ userId, rpm: rpmCount }, "User exceeded RPM limit");
       res.status(429).json({
         error: "Too many requests. Please wait a minute.",

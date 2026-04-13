@@ -20,13 +20,18 @@ export interface Conflict {
   severity: number; // 1-5
 }
 
+function sanitizeForPrompt(text: string): string {
+  return text.replace(/`/g, "'").replace(/"/g, "'");
+}
+
 async function extractClaims(agentId: string, text: string): Promise<Claim[]> {
+  const sanitized = sanitizeForPrompt(text.substring(0, 2000));
   const result = await routeAndCollect({
     model: "auto",
     messages: [
       {
         role: "user",
-        content: `Extract 3-5 factual claims from this text as a JSON array of strings. Only return the JSON array, no other text.\n\nText: "${text.substring(0, 2000)}"`,
+        content: `Extract 3-5 factual claims from this text as a JSON array of strings. Only return the JSON array, no other text.\n\n<agent_text>${sanitized}</agent_text>`,
       },
     ],
     temperature: 0,
@@ -53,10 +58,10 @@ async function compareClaimSets(
   const prompt = `Compare these two sets of claims and identify any contradictions.
 
 Claims from Agent A:
-${claimsA.map((c) => `- ${c.claim}`).join("\n")}
+${claimsA.map((c) => `- ${sanitizeForPrompt(c.claim)}`).join("\n")}
 
 Claims from Agent B:
-${claimsB.map((c) => `- ${c.claim}`).join("\n")}
+${claimsB.map((c) => `- ${sanitizeForPrompt(c.claim)}`).join("\n")}
 
 Return a JSON array of contradictions. If none, return [].
 Format: [{ "claim_a": "...", "claim_b": "...", "contradiction_type": "factual"|"opinion"|"method", "severity": 1-5 }]

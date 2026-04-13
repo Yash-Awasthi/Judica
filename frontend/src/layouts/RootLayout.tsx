@@ -24,7 +24,7 @@ export function RootLayout() {
         const data = await res.json();
         setConversations(data);
       }
-    } catch { /* silent */ }
+    } catch (err) { console.warn("Failed to load conversations", err); }
   }, [user, fetchWithAuth]);
 
   useEffect(() => { loadConversations(); }, [loadConversations]);
@@ -54,7 +54,7 @@ export function RootLayout() {
           navigate("/");
         }
       }
-    } catch { /* silent */ }
+    } catch (err) { console.warn("Failed to delete conversation", err); }
   }, [fetchWithAuth, activeConvId, navigate]);
 
   const handleShowMetrics = useCallback(() => {

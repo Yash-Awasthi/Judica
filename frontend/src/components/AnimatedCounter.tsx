@@ -32,16 +32,18 @@ export function AnimatedCounter({
   const rafRef = useRef<number>(0);
   const startTimeRef = useRef<number>(0);
   const startValueRef = useRef(0);
+  const displayValueRef = useRef(0);
 
   useEffect(() => {
     // Respect prefers-reduced-motion
     const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (prefersReduced) {
       setDisplayValue(value);
+      displayValueRef.current = value;
       return;
     }
 
-    startValueRef.current = displayValue;
+    startValueRef.current = displayValueRef.current;
     startTimeRef.current = performance.now();
 
     const animate = (now: number) => {
@@ -51,6 +53,7 @@ export function AnimatedCounter({
       const current = startValueRef.current + (value - startValueRef.current) * eased;
 
       setDisplayValue(current);
+      displayValueRef.current = current;
 
       if (progress < 1) {
         rafRef.current = requestAnimationFrame(animate);
@@ -62,7 +65,6 @@ export function AnimatedCounter({
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, duration]);
 
   return (

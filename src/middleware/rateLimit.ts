@@ -16,16 +16,17 @@ const commonHandler = (req: Request, res: Response, _next: NextFunction, options
 
 // Redis-backed store for clustered/multi-instance deployments
 let redisStore: RedisStore | undefined;
+let rateLimitRedisClient: any;
 try {
-  const redisClient = new (IORedis as any)(env.REDIS_URL || "redis://localhost:6379", {
+  rateLimitRedisClient = new (IORedis as any)(env.REDIS_URL || "redis://localhost:6379", {
     maxRetriesPerRequest: null,
     enableOfflineQueue: false,
     lazyConnect: true,
   });
-  redisClient.connect().catch(() => {});
+  rateLimitRedisClient.connect().catch(() => {});
 
   redisStore = new RedisStore({
-    sendCommand: (...args: string[]) => redisClient.call(...args) as any,
+    sendCommand: (...args: string[]) => rateLimitRedisClient.call(...args) as any,
     prefix: "rl:",
   });
 } catch {
@@ -102,3 +103,11 @@ export const voiceLimiter = rateLimit({
   validate: { keyGeneratorIpFallback: false },
   ...(redisStore ? { store: redisStore } : {}),
 });
+
+export async function cleanupRateLimitRedis(): Promise<void> {
+  if (rateLimitRedisClient) {
+    try {
+      await rateLimitRedisClient.quit();
+    } catch { /* ignore */ }
+  }
+}

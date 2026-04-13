@@ -496,7 +496,7 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
       } catch {
         // Fallback: try legacy hardcoded salt for pre-migration data
         // This path handles records encrypted before per-record salt was introduced
-        const legacySalt = randomBytes(0).length === 0 ? "salt" : "salt"; // legacy compat
+        const legacySalt = "salt";
         const legacyKey = scryptSync(key, legacySalt, 32);
         const legacyDecipher = createDecipheriv(ALGO, legacyKey, iv);
         legacyDecipher.setAuthTag(tag);

@@ -29,11 +29,7 @@ export function createGoogleStrategy() {
           .limit(1);
 
         if (existing) {
-          // SEC-7: Prevent cross-provider email collision. If the existing account
-          // has a password hash it's a local account and can be safely linked.
-          // If it has no password (OAuth-only) and was created by a different provider,
-          // reject to prevent account takeover via email collision.
-          if (!existing.passwordHash) {
+          if (existing.passwordHash) {
             return done(new Error("An account with this email already exists from a different sign-in method. Please use your original sign-in method."));
           }
           return done(null, existing as any);

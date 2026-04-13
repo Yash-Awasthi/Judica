@@ -68,14 +68,14 @@ export function resolveProviderFromModel(model: string): string | null {
     return hasAdapter("gemini") ? "gemini" : null;
   }
 
+  // Ollama models (check first since these could also match Groq patterns)
+  if (hasAdapter("ollama") && (m.includes("llama") || m.includes("mistral") || m.includes("phi") || m.includes("qwen"))) {
+    return "ollama";
+  }
+
   // Groq models (llama, mixtral on groq)
   if (hasAdapter("groq") && (m.includes("llama") || m.includes("mixtral") || m.includes("gemma"))) {
     return "groq";
-  }
-
-  // Ollama models
-  if (hasAdapter("ollama") && (m.includes("llama") || m.includes("mistral") || m.includes("phi") || m.includes("qwen"))) {
-    return "ollama";
   }
 
   // OpenRouter models (usually contain a /)

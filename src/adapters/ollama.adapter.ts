@@ -33,7 +33,14 @@ export class OllamaAdapter implements IProviderAdapter {
     // NOTE: Ollama is typically on localhost which validateSafeUrl blocks.
     // For local-only deployments, operators should set ALLOW_PRIVATE_URLS=1 or
     // use the adapter only with explicitly trusted URLs.
-    if (this.baseUrl !== "http://localhost:11434" && !this.baseUrl.startsWith("http://127.0.0.1")) {
+    const localhostPatterns = [
+      "http://localhost:",
+      "http://127.0.0.1",
+      "http://0.0.0.0",
+      "http://[::1]",
+      "http://::1",
+    ];
+    if (!localhostPatterns.some((p) => this.baseUrl.startsWith(p))) {
       await validateSafeUrl(this.baseUrl);
     }
 

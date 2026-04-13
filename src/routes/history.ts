@@ -181,7 +181,7 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
     const { page, limit, skip } = parsePagination(request.query as { page?: string; limit?: string });
 
     const [conversationList, totalResult] = await Promise.all([
-      getConversationList(request.userId!, limit),
+      getConversationList(request.userId!, limit, skip),
       db.select({ value: count() }).from(conversations).where(eq(conversations.userId, request.userId!))
     ]);
 

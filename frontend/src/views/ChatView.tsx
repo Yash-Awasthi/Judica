@@ -7,6 +7,22 @@ import { useAuth } from "../context/AuthContext";
 import { cacheConversation, getCachedConversation } from "../components/OfflineIndicator";
 import type { Conversation } from "../types/index.js";
 
+interface CachedChatMessage {
+  question: string;
+  verdict: string;
+  createdAt: string;
+}
+
+interface ChatHistoryResponse {
+  chats: Array<{
+    id: string;
+    question: string;
+    verdict: string;
+    createdAt: string;
+    opinions: Array<{ agent: string; text: string }>;
+  }>;
+}
+
 interface OutletContextType {
   setIsSidebarOpen: (v: boolean) => void;
   loadConversations: () => void;
@@ -43,14 +59,14 @@ export function ChatView() {
         try {
           const res = await fetchWithAuth(`/api/history/${conversationId}?limit=100`);
           if (res.ok) {
-            const data = await res.json() as { chats: any[] };
+            const data = await res.json() as ChatHistoryResponse;
             setMessages(data.chats || []);
             // Cache conversation for offline use
             const title = conversations.find(c => c.id === conversationId)?.title || "Conversation";
             cacheConversation({
               id: conversationId,
               title,
-              messages: (data.chats || []).slice(-20).map((c: any) => ({
+              messages: (data.chats || []).slice(-20).map((c) => ({
                 question: c.question,
                 verdict: c.verdict,
                 createdAt: c.createdAt,

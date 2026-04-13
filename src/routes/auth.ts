@@ -40,7 +40,7 @@ async function createRefreshToken(userId: number): Promise<string> {
   return rawToken;
 }
 
-async function issueTokenPair(userId: number, username: string, reply: FastifyReply): Promise<void> {
+async function issueTokenPair(userId: number, username: string, reply: FastifyReply): Promise<{ token: string; username: string }> {
   const accessToken = generateAccessToken(userId, username);
   const refreshToken = await createRefreshToken(userId);
 
@@ -53,7 +53,7 @@ async function issueTokenPair(userId: number, username: string, reply: FastifyRe
     path: "/api/auth",
   });
 
-  return { token: accessToken, username } as any;
+  return { token: accessToken, username };
 }
 
 function fastifyValidate(schema: any) {

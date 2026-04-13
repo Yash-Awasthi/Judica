@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 
 interface PiiDetection {
   found: boolean;
@@ -22,6 +22,8 @@ export const PiiWarning: React.FC<PiiWarningProps> = ({
 }) => {
   const [detection, setDetection] = useState<PiiDetection | null>(null);
   const [loading, setLoading] = useState(true);
+  const onProceedRef = useRef(onProceed);
+  onProceedRef.current = onProceed;
 
   useEffect(() => {
     const checkPii = async () => {
@@ -54,9 +56,9 @@ export const PiiWarning: React.FC<PiiWarningProps> = ({
   // before any conditional returns to satisfy React's rules of hooks
   useEffect(() => {
     if (!loading && !detection?.found) {
-      onProceed();
+      onProceedRef.current();
     }
-  }, [loading, detection, onProceed]);
+  }, [loading, detection]);
 
   if (loading) {
     return (

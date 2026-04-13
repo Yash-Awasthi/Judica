@@ -7,6 +7,10 @@ import fastifyHelmet from "@fastify/helmet";
 import fastifyStatic from "@fastify/static";
 import path from "path";
 import fs from "fs";
+import { createRequire } from "module";
+
+const require = createRequire(import.meta.url);
+const pkg = require("../package.json");
 
 import { env } from "./config/env.js";
 import logger from "./lib/logger.js";
@@ -23,7 +27,8 @@ import "./lib/tools/builtin.js";
 import "./adapters/registry.js";
 
 // Express middleware (still needed for swagger-ui and BullMQ Board compat layer)
-import { perUserLimiter } from "./middleware/limiter.js";
+import { cleanupRateLimitRedis } from "./middleware/rateLimit.js";
+import { cleanupCostTrackerInterval } from "./lib/realtimeCost.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { requireAuth } from "./middleware/auth.js";
 import { requestId } from "./middleware/requestId.js";
@@ -163,7 +168,7 @@ fastify.get("/health", async (_request, reply) => {
     env: env.NODE_ENV,
     checks,
     providers,
-    version: "1.0.0",
+    version: pkg.version,
   };
 });
 
@@ -346,6 +351,15 @@ const shutdown = async (signal: string) => {
   } catch (err) {
     logger.error({ err }, "Error closing Redis connection");
   }
+
+  try {
+    await cleanupRateLimitRedis();
+    logger.info("Rate limit Redis connection closed");
+  } catch (err) {
+    logger.error({ err }, "Error closing rate limit Redis");
+  }
+
+  cleanupCostTrackerInterval();
 
   logger.info("Server closed");
   process.exit(0);

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 interface SearchResult {
@@ -40,7 +40,7 @@ export const EnhancedSearch: React.FC = () => {
     totalPages: 0
   });
 
-  const performSearch = async (page = 1) => {
+  const performSearch = useCallback(async (page = 1) => {
     if (!query.trim() || !user) return;
 
     setLoading(true);
@@ -60,7 +60,7 @@ export const EnhancedSearch: React.FC = () => {
 
       const response = await fetch(`/api/history/search?${params}`);
       const data = await response.json();
-      
+
       setResults(data.data);
       setPagination({
         page,
@@ -73,7 +73,7 @@ export const EnhancedSearch: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [query, user, filters, pagination.limit]);
 
   useEffect(() => {
     const timeoutId = setTimeout(() => {
@@ -85,7 +85,7 @@ export const EnhancedSearch: React.FC = () => {
     }, 300);
 
     return () => clearTimeout(timeoutId);
-  }, [query, filters]);
+  }, [query, filters, performSearch]);
 
   const handlePageChange = (newPage: number) => {
     performSearch(newPage);

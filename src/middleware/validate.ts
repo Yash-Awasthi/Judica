@@ -42,7 +42,7 @@ export const askSchema = z
       .max(15)
       .optional(),
     master: providerSchema.optional(),
-    summon: z.enum(["business", "technical", "personal", "creative", "ethical", "strategy", "default"]).optional(),
+    summon: z.enum(["business", "technical", "personal", "creative", "ethical", "strategy", "debate", "research", "default"]).optional(),
     mode: z.enum(["auto", "manual", "direct"]).default("manual"),
     maxTokens: z.number().int().min(256).max(8192).optional(),
     rounds: z.number().int().min(1).max(5).default(1),

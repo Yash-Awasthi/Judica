@@ -46,7 +46,7 @@ export function DebateDashboardView() {
   const [running, setRunning] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
   const [factsCount, setFactsCount] = useState(0);
-  const eventSourceRef = useRef<EventSource | null>(null);
+  const eventSourceRef = useRef<{ close: () => void } | null>(null);
   const columnRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
   // Auto-scroll columns
@@ -124,7 +124,7 @@ export function DebateDashboardView() {
       });
 
       // Store abort controller so we can cancel on error
-      eventSourceRef.current = { close: () => abortController.abort() } as EventSource;
+      eventSourceRef.current = { close: () => abortController.abort() };
     } catch (err) {
       console.error("Debate start failed", err);
       setRunning(false);

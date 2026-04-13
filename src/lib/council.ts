@@ -9,7 +9,7 @@ import { formatAgentOutput, ScoredOpinion } from "./schemas.js";
 import { filterAndRank } from "./scoring.js";
 import { gatherOpinions, conductPeerReview, evaluateConsensus, synthesizeVerdict, conductDebateRound, OpinionResult } from "./deliberationPhases.js";
 import { PeerReview, ValidatorResult } from "./schemas.js";
-import { controller } from "./controller.js";
+import { createController } from "./controller.js";
 import { calculateCost } from "./cost.js";
 import { updateReliability, getReliabilityScores } from "../services/reliability.service.js";
 

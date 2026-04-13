@@ -33,6 +33,7 @@ export interface OrchestrationInput {
   researchMode?: boolean;
   tools?: string[];
   humanGates?: boolean;
+  userId?: number;
   promptDna?: {
     systemPrompt: string;
     steeringRules: string;
@@ -67,14 +68,17 @@ interface MemberResponse {
 }
 
 
+const HUMAN_GATE_TIMEOUT_MS = 5 * 60 * 1000;
+
 const pendingHumanGates = new Map<
   string,
-  { resolve: (choice: string) => void; promise: Promise<string> }
+  { resolve: (choice: string) => void; promise: Promise<string>; timer: ReturnType<typeof setTimeout> }
 >();
 
 export function resolveHumanGate(gateId: string, choice: string): void {
   const gate = pendingHumanGates.get(gateId);
   if (gate) {
+    clearTimeout(gate.timer);
     gate.resolve(choice);
     pendingHumanGates.delete(gateId);
   }
@@ -97,6 +101,7 @@ export class DeliberationOrchestrator {
       kbId,
       humanGates,
       promptDna,
+      userId,
     } = input;
 
     // ── 1. PREPROCESS ─────────────────────────────────────────────────────────
@@ -104,7 +109,7 @@ export class DeliberationOrchestrator {
     let ragContext = "";
     if (kbId) {
       try {
-        const chunks = await hybridSearch(members[0]?.id ? 0 : 0, query, kbId, 5);
+        const chunks = await hybridSearch(userId ?? 0, query, kbId, 5);
         ragContext = chunks
           .map((c: any) => c.content)
           .join("\n\n");
@@ -331,7 +336,13 @@ export class DeliberationOrchestrator {
       const gatePromise = new Promise<string>((resolve) => {
         gateResolve = resolve;
       });
-      pendingHumanGates.set(gateId, { resolve: gateResolve, promise: gatePromise });
+      const gateTimer = setTimeout(() => {
+        if (pendingHumanGates.has(gateId)) {
+          gateResolve("Dismiss conflicts and synthesize");
+          pendingHumanGates.delete(gateId);
+        }
+      }, HUMAN_GATE_TIMEOUT_MS);
+      pendingHumanGates.set(gateId, { resolve: gateResolve, promise: gatePromise, timer: gateTimer });
 
       yield {
         type: "human_gate_pending",
