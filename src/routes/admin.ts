@@ -494,13 +494,15 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
       try {
         return decipher.update(ciphertext, undefined, "utf8") + decipher.final("utf8");
       } catch {
-        // Fallback: try legacy hardcoded salt for pre-migration data
-        // This path handles records encrypted before per-record salt was introduced
+        // Fallback: try legacy hardcoded salt for pre-migration data.
+        // This path only runs once per record — after decryption succeeds,
+        // the record is immediately re-encrypted with IV-as-salt (line 508-515),
+        // permanently removing the legacy salt dependency.
         const legacySalt = "salt";
         const legacyKey = scryptSync(key, legacySalt, 32);
         const legacyDecipher = createDecipheriv(ALGO, legacyKey, iv);
         legacyDecipher.setAuthTag(tag);
-        logger.warn("Decrypting with legacy hardcoded salt — record will be re-encrypted with per-record salt");
+        logger.warn("Decrypting with legacy hardcoded salt — record will be re-encrypted with per-record salt on this rotation");
         return legacyDecipher.update(ciphertext, undefined, "utf8") + legacyDecipher.final("utf8");
       }
     }
