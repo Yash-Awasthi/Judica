@@ -99,65 +99,21 @@ sequenceDiagram
 ## Architecture
 
 ```mermaid
-flowchart TB
-    subgraph CLIENT["Frontend · React 18 + Vite"]
-        direction TB
-        C1(Chat) ~~~ C2(Workflows) ~~~ C3(Debate)
-        C4(Marketplace) ~~~ C5(Analytics) ~~~ C6(Settings)
-    end
+flowchart LR
+    FE["Frontend\nReact 18 · Vite · Tailwind"]
+    GW["API Gateway\nFastify 5 · JWT · RBAC · Rate Limit"]
+    EN["Deliberation Engine\nRouter · Agents · Conflict\nDebate · Synthesis · Validator"]
+    LLM["7 LLM Providers\nOpenAI · Anthropic · Gemini\nGroq · Ollama · OpenRouter"]
+    TL["Tools\nSandbox · RAG · Research\nVoice · PII · File Processing"]
+    DB["Data\nPostgreSQL + pgvector\nRedis · BullMQ"]
+    OB["Observability\nPrometheus · Grafana\nPino · LangFuse"]
 
-    subgraph GATEWAY["API Gateway · Fastify 5 · 35 Routes"]
-        direction TB
-        G1(JWT + OAuth2) ~~~ G2(Rate Limiting) ~~~ G3(RBAC)
-        G4(SSRF + CSP) ~~~ G5(Zod Validation)
-    end
-
-    subgraph ENGINE["Deliberation Engine"]
-        direction TB
-        E1(Query Router) ~~~ E2(Agent Pool) ~~~ E3(Conflict Detector)
-        E4(Debate Manager) ~~~ E5(Scorer) ~~~ E6(Synthesizer)
-        E7(Cold Validator)
-    end
-
-    subgraph TOOLS["Tools"]
-        direction TB
-        T1(Sandbox) ~~~ T2(RAG) ~~~ T3(Research)
-        T4(File Processing) ~~~ T5(Skills) ~~~ T6(Voice)
-        T7(PII Scanner)
-    end
-
-    subgraph PROVIDERS["LLM Providers"]
-        direction TB
-        P1(OpenAI) ~~~ P2(Anthropic) ~~~ P3(Gemini) ~~~ P4(Groq)
-        P5(Ollama) ~~~ P6(OpenRouter) ~~~ P7(Custom)
-    end
-
-    subgraph DATA["Data"]
-        direction TB
-        D1(PostgreSQL + pgvector) ~~~ D2(Redis) ~~~ D3(BullMQ)
-    end
-
-    subgraph OBSERVE["Observability"]
-        direction TB
-        O1(Prometheus) ~~~ O2(Grafana)
-        O3(Pino) ~~~ O4(LangFuse)
-    end
-
-    CLIENT --> GATEWAY --> ENGINE
-    ENGINE --> PROVIDERS
-    ENGINE --> TOOLS
-    TOOLS --> DATA
-    ENGINE --> DATA
-    OBSERVE -.-> GATEWAY
-    OBSERVE -.-> ENGINE
-
-    style CLIENT fill:#0f172a,stroke:#3b82f6,color:#e2e8f0
-    style GATEWAY fill:#0f172a,stroke:#8b5cf6,color:#e2e8f0
-    style ENGINE fill:#0f172a,stroke:#f59e0b,color:#e2e8f0
-    style TOOLS fill:#0f172a,stroke:#06b6d4,color:#e2e8f0
-    style PROVIDERS fill:#0f172a,stroke:#10b981,color:#e2e8f0
-    style DATA fill:#0f172a,stroke:#ef4444,color:#e2e8f0
-    style OBSERVE fill:#0f172a,stroke:#a855f7,color:#e2e8f0
+    FE --> GW --> EN
+    EN --> LLM
+    EN --> TL
+    EN --> DB
+    TL --> DB
+    OB -.-> GW & EN
 ```
 
 ---
