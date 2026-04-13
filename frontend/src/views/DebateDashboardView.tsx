@@ -114,7 +114,7 @@ export function DebateDashboardView() {
               try {
                 const data = JSON.parse(line.slice(6));
                 handleEvent(data);
-              } catch {}
+              } catch (e) { console.warn("SSE parse error", e); }
             }
           }
         }
@@ -129,7 +129,7 @@ export function DebateDashboardView() {
       console.error("Debate start failed", err);
       setRunning(false);
     }
-  }, [query, running, fetchWithAuth]);
+  }, [query, running, fetchWithAuth, handleEvent]);
 
   const handleEvent = useCallback((data: Record<string, unknown>) => {
     const type = data.type as string;

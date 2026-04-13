@@ -95,8 +95,12 @@ export function PersonaBuilder({ onSelect }: PersonaBuilderProps) {
 
   const handleDelete = async (id: string) => {
     if (!confirm("Delete this persona?")) return;
-    await fetchWithAuth(`/api/personas/${id}`, { method: "DELETE" });
-    loadPersonas();
+    try {
+      await fetchWithAuth(`/api/personas/${id}`, { method: "DELETE" });
+      loadPersonas();
+    } catch (err) {
+      console.error("Failed to delete persona", err);
+    }
   };
 
   const builtIn = personas.filter((p) => p.isBuiltIn);

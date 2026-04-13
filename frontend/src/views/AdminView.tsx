@@ -39,56 +39,70 @@ export function AdminView() {
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
 
   const loadUsers = useCallback(async () => {
-    const res = await fetchWithAuth("/api/admin/users");
-    if (res.ok) { const d = await res.json(); setUsers(d.users); }
+    try {
+      const res = await fetchWithAuth("/api/admin/users");
+      if (res.ok) { const d = await res.json(); setUsers(d.users); }
+    } catch (err) { console.error("Failed to load users", err); }
   }, [fetchWithAuth]);
 
   const loadGroups = useCallback(async () => {
-    const res = await fetchWithAuth("/api/admin/groups");
-    if (res.ok) { const d = await res.json(); setGroups(d.groups); }
+    try {
+      const res = await fetchWithAuth("/api/admin/groups");
+      if (res.ok) { const d = await res.json(); setGroups(d.groups); }
+    } catch (err) { console.error("Failed to load groups", err); }
   }, [fetchWithAuth]);
 
   const loadStats = useCallback(async () => {
-    const res = await fetchWithAuth("/api/admin/stats");
-    if (res.ok) { const d = await res.json(); setStats(d); }
+    try {
+      const res = await fetchWithAuth("/api/admin/stats");
+      if (res.ok) { const d = await res.json(); setStats(d); }
+    } catch (err) { console.error("Failed to load stats", err); }
   }, [fetchWithAuth]);
 
   useEffect(() => { loadUsers(); loadGroups(); loadStats(); }, [loadUsers, loadGroups, loadStats]);
 
   const changeRole = async (userId: number, role: string) => {
-    await fetchWithAuth(`/api/admin/users/${userId}/role`, {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ role }),
-    });
-    loadUsers();
+    try {
+      await fetchWithAuth(`/api/admin/users/${userId}/role`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ role }),
+      });
+      loadUsers();
+    } catch (err) { console.error("Failed to change role", err); }
   };
 
   const createGroup = async () => {
     if (!newGroupName.trim()) return;
-    await fetchWithAuth("/api/admin/groups", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ name: newGroupName.trim() }),
-    });
-    setNewGroupName("");
-    loadGroups();
+    try {
+      await fetchWithAuth("/api/admin/groups", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: newGroupName.trim() }),
+      });
+      setNewGroupName("");
+      loadGroups();
+    } catch (err) { console.error("Failed to create group", err); }
   };
 
   const addMember = async (groupId: string) => {
     if (!addUserId) return;
-    await fetchWithAuth(`/api/admin/groups/${groupId}/members`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ userId: addUserId }),
-    });
-    setAddUserId("");
-    loadGroups();
+    try {
+      await fetchWithAuth(`/api/admin/groups/${groupId}/members`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: addUserId }),
+      });
+      setAddUserId("");
+      loadGroups();
+    } catch (err) { console.error("Failed to add member", err); }
   };
 
   const removeMember = async (groupId: string, userId: number) => {
-    await fetchWithAuth(`/api/admin/groups/${groupId}/members/${userId}`, { method: "DELETE" });
-    loadGroups();
+    try {
+      await fetchWithAuth(`/api/admin/groups/${groupId}/members/${userId}`, { method: "DELETE" });
+      loadGroups();
+    } catch (err) { console.error("Failed to remove member", err); }
   };
 
   return (

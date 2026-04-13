@@ -5,7 +5,7 @@ import { useCouncilMembers } from "../hooks/useCouncilMembers";
 import { useDeliberation } from "../hooks/useDeliberation";
 import { useAuth } from "../context/AuthContext";
 import { cacheConversation, getCachedConversation } from "../components/OfflineIndicator";
-import type { Conversation } from "../types/index.js";
+import type { ChatMessage, Conversation } from "../types/index.js";
 
 interface CachedChatMessage {
   question: string;
@@ -77,13 +77,13 @@ export function ChatView() {
             // Try offline cache before giving up
             const cached = await getCachedConversation(conversationId);
             if (cached) {
-              setMessages(cached.messages.map((m, i) => ({
-                id: i,
+              setMessages(cached.messages.map((m: CachedChatMessage, i: number): ChatMessage => ({
+                id: String(i),
                 question: m.question,
                 verdict: m.verdict,
                 createdAt: m.createdAt,
                 opinions: [],
-              })) as any);
+              })));
             } else {
               navigate('/chat');
             }
@@ -93,13 +93,13 @@ export function ChatView() {
           if (conversationId) {
             const cached = await getCachedConversation(conversationId);
             if (cached) {
-              setMessages(cached.messages.map((m, i) => ({
-                id: i,
+              setMessages(cached.messages.map((m: CachedChatMessage, i: number): ChatMessage => ({
+                id: String(i),
                 question: m.question,
                 verdict: m.verdict,
                 createdAt: m.createdAt,
                 opinions: [],
-              })) as any);
+              })));
             }
           }
           console.error("Failed to load history", err);

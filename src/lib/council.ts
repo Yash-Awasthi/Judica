@@ -140,6 +140,7 @@ export async function* deliberate(
   onVerdictChunk?: (chunk: string) => void,
   onMemberChunk?: (name: string, chunk: string) => void
 ): AsyncGenerator<DeliberationEvent> {
+  const controller = createController();
   const currentMessages = [...messages];
   let finalOpinions: { name: string; opinion: string }[] = [];
   let totalTokens = 0;

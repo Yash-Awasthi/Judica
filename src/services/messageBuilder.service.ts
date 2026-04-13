@@ -2,6 +2,7 @@ import { db } from "../lib/drizzle.js";
 import { uploads } from "../db/schema/uploads.js";
 import { eq, inArray, and } from "drizzle-orm";
 import { hybridSearch, type MemoryChunk } from "./vectorStore.service.js";
+import { readFile } from "fs/promises";
 import logger from "../lib/logger.js";
 import type { AdapterContentBlock } from "../adapters/types.js";
 

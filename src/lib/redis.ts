@@ -114,7 +114,7 @@ const redisWrapper = {
     }
   },
 
-  async ttl(key: string): Promise<number> {
+  async pttl(key: string): Promise<number> {
     try {
       const client = await getRedis();
       return await client.pTTL(key);

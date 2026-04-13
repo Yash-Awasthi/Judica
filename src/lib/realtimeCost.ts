@@ -381,6 +381,10 @@ class RealTimeCostTracker {
 
 export const realTimeCostTracker = new RealTimeCostTracker();
 
-setInterval(() => {
+const costTrackerInterval = setInterval(() => {
   realTimeCostTracker.cleanup();
 }, 60 * 60 * 1000);
+
+export function cleanupCostTrackerInterval(): void {
+  clearInterval(costTrackerInterval);
+}
