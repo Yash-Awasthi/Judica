@@ -95,70 +95,70 @@ sequenceDiagram
 ```mermaid
 flowchart TB
     subgraph CLIENT["Frontend"]
-        direction TB
+        direction LR
         CHAT["Chat UI\nStreaming SSE"]
-        WORKFLOW["Workflow Canvas\nReact Flow + 12 Node Types"]
-        DEBATE["Debate Dashboard\nReal-time Deliberation View"]
-        MARKET["Marketplace\nPrompts, Workflows, Personas"]
-        ANALYTICS["Analytics\nECharts Dashboards"]
-        SETTINGS["Settings\nClient-side Preferences"]
+        WORKFLOW["Workflow Canvas\nReact Flow\n12 Node Types"]
+        DEBATE["Debate Dashboard\nReal-time\nDeliberation View"]
+        MARKET["Marketplace\nPrompts, Workflows\nPersonas"]
+        ANALYTICS["Analytics\nECharts\nDashboards"]
+        SETTINGS["Settings\nClient-side\nPreferences"]
     end
 
     subgraph GATEWAY["API Gateway — Fastify 5"]
-        direction TB
-        AUTH["Auth Layer\nJWT (HS256, 15min) + Refresh Tokens\nOAuth2 (Google, GitHub)\nZod-validated payloads"]
-        RATE["Rate Limiter\nRedis-backed distributed\n10/min auth, 60/min API"]
-        RBAC["RBAC\nmember / admin roles"]
-        CSP["Security\nCSP nonces, SSRF filter,\npath traversal protection"]
-        ROUTES["35 Route Plugins\nSwagger UI at /api/docs"]
+        direction LR
+        AUTH["Auth Layer\nJWT + OAuth2\nZod-validated"]
+        RATE["Rate Limiter\nRedis-backed\nDistributed"]
+        RBAC["RBAC\nmember / admin\nroles"]
+        CSP["Security\nCSP nonces\nSSRF filter"]
+        ROUTES["35 Route Plugins\nSwagger UI\nat /api/docs"]
     end
 
     subgraph ENGINE["Deliberation Engine"]
-        direction TB
-        QROUTER["Query Router\nAuto-classify complexity\nSelect archetypes"]
-        PARALLEL["Parallel Agent Pool\n4+ concurrent, configurable"]
-        CONFLICT["Conflict Detector\nCosine similarity thresholds"]
-        DEBATE_R["Debate Manager\nMulti-round peer review\nAdversarial critique"]
-        SCORING["ML Scoring\nAgreement + PeerRanking\nReliability weighting"]
-        SYNTH["Synthesizer\nWeighted consensus merge"]
-        COLD["Cold Validator\nIndependent hallucination check"]
+        direction LR
+        QROUTER["Query Router\nAuto-classify\nSelect archetypes"]
+        PARALLEL["Agent Pool\n4+ concurrent\nConfigurable"]
+        CONFLICT["Conflict Detector\nCosine similarity\nThresholds"]
+        DEBATE_R["Debate Manager\nPeer review\nAdversarial critique"]
+        SCORING["ML Scoring\nAgreement +\nPeerRanking"]
+        SYNTH["Synthesizer\nWeighted\nconsensus merge"]
+        COLD["Cold Validator\nHallucination\ncheck"]
     end
 
     subgraph TOOLS["Tools & Processing"]
-        direction TB
-        SANDBOX["Code Sandbox\nJS: isolated-vm (128MB)\nPython: ulimit + socket block"]
-        RAG["RAG Pipeline\npgvector + HNSW indexes\nHybrid search (vector + BM25)"]
-        RESEARCH["Deep Research\nMulti-step web search\nSource scraping + synthesis"]
-        PROCESSORS["File Processors\nPDF, DOCX, XLSX, CSV,\nTXT, Images"]
-        SKILLS["User Skills\nPython functions as tools\nSandboxed execution"]
-        TTS["Voice / TTS\nMulti-provider fallback\nSTT input support"]
-        PII["PII Scanner\nEmails, SSNs, cards, keys\nRisk scoring + redaction"]
+        direction LR
+        SANDBOX["Code Sandbox\nJS: isolated-vm\nPython: ulimit"]
+        RAG["RAG Pipeline\npgvector + HNSW\nHybrid search"]
+        RESEARCH["Deep Research\nWeb search\nSynthesis"]
+        PROCESSORS["File Processors\nPDF, DOCX, XLSX\nCSV, TXT, Images"]
+        SKILLS["User Skills\nPython tools\nSandboxed"]
+        TTS["Voice / TTS\nMulti-provider\nSTT support"]
+        PII["PII Scanner\nRisk scoring\nRedaction"]
     end
 
     subgraph PROVIDERS["LLM Providers — Circuit-Breaker Protected"]
         direction LR
-        OAI["OpenAI\nGPT-4o, o1, o3, o4"]
-        ANT["Anthropic\nClaude 3.5, 4"]
-        GEM["Gemini\n2.0 Flash, 2.5 Pro"]
-        GRQ["Groq\nLLaMA, Mixtral"]
-        OLL["Ollama\nLocal models"]
-        ORT["OpenRouter\nMulti-model gateway"]
-        CUST["Custom\nAny OpenAI-compatible API"]
+        OAI["OpenAI\nGPT-4o, o1\no3, o4"]
+        ANT["Anthropic\nClaude 3.5\nClaude 4"]
+        GEM["Gemini\n2.0 Flash\n2.5 Pro"]
+        GRQ["Groq\nLLaMA\nMixtral"]
+        OLL["Ollama\nLocal\nmodels"]
+        ORT["OpenRouter\nMulti-model\ngateway"]
+        CUST["Custom\nOpenAI-compat\nAPI"]
     end
 
     subgraph DATA["Data Layer"]
         direction LR
-        PG["PostgreSQL 16\n+ pgvector\nHNSW indexes\nDrizzle ORM"]
+        PG["PostgreSQL 16\npgvector + HNSW\nDrizzle ORM"]
         RD["Redis 7\nSemantic cache\nRate limiting\nSession state"]
-        BULL["BullMQ\nAsync job queue\nRetry + DLQ\nExponential backoff"]
+        BULL["BullMQ\nAsync jobs\nRetry + DLQ\nBackoff"]
     end
 
     subgraph OBSERVE["Observability"]
         direction LR
-        PROM["Prometheus\nprom-client metrics"]
-        GRAF["Grafana\nAuto-provisioned dashboards\nLatency, errors, tokens"]
-        PINO["Pino Logger\nStructured JSON"]
-        LANG["LangFuse\nLLM trace export"]
+        PROM["Prometheus\nprom-client\nmetrics"]
+        GRAF["Grafana\nAuto-provisioned\ndashboards"]
+        PINO["Pino Logger\nStructured\nJSON"]
+        LANG["LangFuse\nLLM trace\nexport"]
     end
 
     CLIENT --> GATEWAY
