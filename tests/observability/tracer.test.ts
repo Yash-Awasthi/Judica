@@ -1,156 +1,157 @@
-import { describe, it, expect, vi, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 
-vi.mock("../../src/lib/drizzle.js", () => ({
-  db: {
-    insert: vi.fn(() => ({
-      values: vi.fn(() => ({
-        returning: vi.fn().mockResolvedValue([{ id: "trace-uuid-1" }]),
-      })),
-    })),
-  },
-}));
+vi.mock("../../src/lib/drizzle.js", () => {
+  const returning = vi.fn().mockResolvedValue([{ id: "trace-id" }]);
+  const values = vi.fn().mockReturnValue({ returning });
+  const insert = vi.fn().mockReturnValue({ values });
+  return { db: { insert } };
+});
 
-vi.mock("../../src/db/schema/traces.js", () => ({
-  traces: {
-    id: "id",
-    userId: "userId",
-    type: "type",
-  },
-}));
+vi.mock("../../src/db/schema/traces.js", () => ({ traces: {} }));
 
 vi.mock("../../src/lib/logger.js", () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-vi.mock("crypto", () => ({
-  randomUUID: vi.fn(() => "trace-uuid-1"),
-}));
-
 import { startTrace, addStep, endTrace } from "../../src/observability/tracer.js";
 import { db } from "../../src/lib/drizzle.js";
 
-describe("Tracer", () => {
-  const originalEnv = { ...process.env };
-
+describe("tracer", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     delete process.env.LANGFUSE_SECRET_KEY;
   });
 
-  afterAll(() => {
-    process.env = originalEnv;
-  });
-
   describe("startTrace", () => {
-    it("creates a trace context with required fields", () => {
-      const ctx = startTrace(1, "council_session");
-
-      expect(ctx.id).toBe("trace-uuid-1");
-      expect(ctx.userId).toBe(1);
-      expect(ctx.type).toBe("council_session");
+    it("returns context with id, userId, type, empty steps, and startTime", () => {
+      const ctx = startTrace(42, "chat");
+      expect(ctx.id).toBeTypeOf("string");
+      expect(ctx.id.length).toBeGreaterThan(0);
+      expect(ctx.userId).toBe(42);
+      expect(ctx.type).toBe("chat");
       expect(ctx.steps).toEqual([]);
-      expect(ctx.startTime).toBeGreaterThan(0);
+      expect(ctx.startTime).toBeTypeOf("number");
+      expect(ctx.startTime).toBeLessThanOrEqual(Date.now());
     });
 
-    it("creates trace with optional conversationId and workflowRunId", () => {
-      const ctx = startTrace(2, "workflow", {
+    it("includes conversationId and workflowRunId from opts", () => {
+      const ctx = startTrace(1, "workflow", {
         conversationId: "conv-123",
         workflowRunId: "wf-456",
       });
-
       expect(ctx.conversationId).toBe("conv-123");
       expect(ctx.workflowRunId).toBe("wf-456");
     });
   });
 
   describe("addStep", () => {
-    it("records a step event in the trace context", () => {
-      const ctx = startTrace(1, "test");
-
+    it("pushes step with default latencyMs=0", () => {
+      const ctx = startTrace(1, "chat");
       addStep(ctx, {
-        name: "llm-call-1",
+        name: "llm",
         type: "llm_call",
-        input: "What is AI?",
-        output: "AI is artificial intelligence.",
-        model: "gpt-4",
-        tokens: 50,
+        input: "hello",
+        output: "world",
+        tokens: 10,
       });
-
       expect(ctx.steps).toHaveLength(1);
-      expect(ctx.steps[0].name).toBe("llm-call-1");
-      expect(ctx.steps[0].type).toBe("llm_call");
-      expect(ctx.steps[0].tokens).toBe(50);
       expect(ctx.steps[0].latencyMs).toBe(0);
+      expect(ctx.steps[0].name).toBe("llm");
     });
 
-    it("records multiple steps with latency", () => {
-      const ctx = startTrace(1, "test");
-
+    it("preserves provided latencyMs", () => {
+      const ctx = startTrace(1, "chat");
       addStep(ctx, {
-        name: "embedding",
-        type: "embedding",
-        input: "text",
-        output: "[0.1, 0.2]",
-        latencyMs: 100,
+        name: "slow-call",
+        type: "llm_call",
+        input: "in",
+        output: "out",
+        latencyMs: 500,
       });
-
-      addStep(ctx, {
-        name: "retrieval",
-        type: "retrieval",
-        input: "query",
-        output: "results",
-        latencyMs: 200,
-      });
-
-      expect(ctx.steps).toHaveLength(2);
-      expect(ctx.steps[0].latencyMs).toBe(100);
-      expect(ctx.steps[1].latencyMs).toBe(200);
+      expect(ctx.steps[0].latencyMs).toBe(500);
     });
   });
 
   describe("endTrace", () => {
-    it("persists trace to database and returns trace id", async () => {
-      const ctx = startTrace(1, "council");
-      addStep(ctx, {
-        name: "step1",
-        type: "llm_call",
-        input: "in",
-        output: "out",
-        tokens: 100,
-      });
+    it("calculates totalTokens from steps", async () => {
+      const ctx = startTrace(1, "chat");
+      addStep(ctx, { name: "a", type: "llm_call", input: "", output: "", tokens: 100 });
+      addStep(ctx, { name: "b", type: "llm_call", input: "", output: "", tokens: 200 });
 
-      const id = await endTrace(ctx);
+      await endTrace(ctx);
 
-      expect(id).toBe("trace-uuid-1");
+      const valuesCall = (db.insert as any).mock.results[0].value.values;
+      const insertedData = valuesCall.mock.calls[0][0];
+      expect(insertedData.totalTokens).toBe(300);
+    });
+
+    it("calculates totalCostUsd at $0.000005/token", async () => {
+      const ctx = startTrace(1, "chat");
+      addStep(ctx, { name: "a", type: "llm_call", input: "", output: "", tokens: 200000 });
+
+      await endTrace(ctx);
+
+      const valuesCall = (db.insert as any).mock.results[0].value.values;
+      const insertedData = valuesCall.mock.calls[0][0];
+      expect(insertedData.totalCostUsd).toBeCloseTo(1.0, 5);
+    });
+
+    it("inserts trace into database", async () => {
+      const ctx = startTrace(7, "workflow");
+      addStep(ctx, { name: "step1", type: "tool_call", input: "x", output: "y", tokens: 50 });
+
+      await endTrace(ctx);
+
       expect(db.insert).toHaveBeenCalled();
+      const valuesCall = (db.insert as any).mock.results[0].value.values;
+      const insertedData = valuesCall.mock.calls[0][0];
+      expect(insertedData.id).toBe(ctx.id);
+      expect(insertedData.userId).toBe(7);
+      expect(insertedData.type).toBe("workflow");
+      expect(insertedData.totalTokens).toBe(50);
     });
 
-    it("handles missing langfuse config gracefully (no LANGFUSE_SECRET_KEY)", async () => {
+    it("returns trace id on success", async () => {
+      const ctx = startTrace(1, "chat");
+      const result = await endTrace(ctx);
+      expect(result).toBe("trace-id");
+    });
+
+    it("returns ctx.id on db error (does not throw)", async () => {
+      const returning = vi.fn().mockRejectedValueOnce(new Error("DB down"));
+      const values = vi.fn().mockReturnValue({ returning });
+      (db.insert as any).mockReturnValueOnce({ values });
+
+      const ctx = startTrace(1, "chat");
+      const result = await endTrace(ctx);
+      expect(result).toBe(ctx.id);
+    });
+
+    it("skips Langfuse when LANGFUSE_SECRET_KEY not set", async () => {
       delete process.env.LANGFUSE_SECRET_KEY;
+      const ctx = startTrace(1, "chat");
 
-      const ctx = startTrace(1, "test");
-      addStep(ctx, {
-        name: "step",
-        type: "tool_call",
-        input: "x",
-        output: "y",
-      });
-
-      const id = await endTrace(ctx);
-      expect(id).toBe("trace-uuid-1");
+      const result = await endTrace(ctx);
+      expect(result).toBe("trace-id");
     });
+  });
 
-    it("returns ctx.id on database error", async () => {
-      vi.mocked(db.insert).mockImplementationOnce(() => ({
-        values: vi.fn(() => ({
-          returning: vi.fn().mockRejectedValue(new Error("DB error")),
-        })),
-      }) as any);
+  describe("multiple steps", () => {
+    it("accumulate correctly", async () => {
+      const ctx = startTrace(1, "chat");
+      addStep(ctx, { name: "s1", type: "llm_call", input: "", output: "", tokens: 10 });
+      addStep(ctx, { name: "s2", type: "tool_call", input: "", output: "", tokens: 20 });
+      addStep(ctx, { name: "s3", type: "embedding", input: "", output: "", tokens: 30 });
+      addStep(ctx, { name: "s4", type: "retrieval", input: "", output: "" });
 
-      const ctx = startTrace(1, "test");
-      const id = await endTrace(ctx);
+      expect(ctx.steps).toHaveLength(4);
 
-      expect(id).toBe("trace-uuid-1");
+      await endTrace(ctx);
+
+      const valuesCall = (db.insert as any).mock.results[0].value.values;
+      const insertedData = valuesCall.mock.calls[0][0];
+      expect(insertedData.totalTokens).toBe(60);
+      expect(insertedData.totalCostUsd).toBeCloseTo(0.0003, 6);
     });
   });
 });

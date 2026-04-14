@@ -67,11 +67,11 @@ describe("ML Worker", () => {
 /*  Tests with mocked child_process (NODE_ENV != "test")                      */
 /* -------------------------------------------------------------------------- */
 
-import { EventEmitter, Readable, PassThrough } from "stream";
+import { EventEmitter, PassThrough } from "stream";
 
 /** Build a fake ChildProcess-like object that spawn() will return. */
 function createMockProcess() {
-  // Use PassThrough streams which work better with readline
+  // Use PassThrough streams which work correctly with readline
   const stdout = new PassThrough();
   const stderr = new PassThrough();
   const stdin = { write: vi.fn().mockReturnValue(true), end: vi.fn() };
@@ -88,12 +88,8 @@ function createMockProcess() {
   return proc;
 }
 
-/** Flush the event loop enough times for readline + async chains to settle */
-async function flush(n = 5) {
-  for (let i = 0; i < n; i++) {
-    await new Promise<void>((r) => setImmediate(r));
-  }
-}
+/** Small real delay to let microtasks and readline async processing settle. */
+const tick = () => new Promise<void>((r) => setTimeout(r, 50));
 
 describe("MLWorker with mocked child_process", () => {
   let mockProc: ReturnType<typeof createMockProcess>;
@@ -108,7 +104,6 @@ describe("MLWorker with mocked child_process", () => {
 
   afterEach(() => {
     process.env.NODE_ENV = "test";
-    vi.useRealTimers();
   });
 
   async function importWorker() {
@@ -189,7 +184,7 @@ describe("MLWorker with mocked child_process", () => {
       mockProc.stderr.write("Fatal: module not found\n");
       mockProc.stderr.write("Loading model weights...\n");
 
-      await flush();
+      await tick();
     });
   });
 
@@ -205,8 +200,8 @@ describe("MLWorker with mocked child_process", () => {
 
       const similarityPromise = worker.computeSimilarity("hello", "world");
 
-      // Give the async init() await inside computeSimilarity time to settle
-      await flush();
+      // Real delay lets the awaited init() microtask inside computeSimilarity settle
+      await tick();
 
       expect(mockProc.stdin.write).toHaveBeenCalledOnce();
       const written = mockProc.stdin.write.mock.calls[0][0] as string;
@@ -227,7 +222,7 @@ describe("MLWorker with mocked child_process", () => {
       await initPromise;
 
       const similarityPromise = worker.computeSimilarity("a", "b");
-      await flush();
+      await tick();
 
       mockProc.stdout.write(JSON.stringify({ error: "tokenizer failed" }) + "\n");
 
@@ -267,14 +262,20 @@ describe("MLWorker with mocked child_process", () => {
 
       // Push garbage that is not JSON and not "READY"
       mockProc.stdout.write("not-json-garbage\n");
-      await flush();
+      await tick();
 
       // Worker should still be functional
       const similarityPromise = worker.computeSimilarity("a", "b");
-      await flush();
+      await tick();
       mockProc.stdout.write(JSON.stringify({ score: 0.5 }) + "\n");
       await expect(similarityPromise).resolves.toBe(0.5);
     });
+
+    // NOTE: The 5-second timeout inside computeSimilarity is not tested here.
+    // Testing real setTimeout(5000) would require either fake timers (which
+    // interfere with readline's async processing on PassThrough streams) or
+    // waiting 5+ real seconds per test. The timeout behaviour is straightforward
+    // enough to verify by inspection of the source code.
   });
 
   /* ===================== shutdown() ===================== */
@@ -324,7 +325,7 @@ describe("MLWorker with mocked child_process", () => {
       await initPromise2;
 
       const simPromise = worker.computeSimilarity("x", "y");
-      await flush();
+      await tick();
       mockProc2.stdout.write(JSON.stringify({ score: 0.99 }) + "\n");
       await expect(simPromise).resolves.toBe(0.99);
     });
@@ -377,7 +378,7 @@ describe("MLWorker with mocked child_process", () => {
       const p2 = worker.computeSimilarity("c", "d");
       const p3 = worker.computeSimilarity("e", "f");
 
-      await flush();
+      await tick();
 
       expect(mockProc.stdin.write).toHaveBeenCalledTimes(3);
 
@@ -402,7 +403,7 @@ describe("MLWorker with mocked child_process", () => {
       const p2 = worker.computeSimilarity("bad", "text");
       const p3 = worker.computeSimilarity("ok2", "text2");
 
-      await flush();
+      await tick();
 
       mockProc.stdout.write(JSON.stringify({ score: 0.75 }) + "\n");
       mockProc.stdout.write(JSON.stringify({ error: "embedding failed" }) + "\n");
