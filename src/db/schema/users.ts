@@ -22,6 +22,17 @@ export const users = pgTable("User", {
   role: text("role").default("member").notNull(),
 });
 
+// ─── UserSettings ───────────────────────────────────────────────────────────
+export const userSettings = pgTable("UserSettings", {
+  id: serial("id").primaryKey(),
+  userId: integer("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" })
+    .unique(),
+  settings: jsonb("settings").notNull().default({}),
+  updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
+});
+
 // ─── DailyUsage ──────────────────────────────────────────────────────────────
 export const dailyUsage = pgTable(
   "DailyUsage",

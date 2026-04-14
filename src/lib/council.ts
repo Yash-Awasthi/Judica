@@ -68,12 +68,17 @@ export async function prepareCouncilMembers(members: CouncilMemberInput[], summo
   const summonKey = (summon && SUMMONS[summon]) ? summon : "default";
   const archetypeOrder = SUMMONS[summonKey];
 
-  const userArchetypes: Record<string, any> = {};
+  const userArchetypes: Record<string, any> = Object.create(null);
   if (userId) {
     const [config] = await db.select().from(councilConfigs).where(eq(councilConfigs.userId, userId)).limit(1);
     if (config) {
       const customs = (config.config as any).customArchetypes || [];
-      customs.forEach((a: any) => { userArchetypes[a.id] = a; });
+      customs.forEach((a: any) => {
+        // Prevent prototype pollution
+        if (typeof a?.id === 'string' && !['__proto__', 'constructor', 'prototype'].includes(a.id)) {
+          userArchetypes[a.id] = a;
+        }
+      });
     }
   }
 

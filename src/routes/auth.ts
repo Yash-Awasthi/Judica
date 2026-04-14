@@ -3,7 +3,7 @@ import argon2 from "argon2";
 import jwt from "jsonwebtoken";
 import crypto, { randomUUID } from "crypto";
 import { db } from "../lib/drizzle.js";
-import { users } from "../db/schema/users.js";
+import { users, userSettings } from "../db/schema/users.js";
 import { refreshTokens, revokedTokens, councilConfigs } from "../db/schema/auth.js";
 import { eq } from "drizzle-orm";
 import redis from "../lib/redis.js";
@@ -44,6 +44,15 @@ async function issueTokenPair(userId: number, username: string, reply: FastifyRe
   const accessToken = generateAccessToken(userId, username);
   const refreshToken = await createRefreshToken(userId);
 
+  // Set access token as httpOnly cookie
+  reply.setCookie("access_token", accessToken, {
+    httpOnly: true,
+    secure: env.NODE_ENV === "production",
+    sameSite: "strict",
+    maxAge: 15 * 60, // 15 minutes
+    path: "/",
+  });
+
   // Set refresh token as httpOnly cookie
   reply.setCookie("refresh_token", refreshToken, {
     httpOnly: true,
@@ -53,6 +62,7 @@ async function issueTokenPair(userId: number, username: string, reply: FastifyRe
     path: "/api/auth",
   });
 
+  // Still return token in body for backward compatibility during migration
   return { token: accessToken, username };
 }
 
@@ -67,6 +77,40 @@ function fastifyValidate(schema: any) {
 }
 
 const authPlugin: FastifyPluginAsync = async (fastify) => {
+
+  // Rate limiting for auth endpoints
+  const authAttempts = new Map<string, { count: number; resetAt: number }>();
+  const AUTH_RATE_LIMIT = 10; // 10 attempts per minute
+  const AUTH_RATE_WINDOW = 60_000;
+
+  function getClientKey(request: FastifyRequest): string {
+    return request.ip || "unknown";
+  }
+
+  const authRateLimit = async (request: FastifyRequest, reply: FastifyReply) => {
+    const key = getClientKey(request);
+    const now = Date.now();
+    const entry = authAttempts.get(key);
+
+    if (entry && now < entry.resetAt) {
+      if (entry.count >= AUTH_RATE_LIMIT) {
+        const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
+        reply.header("Retry-After", String(retryAfter));
+        reply.code(429).send({ error: "Too many auth attempts, try again later." });
+        return;
+      }
+      entry.count++;
+    } else {
+      authAttempts.set(key, { count: 1, resetAt: now + AUTH_RATE_WINDOW });
+    }
+
+    // Cleanup old entries periodically
+    if (authAttempts.size > 10000) {
+      for (const [k, v] of authAttempts) {
+        if (now >= v.resetAt) authAttempts.delete(k);
+      }
+    }
+  };
 
   /**
    * @openapi
@@ -89,7 +133,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
    *       409: { description: Username already taken }
    *       400: { description: Validation error }
    */
-  fastify.post("/register", { preHandler: [fastifyValidate(authSchema)] }, async (request, reply) => {
+  fastify.post("/register", { preHandler: [authRateLimit, fastifyValidate(authSchema)] }, async (request, reply) => {
     try {
       const { username, password } = request.body as any;
       const hash = await argon2.hash(password, { type: argon2.argon2id, memoryCost: 65536, timeCost: 3 });
@@ -128,7 +172,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
    *       401: { description: Invalid username or password }
    *       400: { description: Validation error }
    */
-  fastify.post("/login", { preHandler: [fastifyValidate(authSchema)] }, async (request, reply) => {
+  fastify.post("/login", { preHandler: [authRateLimit, fastifyValidate(authSchema)] }, async (request, reply) => {
     const { username, password } = request.body as any;
     const [user] = await db.select().from(users).where(eq(users.username, username)).limit(1);
 
@@ -213,7 +257,8 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
       await db.delete(refreshTokens).where(eq(refreshTokens.tokenHash, tokenHash));
     }
 
-    // Clear the refresh token cookie
+    // Clear both auth cookies
+    reply.clearCookie("access_token", { path: "/" });
     reply.clearCookie("refresh_token", { path: "/api/auth" });
     return { success: true };
   });
@@ -270,7 +315,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
    *       200: { description: Token refreshed, content: { application/json: { schema: { type: object, properties: { token: { type: string }, username: { type: string } } } } } }
    *       401: { description: Invalid or expired refresh token }
    */
-  fastify.post("/refresh", async (request, reply) => {
+  fastify.post("/refresh", { preHandler: [authRateLimit] }, async (request, reply) => {
     const refreshToken = (request as any).cookies?.refresh_token;
     if (!refreshToken) {
       throw new AppError(401, "No refresh token provided");
@@ -441,6 +486,31 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
 
     logger.info({ userId: request.userId }, "Rotated API keys for user config");
     return { success: true, message: "Keys rotated successfully" };
+  });
+
+  // GET /api/auth/settings - retrieve user settings
+  fastify.get("/settings", { preHandler: [fastifyRequireAuth] }, async (request, reply) => {
+    const [row] = await db.select().from(userSettings).where(eq(userSettings.userId, request.userId!)).limit(1);
+    return row?.settings ?? {};
+  });
+
+  // PUT /api/auth/settings - save user settings
+  fastify.put("/settings", { preHandler: [fastifyRequireAuth] }, async (request, reply) => {
+    const settings = request.body;
+    if (typeof settings !== "object" || settings === null || Array.isArray(settings)) {
+      throw new AppError(400, "Settings must be a JSON object");
+    }
+
+    await db.insert(userSettings).values({
+      userId: request.userId!,
+      settings,
+      updatedAt: new Date(),
+    }).onConflictDoUpdate({
+      target: userSettings.userId,
+      set: { settings, updatedAt: new Date() },
+    });
+
+    return { success: true };
   });
 };
 

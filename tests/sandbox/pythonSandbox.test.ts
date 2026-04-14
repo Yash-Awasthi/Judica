@@ -2,25 +2,28 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EventEmitter } from "events";
 
 // Use vi.hoisted so these fns exist before the hoisted vi.mock factories run.
-// This is the correct pattern — plain `const` at module scope would cause a
-// TDZ error because vi.mock factories execute before any module-level code.
-const { mockSpawn, mockWriteFileSync, mockUnlinkSync } = vi.hoisted(() => ({
+const { mockSpawn, mockExecSync, mockWriteFileSync, mockMkdirSync, mockRmSync } = vi.hoisted(() => ({
   mockSpawn: vi.fn(),
+  mockExecSync: vi.fn(),
   mockWriteFileSync: vi.fn(),
-  mockUnlinkSync: vi.fn(),
+  mockMkdirSync: vi.fn(),
+  mockRmSync: vi.fn(),
 }));
 
 vi.mock("child_process", () => ({
   spawn: mockSpawn,
+  execSync: mockExecSync,
 }));
 
 vi.mock("fs", () => ({
   default: {
     writeFileSync: mockWriteFileSync,
-    unlinkSync: mockUnlinkSync,
+    mkdirSync: mockMkdirSync,
+    rmSync: mockRmSync,
   },
   writeFileSync: mockWriteFileSync,
-  unlinkSync: mockUnlinkSync,
+  mkdirSync: mockMkdirSync,
+  rmSync: mockRmSync,
 }));
 
 vi.mock("crypto", () => ({
@@ -35,6 +38,15 @@ vi.mock("os", () => ({
     tmpdir: () => "/tmp",
   },
   tmpdir: () => "/tmp",
+}));
+
+vi.mock("../../src/lib/logger.js", () => ({
+  default: {
+    warn: vi.fn(),
+    info: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  },
 }));
 
 import { executePython } from "../../src/sandbox/pythonSandbox.js";
@@ -110,7 +122,7 @@ describe("pythonSandbox – executePython", () => {
     expect(result.error).toContain("ENOENT");
   });
 
-  it("writes a temp file and cleans it up in finally", async () => {
+  it("creates a sandbox directory, writes a temp file, and cleans up in finally", async () => {
     const proc = makeFakeProc();
     mockSpawn.mockReturnValue(proc);
 
@@ -119,15 +131,22 @@ describe("pythonSandbox – executePython", () => {
     proc.emit("close", 0);
     await promise;
 
+    // Should create a sandbox directory
+    expect(mockMkdirSync).toHaveBeenCalledTimes(1);
+    const dirPath = mockMkdirSync.mock.calls[0][0] as string;
+    expect(dirPath).toMatch(/sandbox_/);
+
+    // Should write the script file inside the sandbox directory
     expect(mockWriteFileSync).toHaveBeenCalledTimes(1);
     const writtenPath = mockWriteFileSync.mock.calls[0][0] as string;
-    expect(writtenPath).toMatch(/sandbox_.*\.py$/);
+    expect(writtenPath).toMatch(/sandbox_.*\/script\.py$/);
 
-    expect(mockUnlinkSync).toHaveBeenCalledTimes(1);
-    expect(mockUnlinkSync.mock.calls[0][0]).toBe(writtenPath);
+    // Should clean up with rmSync (recursive directory removal)
+    expect(mockRmSync).toHaveBeenCalledTimes(1);
+    expect(mockRmSync.mock.calls[0][0]).toBe(dirPath);
   });
 
-  it("cleans up temp file even when execution errors", async () => {
+  it("cleans up sandbox directory even when execution errors", async () => {
     const proc = makeFakeProc();
     mockSpawn.mockReturnValue(proc);
 
@@ -136,10 +155,10 @@ describe("pythonSandbox – executePython", () => {
     proc.emit("error", new Error("spawn failed"));
     await promise;
 
-    expect(mockUnlinkSync).toHaveBeenCalledTimes(1);
+    expect(mockRmSync).toHaveBeenCalledTimes(1);
   });
 
-  it("prepends network-blocking preamble to the script", async () => {
+  it("prepends sandbox preamble with import restrictions and network blocking", async () => {
     const proc = makeFakeProc();
     mockSpawn.mockReturnValue(proc);
 
@@ -149,8 +168,17 @@ describe("pythonSandbox – executePython", () => {
     await promise;
 
     const writtenContent = mockWriteFileSync.mock.calls[0][1] as string;
+    // Should contain network blocking (carried over from original)
     expect(writtenContent).toContain("_BlockedSocket");
     expect(writtenContent).toContain("Network access is disabled in sandbox");
+    // Should contain new ctypes/FFI blocking
+    expect(writtenContent).toContain("_BLOCKED_MODULES");
+    expect(writtenContent).toContain("_restricted_import");
+    // Should contain os function blocking
+    expect(writtenContent).toContain("'system', 'popen'");
+    // Should contain file write restrictions
+    expect(writtenContent).toContain("_restricted_open");
+    // Should contain the user code
     expect(writtenContent).toContain("print(1)");
   });
 
@@ -168,5 +196,36 @@ describe("pythonSandbox – executePython", () => {
       expect.arrayContaining(["-c", expect.stringContaining("ulimit")]),
       expect.objectContaining({ timeout: 10000 }),
     );
+  });
+
+  it("sets restricted environment variables including PYTHONSAFEPATH", async () => {
+    const proc = makeFakeProc();
+    mockSpawn.mockReturnValue(proc);
+
+    const promise = executePython("pass");
+
+    proc.emit("close", 0);
+    await promise;
+
+    const spawnOptions = mockSpawn.mock.calls[0][2];
+    expect(spawnOptions.env).toMatchObject({
+      PYTHONDONTWRITEBYTECODE: "1",
+      PYTHONPATH: "",
+      PYTHONNOUSERSITE: "1",
+      PYTHONSAFEPATH: "1",
+    });
+  });
+
+  it("sets cwd to the sandbox directory", async () => {
+    const proc = makeFakeProc();
+    mockSpawn.mockReturnValue(proc);
+
+    const promise = executePython("pass");
+
+    proc.emit("close", 0);
+    await promise;
+
+    const spawnOptions = mockSpawn.mock.calls[0][2];
+    expect(spawnOptions.cwd).toMatch(/sandbox_/);
   });
 });

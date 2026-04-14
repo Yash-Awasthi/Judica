@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import type { CouncilMember } from "../types/index.js";
+import { useAuth } from "../context/AuthContext.js";
 
 const DEFAULT_MEMBERS: CouncilMember[] = [
   {
@@ -55,7 +56,22 @@ const DEFAULT_MEMBERS: CouncilMember[] = [
 
 const STORAGE_KEY = "council_members";
 
+// Strip sensitive data for localStorage storage
+function stripSensitiveData(members: CouncilMember[]): CouncilMember[] {
+  return members.map(m => ({
+    ...m,
+    apiKey: "", // Never store API keys in localStorage
+  }));
+}
+
+// Mask an API key for display: "sk-abc...xyz" -> "sk-a****xyz"
+export function maskApiKey(key: string): string {
+  if (!key || key.length < 8) return key ? "********" : "";
+  return key.slice(0, 4) + "****" + key.slice(-4);
+}
+
 export function useCouncilMembers() {
+  const { token, fetchWithAuth } = useAuth();
   const [members, setMembers] = useState<CouncilMember[]>(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
@@ -64,12 +80,52 @@ export function useCouncilMembers() {
       return DEFAULT_MEMBERS;
     }
   });
+  const [serverKeysLoaded, setServerKeysLoaded] = useState(false);
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Load server-side config (with API keys) on mount
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(members));
-  }, [members]);
+    if (!token) return;
+    fetchWithAuth("/api/auth/config")
+      .then(res => res.ok ? res.json() : null)
+      .then(data => {
+        if (data?.members && Array.isArray(data.members)) {
+          setMembers(prev => {
+            // Merge server-side API keys into local member state
+            const serverMap = new Map<string, CouncilMember>(data.members.map((m: CouncilMember) => [m.id, m]));
+            return prev.map(local => {
+              const server = serverMap.get(local.id);
+              if (server?.apiKey) {
+                return { ...local, apiKey: server.apiKey };
+              }
+              return local;
+            });
+          });
+        }
+        setServerKeysLoaded(true);
+      })
+      .catch(() => setServerKeysLoaded(true));
+  }, [token, fetchWithAuth]);
 
-  const addMember = () => {
+  // Save to localStorage (stripped) and server (full) when members change
+  useEffect(() => {
+    // Save stripped version to localStorage
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stripSensitiveData(members)));
+
+    // Debounced save to server
+    if (token && serverKeysLoaded) {
+      if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
+      saveTimeoutRef.current = setTimeout(() => {
+        fetchWithAuth("/api/auth/config", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ config: { members } }),
+        }).catch(() => { /* best effort */ });
+      }, 1000);
+    }
+  }, [members, token, fetchWithAuth, serverKeysLoaded]);
+
+  const addMember = useCallback(() => {
     setMembers((prev) => [
       ...prev,
       {
@@ -84,17 +140,17 @@ export function useCouncilMembers() {
         customBehaviour: "",
       },
     ]);
-  };
+  }, []);
 
-  const removeMember = (id: string) => {
+  const removeMember = useCallback((id: string) => {
     setMembers((prev) => prev.filter((m) => m.id !== id));
-  };
+  }, []);
 
-  const updateMember = (id: string, updates: Partial<CouncilMember>) => {
+  const updateMember = useCallback((id: string, updates: Partial<CouncilMember>) => {
     setMembers((prev) =>
       prev.map((m) => (m.id === id ? { ...m, ...updates } : m))
     );
-  };
+  }, []);
 
-  return { members, setMembers, addMember, removeMember, updateMember };
+  return { members, setMembers, addMember, removeMember, updateMember, maskApiKey };
 }

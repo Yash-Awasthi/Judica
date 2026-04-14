@@ -36,6 +36,12 @@ import { requestId } from "./middleware/requestId.js";
 import { cspNonce } from "./middleware/cspNonce.js";
 import { prometheusMiddleware } from "./middleware/prometheusMiddleware.js";
 
+// Fastify-native middleware
+import { fastifyRequestId } from "./middleware/requestId.js";
+import { fastifyCspNonce } from "./middleware/cspNonce.js";
+import { fastifyPrometheusOnRequest, fastifyPrometheusOnResponse } from "./middleware/prometheusMiddleware.js";
+import { fastifyErrorHandler } from "./middleware/errorHandler.js";
+
 // Express (for swagger-ui compat layer only)
 import express from "express";
 import pinoHttp from "pino-http";
@@ -123,6 +129,13 @@ await fastify.register(fastifyStatic, {
   index: false,
   wildcard: false,
 });
+
+// ─── Fastify-native global hooks (bypass Express overhead) ───────────────────
+fastify.addHook("onRequest", fastifyRequestId);
+fastify.addHook("onRequest", fastifyCspNonce);
+fastify.addHook("onRequest", fastifyPrometheusOnRequest);
+fastify.addHook("onResponse", fastifyPrometheusOnResponse);
+fastify.setErrorHandler(fastifyErrorHandler);
 
 // ─── Native Fastify routes (no Express overhead) ────────────────────────────
 

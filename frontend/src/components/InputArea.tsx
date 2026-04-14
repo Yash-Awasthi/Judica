@@ -44,6 +44,7 @@ export function InputArea({
         {/* Stream toggle */}
         <button
           onClick={() => setUseStream(!useStream)}
+          aria-label={useStream ? "Disable streaming" : "Enable streaming"}
           className={`shrink-0 p-2 rounded-xl transition-all duration-200 ${
             useStream
               ? "text-[var(--accent-mint)] bg-[rgba(110,231,183,0.08)]"
@@ -61,6 +62,8 @@ export function InputArea({
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
+          aria-label="Chat message input"
+          aria-keyshortcuts="Enter"
           rows={1}
           className="flex-1 bg-transparent text-[var(--text-primary)] text-sm placeholder:text-[var(--text-muted)] outline-none resize-none max-h-40 py-2 leading-relaxed"
         />
@@ -69,6 +72,7 @@ export function InputArea({
         <button
           onClick={onSend}
           disabled={!input.trim() || isStreaming}
+          aria-label="Send message"
           className={`shrink-0 w-9 h-9 rounded-xl flex items-center justify-center transition-all duration-200 ${
             input.trim() && !isStreaming
               ? "bg-[var(--accent-mint)] text-black shadow-glow-sm hover:shadow-glow"

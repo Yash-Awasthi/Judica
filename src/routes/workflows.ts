@@ -16,6 +16,19 @@ import type { WorkflowExecutor } from "../workflow/executor.js";
 function validateWorkflowDefinition(definition: any): void {
   const { nodes, edges } = definition;
 
+  if (!Array.isArray(nodes) || !Array.isArray(edges)) {
+    throw new AppError(400, "Workflow definition must contain 'nodes' and 'edges' arrays", "WORKFLOW_INVALID");
+  }
+
+  const MAX_NODES = 500;
+  const MAX_EDGES = 2000;
+  if (nodes.length > MAX_NODES) {
+    throw new AppError(400, `Workflow exceeds maximum of ${MAX_NODES} nodes`, "WORKFLOW_TOO_LARGE");
+  }
+  if (edges.length > MAX_EDGES) {
+    throw new AppError(400, `Workflow exceeds maximum of ${MAX_EDGES} edges`, "WORKFLOW_TOO_LARGE");
+  }
+
   if (nodes.length === 0) {
     throw new AppError(400, "Workflow must contain at least one node", "WORKFLOW_EMPTY");
   }

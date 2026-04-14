@@ -49,6 +49,7 @@ export async function executeSearch(args: unknown): Promise<string> {
   const params = new URLSearchParams({
     q: query,
     engine: "google",
+    api_key: apiKey,
   });
 
   const url = `https://serpapi.com/search.json?${params.toString()}`;
@@ -58,7 +59,6 @@ export async function executeSearch(args: unknown): Promise<string> {
     const timeout = setTimeout(() => controller.abort(), 10000);
 
     const response = await fetch(url, {
-      headers: { "X-API-KEY": apiKey },
       signal: controller.signal,
     });
 

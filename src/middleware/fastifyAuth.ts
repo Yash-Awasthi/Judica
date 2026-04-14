@@ -30,10 +30,13 @@ async function isTokenRevoked(token: string): Promise<boolean> {
 
 export async function fastifyOptionalAuth(request: FastifyRequest, reply: FastifyReply) {
   const authHeader = request.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ")) return;
+  const tokenFromHeader = authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
+  const tokenFromCookie = (request as any).cookies?.access_token;
+  const token = tokenFromHeader || tokenFromCookie;
+
+  if (!token) return;
 
   try {
-    const token = authHeader.split(" ")[1];
     const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] });
     const payload = jwtPayloadSchema.parse(decoded);
 
@@ -48,11 +51,14 @@ export async function fastifyOptionalAuth(request: FastifyRequest, reply: Fastif
 
 export async function fastifyRequireAuth(request: FastifyRequest, reply: FastifyReply) {
   const authHeader = request.headers.authorization;
-  if (!authHeader?.startsWith("Bearer ")) {
+  const tokenFromHeader = authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
+  const tokenFromCookie = (request as any).cookies?.access_token;
+  const token = tokenFromHeader || tokenFromCookie;
+
+  if (!token) {
     reply.code(401).send({ error: "Authentication required" });
     return;
   }
-  const token = authHeader.split(" ")[1];
 
   try {
     const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] });

@@ -35,14 +35,10 @@ vi.mock("../../src/services/vectorStore.service.js", () => ({
   hybridSearch: (...args: unknown[]) => mockHybridSearch(...args),
 }));
 
-// Mock fs
-const mockReadFileSync = vi.fn();
-vi.mock("fs", () => ({
-  readFileSync: (...args: unknown[]) => mockReadFileSync(...args),
-}));
-
+// Mock fs/promises (used by the updated code)
+const mockReadFile = vi.fn();
 vi.mock("fs/promises", () => ({
-  readFile: vi.fn(),
+  readFile: (...args: unknown[]) => mockReadFile(...args),
 }));
 
 // Mock drizzle-orm
@@ -101,10 +97,10 @@ describe("messageBuilder.service", () => {
           userId: 1,
           mimeType: "image/png",
           originalName: "screenshot.png",
-          storagePath: "/uploads/screenshot.png",
+          storagePath: "screenshot.png",
         },
       ]);
-      mockReadFileSync.mockReturnValue(Buffer.from("fake-png-data"));
+      mockReadFile.mockResolvedValue(Buffer.from("fake-png-data"));
 
       const { loadFileContext } = await import("../../src/services/messageBuilder.service.js");
       const result = await loadFileContext(["upload-2"], 1);
@@ -124,18 +120,97 @@ describe("messageBuilder.service", () => {
           userId: 1,
           mimeType: "image/jpeg",
           originalName: "broken.jpg",
-          storagePath: "/uploads/broken.jpg",
+          storagePath: "broken.jpg",
         },
       ]);
-      mockReadFileSync.mockImplementation(() => {
-        throw new Error("ENOENT: file not found");
-      });
+      mockReadFile.mockRejectedValue(new Error("ENOENT: file not found"));
 
       const { loadFileContext } = await import("../../src/services/messageBuilder.service.js");
       const result = await loadFileContext(["upload-3"], 1);
 
       expect(result.image_blocks).toHaveLength(0);
       expect(result.text_documents).toHaveLength(0);
+    });
+
+    // Security tests for path traversal vulnerability mitigation
+    describe("path traversal security", () => {
+      it("rejects path traversal with ../ sequences", async () => {
+        vi.resetModules();
+        mockWhere.mockResolvedValue([
+          {
+            id: "upload-malicious-1",
+            userId: 1,
+            mimeType: "image/png",
+            originalName: "malicious.png",
+            storagePath: "../../../etc/passwd",
+          },
+        ]);
+
+        const { loadFileContext } = await import("../../src/services/messageBuilder.service.js");
+        const result = await loadFileContext(["upload-malicious-1"], 1);
+
+        expect(result.image_blocks).toHaveLength(0);
+        expect(mockReadFile).not.toHaveBeenCalled();
+      });
+
+      it("rejects absolute paths", async () => {
+        vi.resetModules();
+        mockWhere.mockResolvedValue([
+          {
+            id: "upload-malicious-3",
+            userId: 1,
+            mimeType: "image/png",
+            originalName: "malicious.png",
+            storagePath: "/etc/passwd",
+          },
+        ]);
+
+        const { loadFileContext } = await import("../../src/services/messageBuilder.service.js");
+        const result = await loadFileContext(["upload-malicious-3"], 1);
+
+        expect(result.image_blocks).toHaveLength(0);
+        expect(mockReadFile).not.toHaveBeenCalled();
+      });
+
+      it("rejects paths with mixed traversal techniques", async () => {
+        vi.resetModules();
+        mockWhere.mockResolvedValue([
+          {
+            id: "upload-malicious-4",
+            userId: 1,
+            mimeType: "image/png",
+            originalName: "malicious.png",
+            storagePath: "subdir/../../../../../../etc/shadow",
+          },
+        ]);
+
+        const { loadFileContext } = await import("../../src/services/messageBuilder.service.js");
+        const result = await loadFileContext(["upload-malicious-4"], 1);
+
+        expect(result.image_blocks).toHaveLength(0);
+        expect(mockReadFile).not.toHaveBeenCalled();
+      });
+
+      it("allows valid relative paths within upload directory", async () => {
+        vi.resetModules();
+        mockWhere.mockResolvedValue([
+          {
+            id: "upload-valid",
+            userId: 1,
+            mimeType: "image/png",
+            originalName: "valid.png",
+            storagePath: "user123/valid.png",
+          },
+        ]);
+        mockReadFile.mockResolvedValue(Buffer.from("valid-image-data"));
+
+        const { loadFileContext } = await import("../../src/services/messageBuilder.service.js");
+        const result = await loadFileContext(["upload-valid"], 1);
+
+        expect(result.image_blocks).toHaveLength(1);
+        expect(result.image_blocks[0].filename).toBe("valid.png");
+        expect(mockReadFile).toHaveBeenCalled();
+      });
     });
   });
 

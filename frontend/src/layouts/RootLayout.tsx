@@ -84,6 +84,7 @@ export function RootLayout() {
 
   return (
     <div className="flex h-screen overflow-hidden bg-[var(--bg)] relative">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-card focus:text-text focus:p-2 focus:rounded">Skip to main content</a>
       {/* Ambient background orbs — only render in dark mode */}
       <div className="bg-orb-mint w-[500px] h-[500px] top-[-10%] left-[20%] animate-drift hidden dark:block" />
       <div className="bg-orb-blue w-[400px] h-[400px] bottom-[-5%] right-[15%] animate-drift-slow hidden dark:block" />
@@ -113,7 +114,7 @@ export function RootLayout() {
       />
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <main id="main-content" className="flex-1 flex flex-col min-w-0 overflow-hidden">
         {/* Error banner */}
         {error && (
           <div className="px-4 py-3 bg-red-500/10 border-b border-red-500/30 text-red-400 text-sm flex items-center justify-between">
@@ -131,6 +132,7 @@ export function RootLayout() {
         <div className="md:hidden px-4 py-3 flex items-center border-b border-[var(--border-subtle)] bg-[var(--bg-surface-1)]">
           <button
             onClick={() => setSidebarOpen(!sidebarOpen)}
+            aria-label="Toggle sidebar"
             className="p-2 rounded-lg text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)] transition-colors"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">

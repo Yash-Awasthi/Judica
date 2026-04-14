@@ -4,6 +4,8 @@ import { eq, and, desc, asc, sql } from "drizzle-orm";
 import { Message } from "../lib/providers.js";
 import logger from "../lib/logger.js";
 import { getEmbeddingWithLock } from "../lib/cache.js";
+import { AppError } from "../middleware/errorHandler.js";
+import { safeVectorLiteral } from "./vectorStore.service.js";
 
 export interface Conversation {
   id: string;
@@ -100,7 +102,7 @@ export async function createChat(input: CreateChatInput, generateEmbedding: bool
     }
 
     if (embeddingVector) {
-      const vectorStr = `[${embeddingVector.join(',')}]`;
+      const vectorStr = safeVectorLiteral(embeddingVector);
       const result = await db.execute(sql`
         INSERT INTO "Chat" ("userId", "conversationId", question, verdict, opinions, "durationMs", "tokensUsed", "cacheHit", embedding, "createdAt")
         VALUES (${input.userId ?? null}, ${input.conversationId ?? null}, ${input.question}, ${input.verdict}, ${JSON.stringify(input.opinions)}::jsonb, ${input.durationMs ?? null}, ${input.tokensUsed ?? null}, ${input.cacheHit ?? false}, ${vectorStr}::vector, NOW())
@@ -251,7 +253,7 @@ export async function retrieveRelevantContext(
 
     if (queryEmbedding) {
       try {
-        const vectorStr = `[${queryEmbedding.join(',')}]`;
+        const vectorStr = safeVectorLiteral(queryEmbedding);
         const result = await db.execute(sql`
           SELECT id, question, verdict,
                  embedding <-> ${vectorStr}::vector as distance

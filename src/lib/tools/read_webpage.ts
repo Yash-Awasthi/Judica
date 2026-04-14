@@ -64,10 +64,19 @@ export const readWebpageTool: ToolInstance = {
       const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
       let content = bodyMatch ? bodyMatch[1] : html;
 
+      // Strip HTML tags safely (handles multi-line, nested tags)
       content = content.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
       content = content.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "");
 
-      const text = content.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim();
+      const text = content
+        .replace(/<[^>]+>/g, " ")
+        .replace(/&nbsp;/g, " ")
+        .replace(/&lt;/g, "<")
+        .replace(/&gt;/g, ">")
+        .replace(/&quot;/g, '"')
+        .replace(/&amp;/g, "&")
+        .replace(/\s+/g, " ")
+        .trim();
 
       return text.length > 10000 ? text.slice(0, 10000) + "... [Truncated]" : text;
     } catch (err) {

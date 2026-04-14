@@ -1,4 +1,4 @@
-import { FastifyPluginAsync } from "fastify";
+import { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
 import multipart from "@fastify/multipart";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { db } from "../lib/drizzle.js";
@@ -14,6 +14,34 @@ import { pipeline } from "stream/promises";
 import logger from "../lib/logger.js";
 
 const uploadsPlugin: FastifyPluginAsync = async (fastify) => {
+  const uploadAttempts = new Map<string, { count: number; resetAt: number }>();
+  const UPLOAD_RATE_LIMIT = 30;
+  const UPLOAD_RATE_WINDOW = 60_000;
+
+  const uploadRateLimit = async (request: FastifyRequest, reply: FastifyReply) => {
+    const key = String(request.userId || request.ip || "unknown");
+    const now = Date.now();
+    const entry = uploadAttempts.get(key);
+
+    if (entry && now < entry.resetAt) {
+      if (entry.count >= UPLOAD_RATE_LIMIT) {
+        const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
+        reply.header("Retry-After", String(retryAfter));
+        reply.code(429).send({ error: "Upload rate limit exceeded, try again later." });
+        return;
+      }
+      entry.count++;
+    } else {
+      uploadAttempts.set(key, { count: 1, resetAt: now + UPLOAD_RATE_WINDOW });
+    }
+
+    if (uploadAttempts.size > 10000) {
+      for (const [k, v] of uploadAttempts) {
+        if (now >= v.resetAt) uploadAttempts.delete(k);
+      }
+    }
+  };
+
   await fastify.register(multipart, {
     limits: {
       fileSize: 100 * 1024 * 1024, // 100MB
@@ -76,7 +104,7 @@ const uploadsPlugin: FastifyPluginAsync = async (fastify) => {
    *         description: Unauthorized
    */
   // POST /api/uploads — upload up to 10 files
-  fastify.post("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.post("/", { preHandler: [uploadRateLimit, fastifyRequireAuth] }, async (request, reply) => {
     const userId = request.userId!;
     const parts = request.files();
     const savedFiles: Array<{
@@ -111,7 +139,9 @@ const uploadsPlugin: FastifyPluginAsync = async (fastify) => {
       fs.mkdirSync(dir, { recursive: true });
 
       const unique = crypto.randomBytes(8).toString("hex");
-      const ext = path.extname(part.filename);
+      const rawExt = path.extname(part.filename);
+      // Sanitize extension: only allow alphanumeric chars and dots, max 10 chars
+      const ext = /^\.[a-zA-Z0-9]{1,10}$/.test(rawExt) ? rawExt : "";
       const diskFilename = `${unique}${ext}`;
       const storagePath = path.join(dir, diskFilename);
 

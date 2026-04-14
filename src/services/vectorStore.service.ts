@@ -3,6 +3,21 @@ import { sql } from "drizzle-orm";
 import { embed } from "./embeddings.service.js";
 import logger from "../lib/logger.js";
 
+/**
+ * Safely convert a numeric array to a PostgreSQL vector literal.
+ * Validates every component is a finite number to prevent SQL injection.
+ */
+function safeVectorLiteral(vec: number[]): string {
+  for (let i = 0; i < vec.length; i++) {
+    if (typeof vec[i] !== "number" || !Number.isFinite(vec[i])) {
+      throw new Error(`Invalid vector component at index ${i}: must be a finite number`);
+    }
+  }
+  return `[${vec.join(",")}]`;
+}
+
+export { safeVectorLiteral };
+
 export interface MemoryChunk {
   id: string;
   content: string;
@@ -21,7 +36,7 @@ export async function storeChunk(
   sourceUrl?: string
 ): Promise<string> {
   const embedding = await embed(content);
-  const vectorStr = `[${embedding.join(",")}]`;
+  const vectorStr = safeVectorLiteral(embedding);
 
   const result = await db.execute(sql`
     INSERT INTO "Memory" ("id", "userId", "kbId", "content", "chunkIndex", "sourceName", "sourceUrl", "embedding", "createdAt")
@@ -40,7 +55,7 @@ export async function searchSimilar(
   limit: number = 5
 ): Promise<MemoryChunk[]> {
   const queryEmbedding = await embed(query);
-  const vectorStr = `[${queryEmbedding.join(",")}]`;
+  const vectorStr = safeVectorLiteral(queryEmbedding);
 
   const kbCondition = kbId ? sql`AND "kbId" = ${kbId}` : sql``;
 

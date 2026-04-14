@@ -63,14 +63,14 @@ function NavItem({ to, icon, label, active, onClick, collapsed }: NavItemProps) 
 
   if (to) {
     return (
-      <Link to={to} className={classes} onClick={onClick}>
+      <Link to={to} className={classes} onClick={onClick} aria-current={active ? "page" : undefined}>
         {content}
       </Link>
     );
   }
 
   return (
-    <button onClick={onClick} className={classes}>
+    <button onClick={onClick} className={classes} aria-current={active ? "page" : undefined}>
       {content}
     </button>
   );
@@ -181,7 +181,7 @@ export function Sidebar({
       </div>
 
       {/* Navigation */}
-      <nav className={`${collapsed ? "px-1.5" : "px-2"} space-y-0.5 shrink-0`}>
+      <nav className={`${collapsed ? "px-1.5" : "px-2"} space-y-0.5 shrink-0`} role="navigation" aria-label="Main Navigation">
         {/* Main */}
         <SectionHeader label="Main" collapsed={collapsed} />
         <NavItem to="/" icon={<Home size={16} />} label="Home" active={currentPath === "/"} collapsed={collapsed} onClick={onHome} />
@@ -267,6 +267,7 @@ export function Sidebar({
                         onClick={(e) => { e.stopPropagation(); onDelete(c.id); }}
                         className="opacity-0 group-hover:opacity-60 hover:!opacity-100 text-[var(--accent-coral)] transition-all p-0.5 shrink-0"
                         title="Delete conversation"
+                        aria-label="Delete conversation"
                       >
                         <Trash2 size={13} />
                       </button>
@@ -302,6 +303,7 @@ export function Sidebar({
                 onClick={onLogout}
                 className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent-coral)] transition-colors shrink-0 rounded-lg hover:bg-[var(--glass-bg-hover)]"
                 title="Logout"
+                aria-label="Logout"
               >
                 <LogOut size={14} />
               </button>
@@ -314,6 +316,7 @@ export function Sidebar({
                 onClick={onLogout}
                 className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent-coral)] transition-colors rounded-lg hover:bg-[var(--glass-bg-hover)]"
                 title="Logout"
+                aria-label="Logout"
               >
                 <LogOut size={14} />
               </button>

@@ -3,6 +3,7 @@ import { uploads } from "../db/schema/uploads.js";
 import { eq, inArray, and } from "drizzle-orm";
 import { hybridSearch, type MemoryChunk } from "./vectorStore.service.js";
 import { readFile } from "fs/promises";
+import path from "path";
 import logger from "../lib/logger.js";
 import type { AdapterContentBlock } from "../adapters/types.js";
 
@@ -29,10 +30,17 @@ export async function loadFileContext(uploadIds: string[], userId: number): Prom
 
   for (const upload of results) {
     if (upload.mimeType.startsWith("image/") && upload.storagePath) {
+      // Validate storagePath stays within the uploads directory (prevent path traversal)
+      const baseDir = path.resolve(process.env.UPLOAD_DIR || "./uploads");
+      const targetPath = path.resolve(baseDir, upload.storagePath);
+      const relativePath = path.relative(baseDir, targetPath);
+      if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
+        logger.warn({ uploadId: upload.id, storagePath: upload.storagePath }, "Blocked path traversal attempt");
+        continue;
+      }
       // Read image as base64
-      const { readFileSync } = await import("fs");
       try {
-        const buffer = readFileSync(upload.storagePath);
+        const buffer = await readFile(targetPath);
         image_blocks.push({
           base64: buffer.toString("base64"),
           mimeType: upload.mimeType,

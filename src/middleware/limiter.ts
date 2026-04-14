@@ -1,4 +1,5 @@
 import { Response, NextFunction } from "express";
+import type { FastifyRequest, FastifyReply } from "fastify";
 import { AuthRequest } from "../types/index.js";
 import redis from "../lib/redis.js";
 import logger from "../lib/logger.js";
@@ -172,7 +173,7 @@ function inMemoryLimiter(userId: number, res: Response, next: NextFunction): voi
   next();
 }
 
-// ---------- Exported middleware ----------
+// ---------- Exported Express middleware ----------
 export async function perUserLimiter(req: AuthRequest, res: Response, next: NextFunction) {
   const userId = req.userId;
   if (!userId) return next();
@@ -182,4 +183,136 @@ export async function perUserLimiter(req: AuthRequest, res: Response, next: Next
   }
 
   inMemoryLimiter(userId, res, next);
+}
+
+// ---------- Fastify-native rate limiter ----------
+
+async function fastifyRedisLimiter(userId: number, reply: FastifyReply, done: () => void): Promise<void> {
+  const rpmKey = `rl:rpm:${userId}`;
+  const concKey = `rl:conc:${userId}`;
+
+  try {
+    const rpmRaw = await redis.incr(rpmKey);
+    const rpmCount = rpmRaw ?? 0;
+
+    if (rpmCount === 1) {
+      await redis.expire(rpmKey, RPM_WINDOW_SECS);
+    }
+
+    if (rpmCount > MAX_RPM) {
+      const ttl = await redis.pttl(rpmKey);
+      const retryAfter = ttl > 0 ? Math.ceil(ttl / 1000) : RPM_WINDOW_SECS;
+      logger.warn({ userId, rpm: rpmCount }, "User exceeded RPM limit");
+      reply.code(429).send({
+        error: "Too many requests. Please wait a minute.",
+        retryAfter,
+      });
+      return;
+    }
+
+    const concRaw = await redis.incr(concKey);
+    const concurrency = concRaw ?? 0;
+
+    if (concurrency > MAX_CONCURRENCY) {
+      await redis.decr(concKey);
+      logger.warn({ userId, concurrency }, "User exceeded concurrency limit");
+      reply.code(429).send({ error: "Too many simultaneous requests. Please wait for previous tasks to complete." });
+      return;
+    }
+
+    let decremented = false;
+    const decrement = async () => {
+      if (decremented) return;
+      decremented = true;
+      try {
+        await redis.decr(concKey);
+      } catch { /* best effort */ }
+    };
+
+    reply.raw.on("finish", decrement);
+    reply.raw.on("close", decrement);
+
+    done();
+  } catch (err) {
+    redisAvailable = false;
+    lastRedisCheck = Date.now();
+    logger.warn({ err }, "Rate limiter: Redis call failed, falling back to in-memory");
+    fastifyInMemoryLimiter(userId, reply, done);
+  }
+}
+
+function fastifyInMemoryLimiter(userId: number, reply: FastifyReply, done: () => void): void {
+  let state = fallbackLimits.get(userId);
+  const now = Date.now();
+
+  if (!state) {
+    if (fallbackLimits.size >= MAX_MAP_SIZE) {
+      logger.warn("Per-user rate limit map reached max size; rejecting new user");
+      reply.code(429).send({ error: "Server is busy. Please try again later." });
+      return;
+    }
+    state = { rpmCount: 0, lastReset: now, concurrency: 0 };
+    fallbackLimits.set(userId, state);
+  }
+
+  if (now - state.lastReset > RPM_WINDOW) {
+    state.rpmCount = 0;
+    state.lastReset = now;
+  }
+
+  if (state.rpmCount >= MAX_RPM) {
+    logger.warn({ userId, rpm: state.rpmCount }, "User exceeded RPM limit");
+    reply.code(429).send({
+      error: "Too many requests. Please wait a minute.",
+      retryAfter: Math.ceil((RPM_WINDOW - (now - state.lastReset)) / 1000),
+    });
+    return;
+  }
+
+  if (state.concurrency >= MAX_CONCURRENCY) {
+    logger.warn({ userId, concurrency: state.concurrency }, "User exceeded concurrency limit");
+    reply.code(429).send({ error: "Too many simultaneous requests. Please wait for previous tasks to complete." });
+    return;
+  }
+
+  state.rpmCount++;
+  state.concurrency++;
+
+  const decrement = () => {
+    const s = fallbackLimits.get(userId);
+    if (s && s.concurrency > 0) {
+      s.concurrency--;
+    }
+  };
+
+  reply.raw.on("finish", decrement);
+  reply.raw.on("close", decrement);
+
+  done();
+}
+
+export async function fastifyPerUserLimiter(request: FastifyRequest, reply: FastifyReply) {
+  const userId = (request as any).userId;
+  if (!userId) return;
+
+  return new Promise<void>((resolve) => {
+    const done = () => resolve();
+    if (redisAvailable) {
+      isRedisUp().then((up) => {
+        if (up) {
+          fastifyRedisLimiter(userId, reply, done);
+        } else {
+          fastifyInMemoryLimiter(userId, reply, done);
+        }
+      });
+    } else {
+      isRedisUp().then((up) => {
+        if (up) {
+          fastifyRedisLimiter(userId, reply, done);
+        } else {
+          fastifyInMemoryLimiter(userId, reply, done);
+        }
+      });
+    }
+  });
 }

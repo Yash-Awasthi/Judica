@@ -28,8 +28,7 @@
   "license": "ISC",
   "description": "A production-grade multi-model AI orchestration engine with agentic tools and semantic caching.",
   "_dependencyNotes": {
-    "redis+ioredis": "Both Redis clients are required: 'redis' is used by src/lib/redis.ts for general caching/pub-sub, 'ioredis' is required by BullMQ (src/queue/connection.ts) and rate-limit-redis (src/middleware/rateLimit.ts).",
-    "xlsx": "xlsx 0.18.5 has known CVEs (CVE-2024-22363 and others). It is actively used by src/processors/xlsx.processor.ts. Plan to migrate to 'exceljs' when feasible."
+    "redis+ioredis": "Both Redis clients are required: 'redis' is used by src/lib/redis.ts for general caching/pub-sub, 'ioredis' is required by BullMQ (src/queue/connection.ts) and rate-limit-redis (src/middleware/rateLimit.ts)."
   },
   "dependencies": {
     "@fastify/compress": "^8.0.2",
@@ -67,7 +66,7 @@
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "ws": "^8.20.0",
-    "xlsx": "0.18.5",
+    "exceljs": "^4.4.0",
     "zod": "4.3.6"
   },
   "devDependencies": {
@@ -95,5 +94,8 @@
     "tsx": "4.21.0",
     "typescript": "6.0.2",
     "vitest": "4.1.4"
+  },
+  "overrides": {
+    "z-schema": ">=5.0.6 <7.0.0"
   }
 }

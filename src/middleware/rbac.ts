@@ -1,4 +1,5 @@
 import type { Response, NextFunction, RequestHandler } from "express";
+import type { FastifyRequest, FastifyReply } from "fastify";
 import type { AuthRequest } from "../types/index.js";
 import { AppError } from "./errorHandler.js";
 import { db } from "../lib/drizzle.js";
@@ -23,6 +24,28 @@ export function requireRole(...roles: string[]): RequestHandler {
       next();
     } catch (err) {
       next(err);
+    }
+  };
+}
+
+// ---------- Fastify-native version ----------
+
+export function fastifyRequireRole(...roles: string[]) {
+  return async (request: FastifyRequest, reply: FastifyReply) => {
+    if (!(request as any).userId) {
+      reply.code(401).send({ error: "Not authenticated", code: "AUTH_REQUIRED" });
+      return;
+    }
+
+    const [user] = await db
+      .select({ role: users.role })
+      .from(users)
+      .where(eq(users.id, (request as any).userId))
+      .limit(1);
+
+    if (!user || !roles.includes(user.role)) {
+      reply.code(403).send({ error: "Insufficient permissions", code: "FORBIDDEN" });
+      return;
     }
   };
 }

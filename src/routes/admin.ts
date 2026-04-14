@@ -498,6 +498,10 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
         // This path only runs once per record — after decryption succeeds,
         // the record is immediately re-encrypted with IV-as-salt (line 508-515),
         // permanently removing the legacy salt dependency.
+        // SECURITY: Legacy salt compatibility. This branch handles data encrypted
+        // with an older version that used a hardcoded salt. New encryptions use
+        // the IV as salt (line above). The legacy path should be removed after
+        // all data has been re-encrypted with the new method.
         const legacySalt = "salt";
         const legacyKey = scryptSync(key, legacySalt, 32);
         const legacyDecipher = createDecipheriv(ALGO, legacyKey, iv);
