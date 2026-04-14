@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Plus, Trash2 } from "lucide-react";
 import type { CouncilMember } from "../types/index.js";
 import { maskApiKey } from "../hooks/useCouncilMembers.js";
+import { useFocusTrap } from "../hooks/useFocusTrap.js";
 
 interface CouncilConfigPanelProps {
   isOpen: boolean;
@@ -89,16 +90,21 @@ export function CouncilConfigPanel({
   onRemoveMember,
   onUpdateMember
 }: CouncilConfigPanelProps) {
+  const trapRef = useFocusTrap(onClose);
   return (
     <AnimatePresence>
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={onClose} />
           <motion.div
+            ref={trapRef}
             initial={{ opacity: 0, y: 8, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.97 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Council Configuration"
             className="absolute bottom-full right-4 mb-4 w-96 surface-card rounded-modal shadow-2xl z-50 p-6 border border-[var(--border-medium)] max-h-[60vh] overflow-y-auto scrollbar-custom"
           >
             <div className="flex items-center justify-between mb-5">

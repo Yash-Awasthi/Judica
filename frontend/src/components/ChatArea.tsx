@@ -1,6 +1,7 @@
 import { useReducer, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Settings2, Download, FileText, FileJson } from "lucide-react";
+import { useAuth } from "../context/AuthContext.js";
 import { MessageList } from "./MessageList.js";
 import { InputArea } from "./InputArea.js";
 import { StreamingStatus } from "./StreamingStatus.js";
@@ -78,6 +79,7 @@ export function ChatArea({
   onUpdateMembers,
   isLoading = false
 }: ChatAreaProps) {
+  const { fetchWithAuth } = useAuth();
   const [state, dispatch] = useReducer(chatAreaReducer, {
     input: "",
     summon: defaultSummon,
@@ -119,12 +121,10 @@ export function ChatArea({
     }
     setPlayingAudioId(msgId);
     try {
-      const token = localStorage.getItem("council_token");
-      const res = await fetch("/api/tts", {
+      const res = await fetchWithAuth("/api/tts", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
         },
         body: JSON.stringify({ text })
       });

@@ -199,16 +199,12 @@ export function DebateDashboardView() {
 
       const { sessionId } = await res.json();
 
-      const token = localStorage.getItem("council_token") || "";
-      // Use fetch with Authorization header instead of EventSource with token in URL
-      // to avoid leaking the token in browser history and server logs
       const streamUrl = `/api/council/debate/${sessionId}/stream`;
       const abortController = new AbortController();
 
-      fetch(streamUrl, {
+      fetchWithAuth(streamUrl, {
         headers: {
           "Accept": "text/event-stream",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
         },
         signal: abortController.signal,
       }).then(async (streamRes) => {

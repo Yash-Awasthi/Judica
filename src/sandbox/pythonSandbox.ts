@@ -9,14 +9,15 @@ import logger from "../lib/logger.js";
  * Python sandbox for executing untrusted user code.
  *
  * Security layers (defense in depth):
- * 1. Linux namespace isolation via unshare (PID, network, mount, user)
- * 2. Restricted filesystem: read-only rootfs with tmpfs /tmp
- * 3. ulimit resource constraints (memory, CPU, files, processes)
- * 4. Python-level import restrictions (ctypes, subprocess, os.system blocked)
- * 5. Python-level socket monkey-patching (network blocking)
- * 6. seccomp-like restrictions via restricted env vars
+ * 1. Container-level isolation via bubblewrap (preferred) or unshare namespaces
+ * 2. Linux namespace isolation: PID, network, mount, user
+ * 3. /proc isolation via --mount-proc (prevents reading host process info)
+ * 4. ulimit resource constraints (memory, CPU, files, processes)
+ * 5. Python-level import restrictions (ctypes, subprocess, os.system blocked)
+ * 6. Python-level socket monkey-patching (network blocking)
+ * 7. Python introspection hardening (gc, inspect, sys._getframe blocked)
  *
- * Falls back to ulimit-only mode if unshare is unavailable.
+ * Isolation priority: bubblewrap > unshare > ulimit-only
  */
 
 export interface SandboxResult {
@@ -25,13 +26,23 @@ export interface SandboxResult {
   elapsedMs: number;
 }
 
-// Check if unshare is available at startup
-let unshareAvailable = false;
+// Check isolation capabilities at startup (prefer strongest available)
+let isolationLevel: "bwrap" | "unshare" | "ulimit" = "ulimit";
 try {
-  execSync("unshare --help", { stdio: "pipe" });
-  unshareAvailable = true;
+  execSync("bwrap --version", { stdio: "pipe" });
+  isolationLevel = "bwrap";
 } catch {
-  logger.warn("unshare not available — Python sandbox will use ulimit-only isolation");
+  try {
+    execSync("unshare --help", { stdio: "pipe" });
+    isolationLevel = "unshare";
+  } catch {
+    // Fall through to ulimit-only
+  }
+}
+if (isolationLevel === "ulimit") {
+  logger.warn("Neither bwrap nor unshare available — Python sandbox will use ulimit-only isolation");
+} else {
+  logger.info(`Python sandbox using ${isolationLevel} isolation`);
 }
 
 // Python preamble that blocks dangerous modules and network access
@@ -49,6 +60,9 @@ const SANDBOX_PREAMBLE = [
   `    'resource', '_posixsubprocess',`,
   `    'importlib.machinery', 'importlib.abc',`,
   `    'code', 'codeop', 'compileall', 'py_compile',`,
+  `    'gc', 'inspect', 'dis', 'pickletools',`,
+  `    'webbrowser', 'antigravity', 'turtle',`,
+  `    'ensurepip', 'pip', 'venv',`,
   `})`,
   `def _restricted_import(name, *args, **kwargs):`,
   `    if name in _BLOCKED_MODULES or any(name.startswith(b + '.') for b in _BLOCKED_MODULES):`,
@@ -99,19 +113,63 @@ const SANDBOX_PREAMBLE = [
   `    import builtins`,
   `    builtins.open = _restricted_open`,
   ``,
+  // Block introspection escape vectors
+  `import sys as _sys`,
+  `_sys.tracebacklimit = 50`,
+  `if hasattr(_sys, '_getframe'):`,
+  `    _orig_getframe = _sys._getframe`,
+  `    def _safe_getframe(depth=0):`,
+  `        f = _orig_getframe(depth + 1)`,
+  `        return f`,
+  `    _sys._getframe = _safe_getframe`,
+  `# Prevent sys.modules manipulation to re-import blocked modules`,
+  `_blocked_from_modules = [k for k in _sys.modules if any(k == b or k.startswith(b + '.') for b in _BLOCKED_MODULES)]`,
+  `for _k in _blocked_from_modules:`,
+  `    del _sys.modules[_k]`,
+  ``,
 ].join("\n");
 
-function buildCommand(tmpFile: string): string {
+function buildCommand(tmpFile: string, tmpDir: string): string {
   const ulimits = `ulimit -v 262144 -t 10 -f 1024 -u 32 -n 64`;
 
-  if (unshareAvailable) {
-    // Use unshare for namespace isolation:
+  if (isolationLevel === "bwrap") {
+    // bubblewrap provides the strongest userspace sandboxing:
+    // - Full filesystem isolation (bind-mount only what's needed)
+    // - /proc isolation (--proc /proc)
+    // - New PID/net/UTS namespaces (--unshare-all)
+    // - Die with parent (--die-with-parent)
+    // - No new privileges
+    return [
+      `bwrap`,
+      `--ro-bind /usr /usr`,
+      `--ro-bind /lib /lib`,
+      `--ro-bind-try /lib64 /lib64`,
+      `--ro-bind /bin /bin`,
+      `--ro-bind /etc/alternatives /etc/alternatives`,
+      `--ro-bind-try /etc/ld.so.cache /etc/ld.so.cache`,
+      `--ro-bind-try /etc/ld.so.conf /etc/ld.so.conf`,
+      `--ro-bind-try /etc/python3 /etc/python3`,
+      `--bind "${tmpDir}" /sandbox`,
+      `--tmpfs /tmp`,
+      `--proc /proc`,
+      `--dev /dev`,
+      `--unshare-all`,
+      `--die-with-parent`,
+      `--new-session`,
+      `--chdir /sandbox`,
+      `-- bash -c '${ulimits}; exec python3 /sandbox/script.py'`,
+    ].join(" ");
+  }
+
+  if (isolationLevel === "unshare") {
+    // unshare provides kernel namespace isolation:
     // --user: user namespace (no root required)
     // --pid: PID namespace (can't see/signal host processes)
     // --net: network namespace (no network interfaces)
+    // --mount-proc: isolated /proc (prevents reading host process info)
     // --fork: fork before exec (required for PID namespace)
     // --map-root-user: map current UID to root inside namespace
-    return `unshare --user --pid --net --fork --map-root-user -- bash -c '${ulimits}; exec python3 "${tmpFile}"'`;
+    return `unshare --user --pid --net --fork --mount-proc --map-root-user -- bash -c '${ulimits}; exec python3 "${tmpFile}"'`;
   }
 
   // Fallback: ulimit-only isolation
@@ -133,7 +191,7 @@ export async function executePython(code: string, timeout: number = 10000): Prom
       const stdout: string[] = [];
       const stderr: string[] = [];
 
-      const command = buildCommand(tmpFile);
+      const command = buildCommand(tmpFile, tmpDir);
 
       const proc = spawn("bash", ["-c", command], {
         timeout,

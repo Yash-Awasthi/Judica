@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Link2, Copy, Check, X } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
+import { useFocusTrap } from "../hooks/useFocusTrap";
 
 interface ShareModalProps {
   resourceType: "conversations" | "workflows" | "prompts";
@@ -10,6 +11,7 @@ interface ShareModalProps {
 
 export function ShareModal({ resourceType, resourceId, onClose }: ShareModalProps) {
   const { fetchWithAuth } = useAuth();
+  const trapRef = useFocusTrap(onClose);
   const [shareToken, setShareToken] = useState<string | null>(null);
   const [expiry, setExpiry] = useState("never");
   const [copied, setCopied] = useState(false);
@@ -59,8 +61,8 @@ export function ShareModal({ resourceType, resourceId, onClose }: ShareModalProp
   };
 
   return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-      <div className="bg-[var(--bg-surface-1)] rounded-xl shadow-xl p-6 max-w-md w-full">
+    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" role="dialog" aria-modal="true" aria-label="Share">
+      <div ref={trapRef} className="bg-[var(--bg-surface-1)] rounded-xl shadow-xl p-6 max-w-md w-full">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-lg flex items-center gap-2 text-[var(--text-primary)]">
             <Link2 size={18} /> Share

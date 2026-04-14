@@ -178,6 +178,8 @@ describe("pythonSandbox – executePython", () => {
     expect(writtenContent).toContain("'system', 'popen'");
     // Should contain file write restrictions
     expect(writtenContent).toContain("_restricted_open");
+    // Should contain introspection hardening
+    expect(writtenContent).toContain("_blocked_from_modules");
     // Should contain the user code
     expect(writtenContent).toContain("print(1)");
   });

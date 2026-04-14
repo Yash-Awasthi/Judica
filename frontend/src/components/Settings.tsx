@@ -3,8 +3,8 @@ import { useAuth } from '../context/AuthContext';
 
 const SETTINGS_KEY = 'council_settings';
 
-// Known limitation: Settings are stored only in localStorage and are not synced
-// to the backend. They will be lost if the user clears browser data or switches devices.
+// Settings are synced to the backend via GET/PUT /api/auth/settings.
+// localStorage is used as a local cache for offline access.
 
 interface SettingsState {
   autoCouncil: boolean;

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useAuth } from '../context/AuthContext.js';
 
 interface PiiDetection {
   found: boolean;
@@ -20,6 +21,7 @@ export const PiiWarning: React.FC<PiiWarningProps> = ({
   onCancel,
   onAnonymize,
 }) => {
+  const { fetchWithAuth } = useAuth();
   const [detection, setDetection] = useState<PiiDetection | null>(null);
   const [loading, setLoading] = useState(true);
   const onProceedRef = useRef(onProceed);
@@ -28,12 +30,10 @@ export const PiiWarning: React.FC<PiiWarningProps> = ({
   useEffect(() => {
     const checkPii = async () => {
       try {
-        const token = localStorage.getItem("council_token");
-        const response = await fetch('/api/pii/check', {
+        const response = await fetchWithAuth('/api/pii/check', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
           body: JSON.stringify({ text }),
         });
