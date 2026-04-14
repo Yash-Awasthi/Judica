@@ -214,11 +214,29 @@ export class CustomAdapter implements IProviderAdapter {
       const apiKey = this.getApiKey();
       const headers: Record<string, string> = {};
 
-      if (this.config.auth_type === "bearer") {
-        headers["Authorization"] = `Bearer ${apiKey}`;
+      // Apply auth based on auth_type (not just bearer)
+      switch (this.config.auth_type) {
+        case "bearer":
+          headers["Authorization"] = `Bearer ${apiKey}`;
+          break;
+        case "api_key_header":
+          headers[this.config.auth_header_name || "X-API-Key"] = apiKey;
+          break;
+        case "basic":
+          headers["Authorization"] = `Basic ${Buffer.from(apiKey).toString("base64")}`;
+          break;
+        // api_key_query handled below
       }
 
-      const res = await fetch(`${baseUrl}/models`, {
+      // SSRF validation
+      await validateSafeUrl(`${baseUrl}/models`);
+
+      const url = new URL(`${baseUrl}/models`);
+      if (this.config.auth_type === "api_key_query") {
+        url.searchParams.set("api_key", apiKey);
+      }
+
+      const res = await fetch(url.toString(), {
         headers,
         signal: AbortSignal.timeout(5000),
       });

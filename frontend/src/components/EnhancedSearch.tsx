@@ -25,7 +25,7 @@ interface SearchFilters {
 }
 
 export const EnhancedSearch: React.FC = () => {
-  const { user } = useAuth();
+  const { user, fetchWithAuth } = useAuth();
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
@@ -58,7 +58,7 @@ export const EnhancedSearch: React.FC = () => {
       if (filters.conversationId) params.append('filters', JSON.stringify({ conversationId: filters.conversationId }));
       if (filters.hasOpinions !== undefined) params.append('filters', JSON.stringify({ hasOpinions: filters.hasOpinions }));
 
-      const response = await fetch(`/api/history/search?${params}`);
+      const response = await fetchWithAuth(`/api/history/search?${params}`);
       const data = await response.json();
 
       setResults(data.data);

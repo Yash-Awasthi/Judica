@@ -70,6 +70,10 @@ vi.mock("../../src/lib/crypto.js", () => ({
   mask: mockMask,
 }));
 
+vi.mock("../../src/lib/ssrf.js", () => ({
+  validateSafeUrl: vi.fn().mockResolvedValue(undefined),
+}));
+
 vi.mock("../../src/adapters/registry.js", () => ({
   registerAdapter: mockRegisterAdapter,
   deregisterAdapter: mockDeregisterAdapter,

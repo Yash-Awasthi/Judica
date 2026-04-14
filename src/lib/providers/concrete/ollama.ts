@@ -1,6 +1,7 @@
 import logger from "../../logger.js";
 import { BaseProvider } from "../baseProvider.js";
 import { ProviderConfig, ProviderResponse, Message } from "../types.js";
+import { validateSafeUrl } from "../../ssrf.js";
 
 interface OllamaResponse {
   response?: string;
@@ -15,6 +16,13 @@ export class OllamaProvider extends BaseProvider {
   constructor(config: ProviderConfig) {
     super(config);
     this.baseUrl = config.baseUrl || "http://localhost:11434";
+  }
+
+  private async validateBaseUrl(url: string): Promise<void> {
+    // Allow localhost for local Ollama instances
+    const parsed = new URL(url);
+    if (parsed.hostname === "localhost" || parsed.hostname === "127.0.0.1") return;
+    await validateSafeUrl(url);
   }
 
   async call({ prompt, messages, signal, isFallback, onChunk }: {
@@ -35,6 +43,8 @@ export class OllamaProvider extends BaseProvider {
         if (signal.aborted) controller.abort();
         signal.addEventListener("abort", () => controller.abort());
       }
+
+      await this.validateBaseUrl(this.baseUrl);
 
       const response = await this.protectedFetch(`${this.baseUrl}/api/generate`, {
         method: "POST",

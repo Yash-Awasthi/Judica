@@ -17,7 +17,7 @@ interface AuditLog {
 }
 
 export const AuditLogs: React.FC = () => {
-  const { user } = useAuth();
+  const { user, fetchWithAuth } = useAuth();
   const [logs, setLogs] = useState<AuditLog[]>([]);
   const [loading, setLoading] = useState(true);
   const [expandedId, setExpandedId] = useState<number | null>(null);
@@ -27,7 +27,7 @@ export const AuditLogs: React.FC = () => {
 
     const fetchLogs = async () => {
       try {
-        const response = await fetch('/api/audit/logs?limit=50');
+        const response = await fetchWithAuth('/api/audit/logs?limit=50');
         if (response.ok) {
           const data = await response.json();
           setLogs(data.logs || []);

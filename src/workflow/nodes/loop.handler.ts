@@ -1,11 +1,40 @@
+import ivm from "isolated-vm";
 import type { NodeHandler } from "../types.js";
+
+/**
+ * Safely evaluate a user-supplied expression inside an isolated-vm sandbox.
+ * No access to process, require, fs, or any Node.js globals.
+ */
+async function safeEvalExpr(
+  expr: string,
+  item: unknown,
+  index: number,
+  items: unknown[],
+): Promise<unknown> {
+  const isolate = new ivm.Isolate({ memoryLimit: 32 });
+  try {
+    const context = await isolate.createContext();
+    const jail = context.global;
+
+    await jail.set("__item", new ivm.ExternalCopy(item).copyInto());
+    await jail.set("__index", index);
+    await jail.set("__items", new ivm.ExternalCopy(items).copyInto());
+
+    const script = await isolate.compileScript(
+      `"use strict"; const item = __item; const index = __index; const items = __items; (${expr});`,
+    );
+    const result = await script.run(context, { timeout: 1000 });
+    return result;
+  } finally {
+    try { isolate.dispose(); } catch {}
+  }
+}
 
 export const loopHandler: NodeHandler = async (ctx) => {
   const items = (ctx.inputs.items as unknown[]) ?? [];
   const maxIterations = (ctx.nodeData.max_iterations as number) || 100;
 
   // Optional body expression evaluated per item (e.g. "item.name", "item * 2").
-  // When not provided, each item is passed through unchanged (map-identity).
   const bodyExpr = (ctx.nodeData.body as string) || "";
 
   // Optional filter expression evaluated per item — only truthy results are kept.
@@ -20,22 +49,21 @@ export const loopHandler: NodeHandler = async (ctx) => {
 
   for (let i = 0; i < limit; i++) {
     const item = items[i];
-    const index = i;
 
-    // Evaluate the optional filter expression
+    // Evaluate the optional filter expression in sandbox
     if (filterExpr) {
       try {
-        const keep = new Function("item", "index", "items", `"use strict"; return (${filterExpr});`)(item, index, items);
+        const keep = await safeEvalExpr(filterExpr, item, i, items);
         if (!keep) continue;
       } catch {
         // If filter expression fails, include the item
       }
     }
 
-    // Evaluate the body expression to transform each item
+    // Evaluate the body expression in sandbox
     if (bodyExpr) {
       try {
-        const transformed = new Function("item", "index", "items", `"use strict"; return (${bodyExpr});`)(item, index, items);
+        const transformed = await safeEvalExpr(bodyExpr, item, i, items);
         results.push(transformed);
       } catch {
         // On expression error, pass the item through unchanged

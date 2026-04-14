@@ -31,6 +31,7 @@ export class OpenAIAdapter implements IProviderAdapter {
     const body: Record<string, unknown> = {
       model: req.model,
       stream: true,
+      stream_options: { include_usage: true },
       messages: this.formatMessages(req),
     };
 

@@ -126,8 +126,26 @@ await fastify.register(fastifyStatic, {
 
 // ─── Native Fastify routes (no Express overhead) ────────────────────────────
 
-// Prometheus metrics endpoint
-fastify.get("/metrics", async (_request, reply) => {
+// Prometheus metrics endpoint (admin-only or bearer-token gated)
+fastify.get("/metrics", async (request, reply) => {
+  // Allow access via METRICS_TOKEN env var or authenticated admin
+  const authHeader = request.headers.authorization;
+  const metricsToken = process.env.METRICS_TOKEN;
+
+  if (metricsToken && authHeader === `Bearer ${metricsToken}`) {
+    // Token-based access for Prometheus scraper
+  } else if (!metricsToken) {
+    // No token configured — restrict to localhost only
+    const ip = request.ip;
+    if (ip !== "127.0.0.1" && ip !== "::1" && ip !== "::ffff:127.0.0.1") {
+      reply.code(403);
+      return "Forbidden";
+    }
+  } else {
+    reply.code(401);
+    return "Unauthorized";
+  }
+
   try {
     reply.type(registry.contentType);
     return await registry.metrics();
