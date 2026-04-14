@@ -362,7 +362,7 @@ const uploadsPlugin: FastifyPluginAsync = async (fastify) => {
 
     return reply
       .header("Content-Type", record.mimeType)
-      .header("Content-Disposition", `inline; filename="${record.originalName}"`)
+      .header("Content-Disposition", `inline; filename="${record.originalName.replace(/[^a-zA-Z0-9_.-]/g, "_")}"`)
       .send(fs.createReadStream(record.storagePath));
   });
 
