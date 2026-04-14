@@ -1,5 +1,5 @@
+import fastifyRateLimit from "@fastify/rate-limit";
 import Fastify from "fastify";
-import fastifyExpress from "@fastify/express";
 import fastifyCors from "@fastify/cors";
 import fastifyCompress from "@fastify/compress";
 import fastifyCookie from "@fastify/cookie";
@@ -26,22 +26,17 @@ import { registry } from "./lib/prometheusMetrics.js";
 import "./lib/tools/builtin.js";
 import "./adapters/registry.js";
 
-// Express middleware (still needed for swagger-ui and BullMQ Board compat layer)
 import { cleanupRateLimitRedis } from "./middleware/rateLimit.js";
-import { perUserLimiter } from "./middleware/limiter.js";
 import { cleanupCostTrackerInterval } from "./lib/realtimeCost.js";
-import { errorHandler } from "./middleware/errorHandler.js";
-import { requireAuth } from "./middleware/auth.js";
-import { requestId } from "./middleware/requestId.js";
-import { cspNonce } from "./middleware/cspNonce.js";
-import { prometheusMiddleware } from "./middleware/prometheusMiddleware.js";
 
-// Express (for swagger-ui compat layer only)
-import express from "express";
-import pinoHttp from "pino-http";
-import swaggerUi from "swagger-ui-express";
+// Fastify-native middleware
+import { fastifyRequestId } from "./middleware/requestId.js";
+import { fastifyCspNonce } from "./middleware/cspNonce.js";
+import { fastifyPrometheusOnRequest, fastifyPrometheusOnResponse } from "./middleware/prometheusMiddleware.js";
+import { fastifyErrorHandler } from "./middleware/errorHandler.js";
+import { fastifyRequireAuth } from "./middleware/fastifyAuth.js";
+
 import { swaggerSpec } from "./lib/swagger.js";
-import { requestContext } from "./lib/context.js";
 
 // Native Fastify plugins (all routes now converted)
 import askPlugin from "./routes/ask.js";
@@ -112,6 +107,12 @@ await fastify.register(fastifyHelmet, {
   contentSecurityPolicy: false, // CSP is handled separately via cspNonce middleware
 });
 
+await fastify.register(fastifyRateLimit, {
+  max: 120,
+  timeWindow: "1 minute",
+  keyGenerator: (request) => (request as any).userId?.toString() || request.ip,
+});
+
 const publicPath = fs.existsSync(path.join(process.cwd(), "frontend/dist"))
   ? path.join(process.cwd(), "frontend/dist")
   : path.join(process.cwd(), "dist/public");
@@ -123,6 +124,13 @@ await fastify.register(fastifyStatic, {
   index: false,
   wildcard: false,
 });
+
+// ─── Fastify-native global hooks (bypass Express overhead) ───────────────────
+fastify.addHook("onRequest", fastifyRequestId);
+fastify.addHook("onRequest", fastifyCspNonce);
+fastify.addHook("onRequest", fastifyPrometheusOnRequest);
+fastify.addHook("onResponse", fastifyPrometheusOnResponse);
+fastify.setErrorHandler(fastifyErrorHandler);
 
 // ─── Native Fastify routes (no Express overhead) ────────────────────────────
 
@@ -192,7 +200,6 @@ fastify.get("/health", async (_request, reply) => {
 });
 
 // ─── Register all native Fastify route plugins ─────────────────────────────
-// These MUST be registered BEFORE the @fastify/express compat layer.
 
 await fastify.register(templatesPlugin,       { prefix: "/api/templates" });
 await fastify.register(metricsPlugin,         { prefix: "/api/metrics" });
@@ -228,82 +235,82 @@ await fastify.register(evaluationPlugin,      { prefix: "/api/evaluation" });
 await fastify.register(askPlugin,             { prefix: "/api/ask" });
 await fastify.register(uploadsPlugin,         { prefix: "/api/uploads" });
 
-// ─── Express compatibility layer ────────────────────────────────────────────
-// Only needed for swagger-ui-express and BullMQ Board (dev only).
+// ─── Swagger API docs (native Fastify, no Express) ─────────────────────────
 
-await fastify.register(fastifyExpress);
-
-// Express middleware chain (for swagger and dev tools)
-fastify.use(cspNonce);
-fastify.use((pinoHttp as any)({ logger, autoLogging: { ignore: (req: any) => req.url === '/health' } }));
-fastify.use(express.json({ limit: "200kb" }));
-fastify.use(requestId);
-fastify.use(prometheusMiddleware);
-
-fastify.use((req: any, res: any, next: any) => {
-  requestContext.run({ requestId: req.requestId || res.getHeader('x-request-id') as string }, () => {
-    next();
-  });
+// Serve the OpenAPI spec as JSON
+fastify.get("/api/docs/swagger.json", async (_request, reply) => {
+  reply.type("application/json").send(swaggerSpec);
 });
 
-// Index route with CSP nonce injection
-fastify.use("/", (req: any, res: any, next: any) => {
-  if (req.method === "GET" && req.url === "/") {
-    const indexPath = path.join(publicPath, "index.html");
-    try {
-      let html = fs.readFileSync(indexPath, "utf8");
-      const nonce = res.locals.cspNonce as string;
+// Serve Swagger UI via CDN (no swagger-ui-express dependency)
+fastify.get("/api/docs", async (_request, reply) => {
+  const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>AIBYAI API Documentation</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
+  <style>.swagger-ui .topbar { display: none }</style>
+</head>
+<body>
+  <div id="swagger-ui"></div>
+  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
+  <script>SwaggerUIBundle({ url: "/api/docs/swagger.json", dom_id: "#swagger-ui" });</script>
+</body>
+</html>`;
+  reply.type("text/html").send(html);
+});
 
-      html = html
-        .replace(/<script\b([^>]*)>/g, (_match: string, attrs: string) => {
-          if (attrs.includes('nonce=')) return _match;
-          return `<script nonce="${nonce}"${attrs}>`;
-        });
+// ─── Index route with CSP nonce injection ───────────────────────────────────
 
-      res.setHeader("Content-Type", "text/html");
-      res.send(html);
-    } catch {
-      res.status(500).send("Failed to load application index");
-    }
-    return;
+fastify.get("/", async (request, reply) => {
+  const indexPath = path.join(publicPath, "index.html");
+  try {
+    let html = fs.readFileSync(indexPath, "utf8");
+    const nonce = (request as any).cspNonce as string || "";
+
+    // Inject CSP nonce into script tags using safe string replacement
+    // (avoids regex-based HTML parsing — CodeQL CWE-116 / CWE-185)
+    html = html.split("<script").join(`<script nonce="${nonce}"`);
+    html = html.split(`nonce="${nonce}" nonce="`).join(`nonce="`); // dedupe if already present
+
+    reply.type("text/html").send(html);
+  } catch {
+    reply.code(500).send("Failed to load application index");
   }
-  next();
 });
 
-// Swagger docs
-fastify.use("/api/docs", swaggerUi.serve);
-fastify.use("/api/docs", swaggerUi.setup(swaggerSpec, {
-  customCss: ".swagger-ui .topbar { display: none }",
-  customSiteTitle: "AIBYAI API Documentation",
-}));
+// ─── BullMQ Board (dev only, optional) ──────────────────────────────────────
 
-// Per-user rate limiting (Express compat for swagger/docs)
-fastify.use(perUserLimiter);
-
-// BullMQ Board (dev only)
 if (env.NODE_ENV === "development") {
   import("@bull-board/api").then(async ({ createBullBoard, BullMQAdapter }) => {
-    const { ExpressAdapter } = await import("@bull-board/express");
-    const serverAdapter = new ExpressAdapter();
-    serverAdapter.setBasePath("/admin/queues");
-    createBullBoard({
-      queues: [
-        new BullMQAdapter(ingestionQueue),
-        new BullMQAdapter(researchQueue),
-        new BullMQAdapter(repoQueue),
-        new BullMQAdapter(compactionQueue),
-      ],
-      serverAdapter,
-    });
-    fastify.use("/admin/queues", requireAuth, serverAdapter.getRouter());
-    logger.info("BullMQ Board mounted at /admin/queues");
-  }).catch((err) => {
-    logger.warn({ err }, "BullMQ Board not available (install @bull-board/api @bull-board/express as dev deps)");
+    try {
+      // @ts-expect-error — @bull-board/fastify is an optional dev dependency
+      const { FastifyAdapter } = await import("@bull-board/fastify");
+      const serverAdapter = new FastifyAdapter();
+      serverAdapter.setBasePath("/admin/queues");
+      createBullBoard({
+        queues: [
+          new BullMQAdapter(ingestionQueue),
+          new BullMQAdapter(researchQueue),
+          new BullMQAdapter(repoQueue),
+          new BullMQAdapter(compactionQueue),
+        ],
+        serverAdapter,
+      });
+      await fastify.register(serverAdapter.registerPlugin(), {
+        basePath: "/admin/queues",
+        prefix: "/admin/queues",
+      });
+      logger.info("BullMQ Board mounted at /admin/queues (Fastify adapter)");
+    } catch {
+      // Fall back gracefully if @bull-board/fastify not installed
+      logger.warn("BullMQ Board not available (install @bull-board/api @bull-board/fastify as dev deps)");
+    }
+  }).catch(() => {
+    logger.warn("BullMQ Board not available (install @bull-board/api @bull-board/fastify as dev deps)");
   });
 }
-
-// Express error handler (must be last .use())
-fastify.use(errorHandler);
 
 // ─── Fastify 404 handler ────────────────────────────────────────────────────
 

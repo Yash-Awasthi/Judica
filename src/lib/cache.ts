@@ -9,7 +9,7 @@ const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const embeddingLocks = new Map<string, Promise<number[] | null>>();
 
 export async function getEmbeddingWithLock(text: string): Promise<number[] | null> {
-  const key = crypto.createHash("md5").update(text).digest("hex");
+  const key = crypto.createHash("sha256").update(text).digest("hex");
 
   const existing = embeddingLocks.get(key);
   if (existing) {

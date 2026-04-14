@@ -4,19 +4,19 @@
 
 ### Multi-Agent Deliberative Intelligence Platform
 
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.9-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![React](https://img.shields.io/badge/React-18.3-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-6.0-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![Fastify](https://img.shields.io/badge/Fastify-5-000000?style=for-the-badge&logo=fastify&logoColor=white)](https://fastify.dev/)
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![License](https://img.shields.io/badge/License-ISC-22C55E?style=for-the-badge)](./LICENSE)
+
 
 <br />
 
 **Instead of trusting one model's best guess, AIBYAI runs a council — 4+ agents argue, critique each other's claims, and produce a scored consensus with a confidence number you can actually trust.**
 
-[Quick Start](#-quick-start) · [Architecture](#-architecture) · [Features](#-features) · [Documentation](./DOCUMENTATION.md) · [Roadmap](./ROADMAP.md)
+[Quick Start](#quick-start) · [Architecture](#architecture) · [Features](#features) · [Documentation](./DOCUMENTATION.md) · [Roadmap](./ROADMAP.md)
 
 </div>
 
@@ -100,7 +100,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    FE["Frontend\nReact 18 · Vite · Tailwind"]
+    FE["Frontend\nReact 19 · Vite · Tailwind"]
     GW["API Gateway\nFastify 5 · JWT · RBAC · Rate Limit"]
     EN["Deliberation Engine\nRouter · Agents · Conflict\nDebate · Synthesis · Validator"]
     LLM["7 LLM Providers\nOpenAI · Anthropic · Gemini\nGroq · Ollama · OpenRouter"]
@@ -159,9 +159,9 @@ Multi-provider TTS with automatic fallback and STT input. Server-side PII scanni
 
 | Layer | Technology |
 |---|---|
-| **Runtime** | Node.js 22, TypeScript 5.9 (strict) |
+| **Runtime** | Node.js 22, TypeScript 6.0 (strict) |
 | **API** | Fastify 5 — 35 route plugins, Swagger UI |
-| **Frontend** | React 18, Vite 6, Tailwind CSS |
+| **Frontend** | React 19, Vite 6, Tailwind CSS |
 | **Database** | PostgreSQL 16 + pgvector + HNSW indexes, Drizzle ORM |
 | **Cache / Queues** | Redis 7, BullMQ with dead-letter queue |
 | **Realtime** | Native WebSocket (ws) + SSE streaming |
@@ -242,27 +242,34 @@ aibyai/
 │   ├── agents/             # Orchestrator, conflict detector, shared memory
 │   ├── auth/               # OAuth strategies (Google, GitHub)
 │   ├── config/             # Zod-validated environment config
-│   ├── db/schema/          # 15 Drizzle ORM tables, HNSW indexes
+│   ├── db/schema/          # 13 Drizzle ORM tables, HNSW indexes
 │   ├── lib/                # Crypto, circuit breaker, cost tracking, SSRF, scoring
-│   ├── middleware/          # Auth, RBAC, rate limiting, CSP, validation
+│   ├── middleware/         # Auth, RBAC, rate limiting, CSP, quota, request ID, error handling
+│   ├── observability/      # OpenTelemetry tracer
 │   ├── processors/         # File ingestion (PDF, DOCX, XLSX, CSV, images)
 │   ├── queue/              # BullMQ workers + dead-letter queue
 │   ├── router/             # Smart routing, token estimation, quota tracking
 │   ├── routes/             # 35 Fastify route plugins
 │   ├── sandbox/            # V8 isolate (JS) + subprocess (Python)
 │   ├── services/           # Council, research, embeddings, memory, reliability
-│   └── workflow/           # Executor + 12 node type handlers
+│   ├── types/              # TypeScript declarations
+│   └── workflow/           # Executor + 9 node type handlers
 ├── frontend/src/
-│   ├── components/         # React components
+│   ├── components/         # React components + 12 workflow node UIs
 │   ├── context/            # Auth + Theme contexts
-│   ├── views/              # 12 views (Chat, Debate, Workflows, Marketplace, etc.)
-│   └── router.tsx          # React Router
-├── tests/                  # 166 test files, 2550+ tests (86%+ coverage)
+│   ├── hooks/              # Council stream, deliberation, member hooks
+│   ├── layouts/            # Root layout
+│   ├── views/              # 13 views (Chat, Debate, Workflows, Marketplace, etc.)
+│   └── router.tsx          # React Router 7
+├── tests/                  # 166 test files (86%+ coverage)
 ├── grafana/                # Auto-provisioned dashboards
+├── scripts/                # Setup, load tests, provider diagnostics
+├── .github/workflows/      # CI: lint, typecheck, test, security audit, CodeQL
 ├── docker-compose.yml      # PostgreSQL + Redis + Prometheus + Grafana
 ├── Dockerfile              # Multi-stage build with HEALTHCHECK
 ├── DOCUMENTATION.md        # Complete technical reference
-└── .github/workflows/      # CI: lint, typecheck, test, security audit, CodeQL
+├── SECURITY.md             # Vulnerability reporting & security policy
+└── ROADMAP.md              # Future development roadmap
 ```
 
 ---
@@ -273,13 +280,14 @@ aibyai/
 |---|---|
 | **Authentication** | JWT (HS256-pinned, 15 min TTL) + rotating httpOnly refresh tokens + argon2id |
 | **OAuth2** | Google + GitHub with verified email enforcement |
-| **Authorization** | RBAC (member/admin), per-route guards |
+| **Authorization** | RBAC (member/admin), per-route guards, per-tenant quota enforcement |
 | **Rate Limiting** | Redis-backed: 10/min auth, 60/min API, 10/min sandbox, 20/min voice |
 | **Input Validation** | Zod on all payloads; safe math parser (no eval); LIKE wildcard escaping |
 | **SSRF Protection** | Validated on all outbound HTTP — adapters, tools, workflow nodes |
 | **Code Sandbox** | JS: V8 isolate (128MB). Python: ulimit + socket blocking. Process-level only. |
-| **Encryption** | AES-256-GCM, per-record IV-derived key via scrypt |
+| **Encryption** | AES-256-GCM, per-record IV-derived key via scrypt; API keys encrypted server-side |
 | **Resilience** | Circuit breaker on provider calls, exponential backoff, dead-letter queue |
+| **Headers** | CSP with nonce, request ID correlation, structured error responses |
 
 ---
 
@@ -295,12 +303,6 @@ aibyai/
    ```
 4. Commit with conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`
 5. Push and open a pull request
-
----
-
-## License
-
-[ISC](./LICENSE) — Yash Awasthi
 
 ---
 

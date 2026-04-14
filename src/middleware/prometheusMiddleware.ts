@@ -1,19 +1,20 @@
-import { Request, Response, NextFunction } from "express";
+import type { FastifyRequest, FastifyReply } from "fastify";
 import { httpRequestDuration, httpRequestTotal } from "../lib/prometheusMetrics.js";
 
-export function prometheusMiddleware(req: Request, res: Response, next: NextFunction) {
-  const end = httpRequestDuration.startTimer();
+export async function fastifyPrometheusOnRequest(request: FastifyRequest, reply: FastifyReply) {
+  (request as any).metricsTimer = httpRequestDuration.startTimer();
+}
 
-  res.on("finish", () => {
-    const route = req.route?.path || req.path;
+export async function fastifyPrometheusOnResponse(request: FastifyRequest, reply: FastifyReply) {
+  const timer = (request as any).metricsTimer;
+  if (timer) {
+    const route = request.routeOptions?.url || request.url;
     const labels = {
-      method: req.method,
+      method: request.method,
       route,
-      status_code: String(res.statusCode),
+      status_code: String(reply.statusCode),
     };
-    end(labels);
+    timer(labels);
     httpRequestTotal.inc(labels);
-  });
-
-  next();
+  }
 }

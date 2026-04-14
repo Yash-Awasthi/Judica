@@ -1,22 +1,24 @@
 import type { ProcessedFile } from "./types.js";
 import { assertFileSizeLimit } from "./types.js";
-import fs from "fs";
+import ExcelJS from "exceljs";
 
-// TODO: xlsx 0.18.5 has known security advisories (CVE-2024-22363 and others).
-// Replace with 'exceljs' when possible. See: https://github.com/SheetJS/sheetjs/issues
 export async function processXLSX(filePath: string): Promise<ProcessedFile> {
   assertFileSizeLimit(filePath);
-  const XLSX = await import("xlsx");
-  const buffer = fs.readFileSync(filePath);
-  const workbook = XLSX.read(buffer, { type: "buffer" });
+  const workbook = new ExcelJS.Workbook();
+  await workbook.xlsx.readFile(filePath);
   const sheets: string[] = [];
   const parts: string[] = [];
 
-  for (const name of workbook.SheetNames) {
-    sheets.push(name);
-    const sheet = workbook.Sheets[name];
-    const csv = XLSX.utils.sheet_to_csv(sheet);
-    parts.push(`=== Sheet: ${name} ===\n${csv}`);
+  for (const sheet of workbook.worksheets) {
+    sheets.push(sheet.name);
+    const rows: string[] = [];
+    sheet.eachRow((row) => {
+      const values = row.values as (string | number | boolean | null | undefined)[];
+      // row.values is 1-indexed; first element is undefined
+      const cells = values.slice(1).map((v) => (v === null || v === undefined ? "" : String(v)));
+      rows.push(cells.join(","));
+    });
+    parts.push(`=== Sheet: ${sheet.name} ===\n${rows.join("\n")}`);
   }
 
   return {

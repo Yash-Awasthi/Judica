@@ -164,16 +164,30 @@ export interface ApiKeyResolutionInput {
   name?: string;
 }
 
+function getHostname(urlStr: string): string {
+  try {
+    return new URL(urlStr).hostname;
+  } catch {
+    return "";
+  }
+}
+
 export function resolveApiKey(member: ApiKeyResolutionInput): string {
-  const base = (member.baseUrl || "").toLowerCase();
+  const hostname = getHostname(member.baseUrl || "");
   const model = (member.model || "").toLowerCase();
 
-  if (base.includes("siliconflow"))   return env.XIAOMI_MIMO_API_KEY || env.OPENAI_API_KEY || "";
-  if (base.includes("openrouter"))    return env.OPENROUTER_API_KEY || env.OPENAI_API_KEY || "";
-  if (base.includes("groq.com"))      return env.GROQ_API_KEY || env.OPENAI_API_KEY || "";
-  if (base.includes("mistral.ai"))    return env.MISTRAL_API_KEY || env.OPENAI_API_KEY || "";
-  if (base.includes("cerebras.ai"))   return env.CEREBRAS_API_KEY || env.OPENAI_API_KEY || "";
-  if (base.includes("nvidia.com"))    return env.NVIDIA_API_KEY || env.OPENAI_API_KEY || "";
+  if (hostname.endsWith("siliconflow.cn") || hostname.endsWith("siliconflow.com"))
+    return env.XIAOMI_MIMO_API_KEY || env.OPENAI_API_KEY || "";
+  if (hostname.endsWith("openrouter.ai"))
+    return env.OPENROUTER_API_KEY || env.OPENAI_API_KEY || "";
+  if (hostname.endsWith("groq.com"))
+    return env.GROQ_API_KEY || env.OPENAI_API_KEY || "";
+  if (hostname.endsWith("mistral.ai"))
+    return env.MISTRAL_API_KEY || env.OPENAI_API_KEY || "";
+  if (hostname.endsWith("cerebras.ai"))
+    return env.CEREBRAS_API_KEY || env.OPENAI_API_KEY || "";
+  if (hostname.endsWith("nvidia.com"))
+    return env.NVIDIA_API_KEY || env.OPENAI_API_KEY || "";
 
   if (model.includes("xiaomi") || model.includes("mimo")) return env.XIAOMI_MIMO_API_KEY || env.OPENAI_API_KEY || "";
   if (model.includes("mistral"))      return env.MISTRAL_API_KEY || env.OPENAI_API_KEY || "";

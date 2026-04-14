@@ -53,7 +53,7 @@ const nodeTypes = {
 function WorkflowEditorInner() {
   const { id: workflowId } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { fetchWithAuth } = useAuth();
+  const { fetchWithAuth, token } = useAuth();
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const nodeIdCounterRef = useRef(0);
 
@@ -214,8 +214,7 @@ function WorkflowEditorInner() {
 
       const { run_id } = await res.json();
 
-      // Subscribe to SSE using fetch with Authorization header
-      const token = localStorage.getItem("council_token") || "";
+      // Subscribe to SSE using fetch with Authorization header (token from auth context)
       const streamUrl = `/api/workflows/runs/${run_id}/stream`;
       const abortController = new AbortController();
 
@@ -296,7 +295,16 @@ function WorkflowEditorInner() {
     const blob = new Blob([JSON.stringify(def, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url;
+    try {
+      const parsedUrl = new URL(url, window.location.origin);
+      if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:" && parsedUrl.protocol !== "blob:") {
+        throw new Error("Invalid protocol");
+      }
+      a.href = parsedUrl.toString();
+    } catch {
+      URL.revokeObjectURL(url);
+      return;
+    }
     a.download = `${workflowName.replace(/\s+/g, "_")}.json`;
     a.click();
     URL.revokeObjectURL(url);
@@ -336,11 +344,12 @@ function WorkflowEditorInner() {
   }, [nodes, nodeStatuses]);
 
   return (
-    <div className="flex flex-col h-full bg-[var(--bg)]">
+    <div className="flex flex-col h-full bg-[var(--bg)]" aria-label="Workflow Editor">
       {/* Top bar */}
       <div className="flex items-center gap-3 px-4 py-2.5 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-1)]">
         <input
           className="text-lg font-semibold bg-transparent text-[var(--text-primary)] border-b border-transparent hover:border-[var(--border-subtle)] focus:border-[var(--accent-mint)] focus:outline-none px-1 py-0.5 min-w-[200px]"
+          aria-label="Workflow name"
           value={workflowName}
           onChange={(e) => setWorkflowName(e.target.value)}
         />
@@ -348,6 +357,8 @@ function WorkflowEditorInner() {
         <button
           onClick={handleSave}
           disabled={saving}
+          aria-label="Save workflow"
+          aria-keyshortcuts="Control+S"
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold btn-pill-primary disabled:opacity-50"
         >
           <Save size={14} /> {saving ? "Saving..." : "Save"}
@@ -355,18 +366,21 @@ function WorkflowEditorInner() {
         <button
           onClick={handleRunStart}
           disabled={running || !savedId}
+          aria-label="Run workflow"
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-button bg-[rgba(110,231,183,0.08)] text-[var(--accent-mint)] border border-[rgba(110,231,183,0.15)] hover:bg-[rgba(110,231,183,0.15)] transition-colors disabled:opacity-50"
         >
           <Play size={14} /> {running ? "Running..." : "Run"}
         </button>
         <button
           onClick={handleExport}
+          aria-label="Export workflow"
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-button bg-[var(--glass-bg)] text-[var(--text-secondary)] border border-[var(--glass-border)] hover:bg-[var(--glass-bg-hover)] transition-colors"
         >
           <Download size={14} /> Export
         </button>
         <button
           onClick={handleImport}
+          aria-label="Import workflow"
           className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-button bg-[var(--glass-bg)] text-[var(--text-secondary)] border border-[var(--glass-border)] hover:bg-[var(--glass-bg-hover)] transition-colors"
         >
           <Upload size={14} /> Import
@@ -376,7 +390,7 @@ function WorkflowEditorInner() {
       {/* Main area */}
       <div className="flex flex-1 overflow-hidden">
         <NodePalette />
-        <div className="flex-1 relative" ref={reactFlowWrapper}>
+        <div className="flex-1 relative" ref={reactFlowWrapper} role="application" aria-label="Workflow canvas" aria-roledescription="Drag and drop workflow editor">
           <ReactFlow
             nodes={styledNodes}
             edges={edges}
@@ -412,7 +426,7 @@ function WorkflowEditorInner() {
             <div className="p-4 max-h-48 overflow-y-auto scrollbar-custom">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="text-xs font-bold text-[var(--text-muted)] uppercase tracking-widest">Workflow Output</h4>
-                <button onClick={() => setRunOutputs(null)} className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
+                <button onClick={() => setRunOutputs(null)} aria-label="Close output panel" className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors">
                   <X size={14} />
                 </button>
               </div>

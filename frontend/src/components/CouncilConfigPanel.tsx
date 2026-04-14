@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { X, Plus, Trash2 } from "lucide-react";
 import type { CouncilMember } from "../types/index.js";
+import { maskApiKey } from "../hooks/useCouncilMembers.js";
+import { useFocusTrap } from "../hooks/useFocusTrap.js";
 
 interface CouncilConfigPanelProps {
   isOpen: boolean;
@@ -39,6 +42,42 @@ const TONE_PRESETS: Record<string, string> = {
   "Casual": "Use simple conversational language.",
 };
 
+// Separate component for API key input that never displays the real key
+function ApiKeyInput({ memberId: _memberId, hasKey, maskedKey, onUpdate }: {
+  memberId: string;
+  hasKey: boolean;
+  maskedKey: string;
+  onUpdate: (value: string) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+
+  const handleFocus = () => {
+    setEditing(true);
+    setDraft("");
+  };
+
+  const handleBlur = () => {
+    if (draft) {
+      onUpdate(draft);
+    }
+    setEditing(false);
+    setDraft("");
+  };
+
+  return (
+    <input
+      type="password"
+      placeholder={hasKey ? maskedKey : "API Key (optional)"}
+      value={editing ? draft : ""}
+      onFocus={handleFocus}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={handleBlur}
+      className="flex-1 px-2 py-1.5 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-md text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-mint)]/50 transition-colors font-mono"
+    />
+  );
+}
+
 export function CouncilConfigPanel({
   isOpen,
   onClose,
@@ -51,16 +90,21 @@ export function CouncilConfigPanel({
   onRemoveMember,
   onUpdateMember
 }: CouncilConfigPanelProps) {
+  const trapRef = useFocusTrap(onClose);
   return (
     <AnimatePresence>
       {isOpen && (
         <>
           <div className="fixed inset-0 z-40" onClick={onClose} />
           <motion.div
+            ref={trapRef}
             initial={{ opacity: 0, y: 8, scale: 0.97 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.97 }}
             transition={{ duration: 0.2, ease: "easeOut" }}
+            role="dialog"
+            aria-modal="true"
+            aria-label="Council Configuration"
             className="absolute bottom-full right-4 mb-4 w-96 surface-card rounded-modal shadow-2xl z-50 p-6 border border-[var(--border-medium)] max-h-[60vh] overflow-y-auto scrollbar-custom"
           >
             <div className="flex items-center justify-between mb-5">
@@ -207,12 +251,11 @@ export function CouncilConfigPanel({
                           onChange={(e) => onUpdateMember(member.id, "model", e.target.value)}
                           className="flex-1 px-2 py-1.5 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-md text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-mint)]/50 transition-colors font-mono"
                         />
-                        <input
-                          type="password"
-                          placeholder="API Key (optional)"
-                          value={member.apiKey || ""}
-                          onChange={(e) => onUpdateMember(member.id, "apiKey", e.target.value)}
-                          className="flex-1 px-2 py-1.5 bg-[var(--input-bg)] border border-[var(--input-border)] rounded-md text-xs text-[var(--text-primary)] focus:outline-none focus:border-[var(--accent-mint)]/50 transition-colors font-mono"
+                        <ApiKeyInput
+                          memberId={member.id}
+                          hasKey={!!member.apiKey}
+                          maskedKey={maskApiKey(member.apiKey)}
+                          onUpdate={(value) => onUpdateMember(member.id, "apiKey", value)}
                         />
                       </div>
                     </div>

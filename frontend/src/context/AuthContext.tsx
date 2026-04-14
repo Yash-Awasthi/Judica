@@ -16,7 +16,8 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  const [token, setToken] = useState<string | null>(() => localStorage.getItem("council_token"));
+  // Token kept in memory only (also set as httpOnly cookie by backend)
+  const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<string>(() => localStorage.getItem("council_user") || "");
 
   const tokenRef = useRef<string | null>(token);
@@ -24,30 +25,45 @@ export function AuthProvider({ children }: AuthProviderProps) {
     tokenRef.current = token;
   }, [token]);
 
+  // On mount, try to restore session via refresh endpoint (cookie-based)
+  useEffect(() => {
+    if (user && !token) {
+      fetch("/api/auth/refresh", { method: "POST", credentials: "include" })
+        .then(res => res.ok ? res.json() : null)
+        .then(data => {
+          if (data?.token) {
+            tokenRef.current = data.token;
+            setToken(data.token);
+            setUser(data.username || user);
+          }
+        })
+        .catch(() => { /* no valid refresh token */ });
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
   const logout = useCallback(async () => {
-    const currentToken = tokenRef.current;
-    if (currentToken) {
-      try {
-        await fetch("/api/auth/logout", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${currentToken}` }
-        });
-      } catch (err: unknown) {
-        console.error("Logout request failed", err);
-      }
+    try {
+      await fetch("/api/auth/logout", {
+        method: "POST",
+        credentials: "include",
+        headers: tokenRef.current ? { Authorization: `Bearer ${tokenRef.current}` } : {},
+      });
+    } catch (err: unknown) {
+      console.error("Logout request failed", err);
     }
     tokenRef.current = null;
     setToken(null);
     setUser("");
-    localStorage.removeItem("council_token");
     localStorage.removeItem("council_user");
+    // Remove legacy keys
+    localStorage.removeItem("council_token");
   }, []);
 
   const login = useCallback(async (emailOrToken: string, passwordOrUsername: string) => {
-    // Try API login first
     try {
       const res = await fetch("/api/auth/login", {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username: emailOrToken, password: passwordOrUsername }),
       });
@@ -56,7 +72,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
         tokenRef.current = data.token;
         setToken(data.token);
         setUser(data.username || emailOrToken);
-        localStorage.setItem("council_token", data.token);
         localStorage.setItem("council_user", data.username || emailOrToken);
         return;
       }
@@ -70,6 +85,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const register = useCallback(async (username: string, email: string, password: string) => {
     const res = await fetch("/api/auth/register", {
       method: "POST",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ username, email, password }),
     });
@@ -81,7 +97,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     tokenRef.current = data.token;
     setToken(data.token);
     setUser(data.username || username);
-    localStorage.setItem("council_token", data.token);
     localStorage.setItem("council_user", data.username || username);
   }, []);
 
@@ -91,14 +106,26 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit): Promise<Response> => {
     const currentToken = tokenRef.current;
     const headers = new Headers(options?.headers || {});
-    
+
+    // Still send Bearer token in header for backward compat + non-cookie clients
     if (currentToken && !headers.has("Authorization")) {
       headers.set("Authorization", `Bearer ${currentToken}`);
     }
 
-    const response = await fetch(url, { ...options, headers });
+    const response = await fetch(url, { ...options, headers, credentials: "include" });
 
     if (response.status === 401) {
+      // Try to refresh the token via cookie
+      const refreshRes = await fetch("/api/auth/refresh", { method: "POST", credentials: "include" });
+      if (refreshRes.ok) {
+        const data = await refreshRes.json();
+        tokenRef.current = data.token;
+        setToken(data.token);
+        // Retry the original request with new token
+        const retryHeaders = new Headers(options?.headers || {});
+        retryHeaders.set("Authorization", `Bearer ${data.token}`);
+        return fetch(url, { ...options, headers: retryHeaders, credentials: "include" });
+      }
       logoutRef.current();
     }
 

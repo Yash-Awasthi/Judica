@@ -1,5 +1,6 @@
 import { pool } from "../lib/db.js";
 import { embed } from "./embeddings.service.js";
+import { safeVectorLiteral } from "./vectorStore.service.js";
 
 export interface CodeSearchResult {
   path: string;
@@ -14,7 +15,7 @@ export async function searchRepo(
   limit = 10
 ): Promise<CodeSearchResult[]> {
   const queryEmbedding = await embed(query);
-  const vectorStr = `[${queryEmbedding.join(",")}]`;
+  const vectorStr = safeVectorLiteral(queryEmbedding);
 
   const { rows } = await pool.query<{
     path: string;

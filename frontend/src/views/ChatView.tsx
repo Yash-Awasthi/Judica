@@ -132,7 +132,16 @@ export function ChatView() {
       const blob = await res.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
-      a.href = url;
+      try {
+        const parsedUrl = new URL(url, window.location.origin);
+        if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:" && parsedUrl.protocol !== "blob:") {
+          throw new Error("Invalid protocol");
+        }
+        a.href = parsedUrl.toString();
+      } catch {
+        window.URL.revokeObjectURL(url);
+        return;
+      }
       a.download = `deliberation-${conversationId}.${format === "markdown" ? "md" : "json"}`;
       document.body.appendChild(a);
       a.click();

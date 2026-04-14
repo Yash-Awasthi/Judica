@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { errorHandler, AppError } from "../../src/middleware/errorHandler.js";
+import { fastifyErrorHandler, AppError } from "../../src/middleware/errorHandler.js";
 import { env } from "../../src/config/env.js";
 
 vi.mock("../../src/lib/logger.js", () => ({
@@ -10,44 +10,41 @@ vi.mock("../../src/config/env.js", () => ({
   env: { NODE_ENV: "development" }
 }));
 
-describe("Error Handler Middleware", () => {
-  let req: any;
-  let res: any;
-  let next: any;
+describe("Fastify Error Handler", () => {
+  let request: any;
+  let reply: any;
 
   beforeEach(() => {
     vi.resetAllMocks();
-    req = { path: "/test", method: "GET", requestId: "req-123" };
-    res = {
-      status: vi.fn().mockReturnThis(),
-      json: vi.fn().mockReturnThis()
+    request = { url: "/test", method: "GET" };
+    reply = {
+      code: vi.fn().mockReturnThis(),
+      send: vi.fn().mockReturnThis(),
     };
-    next = vi.fn();
   });
 
   it("should handle AppError", () => {
     const error = new AppError(403, "Forbidden Action", "FORBIDDEN");
-    errorHandler(error, req, res, next);
+    fastifyErrorHandler(error, request, reply);
 
-    expect(res.status).toHaveBeenCalledWith(403);
-    expect(res.json).toHaveBeenCalledWith({ error: "Forbidden Action", code: "FORBIDDEN" });
+    expect(reply.code).toHaveBeenCalledWith(403);
+    expect(reply.send).toHaveBeenCalledWith({ error: "Forbidden Action", code: "FORBIDDEN" });
   });
 
   it("should handle ZodError (validation failed)", () => {
     const error = { name: "ZodError", issues: [{ message: "Required" }] } as any;
-    errorHandler(error, req, res, next);
+    fastifyErrorHandler(error, request, reply);
 
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith({ error: "Validation failed", details: error.issues });
+    expect(reply.code).toHaveBeenCalledWith(400);
+    expect(reply.send).toHaveBeenCalledWith({ error: "Validation failed", details: error.issues });
   });
 
   it("should handle generic errors (development)", () => {
-    // env.NODE_ENV is "development" from mock
     const error = new Error("Something went wrong");
-    errorHandler(error, req, res, next);
+    fastifyErrorHandler(error, request, reply);
 
-    expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({
+    expect(reply.code).toHaveBeenCalledWith(500);
+    expect(reply.send).toHaveBeenCalledWith({
       error: "Something went wrong",
       code: "INTERNAL_ERROR"
     });
@@ -56,10 +53,10 @@ describe("Error Handler Middleware", () => {
   it("should handle generic errors (production)", () => {
     vi.mocked(env).NODE_ENV = "production";
     const error = new Error("Secret error details");
-    errorHandler(error, req, res, next);
+    fastifyErrorHandler(error, request, reply);
 
-    expect(res.status).toHaveBeenCalledWith(500);
-    expect(res.json).toHaveBeenCalledWith({
+    expect(reply.code).toHaveBeenCalledWith(500);
+    expect(reply.send).toHaveBeenCalledWith({
       error: "Internal server error",
       code: "INTERNAL_ERROR"
     });

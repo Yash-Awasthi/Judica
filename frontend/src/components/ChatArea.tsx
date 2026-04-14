@@ -1,6 +1,7 @@
 import { useReducer, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Settings2, Download, FileText, FileJson } from "lucide-react";
+import { useAuth } from "../context/AuthContext.js";
 import { MessageList } from "./MessageList.js";
 import { InputArea } from "./InputArea.js";
 import { StreamingStatus } from "./StreamingStatus.js";
@@ -78,6 +79,7 @@ export function ChatArea({
   onUpdateMembers,
   isLoading = false
 }: ChatAreaProps) {
+  const { fetchWithAuth } = useAuth();
   const [state, dispatch] = useReducer(chatAreaReducer, {
     input: "",
     summon: defaultSummon,
@@ -119,12 +121,10 @@ export function ChatArea({
     }
     setPlayingAudioId(msgId);
     try {
-      const token = localStorage.getItem("council_token");
-      const res = await fetch("/api/tts", {
+      const res = await fetchWithAuth("/api/tts", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {})
         },
         body: JSON.stringify({ text })
       });
@@ -166,13 +166,14 @@ export function ChatArea({
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full overflow-hidden bg-[var(--bg)] relative">
+    <div className="flex-1 flex flex-col h-full overflow-hidden bg-[var(--bg)] relative" role="main" aria-label="Chat">
 
       {/* ━━━ Top Bar ━━━ */}
       <header className="shrink-0 h-14 flex items-center justify-between px-5 md:px-8 bg-[var(--bg-surface-1)]/80 backdrop-blur-xl border-b border-[var(--border-subtle)] z-20">
         <div className="flex items-center gap-3 min-w-0">
           <button
             onClick={onToggleSidebar}
+            aria-label="Toggle sidebar"
             className="md:hidden p-2 -ml-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] rounded-lg transition-colors hover:bg-[var(--glass-bg-hover)]"
           >
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
@@ -191,6 +192,7 @@ export function ChatArea({
           {/* Council Settings */}
           <button
             onClick={() => setShowMemberConfig(true)}
+            aria-label="Council settings"
             className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold text-[var(--accent-mint)] hover:bg-[rgba(110,231,183,0.08)] rounded-button transition-all uppercase tracking-widest border border-[rgba(110,231,183,0.15)] hover:border-[rgba(110,231,183,0.3)]"
           >
             <Settings2 size={14} />
@@ -201,6 +203,7 @@ export function ChatArea({
           <div className="relative">
             <button
               onClick={() => setShowExport(!showExport)}
+              aria-label="Export conversation"
               className="flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-semibold text-[var(--text-secondary)] hover:text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)] rounded-button transition-all uppercase tracking-widest"
             >
               <Download size={14} />
@@ -242,7 +245,7 @@ export function ChatArea({
       <StreamingStatus isLoading={isLoading} isStreaming={false} />
 
       {/* ━━━ Messages ━━━ */}
-      <div ref={scrollRef} className="flex-1 overflow-y-auto pt-6 pb-32 px-4 md:px-8 scrollbar-custom">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto pt-6 pb-32 px-4 md:px-8 scrollbar-custom" role="log" aria-live="polite" aria-label="Chat messages">
         {isLoading ? (
           <div className="max-w-3xl mx-auto space-y-6 pt-8">
             <SkeletonLoader variant="text" count={3} />

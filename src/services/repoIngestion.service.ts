@@ -5,6 +5,7 @@ import { codeRepositories } from "../db/schema/repos.js";
 import { eq } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { embed } from "./embeddings.service.js";
+import { safeVectorLiteral } from "./vectorStore.service.js";
 import logger from "../lib/logger.js";
 
 const SUPPORTED_EXTENSIONS = [
@@ -99,7 +100,7 @@ export async function ingestGitHubRepo(
             const ext = getExtension(file.path!);
             const language = extensionToLanguage(ext);
             const embedding = await embed(content);
-            const vectorStr = `[${embedding.join(",")}]`;
+            const vectorStr = safeVectorLiteral(embedding);
 
             await pool.query(
               `INSERT INTO "CodeFile" ("id", "repoId", "path", "language", "content", "embedding")

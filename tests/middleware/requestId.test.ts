@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { requestId } from "../../src/middleware/requestId.js";
+import { fastifyRequestId } from "../../src/middleware/requestId.js";
 
 vi.mock("crypto", async () => {
   const actual = await vi.importActual<typeof import("crypto")>("crypto");
@@ -10,59 +10,44 @@ vi.mock("crypto", async () => {
 });
 
 function createMocks(headers: Record<string, string> = {}) {
-  const req = { headers } as any;
-  const resHeaders: Record<string, string> = {};
-  const res = {
-    locals: {} as Record<string, any>,
-    setHeader: vi.fn((name: string, value: string) => {
-      resHeaders[name] = value;
-    }),
+  const request = { headers } as any;
+  const reply = {
+    header: vi.fn().mockReturnThis(),
   } as any;
-  const next = vi.fn();
-  return { req, res, next, resHeaders };
+  return { request, reply };
 }
 
-describe("requestId middleware", () => {
+describe("fastifyRequestId middleware", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("uses the x-request-id header if present", () => {
-    const { req, res, next } = createMocks({ "x-request-id": "client-id-abc" });
-    requestId(req, res, next);
+  it("uses the x-request-id header if present", async () => {
+    const { request, reply } = createMocks({ "x-request-id": "client-id-abc" });
+    await fastifyRequestId(request, reply);
 
-    expect(req.requestId).toBe("client-id-abc");
-    expect(res.locals.requestId).toBe("client-id-abc");
+    expect(request.requestId).toBe("client-id-abc");
   });
 
-  it("generates a UUID if x-request-id header is missing", () => {
-    const { req, res, next } = createMocks();
-    requestId(req, res, next);
+  it("generates a UUID if x-request-id header is missing", async () => {
+    const { request, reply } = createMocks();
+    await fastifyRequestId(request, reply);
 
-    expect(req.requestId).toBe("generated-uuid-1234");
-    expect(res.locals.requestId).toBe("generated-uuid-1234");
+    expect(request.requestId).toBe("generated-uuid-1234");
   });
 
-  it("sets X-Request-ID response header", () => {
-    const { req, res, next } = createMocks({ "x-request-id": "my-id" });
-    requestId(req, res, next);
+  it("sets X-Request-ID response header", async () => {
+    const { request, reply } = createMocks({ "x-request-id": "my-id" });
+    await fastifyRequestId(request, reply);
 
-    expect(res.setHeader).toHaveBeenCalledWith("X-Request-ID", "my-id");
+    expect(reply.header).toHaveBeenCalledWith("X-Request-ID", "my-id");
   });
 
-  it("sets res.locals.requestId", () => {
-    const { req, res, next } = createMocks();
-    requestId(req, res, next);
+  it("sets request.requestId", async () => {
+    const { request, reply } = createMocks();
+    await fastifyRequestId(request, reply);
 
-    expect(res.locals.requestId).toBeDefined();
-    expect(typeof res.locals.requestId).toBe("string");
-  });
-
-  it("calls next()", () => {
-    const { req, res, next } = createMocks();
-    requestId(req, res, next);
-
-    expect(next).toHaveBeenCalledOnce();
-    expect(next).toHaveBeenCalledWith();
+    expect(request.requestId).toBeDefined();
+    expect(typeof request.requestId).toBe("string");
   });
 });

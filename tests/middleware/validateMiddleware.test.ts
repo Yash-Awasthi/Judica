@@ -11,7 +11,6 @@ vi.mock("../../src/lib/logger.js", () => ({
 }));
 
 import {
-  validate,
   fastifyValidate,
   providerSchema,
   askSchema,
@@ -21,69 +20,6 @@ import {
   authSchema,
   configSchema,
 } from "../../src/middleware/validate.js";
-
-// ── Express validate() middleware ────────────────────────────────────
-describe("validate() — Express middleware", () => {
-  const schema = z.object({
-    name: z.string().min(1),
-    age: z.number().int().min(0),
-  });
-  const middleware = validate(schema);
-
-  function makeMocks(body: unknown) {
-    const req = { body } as any;
-    const res = {
-      status: vi.fn().mockReturnThis(),
-      json: vi.fn().mockReturnThis(),
-    } as any;
-    const next = vi.fn();
-    return { req, res, next };
-  }
-
-  it("should call next() and set parsed body on valid input", () => {
-    const { req, res, next } = makeMocks({ name: "Alice", age: 30 });
-    middleware(req, res, next);
-    expect(next).toHaveBeenCalledOnce();
-    expect(req.body).toEqual({ name: "Alice", age: 30 });
-    expect(res.status).not.toHaveBeenCalled();
-  });
-
-  it("should strip unknown keys (zod default strip)", () => {
-    const { req, res, next } = makeMocks({ name: "Bob", age: 25, extra: true });
-    middleware(req, res, next);
-    expect(next).toHaveBeenCalledOnce();
-    expect(req.body).toEqual({ name: "Bob", age: 25 });
-  });
-
-  it("should return 400 with error details on invalid input", () => {
-    const { req, res, next } = makeMocks({ name: "", age: -1 });
-    middleware(req, res, next);
-    expect(next).not.toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(400);
-    expect(res.json).toHaveBeenCalledWith(
-      expect.objectContaining({
-        error: "Validation failed",
-        details: expect.arrayContaining([
-          expect.objectContaining({ field: expect.any(String), message: expect.any(String) }),
-        ]),
-      })
-    );
-  });
-
-  it("should return 400 when body is completely wrong type", () => {
-    const { req, res, next } = makeMocks("not an object");
-    middleware(req, res, next);
-    expect(next).not.toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-
-  it("should return 400 when body is undefined", () => {
-    const { req, res, next } = makeMocks(undefined);
-    middleware(req, res, next);
-    expect(next).not.toHaveBeenCalled();
-    expect(res.status).toHaveBeenCalledWith(400);
-  });
-});
 
 // ── Fastify fastifyValidate() hook ───────────────────────────────────
 describe("fastifyValidate() — Fastify preHandler", () => {

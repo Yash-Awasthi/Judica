@@ -93,6 +93,8 @@ export function AuthScreen() {
                 animate={{ height: "auto", opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
                 className="mb-4 px-4 py-3 rounded-button bg-[var(--accent-coral)]/8 border border-[var(--accent-coral)]/15 text-[var(--accent-coral)] text-sm"
+                role="alert"
+                aria-live="assertive"
               >
                 {error}
               </motion.div>
@@ -116,6 +118,8 @@ export function AuthScreen() {
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
                       placeholder="Username"
+                      aria-label="Username"
+                      aria-required="true"
                       className="input-base pl-11"
                       required
                     />
@@ -131,6 +135,8 @@ export function AuthScreen() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Email address"
+                aria-label="Email address"
+                aria-required="true"
                 className="input-base pl-11"
                 required
               />
@@ -143,12 +149,15 @@ export function AuthScreen() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Password"
+                aria-label="Password"
+                aria-required="true"
                 className="input-base pl-11 pr-11"
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowPw(!showPw)}
+                aria-label={showPw ? "Hide password" : "Show password"}
                 className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
                 tabIndex={-1}
               >

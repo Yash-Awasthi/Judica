@@ -614,16 +614,16 @@ aibyai/
 │   ├── router.tsx             # React Router setup
 │   └── main.tsx               # Entry point
 │
-├── docker-compose.yml         # PostgreSQL + Redis + App
+├── docker-compose.yml         # PostgreSQL + Redis + Prometheus + Grafana
 ├── Dockerfile                 # Multi-stage production build
-├── ecosystem.config.cjs       # PM2 cluster mode
-├── .github/workflows/ci.yml   # GitHub Actions CI
+├── .github/workflows/         # CI + CodeQL workflows
 ├── .env.example               # Environment template
 ├── tsconfig.json              # TypeScript (strict, ES2022)
+├── SECURITY.md                # Vulnerability reporting & security policy
 └── package.json               # Dependencies + scripts
 ```
 
-**By the numbers:** 178 backend TypeScript files, 57 frontend React files, 39 Drizzle schema tables, 31 API route plugins, 16 services, 10 middleware, 9 document processors, 7 LLM provider adapters, 10 workflow node types.
+**By the numbers:** ~200 backend TypeScript files, ~64 frontend React files, 13 Drizzle schema tables, 35 API route plugins, 16 services, 11 middleware, 8 document processors, 7 LLM provider adapters, 9 workflow node types.
 
 ---
 
@@ -698,18 +698,6 @@ This starts three services:
 | `redis` | `redis:7-alpine` | 6379 | Cache, queues, rate limits |
 
 Database migrations run automatically on boot. Data persists in Docker volumes (`postgres_data`, `redis_data`).
-
-### PM2 Cluster Mode
-
-```bash
-npm run build
-pm2 start ecosystem.config.cjs --env production
-```
-
-Configuration (`ecosystem.config.cjs`):
-- **instances:** `max` (all CPU cores)
-- **exec_mode:** `cluster` (load balanced)
-- **max_memory_restart:** `512M`
 
 ### Manual Production
 

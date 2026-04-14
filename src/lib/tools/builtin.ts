@@ -4,6 +4,21 @@ import { env } from "../../config/env.js";
 import { registerUserSkillsAsTools } from "./skillExecutor.js";
 import { validateSafeUrl } from "../ssrf.js";
 
+/** Strip HTML tags safely (handles multi-line, nested tags, entities) */
+function stripHtml(html: string): string {
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+    .replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, "&")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 /**
  * Safe math expression evaluator — recursive descent parser.
  * No eval/Function usage.  Supports: +, -, *, /, %, **, parentheses,
@@ -216,12 +231,12 @@ registerTool(
           const safeRedirect = await validateSafeUrl(location);
           const redirectResponse = await fetch(safeRedirect, { signal: AbortSignal.timeout(10000) });
           const text = await redirectResponse.text();
-          const plain = text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+          const plain = stripHtml(text);
           return plain.slice(0, 5000);
         }
       }
       const text = await response.text();
-      const plain = text.replace(/<[^>]*>/g, " ").replace(/\s+/g, " ").trim();
+      const plain = stripHtml(text);
       return plain.slice(0, 5000);
     } catch (err) {
       return `Failed to fetch URL: ${(err as Error).message}`;

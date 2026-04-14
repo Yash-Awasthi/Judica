@@ -15,7 +15,7 @@
 
 ## Phase 1: Production Hardening (Q2 2026)
 
-> **Status: In Progress** — Security remediation complete. 86%+ test coverage achieved. Remaining: E2E, perf, observability.
+> **Status: In Progress** — Security remediation complete. 86%+ test coverage achieved. Middleware modernized. Remaining: E2E testing, performance tuning, observability alerts.
 
 ### Testing
 
@@ -34,19 +34,13 @@
 ### Observability
 
 - [ ] Grafana alert rules: error rate > 5%, p99 latency > 5s, queue backlog > 100, provider failure rate > 20%
-- [ ] Structured error tracking with correlation IDs across request lifecycle
 - [ ] Provider health dashboard — per-provider availability, latency distribution, cost per 1K tokens
 - [ ] Dead letter queue monitoring panel in Grafana
 
-### Technical Debt
+### Remaining Technical Debt
 
-- [ ] Complete Express-to-Fastify migration (11 remaining middleware files use Express compat layer)
-- [ ] Python sandbox: upgrade from process-level to kernel-level isolation (nsjail, bubblewrap, or container-per-execution)
-- [ ] Migrate auth tokens from localStorage to httpOnly cookies
-- [ ] Move API key storage server-side; reference by ID, not value in frontend
-- [ ] Verify SerpAPI auth mechanism (header vs query param) — current fix may break integration
-- [ ] Accessibility (a11y) pass: ARIA attributes, focus trapping, keyboard navigation throughout frontend
-- [ ] Persist user settings server-side (autoCouncil, debateRound, coldValidator, piiDetection currently localStorage-only)
+- [ ] Python sandbox: add seccomp-bpf syscall filter (bubblewrap + unshare namespace isolation already in place; seccomp would harden against obscure syscall-based escapes)
+- [ ] Accessibility (a11y): color contrast audit (WCAG AA), screen reader testing (VoiceOver/NVDA), `aria-live` regions for streaming deliberation updates (focus trapping + ARIA attributes + keyboard nav already done)
 
 ---
 

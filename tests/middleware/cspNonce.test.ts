@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { cspNonce } from "../../src/middleware/cspNonce.js";
+import { fastifyCspNonce } from "../../src/middleware/cspNonce.js";
 
 vi.mock("crypto", async () => {
   const actual = await vi.importActual<typeof import("crypto")>("crypto");
@@ -10,58 +10,50 @@ vi.mock("crypto", async () => {
 });
 
 function createMocks() {
-  const req = {} as any;
-  const headers: Record<string, string> = {};
-  const res = {
-    locals: {} as Record<string, any>,
-    setHeader: vi.fn((name: string, value: string) => {
-      headers[name] = value;
+  const request = {} as any;
+  const headerValues: Record<string, string> = {};
+  const reply = {
+    header: vi.fn((name: string, value: string) => {
+      headerValues[name] = value;
+      return reply;
     }),
   } as any;
-  const next = vi.fn();
-  return { req, res, next, headers };
+  return { request, reply, headerValues };
 }
 
-describe("cspNonce middleware", () => {
+describe("fastifyCspNonce middleware", () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it("sets a nonce on res.locals.cspNonce", () => {
-    const { req, res, next } = createMocks();
-    cspNonce(req, res, next);
-    expect(res.locals.cspNonce).toBeDefined();
-    expect(typeof res.locals.cspNonce).toBe("string");
-    expect(res.locals.cspNonce.length).toBeGreaterThan(0);
+  it("sets a nonce on request.cspNonce", async () => {
+    const { request, reply } = createMocks();
+    await fastifyCspNonce(request, reply);
+    expect(request.cspNonce).toBeDefined();
+    expect(typeof request.cspNonce).toBe("string");
+    expect(request.cspNonce.length).toBeGreaterThan(0);
   });
 
-  it("sets Content-Security-Policy header containing the nonce", () => {
-    const { req, res, next } = createMocks();
-    cspNonce(req, res, next);
+  it("sets Content-Security-Policy header containing the nonce", async () => {
+    const { request, reply } = createMocks();
+    await fastifyCspNonce(request, reply);
 
-    const nonce = res.locals.cspNonce;
-    expect(res.setHeader).toHaveBeenCalledWith(
+    const nonce = request.cspNonce;
+    expect(reply.header).toHaveBeenCalledWith(
       "Content-Security-Policy",
       expect.stringContaining(`'nonce-${nonce}'`)
     );
   });
 
-  it("CSP header contains all required directives", () => {
-    const { req, res, next } = createMocks();
-    cspNonce(req, res, next);
+  it("CSP header contains all required directives", async () => {
+    const { request, reply, headerValues } = createMocks();
+    await fastifyCspNonce(request, reply);
 
-    const cspHeader = res.setHeader.mock.calls[0][1] as string;
+    const cspHeader = headerValues["Content-Security-Policy"];
     expect(cspHeader).toContain("default-src 'self'");
     expect(cspHeader).toContain("script-src 'self'");
     expect(cspHeader).toContain("style-src 'self' 'unsafe-inline'");
     expect(cspHeader).toContain("object-src 'none'");
     expect(cspHeader).toContain("frame-ancestors 'none'");
-  });
-
-  it("calls next()", () => {
-    const { req, res, next } = createMocks();
-    cspNonce(req, res, next);
-    expect(next).toHaveBeenCalledOnce();
-    expect(next).toHaveBeenCalledWith();
   });
 });

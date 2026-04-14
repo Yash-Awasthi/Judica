@@ -1,4 +1,4 @@
-import { useState, useCallback, useRef, useEffect } from "react";
+import React, { useState, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Volume2, VolumeX, Send, Swords, Users, FileWarning, MessageSquare, Gavel } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
@@ -199,16 +199,12 @@ export function DebateDashboardView() {
 
       const { sessionId } = await res.json();
 
-      const token = localStorage.getItem("council_token") || "";
-      // Use fetch with Authorization header instead of EventSource with token in URL
-      // to avoid leaking the token in browser history and server logs
       const streamUrl = `/api/council/debate/${sessionId}/stream`;
       const abortController = new AbortController();
 
-      fetch(streamUrl, {
+      fetchWithAuth(streamUrl, {
         headers: {
           "Accept": "text/event-stream",
-          ...(token ? { "Authorization": `Bearer ${token}` } : {}),
         },
         signal: abortController.signal,
       }).then(async (streamRes) => {
@@ -279,7 +275,7 @@ export function DebateDashboardView() {
         ? "bg-[var(--accent-gold)]"
         : "bg-[var(--accent-mint)]";
 
-  function highlightText(text: string, highlights: string[]): JSX.Element {
+  function highlightText(text: string, highlights: string[]): React.JSX.Element {
     if (highlights.length === 0) return <>{text}</>;
 
     const parts: Array<{ text: string; highlighted: boolean }> = [];
