@@ -11,7 +11,7 @@ interface CostData {
 }
 
 export const CostTracker: React.FC = () => {
-  const { user } = useAuth();
+  const { user, fetchWithAuth } = useAuth();
   const [costData, setCostData] = useState<CostData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showDetails, setShowDetails] = useState(false);
@@ -21,10 +21,10 @@ export const CostTracker: React.FC = () => {
 
     const fetchCostData = async () => {
       try {
-        const response = await fetch('/api/costs/breakdown?days=30');
+        const response = await fetchWithAuth('/api/costs/breakdown?days=30');
         const data = await response.json();
-        
-        const limitsResponse = await fetch('/api/costs/limits');
+
+        const limitsResponse = await fetchWithAuth('/api/costs/limits');
         const limitsData = await limitsResponse.json();
         
         setCostData({

@@ -20,7 +20,7 @@ interface EvaluationData {
 }
 
 export const EvaluationDashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, fetchWithAuth } = useAuth();
   const [evaluationData, setEvaluationData] = useState<EvaluationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [selectedPeriod, setSelectedPeriod] = useState(30);
@@ -30,7 +30,7 @@ export const EvaluationDashboard: React.FC = () => {
 
     const fetchEvaluationData = async () => {
       try {
-        const response = await fetch(`/api/evaluation/dashboard?days=${selectedPeriod}`);
+        const response = await fetchWithAuth(`/api/evaluation/dashboard?days=${selectedPeriod}`);
         const data = await response.json();
         setEvaluationData(data);
       } catch (error) {

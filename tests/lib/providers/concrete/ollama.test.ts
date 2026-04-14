@@ -10,6 +10,10 @@ vi.mock("../../../../src/lib/breaker.js", () => ({
   })),
 }));
 
+vi.mock("../../../../src/lib/ssrf.js", () => ({
+  validateSafeUrl: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { OllamaProvider } from "../../../../src/lib/providers/concrete/ollama.js";
 
 function makeProvider(overrides = {}) {

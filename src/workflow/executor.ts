@@ -7,6 +7,8 @@ import type {
 } from "./types.js";
 import { nodeHandlers } from "./nodes/index.js";
 
+const DEFAULT_NODE_TIMEOUT_MS = 60_000; // 60s per node
+
 interface PendingGate {
   resolve: (choice: string) => void;
   promise: Promise<string>;
@@ -234,7 +236,13 @@ export class WorkflowExecutor {
       };
 
       try {
-        const output = await handler(ctx);
+        const timeoutMs = (node.data.timeout as number) || DEFAULT_NODE_TIMEOUT_MS;
+        const output = await Promise.race([
+          handler(ctx),
+          new Promise<never>((_, reject) =>
+            setTimeout(() => reject(new Error(`Node "${nodeId}" timed out after ${timeoutMs}ms`)), timeoutMs)
+          ),
+        ]);
         contextMap.set(nodeId, output);
 
         // Track condition branches
