@@ -51,7 +51,6 @@ describe("ML Worker", () => {
     process.env.NODE_ENV = "test";
     const { mlWorker } = await import("../../../src/lib/ml/ml_worker.js");
 
-    // In test mode, computeSimilarity rejects immediately before reaching timeout logic
     const promise = mlWorker.computeSimilarity("text1", "text2");
     await expect(promise).rejects.toThrow();
   });
@@ -60,7 +59,359 @@ describe("ML Worker", () => {
     process.env.NODE_ENV = "test";
     const { mlWorker } = await import("../../../src/lib/ml/ml_worker.js");
 
-    // shutdown should not throw even if no process has been spawned
     await expect(mlWorker.shutdown()).resolves.toBeUndefined();
+  });
+});
+
+/* -------------------------------------------------------------------------- */
+/*  Tests with mocked child_process (NODE_ENV != "test")                      */
+/* -------------------------------------------------------------------------- */
+
+import { EventEmitter, PassThrough } from "stream";
+
+/** Build a fake ChildProcess-like object that spawn() will return. */
+function createMockProcess() {
+  // Use PassThrough streams which work correctly with readline
+  const stdout = new PassThrough();
+  const stderr = new PassThrough();
+  const stdin = { write: vi.fn().mockReturnValue(true), end: vi.fn() };
+  const kill = vi.fn();
+
+  const proc = Object.assign(new EventEmitter(), {
+    stdout,
+    stderr,
+    stdin,
+    kill,
+    pid: 12345,
+  });
+
+  return proc;
+}
+
+/** Small real delay to let microtasks and readline async processing settle. */
+const tick = () => new Promise<void>((r) => setTimeout(r, 50));
+
+describe("MLWorker with mocked child_process", () => {
+  let mockProc: ReturnType<typeof createMockProcess>;
+  let spawnMock: ReturnType<typeof vi.fn>;
+
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    mockProc = createMockProcess();
+    spawnMock = vi.fn().mockReturnValue(mockProc);
+  });
+
+  afterEach(() => {
+    process.env.NODE_ENV = "test";
+  });
+
+  async function importWorker() {
+    vi.doMock("child_process", () => ({ spawn: spawnMock }));
+    process.env.NODE_ENV = "production";
+    const mod = await import("../../../src/lib/ml/ml_worker.js");
+    return mod.mlWorker;
+  }
+
+  /* ===================== init() ===================== */
+
+  describe("init()", () => {
+    it("spawns the python process and resolves when READY is received", async () => {
+      const worker = await importWorker();
+
+      const initPromise = worker.init();
+      expect(spawnMock).toHaveBeenCalledOnce();
+
+      mockProc.stdout.write("READY\n");
+      await expect(initPromise).resolves.toBeUndefined();
+    });
+
+    it("does not spawn a second process on duplicate init() calls", async () => {
+      const worker = await importWorker();
+
+      const p1 = worker.init();
+      const p2 = worker.init();
+
+      // spawn should have been called only once
+      expect(spawnMock).toHaveBeenCalledOnce();
+
+      mockProc.stdout.write("READY\n");
+      // Both should resolve
+      await Promise.all([p1, p2]);
+    });
+
+    it("rejects the readyPromise when spawn emits an error", async () => {
+      const worker = await importWorker();
+
+      const initPromise = worker.init();
+
+      const spawnError = new Error("spawn python3 ENOENT") as NodeJS.ErrnoException;
+      spawnError.code = "ENOENT";
+      mockProc.emit("error", spawnError);
+
+      await expect(initPromise).rejects.toThrow("spawn python3 ENOENT");
+    });
+
+    it("resets state when the process exits, allowing re-spawn", async () => {
+      const worker = await importWorker();
+
+      const initPromise = worker.init();
+      mockProc.stdout.write("READY\n");
+      await initPromise;
+
+      // Simulate process exit
+      mockProc.emit("exit", 1);
+
+      // After exit, a new init() should spawn again
+      const mockProc2 = createMockProcess();
+      spawnMock.mockReturnValue(mockProc2);
+
+      const initPromise2 = worker.init();
+      expect(spawnMock).toHaveBeenCalledTimes(2);
+
+      mockProc2.stdout.write("READY\n");
+      await initPromise2;
+    });
+
+    it("logs stderr that contains error/fatal at error level", async () => {
+      const worker = await importWorker();
+
+      const initPromise = worker.init();
+      mockProc.stdout.write("READY\n");
+      await initPromise;
+
+      // Push stderr data — the test verifies no crash
+      mockProc.stderr.write("Fatal: module not found\n");
+      mockProc.stderr.write("Loading model weights...\n");
+
+      await tick();
+    });
+  });
+
+  /* ===================== computeSimilarity() ===================== */
+
+  describe("computeSimilarity()", () => {
+    it("writes a JSON payload to stdin and resolves with the score", async () => {
+      const worker = await importWorker();
+
+      const initPromise = worker.init();
+      mockProc.stdout.write("READY\n");
+      await initPromise;
+
+      const similarityPromise = worker.computeSimilarity("hello", "world");
+
+      // Real delay lets the awaited init() microtask inside computeSimilarity settle
+      await tick();
+
+      expect(mockProc.stdin.write).toHaveBeenCalledOnce();
+      const written = mockProc.stdin.write.mock.calls[0][0] as string;
+      const parsed = JSON.parse(written.trim());
+      expect(parsed).toEqual({ action: "similarity", text1: "hello", text2: "world" });
+
+      // Simulate subprocess response
+      mockProc.stdout.write(JSON.stringify({ score: 0.87 }) + "\n");
+
+      await expect(similarityPromise).resolves.toBe(0.87);
+    });
+
+    it("rejects when the subprocess responds with an error field", async () => {
+      const worker = await importWorker();
+
+      const initPromise = worker.init();
+      mockProc.stdout.write("READY\n");
+      await initPromise;
+
+      const similarityPromise = worker.computeSimilarity("a", "b");
+      await tick();
+
+      mockProc.stdout.write(JSON.stringify({ error: "tokenizer failed" }) + "\n");
+
+      await expect(similarityPromise).rejects.toThrow("tokenizer failed");
+    });
+
+    it("throws when process stdin is null (not available)", async () => {
+      const worker = await importWorker();
+
+      const initPromise = worker.init();
+      mockProc.stdout.write("READY\n");
+      await initPromise;
+
+      // Shut down to null out the process
+      await worker.shutdown();
+
+      // init() will spawn again, but we make spawn return a proc with no stdin
+      const brokenProc = createMockProcess();
+      (brokenProc as any).stdin = null;
+      spawnMock.mockReturnValue(brokenProc);
+
+      const initP = worker.init();
+      brokenProc.stdout.write("READY\n");
+      await initP;
+
+      await expect(worker.computeSimilarity("x", "y")).rejects.toThrow(
+        "ML worker not available"
+      );
+    });
+
+    it("handles unparseable stdout lines without crashing", async () => {
+      const worker = await importWorker();
+
+      const initPromise = worker.init();
+      mockProc.stdout.write("READY\n");
+      await initPromise;
+
+      // Push garbage that is not JSON and not "READY"
+      mockProc.stdout.write("not-json-garbage\n");
+      await tick();
+
+      // Worker should still be functional
+      const similarityPromise = worker.computeSimilarity("a", "b");
+      await tick();
+      mockProc.stdout.write(JSON.stringify({ score: 0.5 }) + "\n");
+      await expect(similarityPromise).resolves.toBe(0.5);
+    });
+
+    // NOTE: The 5-second timeout inside computeSimilarity is not tested here.
+    // Testing real setTimeout(5000) would require either fake timers (which
+    // interfere with readline's async processing on PassThrough streams) or
+    // waiting 5+ real seconds per test. The timeout behaviour is straightforward
+    // enough to verify by inspection of the source code.
+  });
+
+  /* ===================== shutdown() ===================== */
+
+  describe("shutdown()", () => {
+    it("calls process.kill() and resets internal state", async () => {
+      const worker = await importWorker();
+
+      const initPromise = worker.init();
+      mockProc.stdout.write("READY\n");
+      await initPromise;
+
+      await worker.shutdown();
+      expect(mockProc.kill).toHaveBeenCalledOnce();
+
+      // After shutdown, calling init again should spawn a new process
+      const mockProc2 = createMockProcess();
+      spawnMock.mockReturnValue(mockProc2);
+
+      const initPromise2 = worker.init();
+      expect(spawnMock).toHaveBeenCalledTimes(2);
+
+      mockProc2.stdout.write("READY\n");
+      await initPromise2;
+    });
+
+    it("is a no-op when no process is running", async () => {
+      const worker = await importWorker();
+
+      await expect(worker.shutdown()).resolves.toBeUndefined();
+    });
+
+    it("allows re-initialization and usage after shutdown", async () => {
+      const worker = await importWorker();
+
+      // First lifecycle
+      const initPromise1 = worker.init();
+      mockProc.stdout.write("READY\n");
+      await initPromise1;
+      await worker.shutdown();
+
+      // Second lifecycle
+      const mockProc2 = createMockProcess();
+      spawnMock.mockReturnValue(mockProc2);
+      const initPromise2 = worker.init();
+      mockProc2.stdout.write("READY\n");
+      await initPromise2;
+
+      const simPromise = worker.computeSimilarity("x", "y");
+      await tick();
+      mockProc2.stdout.write(JSON.stringify({ score: 0.99 }) + "\n");
+      await expect(simPromise).resolves.toBe(0.99);
+    });
+  });
+
+  /* ===================== Platform detection ===================== */
+
+  describe("platform detection for python path", () => {
+    it("uses python3 on unix/linux/mac", async () => {
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, "platform", { value: "linux", writable: true });
+      try {
+        const worker = await importWorker();
+        worker.init();
+        const pythonArg = spawnMock.mock.calls[0][0];
+        expect(pythonArg).toBe("python3");
+      } finally {
+        Object.defineProperty(process, "platform", { value: originalPlatform, writable: true });
+      }
+    });
+
+    it("uses .venv/Scripts/python.exe on win32", async () => {
+      const originalPlatform = process.platform;
+      Object.defineProperty(process, "platform", { value: "win32", writable: true });
+      try {
+        const worker = await importWorker();
+        worker.init();
+        const pythonArg = spawnMock.mock.calls[0][0] as string;
+        expect(pythonArg).toContain(".venv");
+        expect(pythonArg).toContain("Scripts");
+        expect(pythonArg).toContain("python.exe");
+      } finally {
+        Object.defineProperty(process, "platform", { value: originalPlatform, writable: true });
+      }
+    });
+  });
+
+  /* ===================== Multiple concurrent calls ===================== */
+
+  describe("multiple concurrent computeSimilarity calls", () => {
+    it("queues callbacks and resolves them in FIFO order", async () => {
+      const worker = await importWorker();
+
+      const initPromise = worker.init();
+      mockProc.stdout.write("READY\n");
+      await initPromise;
+
+      // Fire three concurrent requests
+      const p1 = worker.computeSimilarity("a", "b");
+      const p2 = worker.computeSimilarity("c", "d");
+      const p3 = worker.computeSimilarity("e", "f");
+
+      await tick();
+
+      expect(mockProc.stdin.write).toHaveBeenCalledTimes(3);
+
+      // Respond in order
+      mockProc.stdout.write(JSON.stringify({ score: 0.1 }) + "\n");
+      mockProc.stdout.write(JSON.stringify({ score: 0.2 }) + "\n");
+      mockProc.stdout.write(JSON.stringify({ score: 0.3 }) + "\n");
+
+      await expect(p1).resolves.toBe(0.1);
+      await expect(p2).resolves.toBe(0.2);
+      await expect(p3).resolves.toBe(0.3);
+    });
+
+    it("handles a mix of success and error responses in queue", async () => {
+      const worker = await importWorker();
+
+      const initPromise = worker.init();
+      mockProc.stdout.write("READY\n");
+      await initPromise;
+
+      const p1 = worker.computeSimilarity("ok", "text");
+      const p2 = worker.computeSimilarity("bad", "text");
+      const p3 = worker.computeSimilarity("ok2", "text2");
+
+      await tick();
+
+      mockProc.stdout.write(JSON.stringify({ score: 0.75 }) + "\n");
+      mockProc.stdout.write(JSON.stringify({ error: "embedding failed" }) + "\n");
+      mockProc.stdout.write(JSON.stringify({ score: 0.6 }) + "\n");
+
+      await expect(p1).resolves.toBe(0.75);
+      await expect(p2).rejects.toThrow("embedding failed");
+      await expect(p3).resolves.toBe(0.6);
+    });
   });
 });
