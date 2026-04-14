@@ -73,10 +73,10 @@ services:
       - "9090:9090"  # Metrics port
     environment:
       - NODE_ENV=development
-      - DATABASE_URL=postgresql://postgres:password@db:5432/ai_council_dev
+      - DATABASE_URL=postgresql://postgres:\${POSTGRES_PASSWORD:-changeme}@db:5432/ai_council_dev
       - REDIS_URL=redis://redis:6379
-      - JWT_SECRET=dev-jwt-secret-key
-      - SESSION_SECRET=dev-session-secret-key
+      - JWT_SECRET=\${JWT_SECRET:-$(openssl rand -hex 32)}
+      - SESSION_SECRET=\${SESSION_SECRET:-$(openssl rand -hex 32)}
       - LOG_LEVEL=debug
       - METRICS_ENABLED=true
       - HEALTH_CHECKS_ENABLED=true
@@ -98,7 +98,7 @@ services:
     environment:
       - POSTGRES_DB=ai_council_dev
       - POSTGRES_USER=postgres
-      - POSTGRES_PASSWORD=password
+      - POSTGRES_PASSWORD=\${POSTGRES_PASSWORD:-changeme}
     ports:
       - "5432:5432"
     volumes:
@@ -167,7 +167,7 @@ services:
     ports:
       - "3001:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_SECURITY_ADMIN_PASSWORD=\${GRAFANA_PASSWORD:-changeme}
       - GF_USERS_ALLOW_SIGN_UP=false
     volumes:
       - grafana_data:/var/lib/grafana

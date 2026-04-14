@@ -29,7 +29,6 @@ import "./adapters/registry.js";
 // Express middleware (still needed for swagger-ui and BullMQ Board compat layer)
 import { cleanupRateLimitRedis } from "./middleware/rateLimit.js";
 import { perUserLimiter } from "./middleware/limiter.js";
-import { perUserLimiter } from "./middleware/limiter.js";
 import { cleanupCostTrackerInterval } from "./lib/realtimeCost.js";
 import { errorHandler } from "./middleware/errorHandler.js";
 import { requireAuth } from "./middleware/auth.js";
