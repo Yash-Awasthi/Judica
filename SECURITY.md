@@ -14,7 +14,7 @@ We take security vulnerabilities seriously. If you discover a security issue, pl
 
 ### How to Report
 
-1. **Email**: Send details to **security@aibyai.com** (or open a [private security advisory](https://github.com/Yash-Awasthi/aibyai/security/advisories/new) on GitHub)
+1. **Email**: Send details to **yvawasthi1203@gmail.com** (or open a [private security advisory](https://github.com/Yash-Awasthi/aibyai/security/advisories/new) on GitHub)
 2. **Include**:
    - Description of the vulnerability
    - Steps to reproduce

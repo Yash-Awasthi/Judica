@@ -10,13 +10,13 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![License](https://img.shields.io/badge/License-ISC-22C55E?style=for-the-badge)](./LICENSE)
+
 
 <br />
 
 **Instead of trusting one model's best guess, AIBYAI runs a council — 4+ agents argue, critique each other's claims, and produce a scored consensus with a confidence number you can actually trust.**
 
-[Quick Start](#-quick-start) · [Architecture](#-architecture) · [Features](#-features) · [Documentation](./DOCUMENTATION.md) · [Roadmap](./ROADMAP.md)
+[Quick Start](#quick-start) · [Architecture](#architecture) · [Features](#features) · [Documentation](./DOCUMENTATION.md) · [Roadmap](./ROADMAP.md)
 
 </div>
 
@@ -303,12 +303,6 @@ aibyai/
    ```
 4. Commit with conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`
 5. Push and open a pull request
-
----
-
-## License
-
-[ISC](./LICENSE) — Yash Awasthi
 
 ---
 
