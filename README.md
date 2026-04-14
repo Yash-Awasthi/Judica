@@ -16,7 +16,7 @@
 
 **Instead of trusting one model's best guess, AIBYAI runs a council — 4+ agents argue, critique each other's claims, and produce a scored consensus with a confidence number you can actually trust.**
 
-[Quick Start](#-quick-start) · [Architecture](#-architecture) · [Features](#-features) · [Documentation](./docs/DOCUMENTATION.md) · [Roadmap](./ROADMAP.md)
+[Quick Start](#-quick-start) · [Architecture](#-architecture) · [Features](#-features) · [Documentation](./DOCUMENTATION.md) · [Roadmap](./ROADMAP.md)
 
 </div>
 
@@ -214,7 +214,7 @@ docker compose up -d
 # Grafana dashboards → http://localhost:3001 (auto-provisioned)
 ```
 
-> **Full setup guide, environment variables, and API reference:** [docs/DOCUMENTATION.md](./docs/DOCUMENTATION.md)
+> **Full setup guide, environment variables, and API reference:** [DOCUMENTATION.md](./DOCUMENTATION.md)
 
 ---
 
@@ -229,7 +229,7 @@ curl -X POST http://localhost:3000/api/ask \
 
 Returns an SSE stream: `status` → `opinion` → `peer_review` → `scored` → `validator_result` → `metrics` → `done`
 
-> **Full API reference:** [docs/DOCUMENTATION.md](./docs/DOCUMENTATION.md#api-reference) | **Interactive docs:** `/api/docs`
+> **Full API reference:** [DOCUMENTATION.md](./DOCUMENTATION.md#api-reference) | **Interactive docs:** `/api/docs`
 
 ---
 
@@ -257,11 +257,12 @@ aibyai/
 │   ├── context/            # Auth + Theme contexts
 │   ├── views/              # 12 views (Chat, Debate, Workflows, Marketplace, etc.)
 │   └── router.tsx          # React Router
-├── tests/                  # Unit tests (auth, RBAC, rate limiting, SSRF, validation)
+├── tests/                  # 166 test files, 2550+ tests (86%+ coverage)
 ├── grafana/                # Auto-provisioned dashboards
 ├── docker-compose.yml      # PostgreSQL + Redis + Prometheus + Grafana
 ├── Dockerfile              # Multi-stage build with HEALTHCHECK
-└── .github/workflows/      # CI: lint, typecheck, test, build
+├── DOCUMENTATION.md        # Complete technical reference
+└── .github/workflows/      # CI: lint, typecheck, test, security audit, CodeQL
 ```
 
 ---
