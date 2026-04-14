@@ -153,4 +153,265 @@ describe("workers", () => {
 
     expect(deadLetterQueue.add).not.toHaveBeenCalled();
   });
+
+  describe("worker processor functions", () => {
+    const mockStoreChunk = vi.fn().mockResolvedValue(undefined);
+    const mockIngestGitHubRepo = vi.fn().mockResolvedValue(undefined);
+    const mockRunResearch = vi.fn().mockResolvedValue(undefined);
+    const mockCompact = vi.fn().mockResolvedValue(undefined);
+
+    beforeEach(() => {
+      mockStoreChunk.mockClear();
+      mockIngestGitHubRepo.mockClear();
+      mockRunResearch.mockClear();
+      mockCompact.mockClear();
+
+      vi.doMock("../../src/services/vectorStore.service.js", () => ({
+        storeChunk: mockStoreChunk,
+      }));
+      vi.doMock("../../src/services/repoIngestion.service.js", () => ({
+        ingestGitHubRepo: mockIngestGitHubRepo,
+      }));
+      vi.doMock("../../src/services/research.service.js", () => ({
+        runResearch: mockRunResearch,
+      }));
+      vi.doMock("../../src/services/memoryCompaction.service.js", () => ({
+        compact: mockCompact,
+      }));
+    });
+
+    it("ingestion worker should call storeChunk with destructured job data", async () => {
+      const { startWorkers } = await import("../../src/queue/workers.js");
+      startWorkers();
+
+      const ingestionWorker = workerInstances.find((w) => w.name === "ingestion");
+      expect(ingestionWorker).toBeDefined();
+
+      const job = {
+        id: "ingest-1",
+        data: {
+          userId: 10,
+          kbId: "kb-abc",
+          content: "some text content",
+          chunkIndex: 3,
+          sourceName: "doc.pdf",
+          sourceUrl: "https://example.com/doc.pdf",
+        },
+      };
+
+      await ingestionWorker!.processor(job);
+
+      expect(mockStoreChunk).toHaveBeenCalledWith(
+        10, "kb-abc", "some text content", 3, "doc.pdf", "https://example.com/doc.pdf"
+      );
+    });
+
+    it("repo-ingestion worker should call ingestGitHubRepo with destructured job data", async () => {
+      const { startWorkers } = await import("../../src/queue/workers.js");
+      startWorkers();
+
+      const repoWorker = workerInstances.find((w) => w.name === "repo-ingestion");
+      expect(repoWorker).toBeDefined();
+
+      const job = {
+        id: "repo-1",
+        data: {
+          userId: 20,
+          owner: "octocat",
+          repo: "hello-world",
+        },
+      };
+
+      await repoWorker!.processor(job);
+
+      expect(mockIngestGitHubRepo).toHaveBeenCalledWith(20, "octocat", "hello-world");
+    });
+
+    it("research worker should call runResearch with destructured job data", async () => {
+      const { startWorkers } = await import("../../src/queue/workers.js");
+      startWorkers();
+
+      const researchWorker = workerInstances.find((w) => w.name === "research");
+      expect(researchWorker).toBeDefined();
+
+      const job = {
+        id: "research-1",
+        data: {
+          jobId: "rj-42",
+          userId: 30,
+          query: "What is BullMQ?",
+        },
+      };
+
+      await researchWorker!.processor(job);
+
+      expect(mockRunResearch).toHaveBeenCalledWith("rj-42", 30, "What is BullMQ?");
+    });
+
+    it("compaction worker should call compact with userId from job data", async () => {
+      const { startWorkers } = await import("../../src/queue/workers.js");
+      startWorkers();
+
+      const compactionWorker = workerInstances.find((w) => w.name === "compaction");
+      expect(compactionWorker).toBeDefined();
+
+      const job = {
+        id: "compact-1",
+        data: {
+          userId: 40,
+        },
+      };
+
+      await compactionWorker!.processor(job);
+
+      expect(mockCompact).toHaveBeenCalledWith(40);
+    });
+
+    it("ingestion worker processor should propagate service errors", async () => {
+      mockStoreChunk.mockRejectedValueOnce(new Error("Vector store unavailable"));
+
+      const { startWorkers } = await import("../../src/queue/workers.js");
+      startWorkers();
+
+      const ingestionWorker = workerInstances.find((w) => w.name === "ingestion");
+      const job = {
+        id: "ingest-err",
+        data: {
+          userId: 1,
+          kbId: "kb-1",
+          content: "text",
+          chunkIndex: 0,
+          sourceName: "file.txt",
+          sourceUrl: "https://example.com/file.txt",
+        },
+      };
+
+      await expect(ingestionWorker!.processor(job)).rejects.toThrow("Vector store unavailable");
+    });
+  });
+
+  describe("completed event handler", () => {
+    it("should log job completion with jobId and queue name", async () => {
+      const logger = (await import("../../src/lib/logger.js")).default;
+      (logger.info as ReturnType<typeof vi.fn>).mockClear();
+
+      const { startWorkers } = await import("../../src/queue/workers.js");
+      startWorkers();
+
+      const worker = workerInstances.find((w) => w.eventHandlers["completed"]);
+      expect(worker).toBeDefined();
+
+      const completedHandler = worker!.eventHandlers["completed"];
+      const completedJob = { id: "done-99" };
+
+      completedHandler(completedJob);
+
+      expect(logger.info).toHaveBeenCalledWith(
+        { jobId: "done-99", queue: worker!.name },
+        "Worker job completed"
+      );
+    });
+
+    it("should handle completed event when job is undefined", async () => {
+      const logger = (await import("../../src/lib/logger.js")).default;
+      (logger.info as ReturnType<typeof vi.fn>).mockClear();
+
+      const { startWorkers } = await import("../../src/queue/workers.js");
+      startWorkers();
+
+      const worker = workerInstances.find((w) => w.eventHandlers["completed"]);
+      const completedHandler = worker!.eventHandlers["completed"];
+
+      // Should not throw when job is undefined
+      completedHandler(undefined);
+
+      expect(logger.info).toHaveBeenCalledWith(
+        { jobId: undefined, queue: worker!.name },
+        "Worker job completed"
+      );
+    });
+  });
+
+  describe("DLQ error path", () => {
+    it("should log error when deadLetterQueue.add rejects", async () => {
+      const { startWorkers } = await import("../../src/queue/workers.js");
+      const { deadLetterQueue } = await import("../../src/queue/queues.js");
+      const logger = (await import("../../src/lib/logger.js")).default;
+
+      (deadLetterQueue.add as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+        new Error("Redis connection lost")
+      );
+      (logger.error as ReturnType<typeof vi.fn>).mockClear();
+
+      startWorkers();
+
+      const worker = workerInstances.find((w) => w.eventHandlers["failed"]);
+      const failedHandler = worker!.eventHandlers["failed"];
+
+      const exhaustedJob = {
+        id: "job-dlq-err",
+        name: "failing-job",
+        data: { key: "value" },
+        attemptsMade: 3,
+        opts: { attempts: 3 },
+        stacktrace: ["Error: boom"],
+      };
+
+      await failedHandler(exhaustedJob, new Error("Original failure"));
+
+      expect(logger.error).toHaveBeenCalledWith(
+        expect.objectContaining({
+          jobId: "job-dlq-err",
+          queue: worker!.name,
+          err: expect.any(Error),
+        }),
+        "Failed to move job to dead-letter queue"
+      );
+    });
+  });
+
+  describe("failed handler edge cases", () => {
+    it("should not move to DLQ when job is undefined", async () => {
+      const { startWorkers } = await import("../../src/queue/workers.js");
+      const { deadLetterQueue } = await import("../../src/queue/queues.js");
+      (deadLetterQueue.add as ReturnType<typeof vi.fn>).mockClear();
+
+      startWorkers();
+
+      const worker = workerInstances.find((w) => w.eventHandlers["failed"]);
+      const failedHandler = worker!.eventHandlers["failed"];
+
+      await failedHandler(undefined, new Error("Unknown failure"));
+
+      expect(deadLetterQueue.add).not.toHaveBeenCalled();
+    });
+
+    it("should default to 3 attempts when job.opts.attempts is undefined", async () => {
+      const { startWorkers } = await import("../../src/queue/workers.js");
+      const { deadLetterQueue } = await import("../../src/queue/queues.js");
+      (deadLetterQueue.add as ReturnType<typeof vi.fn>).mockClear();
+
+      startWorkers();
+
+      const worker = workerInstances.find((w) => w.eventHandlers["failed"]);
+      const failedHandler = worker!.eventHandlers["failed"];
+
+      // attemptsMade equals the default of 3 (opts.attempts is undefined)
+      const job = {
+        id: "job-default-attempts",
+        name: "test-job",
+        data: {},
+        attemptsMade: 3,
+        opts: {},
+        stacktrace: [],
+      };
+
+      await failedHandler(job, new Error("Failed"));
+
+      expect(deadLetterQueue.add).toHaveBeenCalledWith(
+        "dead-letter",
+        expect.objectContaining({ originalJobId: "job-default-attempts" })
+      );
+    });
+  });
 });
