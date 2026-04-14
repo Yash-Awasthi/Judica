@@ -23,7 +23,7 @@
     "framer-motion": "^12.38.0",
     "idb": "^8.0.3",
     "lucide-react": "0.469.0",
-    "react": "18.3.1",
+    "react": "19.2.5",
     "react-dom": "18.3.1",
     "react-is": "^18.3.1",
     "react-markdown": "9.0.1",
@@ -36,7 +36,7 @@
   },
   "devDependencies": {
     "@eslint/js": "9.17.0",
-    "@types/react": "18.3.18",
+    "@types/react": "19.2.14",
     "@types/react-dom": "18.3.5",
     "@types/three": "^0.183.1",
     "@types/uuid": "10.0.0",
