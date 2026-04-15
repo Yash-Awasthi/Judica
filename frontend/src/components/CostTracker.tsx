@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import * as React from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 interface CostData {
@@ -45,7 +46,7 @@ export const CostTracker: React.FC = () => {
     fetchCostData();
     const interval = setInterval(fetchCostData, 30000); // Update every 30 seconds
     return () => clearInterval(interval);
-  }, [user]);
+  }, [user, fetchWithAuth]);
 
   if (loading) {
     return (

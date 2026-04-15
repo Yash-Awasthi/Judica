@@ -1,8 +1,10 @@
-import React, { useState, useCallback, useRef, useEffect } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Volume2, VolumeX, Send, Swords, Users, FileWarning, MessageSquare, Gavel } from "lucide-react";
+import { Volume2, VolumeX, Send, Swords, Gavel, Zap, Activity, ShieldAlert } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { AnimatedCounter } from "../components/AnimatedCounter";
+import { SectorHUD } from "../components/SectorHUD";
+import { TechnicalGrid } from "../components/TechnicalGrid";
 
 interface MemberColumn {
   id: string;
@@ -14,7 +16,7 @@ interface MemberColumn {
   critiques: Array<{ from: string; content: string; type: string }>;
   tokens: number;
   latencyMs: number;
-  conflictHighlights: string[]; // sentences to highlight
+  conflictHighlights: string[]; 
 }
 
 interface ConflictLine {
@@ -42,26 +44,22 @@ export function DebateDashboardView() {
   const [exchanges, setExchanges] = useState<DebateExchange[]>([]);
   const [synthesis, setSynthesis] = useState<string | null>(null);
   const [consensusScore, setConsensusScore] = useState<number | null>(null);
-  const [consensusBreakdown, setConsensusBreakdown] = useState<Record<string, unknown> | null>(null);
+  const [, setConsensusBreakdown] = useState<Record<string, any> | null>(null);
   const [running, setRunning] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
   const [factsCount, setFactsCount] = useState(0);
   const eventSourceRef = useRef<{ close: () => void } | null>(null);
   const columnRefs = useRef<Map<string, HTMLDivElement>>(new Map());
 
-  // Auto-scroll columns
   const scrollToBottom = (memberId: string) => {
     const el = columnRefs.current.get(memberId);
     if (el) el.scrollTop = el.scrollHeight;
   };
 
-  const handleEvent = useCallback((data: Record<string, unknown>) => {
+  const handleEvent = useCallback((data: Record<string, any>) => {
     const type = data.type as string;
 
     switch (type) {
-      case "preprocessing_complete":
-        break;
-
       case "member_response": {
         const memberId = data.memberId as string;
         const memberName = data.memberName as string;
@@ -69,12 +67,12 @@ export function DebateDashboardView() {
         const usage = data.usage as { prompt_tokens: number; completion_tokens: number } | undefined;
 
         setMembers((prev) => {
-          const existing = prev.find((m) => m.id === memberId);
+          const existing = prev.find((mItem) => mItem.id === memberId);
           if (existing) {
-            return prev.map((m) =>
-              m.id === memberId
-                ? { ...m, text, status: "done" as const, tokens: (usage?.completion_tokens || 0) }
-                : m
+            return prev.map((mItem) =>
+                mItem.id === memberId
+                ? { ...mItem, text, status: "done" as const, tokens: (usage?.completion_tokens || 0) }
+                : mItem
             );
           }
           return [
@@ -95,33 +93,25 @@ export function DebateDashboardView() {
         setTimeout(() => scrollToBottom(memberId), 50);
         break;
       }
-
       case "facts_extracted":
         setFactsCount(data.count as number);
         break;
-
       case "conflicts_found": {
         const conflictList = (data.conflicts || []) as ConflictLine[];
         setConflicts(conflictList);
-
         for (const c of conflictList) {
           setMembers((prev) =>
-            prev.map((m) => {
-              if (m.id === c.agentA) {
-                return { ...m, conflictHighlights: [...m.conflictHighlights, c.claimA] };
-              }
-              if (m.id === c.agentB) {
-                return { ...m, conflictHighlights: [...m.conflictHighlights, c.claimB] };
-              }
-              return m;
+            prev.map((mItem) => {
+              if (mItem.id === c.agentA) return { ...mItem, conflictHighlights: [...mItem.conflictHighlights, c.claimA] };
+              if (mItem.id === c.agentB) return { ...mItem, conflictHighlights: [...mItem.conflictHighlights, c.claimB] };
+              return mItem;
             })
           );
         }
         break;
       }
-
-      case "debate_exchange":
-      case "agent_message": {
+      case "agent_message":
+      case "debate_exchange": {
         const exchange: DebateExchange = {
           from: data.from as string,
           to: data.to as string,
@@ -130,59 +120,45 @@ export function DebateDashboardView() {
           timestamp: new Date().toISOString(),
         };
         setExchanges((prev) => [...prev, exchange]);
-
         setMembers((prev) =>
-          prev.map((m) => {
-            if (m.name === (data.to as string)) {
+          prev.map((mItem) => {
+            if (mItem.name === (data.to as string)) {
               return {
-                ...m,
+                ...mItem,
                 status: "debating" as const,
-                critiques: [...m.critiques, { from: data.from as string, content: (data.content as string).substring(0, 200), type: data.type as string || "critique" }],
+                critiques: [...mItem.critiques, { from: data.from as string, content: (data.content as string).substring(0, 200), type: data.type as string || "critique" }],
               };
             }
-            return m;
+            return mItem;
           })
         );
         break;
       }
-
-      case "synthesis_complete": {
-        const consensus = data.consensus as string;
-        setSynthesis(consensus);
+      case "synthesis_complete":
+        setSynthesis(data.consensus as string);
         setRunning(false);
-
-        if (consensus) {
-          playTTS(consensus);
-        }
+        if (data.consensus) playTTS(data.consensus as string);
         break;
-      }
-
-      case "confidence_score": {
+      case "confidence_score":
         setConsensusScore(data.score as number);
-        setConsensusBreakdown(data.breakdown as Record<string, unknown>);
+        setConsensusBreakdown(data.breakdown as Record<string, any>);
         break;
-      }
-
       case "orchestration_error":
-      case "workflow_error":
         setRunning(false);
         eventSourceRef.current?.close();
         break;
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // Start debate
   const startDebate = useCallback(async () => {
     if (!query.trim() || running) return;
-
     setRunning(true);
     setMembers([]);
     setConflicts([]);
     setExchanges([]);
     setSynthesis(null);
     setConsensusScore(null);
-    setConsensusBreakdown(null);
     setFactsCount(0);
 
     try {
@@ -191,57 +167,32 @@ export function DebateDashboardView() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: query.trim() }),
       });
-
-      if (!res.ok) {
-        setRunning(false);
-        return;
-      }
-
+      if (!res.ok) { setRunning(false); return; }
       const { sessionId } = await res.json();
-
-      const streamUrl = `/api/council/debate/${sessionId}/stream`;
       const abortController = new AbortController();
-
-      fetchWithAuth(streamUrl, {
-        headers: {
-          "Accept": "text/event-stream",
-        },
-        signal: abortController.signal,
-      }).then(async (streamRes) => {
-        if (!streamRes.ok || !streamRes.body) {
-          setRunning(false);
-          return;
-        }
-        const reader = streamRes.body.getReader();
-        const decoder = new TextDecoder();
-        let buffer = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buffer += decoder.decode(value, { stream: true });
-          const lines = buffer.split("\n");
-          buffer = lines.pop() || "";
-          for (const line of lines) {
-            if (line.startsWith("data: ")) {
-              try {
-                const data = JSON.parse(line.slice(6));
-                handleEvent(data);
-              } catch (e) { console.warn("SSE parse error", e); }
-            }
-          }
-        }
-        setRunning(false);
-      }).catch(() => {
-        setRunning(false);
-      });
-
-      // Store abort controller so we can cancel on error
       eventSourceRef.current = { close: () => abortController.abort() };
-    } catch (err) {
-      console.error("Debate start failed", err);
-      setRunning(false);
-    }
+
+      fetchWithAuth(`/api/council/debate/${sessionId}/stream`, { signal: abortController.signal })
+        .then(async (streamRes) => {
+            if (!streamRes.body) return;
+            const reader = streamRes.body.getReader();
+            const decoder = new TextDecoder();
+            let buffer = "";
+            while (true) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                buffer += decoder.decode(value, { stream: true });
+                const lines = buffer.split("\n");
+                buffer = lines.pop() || "";
+                for (const line of lines) {
+                    if (line.startsWith("data: ")) {
+                        try { handleEvent(JSON.parse(line.slice(6))); } catch(_e){ /* ignore malformed chunks */ }
+                    }
+                }
+            }
+            setRunning(false);
+        }).catch(() => setRunning(false));
+    } catch (_err) { setRunning(false); }
   }, [query, running, fetchWithAuth, handleEvent]);
 
   const voiceModeRef = useRef(voiceMode);
@@ -257,288 +208,220 @@ export function DebateDashboardView() {
       });
       if (res.ok) {
         const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        const audio = new Audio(url);
+        const audio = new Audio(URL.createObjectURL(blob));
         audio.play();
       }
-    } catch (err) {
-      console.error("TTS failed", err);
-    }
+    } catch (_err) { /* ignore tts errors */ }
   };
 
   const meterPercent = consensusScore !== null ? Math.round(consensusScore * 100) : 0;
-  const meterColor = consensusScore === null
-    ? "bg-[var(--border-medium)]"
-    : consensusScore < 0.4
-      ? "bg-[var(--accent-coral)]"
-      : consensusScore < 0.7
-        ? "bg-[var(--accent-gold)]"
-        : "bg-[var(--accent-mint)]";
-
-  function highlightText(text: string, highlights: string[]): React.JSX.Element {
-    if (highlights.length === 0) return <>{text}</>;
-
-    const parts: Array<{ text: string; highlighted: boolean }> = [];
-    let remaining = text;
-
-    for (const h of highlights) {
-      const idx = remaining.toLowerCase().indexOf(h.toLowerCase().substring(0, 50));
-      if (idx >= 0) {
-        if (idx > 0) parts.push({ text: remaining.substring(0, idx), highlighted: false });
-        parts.push({ text: remaining.substring(idx, idx + h.length), highlighted: true });
-        remaining = remaining.substring(idx + h.length);
-      }
-    }
-    if (remaining) parts.push({ text: remaining, highlighted: false });
-
-    if (parts.length === 0) return <>{text}</>;
-
-    return (
-      <>
-        {parts.map((p, i) =>
-          p.highlighted ? (
-            <span key={i} className="bg-[var(--accent-coral)]/15 border-b-2 border-[var(--accent-coral)]/40 px-0.5">{p.text}</span>
-          ) : (
-            <span key={i}>{p.text}</span>
-          )
-        )}
-      </>
-    );
-  }
-
-  // Status dot color
-  function statusColor(status: string): string {
-    switch (status) {
-      case "thinking": return "bg-[var(--accent-gold)] animate-pulse";
-      case "debating": return "bg-[var(--accent-blue)] animate-pulse";
-      case "done": return "bg-[var(--accent-mint)]";
-      default: return "bg-[var(--border-medium)]";
-    }
-  }
+  const meterColor = consensusScore === null ? "bg-white/10" : consensusScore < 0.4 ? "bg-[var(--accent-coral)]" : consensusScore < 0.7 ? "bg-[var(--accent-gold)]" : "bg-[var(--accent-mint)]";
 
   return (
-    <div className="flex flex-col h-full bg-[var(--bg)] overflow-hidden">
-      {/* ━━━ Top Bar ━━━ */}
-      <div className="shrink-0 px-6 py-4 border-b border-[var(--border-subtle)] bg-[var(--bg-surface-1)]">
-        <div className="flex items-center gap-3">
-          <div className="flex-1 flex items-center gap-2">
-            <div className="relative flex-1 max-w-2xl">
-              <Swords size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-[var(--accent-mint)]" />
-              <input
-                className="input-base pl-11 pr-4 py-3 text-base"
-                placeholder="Enter your question for the council..."
-                value={query}
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && startDebate()}
-                disabled={running}
-              />
+    <div className="h-full flex flex-col bg-[#000000] relative overflow-hidden selection:bg-[var(--accent-mint)]/30 font-sans">
+      <TechnicalGrid />
+      
+      {/* ━━━ Header HUD ━━━ */}
+      <div className="shrink-0 relative z-20">
+        <SectorHUD 
+          sectorId="SYNC-06" 
+          title="Deliberation_Arena" 
+          subtitle="Adversarial Logic Engine // Real-time conflict resolution"
+          accentColor="var(--accent-coral)"
+          telemetry={[
+            { label: "NODES", value: String(members.length), status: "online" },
+            { label: "TRUTH", value: String(factsCount), status: "optimal" },
+            { label: "UPLINK", value: "SECURE", status: "optimal" }
+          ]}
+        />
+
+        {/* Action Bar */}
+        <div className="mt-10 px-10 flex gap-4 max-w-5xl">
+            <div className="relative flex-1 group">
+                <div className="absolute inset-0 bg-white/[0.01] rounded-3xl pointer-events-none group-focus-within:bg-[var(--accent-mint)]/[0.02] transition-colors" />
+                <Send size={16} className="absolute left-6 top-1/2 -translate-y-1/2 text-[var(--accent-mint)] opacity-30 group-focus-within:opacity-100 transition-all" />
+                <input
+                    className="w-full bg-black/40 border border-white/5 rounded-3xl pl-16 pr-6 py-5 text-sm text-white placeholder:text-white/10 focus:outline-none focus:border-[var(--accent-mint)]/40 transition-all font-diag uppercase tracking-tighter"
+                    placeholder="DEFINE_LOGIC_PARAMETER_FOR_DELIBERATION..."
+                    value={query}
+                    onChange={(e) => setQuery(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && startDebate()}
+                    disabled={running}
+                />
             </div>
             <button
-              onClick={startDebate}
-              disabled={running || !query.trim()}
-              className="btn-pill-primary px-6 py-3 disabled:opacity-40"
+                onClick={startDebate}
+                disabled={running || !query.trim()}
+                className="px-10 h-[64px] rounded-3xl bg-[var(--accent-mint)] text-black font-black uppercase tracking-[0.3em] text-[10px] shadow-[0_0_40px_rgba(110,231,183,0.2)] hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-20 disabled:grayscale flex items-center gap-4"
             >
-              <Send size={16} />
-              {running ? "Debating..." : "Start Debate"}
+                {running ? <Activity size={16} className="animate-spin" /> : <Zap size={16} fill="currentColor" strokeWidth={0} />}
+                {running ? "PROCESSING" : "EXECUTE"}
             </button>
-          </div>
-          <button
-            onClick={() => setVoiceMode(!voiceMode)}
-            className={`p-2.5 rounded-button border transition-all ${
-              voiceMode
-                ? "bg-[rgba(110,231,183,0.08)] border-[rgba(110,231,183,0.2)] text-[var(--accent-mint)]"
-                : "border-[var(--border-subtle)] text-[var(--text-muted)] hover:text-[var(--text-secondary)]"
-            }`}
-            title={voiceMode ? "Voice mode ON" : "Voice mode OFF"}
-          >
-            {voiceMode ? <Volume2 size={18} /> : <VolumeX size={18} />}
-          </button>
+            <button
+                onClick={() => setVoiceMode(!voiceMode)}
+                className={`flex items-center gap-3 h-[64px] px-6 rounded-3xl border transition-all font-diag text-[9px] font-black uppercase tracking-widest ${
+                    voiceMode 
+                    ? "bg-[var(--accent-mint)]/10 border-[var(--accent-mint)]/40 text-[var(--accent-mint)] shadow-[0_0_20px_rgba(110,231,183,0.1)]" 
+                    : "bg-white/[0.02] border-white/5 text-white/30 hover:text-white"
+                }`}
+            >
+                {voiceMode ? <Volume2 size={16} /> : <VolumeX size={16} />}
+                {voiceMode ? "Audio_Live" : "Audio_Muted"}
+            </button>
         </div>
       </div>
 
-      {/* ━━━ Stats Bar ━━━ */}
-      {(members.length > 0 || factsCount > 0) && (
-        <motion.div
-          initial={{ height: 0, opacity: 0 }}
-          animate={{ height: "auto", opacity: 1 }}
-          className="shrink-0 grid grid-cols-4 gap-3 px-6 py-3 border-b border-[var(--border-subtle)] bg-[var(--bg)]"
-        >
-          {[
-            { icon: <Users size={14} />, label: "Agents", value: members.length },
-            { icon: <FileWarning size={14} />, label: "Facts", value: factsCount },
-            { icon: <Swords size={14} />, label: "Conflicts", value: conflicts.length },
-            { icon: <MessageSquare size={14} />, label: "Exchanges", value: exchanges.length },
-          ].map((stat, i) => (
-            <div key={i} className="flex items-center gap-2 text-xs text-[var(--text-muted)]">
-              <span className="text-[var(--accent-mint)]">{stat.icon}</span>
-              <span className="font-semibold text-[var(--text-primary)]">
-                <AnimatedCounter value={stat.value} />
-              </span>
-              <span>{stat.label}</span>
-            </div>
-          ))}
-        </motion.div>
-      )}
-
-      {/* ━━━ Agent Columns ━━━ */}
-      <div className="flex-1 overflow-x-auto p-4">
-        {members.length === 0 && !running ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <div className="w-16 h-16 rounded-2xl bg-[var(--glass-bg)] border border-[var(--glass-border)] flex items-center justify-center mx-auto mb-4">
-                <Swords size={28} className="text-[var(--accent-mint)] opacity-60" />
-              </div>
-              <p className="text-lg font-semibold text-[var(--text-primary)] mb-1">Debate Arena</p>
-              <p className="text-sm text-[var(--text-muted)]">Enter a question to start the deliberation</p>
-            </div>
-          </div>
-        ) : (
-          <div
-            className="grid gap-4 h-full"
-            style={{ gridTemplateColumns: `repeat(${Math.max(members.length, 1)}, minmax(280px, 1fr))` }}
-          >
-            {members.map((member, idx) => (
-              <motion.div
-                key={member.id}
-                initial={{ opacity: 0, y: 16 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: idx * 0.1, duration: 0.3 }}
-                className="flex flex-col surface-card overflow-hidden"
-              >
-                {/* Column Header */}
-                <div className="px-4 py-3 border-b border-[var(--border-subtle)] flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
-                      style={{
-                        backgroundColor: `hsl(${(idx * 70) % 360}, 60%, 85%)`,
-                        color: `hsl(${(idx * 70) % 360}, 60%, 30%)`,
-                        boxShadow: member.status === "thinking" || member.status === "debating"
-                          ? `0 0 12px hsl(${(idx * 70) % 360}, 60%, 60%)`
-                          : "none",
-                      }}
-                    >
-                      {member.name.charAt(0).toUpperCase()}
-                    </div>
-                    <div>
-                      <div className="font-semibold text-sm text-[var(--text-primary)]">{member.name}</div>
-                      {member.model && (
-                        <div className="text-[10px] text-[var(--text-muted)] font-mono">{member.model}</div>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <span className={`w-2 h-2 rounded-full ${statusColor(member.status)}`} />
-                    <span className="text-[10px] text-[var(--text-muted)] capitalize font-semibold">{member.status}</span>
-                  </div>
-                </div>
-
-                {/* Response Text */}
-                <div
-                  ref={(el) => { if (el) columnRefs.current.set(member.id, el); }}
-                  className="flex-1 p-4 overflow-y-auto text-sm text-[var(--text-secondary)] whitespace-pre-wrap leading-relaxed scrollbar-custom"
-                >
-                  {member.text ? (
-                    highlightText(member.text, member.conflictHighlights)
-                  ) : (
-                    <div className="flex items-center justify-center h-full">
-                      <span className="w-5 h-5 border-2 border-[var(--accent-mint)] border-t-transparent rounded-full animate-spin" />
-                    </div>
-                  )}
-                </div>
-
-                {/* Critiques */}
-                <AnimatePresence>
-                  {member.critiques.length > 0 && (
-                    <motion.div
-                      initial={{ height: 0 }}
-                      animate={{ height: "auto" }}
-                      className="border-t border-[var(--border-subtle)] px-3 py-2 bg-[var(--glass-bg)] space-y-1.5 max-h-32 overflow-y-auto scrollbar-custom"
-                    >
-                      {member.critiques.map((c, i) => (
-                        <div key={i} className="flex items-start gap-1.5">
-                          <span className={`text-[10px] px-1.5 py-0.5 rounded-pill font-semibold shrink-0 ${
-                            c.type === "rebuttal" ? "bg-[var(--accent-coral)]/12 text-[var(--accent-coral)]" :
-                            c.type === "concession" ? "bg-[var(--accent-mint)]/12 text-[var(--accent-mint)]" :
-                            "bg-[var(--accent-gold)]/12 text-[var(--accent-gold)]"
-                          }`}>
-                            {c.from}
-                          </span>
-                          <span className="text-[11px] text-[var(--text-muted)] leading-tight">{c.content}</span>
-                        </div>
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-
-                {/* Footer */}
-                {member.status === "done" && (
-                  <div className="px-4 py-2 border-t border-[var(--border-subtle)] flex items-center gap-3 text-[10px] text-[var(--text-muted)]">
-                    <span className="font-mono">{member.tokens} tokens</span>
-                  </div>
-                )}
-              </motion.div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ━━━ Consensus Meter ━━━ */}
+      {/* ━━━ Telemetry Strip ━━━ */}
       <AnimatePresence>
-        {(consensusScore !== null || running) && (
+        {(members.length > 0 || factsCount > 0) && (
           <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="shrink-0 px-6 py-4 bg-[var(--bg-surface-1)] border-t border-[var(--border-subtle)]"
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="shrink-0 flex gap-12 px-10 py-6 border-y border-white/5 mt-10 bg-white/[0.01] backdrop-blur-3xl relative z-20"
           >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-semibold text-[var(--text-primary)]">Consensus</span>
-              {consensusScore !== null && (
-                <span
-                  className="text-sm font-bold font-mono"
-                  style={{
-                    color: consensusScore < 0.4 ? "var(--accent-coral)" : consensusScore < 0.7 ? "var(--accent-gold)" : "var(--accent-mint)"
-                  }}
-                >
-                  {meterPercent}%
-                </span>
-              )}
-            </div>
-            <div className="w-full bg-[var(--border-subtle)] rounded-pill h-2 overflow-hidden">
-              <motion.div
-                className={`h-full rounded-pill ${meterColor}`}
-                initial={{ width: 0 }}
-                animate={{ width: consensusScore !== null ? `${meterPercent}%` : running ? "15%" : "0%" }}
-                transition={{ duration: 1, ease: "easeOut" }}
-              />
-            </div>
-            {consensusBreakdown && (
-              <div className="flex gap-4 mt-2 text-[10px] text-[var(--text-muted)] font-mono">
-                <span>Claims: {Math.round((consensusBreakdown.claimAgreement as number) * 100)}%</span>
-                <span>Debate: {Math.round((consensusBreakdown.debateResolution as number) * 100)}%</span>
-                <span>Conflicts: {consensusBreakdown.totalConflicts as number}</span>
-                <span>Concessions: {consensusBreakdown.totalConcessions as number}</span>
-              </div>
-            )}
+            {[
+              { label: "Neural_Nodes", val: members.length, color: "text-[var(--accent-mint)]" },
+              { label: "Truth_Vectors", val: factsCount, color: "text-[var(--accent-blue)]" },
+              { label: "Conflict_Points", val: conflicts.length, color: "text-[var(--accent-coral)]" },
+              { label: "Comm_Bursts", val: exchanges.length, color: "text-[var(--accent-gold)]" },
+            ].map((s, i) => (
+                <div key={i} className="flex flex-col gap-1">
+                    <span className="text-[8px] font-diag text-white/20 uppercase tracking-[0.3em] font-black">{s.label}</span>
+                    <div className={`text-2xl font-black font-mono tracking-tighter ${s.color}`}>
+                        <AnimatedCounter value={s.val} />
+                    </div>
+                </div>
+            ))}
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* ━━━ Synthesis Panel ━━━ */}
+      {/* ━━━ Arena View ━━━ */}
+      <div className="flex-1 overflow-x-auto overflow-y-hidden p-10 scrollbar-custom relative z-10">
+        {members.length === 0 && !running ? (
+            <div className="h-full flex flex-col items-center justify-center text-center opacity-20 group">
+                <div className="w-32 h-32 rounded-[2rem] bg-white/[0.02] border border-white/5 flex items-center justify-center mb-10 group-hover:border-[var(--accent-mint)]/20 transition-all duration-700">
+                    <Swords size={48} className="text-white group-hover:text-[var(--accent-mint)] transition-all duration-700" />
+                </div>
+                <h2 className="text-2xl font-black text-white uppercase italic tracking-tighter mb-4">Arena_Idle</h2>
+                <p className="text-[10px] font-diag text-white/40 uppercase tracking-[0.4em]">Awaiting high-fidelity deliberative input...</p>
+            </div>
+        ) : (
+            <div className="flex gap-10 h-full min-w-max pb-10">
+                {members.map((mItem, idx) => (
+                    <motion.div
+                        key={mItem.id}
+                        initial={{ opacity: 0, x: 50 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: idx * 0.1 }}
+                        className="w-[480px] flex flex-col glass-panel rounded-[2rem] overflow-hidden border border-white/5 shadow-2xl relative group/card"
+                    >
+                        {/* Unit Badge */}
+                        <div className="px-8 py-6 border-b border-white/5 flex items-center justify-between relative bg-white/[0.02]">
+                            <div className="flex items-center gap-5">
+                                <div className="w-14 h-14 rounded-3xl border border-white/10 flex items-center justify-center text-xl font-black italic shadow-inner bg-gradient-to-br from-white/10 to-transparent">
+                                    {mItem.name[0]}
+                                </div>
+                                <div className="flex flex-col">
+                                    <span className="text-xs font-black text-white tracking-widest uppercase italic">{mItem.name}</span>
+                                    <span className="text-[8px] font-diag text-[var(--accent-mint)] uppercase tracking-[0.2em] mt-1 opacity-60">Neural_Class: {mItem.model || "Core_Unit"}</span>
+                                </div>
+                            </div>
+                            <div className="flex flex-col items-end gap-2">
+                                <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-white/5 border border-white/5">
+                                    <span className="text-[8px] font-mono text-white/20 uppercase tracking-widest">{mItem.status}</span>
+                                    <div className={`w-1.5 h-1.5 rounded-full ${mItem.status === "thinking" ? "bg-[var(--accent-gold)] animate-pulse" : mItem.status === "debating" ? "bg-[var(--accent-coral)] animate-bounce" : "bg-[var(--accent-mint)]"}`} />
+                                </div>
+                                <span className="text-[9px] font-mono text-white/10">{mItem.tokens} tkn</span>
+                            </div>
+                        </div>
+
+                        {/* Inference Terminal */}
+                        <div 
+                            ref={(el) => { if (el) columnRefs.current.set(mItem.id, el); }}
+                            className="flex-1 p-8 overflow-y-auto scrollbar-custom text-sm font-diag font-medium text-white/60 leading-relaxed space-y-6"
+                        >
+                            {mItem.text ? (
+                                <div className="whitespace-pre-wrap selection:bg-[var(--accent-mint)]/20">
+                                    {mItem.text}
+                                </div>
+                            ) : (
+                                <div className="h-full flex flex-col items-center justify-center gap-4 opacity-20">
+                                    <Activity size={24} className="text-[var(--accent-mint)] animate-pulse" />
+                                    <span className="text-[9px] font-diag uppercase tracking-[0.3em] font-black">STREAMING_NEURAL_PULSE...</span>
+                                </div>
+                            )}
+
+                            {/* Conflicts / Critiques */}
+                            <AnimatePresence>
+                                {mItem.critiques.length > 0 && (
+                                    <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4 pt-4">
+                                        <div className="text-[8px] font-diag text-[var(--accent-coral)] uppercase tracking-[0.4em] font-black flex items-center gap-3">
+                                            <ShieldAlert size={10} /> Conflict_Report
+                                        </div>
+                                        {mItem.critiques.map((c, i) => (
+                                            <div key={i} className="p-5 rounded-2xl bg-red-400/[0.03] border border-red-400/10 hover:border-red-400/30 transition-all">
+                                                <div className="flex items-center gap-3 mb-2">
+                                                    <span className="text-[8px] font-black text-red-100 bg-red-500/20 px-2 py-0.5 rounded uppercase tracking-widest">{c.from}</span>
+                                                    <span className="text-[8px] font-diag text-white/20 uppercase tracking-widest font-black italic">{c.type}</span>
+                                                </div>
+                                                <p className="text-[10px] italic text-white/50 leading-relaxed font-diag">{c.content}</p>
+                                            </div>
+                                        ))}
+                                    </motion.div>
+                                )}
+                            </AnimatePresence>
+                        </div>
+                    </motion.div>
+                ))}
+            </div>
+        )}
+      </div>
+
+      {/* ━━━ Synthesis Footprints ━━━ */}
       <AnimatePresence>
         {synthesis && (
-          <motion.div
-            initial={{ height: 0, opacity: 0 }}
-            animate={{ height: "auto", opacity: 1 }}
-            className="shrink-0 px-6 py-5 verdict-box border-t border-[var(--border-subtle)]"
-          >
-            <h3 className="font-semibold text-[var(--text-primary)] mb-3 flex items-center gap-2">
-              <Gavel size={16} className="text-[var(--accent-mint)]" />
-              Council Synthesis
-            </h3>
-            <div className="text-sm text-[var(--text-secondary)] whitespace-pre-wrap leading-relaxed">{synthesis}</div>
-          </motion.div>
+            <motion.div 
+                initial={{ y: 200 }} 
+                animate={{ y: 0 }} 
+                exit={{ y: 200 }}
+                className="shrink-0 bg-black/80 backdrop-blur-3xl border-t border-[var(--accent-mint)]/20 p-10 relative z-30"
+            >
+                <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[var(--accent-mint)] to-transparent" />
+                <div className="max-w-7xl mx-auto flex gap-12">
+                    <div className="w-80 flex-shrink-0">
+                        <div className="flex items-center gap-4 mb-6">
+                            <div className="w-12 h-12 rounded-2xl bg-[var(--accent-mint)]/10 text-[var(--accent-mint)] flex items-center justify-center">
+                                <Gavel size={24} />
+                            </div>
+                            <div>
+                                <h3 className="text-xl font-black text-white italic tracking-tighter uppercase">COUNCIL_VERDICT</h3>
+                                <p className="text-[8px] font-diag text-[var(--accent-mint)] uppercase tracking-[0.3em] font-black">Final_Sythesis_v9.2</p>
+                            </div>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            <div className="flex justify-between items-end">
+                                <span className="text-[9px] font-diag text-white/20 uppercase tracking-widest font-black">Consensus_Confidence</span>
+                                <span className="text-xl font-black text-[var(--accent-mint)] font-mono">{meterPercent}%</span>
+                            </div>
+                            <div className="h-2 w-full bg-white/5 rounded-full overflow-hidden">
+                                <motion.div 
+                                    initial={{ width: 0 }} 
+                                    animate={{ width: `${meterPercent}%` }} 
+                                    className={`h-full ${meterColor} shadow-[0_0_20px_var(--accent-mint)]`}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div className="flex-1 p-8 rounded-3xl bg-white/[0.01] border border-white/5 max-h-[300px] overflow-y-auto scrollbar-custom">
+                        <div className="text-sm font-diag font-medium text-white/70 leading-relaxed italic border-l-2 border-[var(--accent-mint)]/30 pl-8">
+                            {synthesis}
+                        </div>
+                    </div>
+                </div>
+            </motion.div>
         )}
       </AnimatePresence>
     </div>

@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import * as React from 'react';
+import { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 interface AuditLog {
@@ -40,7 +41,7 @@ export const AuditLogs: React.FC = () => {
     };
 
     fetchLogs();
-  }, [user]);
+  }, [user, fetchWithAuth]);
 
   if (loading) {
     return (

@@ -275,7 +275,7 @@ function WorkflowEditorInner() {
       console.error("Run failed", err);
       setRunning(false);
     }
-  }, [savedId, fetchWithAuth]);
+  }, [savedId, fetchWithAuth, token]);
 
   const handleRunStart = useCallback(() => {
     if (!savedId) return;

@@ -1,11 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
+import { AnimatePresence } from "framer-motion";
 import { Outlet, useNavigate, useLocation } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { Sidebar } from "../components/Sidebar";
 import { AuthScreen } from "../components/AuthScreen";
 import { OfflineIndicator } from "../components/OfflineIndicator";
 import { PageTransition } from "../components/PageTransition";
-import type { Conversation } from "../types/index.js";
+import { CommandPalette } from "../components/CommandPalette";
+import { ToastProvider } from "../components/ToastProvider";
+import { GlobalHUD } from "../components/GlobalHUD";
+import type { Conversation } from "../types/index";
 
 export function RootLayout() {
   const { user, fetchWithAuth, logout } = useAuth();
@@ -13,9 +17,25 @@ export function RootLayout() {
   const location = useLocation();
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(true);
-  const [sidebarWidth, setSidebarWidth] = useState(260);
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem("sidebar_open");
+    return saved !== null ? JSON.parse(saved) : true;
+  });
+  const [sidebarWidth, setSidebarWidth] = useState(() => {
+    const saved = localStorage.getItem("sidebar_width");
+    return saved !== null ? parseInt(saved, 10) : 260;
+  });
   const [error, setError] = useState<string | null>(null);
+  const [searchResults, setSearchResults] = useState<any[] | null>(null);
+  const [isSearching, setIsSearching] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem("sidebar_open", JSON.stringify(sidebarOpen));
+  }, [sidebarOpen]);
+
+  useEffect(() => {
+    localStorage.setItem("sidebar_width", sidebarWidth.toString());
+  }, [sidebarWidth]);
 
   const loadConversations = useCallback(async () => {
     if (!user) return;
@@ -63,6 +83,26 @@ export function RootLayout() {
       setError("Failed to delete conversation. Please try again.");
     }
   }, [fetchWithAuth, activeConvId, navigate]);
+  
+  const handleSearch = useCallback(async (query: string) => {
+    if (!query || query.trim().length < 2) {
+      setSearchResults(null);
+      return;
+    }
+    
+    setIsSearching(true);
+    try {
+      const res = await fetchWithAuth(`/api/history/search?q=${encodeURIComponent(query)}`);
+      if (res.ok) {
+        const data = await res.json();
+        setSearchResults(data);
+      }
+    } catch (err) {
+      console.error("Search failed", err);
+    } finally {
+      setIsSearching(false);
+    }
+  }, [fetchWithAuth]);
 
   const handleShowMetrics = useCallback(() => {
     navigate("/metrics");
@@ -83,7 +123,10 @@ export function RootLayout() {
   }
 
   return (
-    <div className="flex h-screen overflow-hidden bg-[var(--bg)] relative">
+    <ToastProvider>
+      <div className="flex h-screen overflow-hidden bg-[var(--bg)] relative">
+        <GlobalHUD />
+        <CommandPalette />
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-card focus:text-text focus:p-2 focus:rounded">Skip to main content</a>
       {/* Ambient background orbs — only render in dark mode */}
       <div className="bg-orb-mint w-[500px] h-[500px] top-[-10%] left-[20%] animate-drift hidden dark:block" />
@@ -109,6 +152,9 @@ export function RootLayout() {
         onDelete={handleDelete}
         onLogout={logout}
         onShowMetrics={handleShowMetrics}
+        onSearch={handleSearch}
+        searchResults={searchResults}
+        isSearching={isSearching}
         width={sidebarWidth}
         onWidthChange={setSidebarWidth}
       />
@@ -148,14 +194,23 @@ export function RootLayout() {
 
         {/* Page content with transition */}
         <div className="flex-1 overflow-hidden">
-          <PageTransition className="h-full" key={location.pathname}>
-            <Outlet context={{ loadConversations, setActiveConvId, setIsSidebarOpen: setSidebarOpen, conversations }} />
-          </PageTransition>
+          <AnimatePresence mode="wait">
+            <PageTransition className="h-full" key={location.pathname}>
+              <Outlet context={{ loadConversations, setActiveConvId, setIsSidebarOpen: setSidebarOpen, conversations }} />
+            </PageTransition>
+          </AnimatePresence>
         </div>
       </main>
 
       {/* Offline indicator */}
       <OfflineIndicator />
-    </div>
+      
+      {/* Global Mission Control Effects */}
+      <div className="scan-line-overlay" />
+      <div className="fixed inset-0 pointer-events-none z-[10000] overflow-hidden opacity-20 dark:opacity-40">
+        <div className="w-full h-[1px] bg-gradient-to-r from-transparent via-[var(--accent-mint)] to-transparent animate-scan" />
+      </div>
+      </div>
+    </ToastProvider>
   );
 }

@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import * as React from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 interface SearchResult {
@@ -73,7 +74,7 @@ export const EnhancedSearch: React.FC = () => {
     } finally {
       setLoading(false);
     }
-  }, [query, user, filters, pagination.limit]);
+  }, [query, user, filters, pagination.limit, fetchWithAuth]);
 
   const performSearchRef = useRef(performSearch);
   useEffect(() => {

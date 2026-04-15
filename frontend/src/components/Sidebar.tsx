@@ -2,13 +2,51 @@ import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
-  Home, MessageSquarePlus, Swords, Workflow, Code2, Braces,
-  GitBranch, Brain, Store, BarChart3, Activity,
+  Home, MessageSquarePlus, Swords, Workflow,
+  Brain, Store, BarChart3, Activity, Terminal,
   Shield, Settings, ChevronLeft, ChevronRight, LogOut, Trash2,
-  MessageCircle, ChevronDown, ChevronUp
+  MessageCircle, ChevronDown, ChevronUp, Search, Loader2, Zap,
+  Cpu, Database, Network
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
-import type { Conversation } from "../types/index.js";
+import type { Conversation } from "../types/index";
+
+function IntelligencePulse() {
+  return (
+    <div className="px-5 py-5 mt-2 border-t border-white/5 bg-white/[0.01]">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Activity size={10} className="text-[var(--accent-mint)] animate-pulse" />
+          <span className="text-[8px] font-black uppercase tracking-[0.3em] text-[var(--accent-mint)] opacity-70 font-diag">Sector_Telemetry</span>
+        </div>
+        <div className="flex items-center gap-1.5">
+          <div className="w-1 h-1 rounded-full bg-[var(--accent-mint)] shadow-[0_0_8px_var(--accent-mint)]" />
+          <span className="text-[8px] font-mono text-white opacity-40 uppercase">Safe</span>
+        </div>
+      </div>
+      <div className="flex items-end gap-[2px] h-10 overflow-hidden px-1">
+        {Array.from({ length: 28 }).map((_, i) => (
+          <motion.div 
+            key={i}
+            className={`w-[2.5px] rounded-t-sm ${i % 6 === 0 ? "bg-[var(--accent-mint)]" : "bg-[var(--accent-mint)]/10"}`}
+            animate={{ 
+              height: [`${20 + Math.random() * 40}%`, `${60 + Math.random() * 40}%`, `${20 + Math.random() * 40}%`],
+              opacity: [0.2, 0.5, 0.2]
+            }}
+            transition={{ repeat: Infinity, duration: 1.2 + Math.random(), ease: "easeInOut" }}
+          />
+        ))}
+      </div>
+      <div className="flex items-center justify-between mt-4 text-[8px] font-diag uppercase tracking-[0.2em] text-[var(--text-muted)]">
+        <div className="flex items-center gap-2">
+          <Zap size={10} className="text-[var(--accent-gold)]" />
+          <span className="opacity-40">Lag</span>
+        </div>
+        <span className="text-white/60 font-black tracking-tight italic">0.002s</span>
+      </div>
+    </div>
+  );
+}
 
 interface SidebarProps {
   conversations: Conversation[];
@@ -21,6 +59,9 @@ interface SidebarProps {
   onDelete: (id: string) => void;
   onLogout: () => void;
   onShowMetrics: () => void;
+  onSearch?: (query: string) => void;
+  searchResults?: any[] | null;
+  isSearching?: boolean;
   width: number;
   onWidthChange: (width: number) => void;
 }
@@ -29,12 +70,12 @@ function timeAgo(dateStr?: string): string {
   if (!dateStr) return "";
   const diff = Date.now() - new Date(dateStr).getTime();
   const m = Math.floor(diff / 60000);
-  if (m < 1) return "just now";
-  if (m < 60) return `${m}m ago`;
+  if (m < 1) return "now";
+  if (m < 60) return `${m}m`;
   const h = Math.floor(m / 60);
-  if (h < 24) return `${h}h ago`;
+  if (h < 24) return `${h}h`;
   const d = Math.floor(h / 24);
-  if (d < 7) return `${d}d ago`;
+  if (d < 7) return `${d}d`;
   return new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric" });
 }
 
@@ -42,46 +83,55 @@ interface NavItemProps {
   to?: string;
   icon: React.ReactNode;
   label: string;
+  sector?: string;
   active?: boolean;
   onClick?: () => void;
   collapsed?: boolean;
 }
 
-function NavItem({ to, icon, label, active, onClick, collapsed }: NavItemProps) {
-  const classes = `w-full flex items-center gap-3 px-3 py-2 rounded-button text-sm transition-all duration-150 group ${
+function NavItem({ to, icon, label, sector, active, onClick, collapsed }: NavItemProps) {
+  const classes = `w-full relative flex items-center gap-3.5 px-3 py-2.5 rounded-2xl text-[13px] transition-all duration-500 group overflow-hidden ${
     active
-      ? "bg-[rgba(110,231,183,0.08)] text-[var(--accent-mint)] font-semibold"
-      : "text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--text-primary)]"
+      ? "text-white font-black bg-white/[0.04] shadow-inner"
+      : "text-white/40 hover:bg-white/[0.04] hover:text-white"
   }`;
 
   const content = (
     <>
-      <span className="shrink-0 w-5 h-5 flex items-center justify-center">{icon}</span>
-      {!collapsed && <span className="truncate">{label}</span>}
+      {active && (
+        <motion.div 
+          layoutId="activeTabGlow"
+          className="absolute left-0 top-0 bottom-0 w-[4px] bg-[var(--accent-mint)] rounded-r-full shadow-[0_0_20px_var(--accent-mint)] z-10" 
+        />
+      )}
+      <span className={`shrink-0 w-5 h-5 flex items-center justify-center transition-all duration-500 group-hover:scale-110 ${active ? "text-[var(--accent-mint)]" : "opacity-40 group-hover:opacity-100 group-hover:text-[var(--accent-mint)]"}`}>
+        {icon}
+      </span>
+      {!collapsed && (
+        <div className="flex flex-col items-start min-w-0">
+          {sector && <span className="text-[7px] font-diag opacity-30 group-hover:opacity-60 transition-opacity uppercase tracking-[0.2em] mb-0.5">{sector}</span>}
+          <span className="truncate tracking-tight uppercase font-black text-[10px] tracking-[0.1em]">{label}</span>
+        </div>
+      )}
+      <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/[0.01] to-transparent opacity-0 group-hover:opacity-100 transition-opacity translate-x-[-100%] group-hover:translate-x-[100%] duration-1000 pointer-events-none" />
     </>
   );
 
   if (to) {
-    return (
-      <Link to={to} className={classes} onClick={onClick} aria-current={active ? "page" : undefined}>
-        {content}
-      </Link>
-    );
+    return <Link to={to} className={classes} onClick={onClick} aria-current={active ? "page" : undefined}>{content}</Link>;
   }
-
-  return (
-    <button onClick={onClick} className={classes} aria-current={active ? "page" : undefined}>
-      {content}
-    </button>
-  );
+  return <button onClick={onClick} className={classes} aria-current={active ? "page" : undefined}>{content}</button>;
 }
 
 function SectionHeader({ label, collapsed }: { label: string; collapsed?: boolean }) {
-  if (collapsed) return null;
+  if (collapsed) return <div className="h-4" />;
   return (
-    <p className="text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-[0.15em] px-3 mt-4 mb-1.5">
-      {label}
-    </p>
+    <div className="px-3 mt-8 mb-3 flex items-center gap-3">
+      <p className="text-[8px] font-black text-white/20 uppercase tracking-[0.4em] font-diag">
+        {label}
+      </p>
+      <div className="h-[1px] flex-1 bg-white/5" />
+    </div>
   );
 }
 
@@ -95,12 +145,16 @@ export function Sidebar({
   onNew,
   onDelete,
   onLogout,
-  onShowMetrics,
+  onShowMetrics: _onShowMetrics,
+  onSearch,
+  searchResults: _searchResults,
+  isSearching,
   width,
   onWidthChange
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(true);
+  const [searchQuery, setSearchQuery] = useState("");
   const location = useLocation();
   const currentPath = location.pathname;
 
@@ -109,217 +163,194 @@ export function Sidebar({
     e.preventDefault();
     const startX = e.clientX;
     const startWidth = width;
-
     const onMouseMove = (moveEvent: MouseEvent) => {
-      const newWidth = Math.max(220, Math.min(480, startWidth + (moveEvent.clientX - startX)));
-      onWidthChange(newWidth);
+      onWidthChange(Math.max(240, Math.min(480, startWidth + (moveEvent.clientX - startX))));
     };
-
     const onMouseUp = () => {
       document.removeEventListener("mousemove", onMouseMove);
       document.removeEventListener("mouseup", onMouseUp);
       document.body.style.cursor = "default";
     };
-
     document.addEventListener("mousemove", onMouseMove);
     document.addEventListener("mouseup", onMouseUp);
     document.body.style.cursor = "col-resize";
   };
 
   const userInitial = (username?.[0] || "U").toUpperCase();
-  const sidebarWidth = collapsed ? 64 : width;
+  const sidebarWidth = collapsed ? 80 : width;
 
   return (
     <aside
       style={{ width: isOpen ? `${sidebarWidth}px` : undefined }}
       className={`
-        fixed md:relative z-40 h-full
-        bg-[var(--bg-surface-1)] border-r border-[var(--border-subtle)]
+        fixed md:relative z-[60] h-full
+        bg-black border-r border-white/5
         flex flex-col
-        transition-all duration-300 ease-in-out
+        transition-all duration-500 cubic-bezier(0.4, 0, 0.2, 1)
         ${isOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"}
-        ${!isOpen ? "w-64" : ""}
+        shadow-2xl overflow-hidden
       `}
     >
+      <div className="absolute inset-0 bg-[#050505] noise opacity-50 z-0 pointer-events-none" />
+      
       {/* Resize handle */}
       {!collapsed && (
         <div
-          className="absolute right-0 top-0 w-1 h-full cursor-col-resize hover:bg-[var(--accent-mint)]/30 transition-colors z-50 hidden md:block group"
+          className="absolute right-0 top-0 w-1.5 h-full cursor-col-resize hover:bg-[var(--accent-mint)]/20 transition-colors z-[100] hidden md:block group"
           onMouseDown={handleMouseDown}
         >
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-16 rounded-full transition-colors group-hover:bg-[var(--accent-mint)]/20" />
+          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-32 rounded-full opacity-0 group-hover:opacity-100 transition-opacity bg-[var(--accent-mint)]/40" />
         </div>
       )}
 
       {/* Header — Logo + Collapse */}
-      <div className={`shrink-0 ${collapsed ? "px-2 pt-4 pb-3" : "px-4 pt-5 pb-3"} flex items-center justify-between`}>
+      <div className={`shrink-0 z-10 ${collapsed ? "px-2 pt-6 pb-4" : "px-5 pt-7 pb-4"} flex items-center justify-between`}>
         <button
           onClick={onHome}
-          className={`flex items-center gap-2.5 rounded-button hover:bg-[var(--glass-bg-hover)] transition-colors ${collapsed ? "p-2" : "px-2 py-1.5"}`}
+          className={`group flex items-center gap-3 transition-all ${collapsed ? "mx-auto" : ""}`}
         >
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-[var(--accent-mint)] to-emerald-500 flex items-center justify-center shrink-0 shadow-glow-sm">
-            <span className="text-black text-sm font-black">A</span>
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[var(--accent-mint)] to-emerald-600 flex items-center justify-center shrink-0 shadow-[0_0_20px_rgba(110,231,183,0.3)] group-hover:rotate-12 transition-transform duration-500">
+            <span className="text-black text-lg font-black italic">A</span>
           </div>
           {!collapsed && (
             <div className="text-left">
-              <p className="text-sm font-bold tracking-tight text-[var(--text-primary)]">
+              <p className="text-sm font-black tracking-tighter text-white italic">
                 AIBY<span className="text-[var(--accent-mint)]">AI</span>
               </p>
-              <p className="text-[9px] uppercase tracking-[0.15em] text-[var(--text-muted)] font-semibold">
-                Multi-Agent Council
+              <p className="text-[8px] font-diag uppercase tracking-[0.3em] text-white/20 font-black">
+                Mission_Control
               </p>
             </div>
           )}
         </button>
         <button
           onClick={() => setCollapsed(!collapsed)}
-          className="p-1.5 rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--glass-bg-hover)] transition-colors hidden md:flex"
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          className="p-2 rounded-xl text-white/10 hover:text-white hover:bg-white/5 transition-all hidden md:flex"
         >
-          {collapsed ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+          {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
         </button>
       </div>
 
       {/* Navigation */}
-      <nav className={`${collapsed ? "px-1.5" : "px-2"} space-y-0.5 shrink-0`} role="navigation" aria-label="Main Navigation">
-        {/* Main */}
-        <SectionHeader label="Main" collapsed={collapsed} />
-        <NavItem to="/" icon={<Home size={16} />} label="Home" active={currentPath === "/"} collapsed={collapsed} onClick={onHome} />
-        <NavItem icon={<MessageSquarePlus size={16} />} label="New Chat" onClick={onNew} collapsed={collapsed} />
-        <NavItem to="/debate" icon={<Swords size={16} />} label="Debate Arena" active={currentPath === "/debate"} collapsed={collapsed} />
+      <nav className={`flex-1 overflow-y-auto scrollbar-custom z-10 ${collapsed ? "px-2" : "px-4"} space-y-1 pb-10`} role="navigation">
+        <SectionHeader label="Intelligence" collapsed={collapsed} />
+        <NavItem to="/" icon={<Home size={18} />} label="Operational_Hub" sector="SEC-00" active={currentPath === "/"} collapsed={collapsed} onClick={onHome} />
+        <NavItem icon={<MessageSquarePlus size={18} />} label="Init_Deliberation" sector="COMM-01" onClick={onNew} collapsed={collapsed} active={currentPath.startsWith("/chat") && !activeId} />
+        <NavItem to="/debate" icon={<Network size={18} />} label="Debate_Arena" sector="COMBAT-07" active={currentPath === "/debate"} collapsed={collapsed} />
 
-        {/* Build */}
-        <SectionHeader label="Build" collapsed={collapsed} />
-        <NavItem to="/workflows" icon={<Workflow size={16} />} label="Workflows" active={currentPath.startsWith("/workflow")} collapsed={collapsed} />
-        <NavItem to="/prompts" icon={<Code2 size={16} />} label="Prompt IDE" active={currentPath === "/prompts"} collapsed={collapsed} />
-        <NavItem to="/skills" icon={<Braces size={16} />} label="Skills" active={currentPath === "/skills"} collapsed={collapsed} />
+        <SectionHeader label="Automation" collapsed={collapsed} />
+        <NavItem to="/workflows" icon={<Workflow size={18} />} label="Flow_Control" sector="PROT-04" active={currentPath.startsWith("/workflow")} collapsed={collapsed} />
+        <NavItem to="/prompts" icon={<Terminal size={18} />} label="Prompt_IDE" sector="CODE-09" active={currentPath === "/prompts"} collapsed={collapsed} />
+        <NavItem to="/skills" icon={<Zap size={18} />} label="Unit_Skills" sector="UNIT-11" active={currentPath === "/skills"} collapsed={collapsed} />
 
-        {/* Knowledge */}
         <SectionHeader label="Knowledge" collapsed={collapsed} />
-        <NavItem to="/repos" icon={<GitBranch size={16} />} label="Repos" active={currentPath === "/repos"} collapsed={collapsed} />
-        <NavItem to="/memory" icon={<Brain size={16} />} label="Memory" active={currentPath === "/memory"} collapsed={collapsed} />
+        <NavItem to="/repos" icon={<Database size={18} />} label="Data_Vaults" sector="INTEL-12" active={currentPath === "/repos"} collapsed={collapsed} />
+        <NavItem to="/memory" icon={<Brain size={18} />} label="Deep_Memory" sector="MEM-06" active={currentPath === "/memory"} collapsed={collapsed} />
 
-        {/* Community */}
-        <SectionHeader label="Community" collapsed={collapsed} />
-        <NavItem to="/marketplace" icon={<Store size={16} />} label="Marketplace" active={currentPath === "/marketplace"} collapsed={collapsed} />
+        <SectionHeader label="Exchange" collapsed={collapsed} />
+        <NavItem to="/marketplace" icon={<Store size={18} />} label="Asset_Exchange" sector="EXCH-02" active={currentPath === "/marketplace"} collapsed={collapsed} />
 
-        {/* System */}
-        <SectionHeader label="System" collapsed={collapsed} />
-        <NavItem to="/analytics" icon={<BarChart3 size={16} />} label="Analytics" active={currentPath === "/analytics"} collapsed={collapsed} />
-        <NavItem icon={<Activity size={16} />} label="Metrics" onClick={onShowMetrics} collapsed={collapsed} />
-        <NavItem to="/admin" icon={<Shield size={16} />} label="Admin" active={currentPath === "/admin"} collapsed={collapsed} />
-        <NavItem to="/settings" icon={<Settings size={16} />} label="Settings" active={currentPath === "/settings"} collapsed={collapsed} />
+        <SectionHeader label="Sim_Training" collapsed={collapsed} />
+        <NavItem to="/benchmarks" icon={<Swords size={18} />} label="Model_Bench" sector="SIM-05" active={currentPath === "/benchmarks"} collapsed={collapsed} />
+        <NavItem to="/training" icon={<Cpu size={18} />} label="Neuro_Forge" sector="GEN-07" active={currentPath === "/training"} collapsed={collapsed} />
+
+        <SectionHeader label="Diagnostics" collapsed={collapsed} />
+        <NavItem to="/analytics" icon={<BarChart3 size={18} />} label="Global_Telemetry" sector="TELE-08" active={currentPath === "/analytics"} collapsed={collapsed} />
+        <NavItem to="/admin" icon={<Shield size={18} />} label="Root_Admin" sector="SYS-AD" active={currentPath === "/admin"} collapsed={collapsed} />
+        <NavItem to="/settings" icon={<Settings size={18} />} label="Global_Settings" sector="CONF" active={currentPath === "/settings"} collapsed={collapsed} />
       </nav>
-
-      {/* Divider */}
-      <div className="mx-3 my-3 border-t border-[var(--border-subtle)]" />
 
       {/* Recent Sessions */}
       {!collapsed && (
-        <div className="flex-1 overflow-hidden flex flex-col px-2 min-h-0">
+        <div className="shrink-0 flex flex-col px-4 min-h-0 z-10 pb-4 border-t border-white/5 pt-6 bg-black">
           <button
             onClick={() => setHistoryOpen(!historyOpen)}
-            className="flex items-center justify-between px-3 mb-1.5 w-full text-[9px] font-bold text-[var(--text-muted)] uppercase tracking-[0.15em] hover:text-[var(--text-secondary)] transition-colors"
+            className="flex items-center justify-between px-3 mb-4 w-full text-[9px] font-black text-white/20 uppercase tracking-[0.4em] font-diag hover:text-white transition-all"
           >
-            <span>Recent Sessions</span>
-            {historyOpen ? <ChevronUp size={10} /> : <ChevronDown size={10} />}
+            <span>Active_Trace_History</span>
+            {historyOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
           </button>
+
+          {/* Search Bar */}
+          <div className="px-1 mb-4">
+            <div className="relative group">
+              <Search size={14} className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${searchQuery ? "text-[var(--accent-mint)]" : "text-white/20"}`} />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => { setSearchQuery(e.target.value); onSearch?.(e.target.value); }}
+                placeholder="TRACE_HISTORY..."
+                className="w-full bg-white/[0.02] border border-white/5 focus:border-[var(--accent-mint)]/30 rounded-2xl py-3 pl-12 pr-10 text-[10px] text-white font-diag uppercase tracking-widest placeholder:text-white/5 focus:outline-none transition-all"
+              />
+              {isSearching && <Loader2 size={12} className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-[var(--accent-mint)]" />}
+            </div>
+          </div>
+
           <AnimatePresence>
             {historyOpen && (
               <motion.div
                 initial={{ height: 0, opacity: 0 }}
-                animate={{ height: "auto", opacity: 1 }}
+                animate={{ height: 280, opacity: 1 }}
                 exit={{ height: 0, opacity: 0 }}
-                transition={{ duration: 0.2 }}
-                className="flex-1 overflow-y-auto scrollbar-custom space-y-0.5 pr-0.5"
+                className="overflow-y-auto scrollbar-custom space-y-1.5 pr-2"
               >
-                {conversations.length === 0 ? (
-                  <div className="px-3 py-4 text-xs text-[var(--text-muted)] italic text-center">
-                    No sessions yet
-                  </div>
-                ) : (
-                  conversations.slice(0, 15).map(c => (
+                {conversations.slice(0, 15).map(c => (
                     <div
                       key={c.id}
-                      role="button"
-                      tabIndex={0}
                       onClick={() => onSelect(c.id, c.title)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          onSelect(c.id, c.title);
-                        }
-                      }}
-                      className={`group flex items-center gap-2 px-3 py-2 rounded-button cursor-pointer transition-all text-sm relative
+                      className={`group flex items-center gap-3 px-4 py-3 rounded-2xl cursor-pointer transition-all border relative overflow-hidden
                         ${activeId === c.id
-                          ? "bg-[rgba(110,231,183,0.06)] text-[var(--text-primary)] border border-[rgba(110,231,183,0.12)]"
-                          : "text-[var(--text-secondary)] hover:bg-[var(--glass-bg-hover)] hover:text-[var(--text-primary)]"
+                          ? "bg-[var(--accent-mint)]/10 text-white border-[var(--accent-mint)]/30"
+                          : "bg-white/[0.02] text-white/40 border-transparent hover:border-white/10 hover:bg-white/[0.04] hover:text-white"
                         }`}
                     >
-                      <MessageCircle size={13} className={`shrink-0 ${activeId === c.id ? "text-[var(--accent-mint)]" : "opacity-30"}`} />
+                      <MessageCircle size={14} className={`shrink-0 ${activeId === c.id ? "text-[var(--accent-mint)] animate-pulse" : "opacity-20"}`} />
                       <div className="flex-1 min-w-0">
-                        <p className="truncate text-xs font-medium leading-tight">{c.title}</p>
-                        {c.updatedAt && (
-                          <p className="text-[9px] text-[var(--text-muted)] mt-0.5">{timeAgo(c.updatedAt)}</p>
-                        )}
+                        <p className="truncate text-[11px] font-black uppercase tracking-tight italic">{c.title}</p>
+                        <p className="text-[8px] font-diag uppercase tracking-widest mt-1 opacity-40">{timeAgo(c.updatedAt)}</p>
                       </div>
-                      <button
-                        onClick={(e) => { e.stopPropagation(); onDelete(c.id); }}
-                        className="opacity-0 group-hover:opacity-60 hover:!opacity-100 text-[var(--accent-coral)] transition-all p-0.5 shrink-0"
-                        title="Delete conversation"
-                        aria-label="Delete conversation"
-                      >
-                        <Trash2 size={13} />
+                      <button onClick={(e) => { e.stopPropagation(); onDelete(c.id); }} className="opacity-0 group-hover:opacity-40 hover:!opacity-100 text-red-400 p-1">
+                        <Trash2 size={12} />
                       </button>
                     </div>
-                  ))
-                )}
+                  ))}
               </motion.div>
             )}
           </AnimatePresence>
         </div>
       )}
 
-      {/* Footer — User + Theme */}
-      <div className={`${collapsed ? "px-1.5" : "px-2"} py-3 shrink-0 border-t border-[var(--border-subtle)] mt-auto`}>
-        {/* System Status */}
-        <div className={`flex items-center gap-2 ${collapsed ? "justify-center py-2" : "px-3 py-1.5"} text-[10px] text-[var(--text-muted)]`}>
-          <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-mint)]" style={{ boxShadow: '0 0 6px var(--accent-mint)' }} />
-          {!collapsed && <span className="uppercase tracking-widest font-semibold">Online</span>}
-        </div>
+      {/* Pulse Telemetry */}
+      {!collapsed && <div className="z-10"><IntelligencePulse /></div>}
 
-        {/* User row */}
-        <div className={`flex items-center ${collapsed ? "flex-col gap-2 py-2" : "gap-2 px-3 py-2"} rounded-button bg-[var(--glass-bg)] border border-[var(--glass-border)]`}>
-          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--accent-mint)] to-emerald-500 flex items-center justify-center text-black text-xs font-bold uppercase shrink-0">
+      {/* Footer — User */}
+      <div className={`shrink-0 z-10 ${collapsed ? "px-2" : "px-4"} py-6 border-t border-white/5 bg-black`}>
+        <div className={`flex items-center ${collapsed ? "flex-col gap-4 py-4" : "gap-4 px-4 py-3"} rounded-[2rem] bg-white/[0.02] border border-white/5 shadow-inner group transition-all hover:bg-white/[0.04]`}>
+          <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-[var(--accent-mint)] to-emerald-600 flex items-center justify-center text-black text-sm font-black italic shrink-0 shadow-lg">
             {userInitial}
           </div>
           {!collapsed && (
             <>
-              <span className="text-sm font-medium text-[var(--text-primary)] truncate flex-1">
-                {username || "User"}
-              </span>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-black text-white uppercase tracking-tight truncate">{username || "Admin_Root"}</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                   <div className="w-1.5 h-1.5 rounded-full bg-[var(--accent-mint)] animate-pulse" />
+                   <span className="text-[7px] font-diag uppercase text-[var(--accent-mint)] tracking-widest font-black">Secure_Session</span>
+                </div>
+              </div>
               <ThemeToggle />
-              <button
-                onClick={onLogout}
-                className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent-coral)] transition-colors shrink-0 rounded-lg hover:bg-[var(--glass-bg-hover)]"
-                title="Logout"
-                aria-label="Logout"
+              <button 
+                onClick={onLogout} 
+                className="p-2 text-white/20 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all"
               >
-                <LogOut size={14} />
+                <LogOut size={16} />
               </button>
             </>
           )}
           {collapsed && (
-            <div className="flex flex-col gap-1.5">
-              <ThemeToggle />
-              <button
-                onClick={onLogout}
-                className="p-1.5 text-[var(--text-muted)] hover:text-[var(--accent-coral)] transition-colors rounded-lg hover:bg-[var(--glass-bg-hover)]"
-                title="Logout"
-                aria-label="Logout"
-              >
-                <LogOut size={14} />
-              </button>
+            <div className="flex flex-col gap-4">
+               <ThemeToggle />
+               <button onClick={onLogout} className="p-2 text-white/20 hover:text-red-400 transition-colors"><LogOut size={16} /></button>
             </div>
           )}
         </div>

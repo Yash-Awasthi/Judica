@@ -1,5 +1,7 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import * as React from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { ProviderManager } from './ProviderManager';
 
 const SETTINGS_KEY = 'council_settings';
 
@@ -127,6 +129,11 @@ export const Settings: React.FC = () => {
                 <input type="checkbox" className="rounded border-border" checked={autoAnonymize} onChange={(e) => updateSetting('autoAnonymize', e.target.checked)} />
               </label>
             </div>
+          </div>
+
+          {/* Provider Management */}
+          <div className="pt-4">
+            <ProviderManager />
           </div>
         </div>
       </div>

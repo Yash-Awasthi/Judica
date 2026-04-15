@@ -4,9 +4,10 @@ interface AuthContextType {
   user: string;
   token: string | null;
   login: (emailOrToken: string, password: string) => void | Promise<void>;
-  register: (username: string, email: string, password: string) => Promise<void>;
+  register: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   fetchWithAuth: (url: string, options?: RequestInit) => Promise<Response>;
+  loginWithGoogle: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -82,12 +83,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, []);
 
-  const register = useCallback(async (username: string, email: string, password: string) => {
+  const register = useCallback(async (username: string, password: string) => {
     const res = await fetch("/api/auth/register", {
       method: "POST",
       credentials: "include",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, email, password }),
+      body: JSON.stringify({ username, password }),
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({ error: "Registration failed" }));
@@ -132,8 +133,58 @@ export function AuthProvider({ children }: AuthProviderProps) {
     return response;
   }, []);
 
+  const loginWithGoogle = useCallback(async () => {
+    return new Promise<void>((resolve, reject) => {
+      const width = 500;
+      const height = 600;
+      const left = window.screenX + (window.outerWidth - width) / 2;
+      const top = window.screenY + (window.outerHeight - height) / 2;
+
+      const popup = window.open(
+        "/api/auth/google",
+        "google-login",
+        `width=${width},height=${height},left=${left},top=${top}`
+      );
+
+      if (!popup) {
+        reject(new Error("Popup blocked"));
+        return;
+      }
+
+      const handleMessage = (event: MessageEvent) => {
+        if (event.origin !== window.location.origin) return;
+        
+        const { type, token: newToken, username: newUsername, error } = event.data;
+        
+        if (type === "AUTH_SUCCESS") {
+          tokenRef.current = newToken;
+          setToken(newToken);
+          setUser(newUsername);
+          localStorage.setItem("council_user", newUsername);
+          window.removeEventListener("message", handleMessage);
+          resolve();
+        } else if (type === "AUTH_ERROR") {
+          window.removeEventListener("message", handleMessage);
+          reject(new Error(error || "Google login failed"));
+        }
+      };
+
+      window.addEventListener("message", handleMessage);
+
+      // Check if popup closed without message
+      const checkClosed = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkClosed);
+          window.removeEventListener("message", handleMessage);
+          // Small delay to allow message to arrive
+          setTimeout(() => reject(new Error("Login cancelled")), 100);
+        }
+      }, 1000);
+    });
+  }, []);
+
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout, fetchWithAuth }}>
+    <AuthContext.Provider value={{ user, token, login, register, logout, fetchWithAuth, loginWithGoogle }}>
       {children}
     </AuthContext.Provider>
   );

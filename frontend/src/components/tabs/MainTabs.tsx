@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import { useState, useCallback, type FC } from 'react';
 import { ChatArea } from '../ChatArea';
 import type { ChatMessage, CouncilMember } from '../../types/index.js';
 import { EnhancedSearch } from '../EnhancedSearch';
@@ -53,8 +53,8 @@ interface MainTabsProps {
   initialTab?: TabId;
 }
 
-export const MainTabs: React.FC<MainTabsProps> = ({ initialTab = 'ask' }) => {
-  const [activeTab, setActiveTab] = useState<TabId>(initialTab);
+export const MainTabs: FC<MainTabsProps> = ({ initialTab = 'ask' }) => {
+  const [activeTab, setActiveTab] = useState<TabId>(initialTab as TabId);
   
   // ChatArea state
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -72,7 +72,7 @@ export const MainTabs: React.FC<MainTabsProps> = ({ initialTab = 'ask' }) => {
       newMessages[newMessages.length - 1] = currentMsg;
 
       switch (event.type) {
-        case 'member_chunk':
+        case 'member_chunk': {
           if (!currentMsg.opinions) currentMsg.opinions = [];
           const opIndex = currentMsg.opinions.findIndex((o: any) => o.name === event.name);
           if (opIndex === -1) {
@@ -82,7 +82,8 @@ export const MainTabs: React.FC<MainTabsProps> = ({ initialTab = 'ask' }) => {
             currentMsg.opinions = [...currentMsg.opinions];
           }
           break;
-        case 'opinion':
+        }
+        case 'opinion': {
           if (!currentMsg.opinions) currentMsg.opinions = [];
           const existingOp = currentMsg.opinions.findIndex((o: any) => o.name === event.name);
           if (existingOp === -1) {
@@ -91,6 +92,7 @@ export const MainTabs: React.FC<MainTabsProps> = ({ initialTab = 'ask' }) => {
             currentMsg.opinions[existingOp] = { ...currentMsg.opinions[existingOp], archetype: event.archetype, opinion: event.opinion };
           }
           break;
+        }
         case 'verdict_chunk':
           currentMsg.verdict = (currentMsg.verdict || '') + event.chunk;
           break;
@@ -207,7 +209,7 @@ export const MainTabs: React.FC<MainTabsProps> = ({ initialTab = 'ask' }) => {
         {tabs.map((tab) => (
           <button
             key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
+            onClick={() => setActiveTab(tab.id as TabId)}
             className={`
               flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium
               transition-all duration-200

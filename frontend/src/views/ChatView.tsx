@@ -5,7 +5,7 @@ import { useCouncilMembers } from "../hooks/useCouncilMembers";
 import { useDeliberation } from "../hooks/useDeliberation";
 import { useAuth } from "../context/AuthContext";
 import { cacheConversation, getCachedConversation } from "../components/OfflineIndicator";
-import type { ChatMessage, Conversation } from "../types/index.js";
+import type { ChatMessage, Conversation } from "../types/index";
 
 interface CachedChatMessage {
   question: string;

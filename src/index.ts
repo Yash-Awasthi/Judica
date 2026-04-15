@@ -95,7 +95,9 @@ const allowedOrigins = env.ALLOWED_ORIGINS
 
 await fastify.register(fastifyCors, {
   origin: (origin, cb) => {
-    if (!origin || allowedOrigins.includes(origin)) return cb(null, true);
+    if (!origin || allowedOrigins.includes(origin) || (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:"))) {
+      return cb(null, true);
+    }
     cb(new Error("CORS Policy: Origin not allowed"), false);
   },
   credentials: true,
