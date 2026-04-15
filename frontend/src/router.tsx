@@ -1,20 +1,26 @@
+import { lazy, Suspense } from "react";
 import { createBrowserRouter } from "react-router-dom";
 import { RootLayout } from "./layouts/RootLayout";
-import { ChatView } from "./views/ChatView";
-import { DashboardView } from "./views/DashboardView";
-import { MetricsView } from "./views/MetricsView";
-import { WorkflowsView } from "./views/WorkflowsView";
-import { WorkflowEditorView } from "./views/WorkflowEditorView";
-import { PromptIDEView } from "./views/PromptIDEView";
-import { MemorySettingsView } from "./views/MemorySettingsView";
-import { DebateDashboardView } from "./views/DebateDashboardView";
-import { AdminView } from "./views/AdminView";
-import { AnalyticsView } from "./views/AnalyticsView";
-import { MarketplaceView } from "./views/MarketplaceView";
-import { SkillsView } from "./views/SkillsView";
-import { ReposView } from "./views/ReposView";
+import { ViewSkeleton } from "./components/ViewSkeleton";
 import { Settings } from "./components/Settings";
 import { Link } from "react-router-dom";
+
+// Lazy-loaded views
+const ChatView = lazy(() => import("./views/ChatView").then(m => ({ default: m.ChatView })));
+const DashboardView = lazy(() => import("./views/DashboardView").then(m => ({ default: m.DashboardView })));
+const MetricsView = lazy(() => import("./views/MetricsView").then(m => ({ default: m.MetricsView })));
+const WorkflowsView = lazy(() => import("./views/WorkflowsView").then(m => ({ default: m.WorkflowsView })));
+const WorkflowEditorView = lazy(() => import("./views/WorkflowEditorView").then(m => ({ default: m.WorkflowEditorView })));
+const PromptIDEView = lazy(() => import("./views/PromptIDEView").then(m => ({ default: m.PromptIDEView })));
+const MemorySettingsView = lazy(() => import("./views/MemorySettingsView").then(m => ({ default: m.MemorySettingsView })));
+const DebateDashboardView = lazy(() => import("./views/DebateDashboardView").then(m => ({ default: m.DebateDashboardView })));
+const AdminView = lazy(() => import("./views/AdminView").then(m => ({ default: m.AdminView })));
+const AnalyticsView = lazy(() => import("./views/AnalyticsView").then(m => ({ default: m.AnalyticsView })));
+const MarketplaceView = lazy(() => import("./views/MarketplaceView").then(m => ({ default: m.MarketplaceView })));
+const SkillsView = lazy(() => import("./views/SkillsView").then(m => ({ default: m.SkillsView })));
+const ReposView = lazy(() => import("./views/ReposView").then(m => ({ default: m.ReposView })));
+const EvaluationView = lazy(() => import("./views/EvaluationView").then(m => ({ default: m.EvaluationView })));
+const TrainingLabView = lazy(() => import("./views/TrainingLabView").then(m => ({ default: m.TrainingLabView })));
 
 function NotFoundView() {
   return (
@@ -36,21 +42,142 @@ export const router = createBrowserRouter([
     path: "/",
     element: <RootLayout />,
     children: [
-      { index: true, element: <DashboardView /> },
-      { path: "chat", element: <ChatView /> },
-      { path: "debate", element: <DebateDashboardView /> },
-      { path: "chat/:conversationId", element: <ChatView /> },
-      { path: "metrics", element: <MetricsView /> },
-      { path: "workflows", element: <WorkflowsView /> },
-      { path: "workflows/new", element: <WorkflowEditorView /> },
-      { path: "workflows/:id", element: <WorkflowEditorView /> },
-      { path: "prompts", element: <PromptIDEView /> },
-      { path: "memory", element: <MemorySettingsView /> },
-      { path: "admin", element: <AdminView /> },
-      { path: "analytics", element: <AnalyticsView /> },
-      { path: "marketplace", element: <MarketplaceView /> },
-      { path: "skills", element: <SkillsView /> },
-      { path: "repos", element: <ReposView /> },
+      { 
+        index: true, 
+        element: (
+          <Suspense fallback={<ViewSkeleton />}>
+            <DashboardView />
+          </Suspense>
+        ) 
+      },
+      { 
+        path: "chat", 
+        element: (
+          <Suspense fallback={<ViewSkeleton />}>
+            <ChatView />
+          </Suspense>
+        ) 
+      },
+      { 
+        path: "debate", 
+        element: (
+          <Suspense fallback={<ViewSkeleton />}>
+            <DebateDashboardView />
+          </Suspense>
+        ) 
+      },
+      { 
+        path: "chat/:conversationId", 
+        element: (
+          <Suspense fallback={<ViewSkeleton />}>
+            <ChatView />
+          </Suspense>
+        ) 
+      },
+      { 
+        path: "metrics", 
+        element: (
+          <Suspense fallback={<ViewSkeleton />}>
+            <MetricsView />
+          </Suspense>
+        ) 
+      },
+      { 
+        path: "workflows", 
+        element: (
+          <Suspense fallback={<ViewSkeleton />}>
+            <WorkflowsView />
+          </Suspense>
+        ) 
+      },
+      { 
+        path: "workflows/new", 
+        element: (
+          <Suspense fallback={<ViewSkeleton />}>
+            <WorkflowEditorView />
+          </Suspense>
+        ) 
+      },
+      { 
+        path: "workflows/:id", 
+        element: (
+          <Suspense fallback={<ViewSkeleton />}>
+            <WorkflowEditorView />
+          </Suspense>
+        ) 
+      },
+      { 
+        path: "prompts", 
+        element: (
+          <Suspense fallback={<ViewSkeleton />}>
+            <PromptIDEView />
+          </Suspense>
+        ) 
+      },
+      { 
+        path: "memory", 
+        element: (
+          <Suspense fallback={<ViewSkeleton />}>
+            <MemorySettingsView />
+          </Suspense>
+        ) 
+      },
+      { 
+        path: "admin", 
+        element: (
+          <Suspense fallback={<ViewSkeleton />}>
+            <AdminView />
+          </Suspense>
+        ) 
+      },
+      { 
+        path: "analytics", 
+        element: (
+          <Suspense fallback={<ViewSkeleton />}>
+            <AnalyticsView />
+          </Suspense>
+        ) 
+      },
+      { 
+        path: "marketplace", 
+        element: (
+          <Suspense fallback={<ViewSkeleton />}>
+            <MarketplaceView />
+          </Suspense>
+        ) 
+      },
+      { 
+        path: "skills", 
+        element: (
+          <Suspense fallback={<ViewSkeleton />}>
+            <SkillsView />
+          </Suspense>
+        ) 
+      },
+      { 
+        path: "repos", 
+        element: (
+          <Suspense fallback={<ViewSkeleton />}>
+            <ReposView />
+          </Suspense>
+        ) 
+      },
+      { 
+        path: "benchmarks", 
+        element: (
+          <Suspense fallback={<ViewSkeleton />}>
+            <EvaluationView />
+          </Suspense>
+        ) 
+      },
+      { 
+        path: "training", 
+        element: (
+          <Suspense fallback={<ViewSkeleton />}>
+            <TrainingLabView />
+          </Suspense>
+        ) 
+      },
       { path: "settings", element: <Settings /> },
       { path: "*", element: <NotFoundView /> },
     ],

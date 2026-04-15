@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import type { CouncilMember } from "../types/index.js";
+import type { CouncilMember } from "../types/index";
 import { useAuth } from "../context/AuthContext.js";
 
 const DEFAULT_MEMBERS: CouncilMember[] = [

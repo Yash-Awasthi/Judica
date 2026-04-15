@@ -70,3 +70,17 @@ export interface UserMetrics {
   cache: { hits: number; hitRatePercentage: number };
   performance: { averageLatencyMs: number; totalTokensUsed: number };
 }
+export interface Link {
+  source: string;
+  target: string;
+  strength: number;
+  type: "critique" | "support" | "synthesis" | "agreement" | "conflict";
+}
+
+export interface Node {
+  id: string;
+  name: string;
+  type: "proposer" | "critic" | "moderator";
+  x: number;
+  y: number;
+}

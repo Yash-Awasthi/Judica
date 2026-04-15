@@ -1,4 +1,4 @@
-import React from "react";
+import * as React from 'react';
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { motion, AnimatePresence } from "framer-motion";
@@ -17,7 +17,7 @@ interface MessageListProps {
 }
 
 const mdComponents = {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   code: ({ className, children, ...props }: any) => {
     const isBlock = className?.includes("language-");
     if (isBlock) {
@@ -33,17 +33,17 @@ const mdComponents = {
       </code>
     );
   },
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   p: ({ children }: any) => <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   ul: ({ children }: any) => <ul className="list-disc list-inside mb-3 space-y-1 text-[var(--text-secondary)]">{children}</ul>,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   ol: ({ children }: any) => <ol className="list-decimal list-inside mb-3 space-y-1 text-[var(--text-secondary)]">{children}</ol>,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   li: ({ children }: any) => <li className="text-sm leading-relaxed">{children}</li>,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   strong: ({ children }: any) => <strong className="font-bold text-[var(--text-primary)]">{children}</strong>,
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   blockquote: ({ children }: any) => (
     <blockquote className="pl-4 border-l-2 border-[var(--accent-mint)]/30 text-[var(--text-secondary)] my-3 italic">{children}</blockquote>
   ),

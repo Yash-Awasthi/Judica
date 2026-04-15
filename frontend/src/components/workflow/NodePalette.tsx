@@ -1,56 +1,56 @@
+import { motion } from "framer-motion";
 import { Brain, Wrench, GitBranch, FileText, Code, Globe, UserCheck, Repeat, ArrowRightCircle, ArrowLeftCircle, Merge, Split } from "lucide-react";
 import type { DragEvent, KeyboardEvent } from "react";
 
 const NODE_GROUPS = [
   {
-    label: "Input / Output",
+    label: "I/O",
     items: [
-      { type: "input", label: "Input", icon: ArrowRightCircle, color: "text-green-600" },
-      { type: "output", label: "Output", icon: ArrowLeftCircle, color: "text-red-600" },
+      { type: "input", label: "Input", icon: ArrowRightCircle, color: "text-[var(--accent-mint)]", glow: "shadow-[0_0_10px_rgba(110,231,183,0.2)]" },
+      { type: "output", label: "Output", icon: ArrowLeftCircle, color: "text-red-400", glow: "shadow-[0_0_10px_rgba(239,68,68,0.2)]" },
     ],
   },
   {
-    label: "AI",
+    label: "Neural",
     items: [
-      { type: "llm", label: "LLM", icon: Brain, color: "text-purple-600" },
+      { type: "llm", label: "LLM", icon: Brain, color: "text-purple-400", glow: "shadow-[0_0_10px_rgba(168,85,247,0.2)]" },
     ],
   },
   {
-    label: "Tools",
+    label: "Utility",
     items: [
-      { type: "tool", label: "Tool", icon: Wrench, color: "text-orange-600" },
-      { type: "http", label: "HTTP", icon: Globe, color: "text-blue-600" },
-      { type: "code", label: "Code", icon: Code, color: "text-gray-600" },
+      { type: "tool", label: "Tool", icon: Wrench, color: "text-orange-400", glow: "shadow-[0_0_10px_rgba(251,146,60,0.2)]" },
+      { type: "http", label: "HTTP", icon: Globe, color: "text-[var(--accent-blue)]", glow: "shadow-[0_0_10px_rgba(59,130,246,0.2)]" },
+      { type: "code", label: "Code", icon: Code, color: "text-gray-400", glow: "shadow-[0_0_10px_rgba(156,163,175,0.2)]" },
     ],
   },
   {
-    label: "Logic",
+    label: "Context",
     items: [
-      { type: "condition", label: "Condition", icon: GitBranch, color: "text-yellow-600" },
-      { type: "template", label: "Template", icon: FileText, color: "text-teal-600" },
-      { type: "loop", label: "Loop", icon: Repeat, color: "text-indigo-600" },
+      { type: "condition", label: "Logic", icon: GitBranch, color: "text-yellow-400", glow: "shadow-[0_0_10px_rgba(250,204,21,0.2)]" },
+      { type: "template", label: "Prompt", icon: FileText, color: "text-teal-400", glow: "shadow-[0_0_10px_rgba(45,212,191,0.2)]" },
+      { type: "loop", label: "Cycle", icon: Repeat, color: "text-indigo-400", glow: "shadow-[0_0_10px_rgba(129,140,248,0.2)]" },
     ],
   },
   {
-    label: "Control",
+    label: "Flow",
     items: [
-      { type: "human_gate", label: "Human Gate", icon: UserCheck, color: "text-pink-600" },
-      { type: "merge", label: "Merge", icon: Merge, color: "text-slate-600" },
-      { type: "split", label: "Split", icon: Split, color: "text-slate-600" },
+      { type: "human_gate", label: "Gate", icon: UserCheck, color: "text-pink-400", glow: "shadow-[0_0_10px_rgba(244,114,182,0.2)]" },
+      { type: "merge", label: "Merge", icon: Merge, color: "text-slate-400", glow: "shadow-[0_0_10px_rgba(148,163,184,0.2)]" },
+      { type: "split", label: "Split", icon: Split, color: "text-slate-400", glow: "shadow-[0_0_10px_rgba(148,163,184,0.2)]" },
     ],
   },
 ];
 
 export function NodePalette() {
-  const onDragStart = (event: DragEvent, nodeType: string) => {
+  const handleDragStart = (event: DragEvent<HTMLDivElement>, nodeType: string) => {
     event.dataTransfer.setData("application/reactflow", nodeType);
     event.dataTransfer.effectAllowed = "move";
   };
 
-  const onKeyDown = (event: KeyboardEvent, nodeType: string) => {
+  const onKeyDown = (event: KeyboardEvent<HTMLDivElement>, nodeType: string) => {
     if (event.key === "Enter" || event.key === " ") {
       event.preventDefault();
-      // Dispatch a custom event that the workflow canvas can listen for
       const customEvent = new CustomEvent("nodePaletteAdd", {
         detail: { nodeType },
         bubbles: true,
@@ -60,28 +60,36 @@ export function NodePalette() {
   };
 
   return (
-    <div className="w-56 border-r border-gray-200 bg-gray-50 p-3 overflow-y-auto">
-      <h3 className="font-semibold text-sm mb-3 text-gray-700">Nodes</h3>
+    <div className="w-64 border-r border-[var(--glass-border)] bg-[rgba(15,15,15,0.7)] backdrop-blur-xl p-5 overflow-y-auto scrollbar-custom z-30">
+      <div className="flex items-center gap-2 mb-8">
+        <div className="w-2 h-2 rounded-full bg-[var(--accent-mint)] animate-pulse shadow-[0_0_10px_var(--accent-mint)]" />
+        <h3 className="font-black text-[10px] uppercase tracking-[0.3em] text-[var(--text-muted)] italic">Neural Modules</h3>
+      </div>
+      
       {NODE_GROUPS.map((group) => (
-        <div key={group.label} className="mb-4">
-          <div className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-2">{group.label}</div>
-          <div className="space-y-1" role="list" aria-label={group.label}>
+        <div key={group.label} className="mb-8">
+          <div className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-[0.2em] mb-4 opacity-40 px-1">{group.label}</div>
+          <div className="grid grid-cols-2 gap-2" role="list" aria-label={group.label}>
             {group.items.map((item) => {
               const Icon = item.icon;
               return (
-                <div
+                <motion.div
                   key={item.type}
-                  className="flex items-center gap-2 px-2 py-1.5 bg-white rounded border border-gray-200 cursor-grab hover:border-blue-300 hover:shadow-sm transition-all focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400"
+                  whileHover={{ y: -2, scale: 1.02 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`flex flex-col items-center justify-center gap-2 p-3 bg-[var(--bg-surface-3)] border border-[var(--glass-border)] rounded-2xl cursor-grab hover:border-[var(--accent-mint)]/30 hover:bg-[rgba(255,255,255,0.02)] transition-all ${item.glow} group`}
                   draggable
                   role="listitem"
                   tabIndex={0}
                   aria-label={`Add ${item.label} node`}
-                  onDragStart={(e) => onDragStart(e, item.type)}
+                  onDragStart={(e: any) => handleDragStart(e, item.type)}
                   onKeyDown={(e) => onKeyDown(e, item.type)}
                 >
-                  <Icon size={14} className={item.color} />
-                  <span className="text-xs font-medium text-gray-700">{item.label}</span>
-                </div>
+                  <div className={`p-2 rounded-xl bg-[rgba(255,255,255,0.03)] group-hover:bg-transparent ${item.color} transition-colors`}>
+                    <Icon size={18} strokeWidth={2.5} />
+                  </div>
+                  <span className="text-[9px] font-black uppercase tracking-widest text-[var(--text-muted)] group-hover:text-[var(--text-primary)] transition-colors">{item.label}</span>
+                </motion.div>
               );
             })}
           </div>

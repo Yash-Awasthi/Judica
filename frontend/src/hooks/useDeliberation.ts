@@ -1,6 +1,6 @@
 import { useRef, useState, useCallback } from "react";
-import { useCouncilStream, type SSEEvent } from "./useCouncilStream.js";
-import type { ChatMessage, CouncilMember } from "../types/index.js";
+import { useCouncilStream, type SSEEvent } from "./useCouncilStream";
+import type { ChatMessage, CouncilMember } from "../types/index";
 import { v4 as uuidv4 } from "uuid";
 
 // Strip <think> tags from streaming content

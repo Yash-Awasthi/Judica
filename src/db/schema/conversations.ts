@@ -45,7 +45,7 @@ export const chats = pgTable(
     }),
     durationMs: integer("durationMs"),
     tokensUsed: integer("tokensUsed"),
-    embedding: vector("embedding"),
+    embedding: vector("embedding", { dimensions: 1536 }),
   },
   (table) => [
     index("Chat_userId_idx").on(table.userId),
@@ -116,7 +116,7 @@ export const semanticCache = pgTable(
     opinions: jsonb("opinions").notNull(),
     prompt: text("prompt").notNull(),
     verdict: text("verdict").notNull(),
-    embedding: vector("embedding"),
+    embedding: vector("embedding", { dimensions: 1536 }),
   },
   (table) => [
     index("SemanticCache_embedding_hnsw_idx")

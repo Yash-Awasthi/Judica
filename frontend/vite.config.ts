@@ -32,7 +32,7 @@ export default defineConfig({
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MiB
         runtimeCaching: [
           {
-            urlPattern: ({ url }) => {
+            urlPattern: ({ url }: { url: URL }) => {
               if (!url.pathname.startsWith('/api/')) return false;
               // Never cache auth, cost, audit, or user-specific sensitive endpoints
               const sensitive = ['/api/auth/', '/api/costs/', '/api/audit/', '/api/admin/', '/api/usage/', '/api/ask/'];
@@ -77,6 +77,9 @@ export default defineConfig({
         manualChunks: {
           vendor: ['react', 'react-dom'],
           markdown: ['react-markdown', 'remark-gfm'],
+          motion: ['framer-motion'],
+          icons: ['lucide-react'],
+          workflow: ['@xyflow/react'],
         },
       },
     },

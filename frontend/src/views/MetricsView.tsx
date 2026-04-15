@@ -1,15 +1,17 @@
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
-import { useNavigate } from "react-router-dom";
-import { X, BarChart3, MessageSquare, Zap, Clock, Database } from "lucide-react";
+
+import { MessageSquare, Zap, Clock, Database, Wifi, Cpu } from "lucide-react";
 import { AnimatedCounter } from "../components/AnimatedCounter";
-import type { UserMetrics } from "../types/index.js";
+import { SectorHUD } from "../components/SectorHUD";
+import { TechnicalGrid } from "../components/TechnicalGrid";
+import type { UserMetrics } from "../types/index";
 
 export function MetricsView() {
   const [metrics, setMetrics] = useState<UserMetrics | null>(null);
   const { fetchWithAuth } = useAuth();
-  const navigate = useNavigate();
+
 
   useEffect(() => {
     const fetchMetrics = async () => {
@@ -27,120 +29,129 @@ export function MetricsView() {
   }, [fetchWithAuth]);
 
   return (
-    <div className="flex-1 flex flex-col items-center justify-center p-4 bg-[var(--bg)] h-full overflow-y-auto scrollbar-custom">
-      <motion.div
-        initial={{ opacity: 0, y: 20, scale: 0.97 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.35, ease: "easeOut" }}
-        className="w-full max-w-lg surface-card rounded-modal shadow-2xl overflow-hidden"
-      >
-        {/* Header */}
-        <div className="px-6 py-4 border-b border-[var(--border-subtle)] flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-[rgba(110,231,183,0.08)] border border-[rgba(110,231,183,0.12)] flex items-center justify-center text-[var(--accent-mint)]">
-              <BarChart3 size={18} />
+    <div className="relative min-h-screen bg-[#000000] overflow-hidden">
+      <TechnicalGrid />
+      
+      <div className="relative z-10 h-full overflow-y-auto scrollbar-custom p-4 lg:p-8">
+
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          className="max-w-7xl mx-auto space-y-12 pb-24"
+        >
+          {/* Sector Header */}
+          <SectorHUD 
+            sectorId="SYS-01"
+            title="Real-Time_Telemetry"
+            subtitle="Live Neural Activity // Resource Consumption"
+            accentColor="var(--accent-mint)"
+            telemetry={[
+              { label: "LINK_STATUS", value: "UPLINK_STABLE", status: "optimal" },
+              { label: "SYNC_FREQ", value: "1.2ms", status: "online" },
+              { label: "LOAD_BAL", value: "NOMINAL", status: "optimal" }
+            ]}
+          />
+
+        {/* Primary Metrics Grid */}
+        {!metrics ? (
+          <div className="h-[400px] flex flex-col items-center justify-center gap-6 surface-card border-dashed">
+            <div className="relative">
+              <div className="w-12 h-12 border-2 border-[var(--accent-mint)]/20 rounded-full" />
+              <div className="absolute inset-0 border-2 border-[var(--accent-mint)] border-t-transparent rounded-full animate-spin" />
             </div>
-            <div>
-              <h3 className="text-sm font-bold tracking-tight text-[var(--text-primary)]">Usage Statistics</h3>
-              <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-widest font-semibold">Council Analytics</p>
+            <div className="flex flex-col items-center gap-1">
+              <span className="text-[10px] font-black uppercase tracking-[0.3em] text-[var(--accent-mint)] animate-pulse">Establishing Link</span>
+              <span className="text-[9px] font-mono text-[var(--text-muted)] opacity-40">Syncing with Central Registry...</span>
             </div>
           </div>
-          <button
-            onClick={() => navigate('/')}
-            className="p-2 rounded-lg flex items-center justify-center hover:bg-[var(--glass-bg-hover)] transition-colors text-[var(--text-muted)] hover:text-[var(--text-primary)]"
-          >
-            <X size={16} />
-          </button>
-        </div>
-
-        {/* Body */}
-        <div className="p-6 space-y-4">
-          {!metrics ? (
-            <div className="py-12 flex flex-col items-center justify-center gap-4 text-[var(--text-muted)]">
-              <span className="w-8 h-8 border-2 border-[var(--accent-mint)] border-t-transparent rounded-full animate-spin" />
-              <span className="text-xs uppercase tracking-widest font-bold">Retrieving Data...</span>
-            </div>
-          ) : (
-            <motion.div
-              initial="initial"
-              animate="animate"
-              variants={{ animate: { transition: { staggerChildren: 0.06 } } }}
-              className="grid grid-cols-2 gap-3"
-            >
+        ) : (
+          <div className="space-y-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               {[
-                { icon: <MessageSquare size={14} />, label: "Total Requests", value: metrics.totalRequests || 0 },
-                { icon: <MessageSquare size={14} />, label: "Conversations", value: metrics.totalConversations || 0 },
-              ].map(({ icon, label, value }) => (
+                { icon: <MessageSquare size={16} />, label: "Total Inferences", value: metrics.totalRequests || 0, color: "var(--accent-mint)", subtext: "Accumulated" },
+                { icon: <Wifi size={16} />, label: "Active Sessions", value: metrics.totalConversations || 0, color: "var(--accent-blue)", subtext: "Neural Threads" },
+                { icon: <Zap size={16} />, label: "Cache Efficiency", value: metrics.cache?.hitRatePercentage || 0, color: "var(--accent-gold)", subtext: `${metrics.cache?.hits || 0} Optimizations`, suffix: "%" },
+                { icon: <Clock size={16} />, label: "Response Latency", value: ((metrics.performance?.averageLatencyMs || 0) / 1000).toFixed(1), color: "#a78bfa", subtext: "Mean Cycle Time", suffix: "s", noCounter: true },
+              ].map(({ icon, label, value, color, subtext, suffix, noCounter }) => (
                 <motion.div
                   key={label}
-                  variants={{ initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 } }}
-                  className="glass-panel p-5 rounded-card"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="surface-card p-6 border-t-2 group"
+                  style={{ borderTopColor: color }}
                 >
-                  <div className="flex items-center gap-1.5 mb-2 text-[var(--accent-mint)]">
-                    {icon}
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="p-2 rounded-lg bg-white/[0.03] text-white/40 group-hover:text-white transition-colors" style={{ color: color }}>
+                      {icon}
+                    </div>
+                    <div className="w-1.5 h-1.5 rounded-full bg-current animate-pulse opacity-40" style={{ color }} />
                   </div>
-                  <p className="text-[9px] text-[var(--text-muted)] uppercase font-bold tracking-widest mb-1">{label}</p>
-                  <p className="text-3xl font-bold text-[var(--text-primary)]">
-                    <AnimatedCounter value={value} />
-                  </p>
+                  <div className="space-y-1">
+                    <p className="text-[9px] font-black text-[var(--text-muted)] uppercase tracking-widest">{label}</p>
+                    <div className="flex items-baseline gap-1">
+                      <span className="text-3xl font-black text-white font-mono tracking-tighter">
+                        {noCounter ? value : <AnimatedCounter value={Number(value)} suffix={suffix} />}
+                      </span>
+                    </div>
+                    <p className="text-[9px] font-mono text-[var(--text-muted)] opacity-40 uppercase tracking-widest">{subtext}</p>
+                  </div>
                 </motion.div>
               ))}
+            </div>
 
-              <motion.div
-                variants={{ initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 } }}
-                className="glass-panel p-5 rounded-card"
-              >
-                <div className="flex items-center gap-1.5 mb-2 text-[var(--accent-mint)]">
-                  <Zap size={14} />
+            {/* Large Token Consumption Panel */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="surface-card p-10 bg-[radial-gradient(circle_at_0%_0%,rgba(110,231,183,0.05)_0%,transparent_50%)] relative overflow-hidden group"
+            >
+              <div className="absolute top-0 right-0 p-6 opacity-[0.03] group-hover:opacity-[0.05] transition-opacity">
+                <Database size={200} />
+              </div>
+              
+              <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-10">
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 rounded-xl bg-[var(--accent-mint)]/10 text-[var(--accent-mint)] shadow-glow-sm">
+                      <Cpu size={24} />
+                    </div>
+                    <div>
+                      <h4 className="text-[11px] font-black uppercase tracking-[0.3em] text-[var(--accent-mint)]">Neural Load Aggregate</h4>
+                      <p className="text-[10px] font-mono text-[var(--text-muted)] opacity-60">Cumulative Token Throughput</p>
+                    </div>
+                  </div>
+                  <div className="flex items-baseline gap-3">
+                    <span className="text-6xl font-black text-white tracking-tighter font-mono">
+                      <AnimatedCounter value={metrics.performance?.totalTokensUsed || 0} />
+                    </span>
+                    <span className="text-xs font-black text-[var(--text-muted)] uppercase tracking-widest opacity-40">Processed</span>
+                  </div>
                 </div>
-                <p className="text-[9px] text-[var(--text-muted)] uppercase font-bold tracking-widest mb-1">Cache Hit Rate</p>
-                <div className="flex items-baseline gap-2">
-                  <p className="text-3xl font-bold text-[var(--accent-mint)]">
-                    <AnimatedCounter value={metrics.cache?.hitRatePercentage || 0} suffix="%" />
-                  </p>
-                  <p className="text-[10px] text-[var(--text-muted)] font-mono">({metrics.cache?.hits || 0} hits)</p>
-                </div>
-              </motion.div>
 
-              <motion.div
-                variants={{ initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 } }}
-                className="glass-panel p-5 rounded-card"
-              >
-                <div className="flex items-center gap-1.5 mb-2 text-[var(--accent-blue)]">
-                  <Clock size={14} />
+                <div className="flex-1 max-w-md space-y-4">
+                   <div className="flex justify-between text-[10px] font-mono text-[var(--text-muted)] uppercase tracking-widest">
+                      <span>Network Quota</span>
+                      <span>84% Reserved</span>
+                   </div>
+                   <div className="h-2 w-full bg-white/[0.03] rounded-full overflow-hidden p-[1px] border border-white/5">
+                      <motion.div 
+                        initial={{ width: 0 }}
+                        animate={{ width: "84%" }}
+                        transition={{ duration: 1.5, ease: "easeOut" }}
+                        className="h-full bg-gradient-to-r from-[var(--accent-mint)] to-[var(--accent-blue)] rounded-full shadow-[0_0_15px_rgba(110,231,183,0.3)]"
+                      />
+                   </div>
+                   <p className="text-[9px] text-[var(--text-muted)] leading-relaxed italic opacity-40">
+                     System resources are dynamically allocated based on council synergy levels. Current throughput is within optimal operational range.
+                   </p>
                 </div>
-                <p className="text-[9px] text-[var(--text-muted)] uppercase font-bold tracking-widest mb-1">Avg Latency</p>
-                <p className="text-3xl font-bold text-[var(--text-primary)]">
-                  {((metrics.performance?.averageLatencyMs || 0) / 1000).toFixed(1)}s
-                </p>
-              </motion.div>
-
-              <motion.div
-                variants={{ initial: { opacity: 0, y: 8 }, animate: { opacity: 1, y: 0 } }}
-                className="col-span-2 p-5 rounded-card border border-[rgba(110,231,183,0.15)] bg-[rgba(110,231,183,0.04)]"
-              >
-                <div className="flex items-center gap-1.5 mb-2 text-[var(--accent-mint)]">
-                  <Database size={14} />
-                </div>
-                <p className="text-[9px] text-[var(--accent-mint)] uppercase font-bold tracking-widest mb-1">Total Tokens Consumed</p>
-                <p className="text-4xl font-bold text-[var(--text-primary)]">
-                  <AnimatedCounter value={metrics.performance?.totalTokensUsed || 0} />
-                </p>
-              </motion.div>
+              </div>
             </motion.div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="px-6 py-4 bg-[var(--glass-bg)] border-t border-[var(--border-subtle)] flex justify-end">
-          <button
-            onClick={() => navigate('/')}
-            className="btn-pill-primary text-xs px-6 py-2"
-          >
-            Close
-          </button>
-        </div>
-      </motion.div>
+          </div>
+        )}
+        </motion.div>
+      </div>
     </div>
   );
+
 }
