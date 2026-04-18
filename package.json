@@ -37,7 +37,7 @@
     "@fastify/helmet": "^13.0.0",
     "@fastify/multipart": "^10.0.0",
     "@fastify/rate-limit": "^10.2.1",
-    "@fastify/static": "^9.1.0",
+    "@fastify/static": "^9.1.1",
     "@octokit/rest": "^22.0.1",
     "argon2": "^0.44.0",
     "bullmq": "^5.73.5",
