@@ -9,13 +9,14 @@ import { PageTransition } from "../components/PageTransition";
 import { CommandPalette } from "../components/CommandPalette";
 import { ToastProvider } from "../components/ToastProvider";
 import { GlobalHUD } from "../components/GlobalHUD";
-import type { Conversation } from "../types/index";
+import type { Conversation, Project } from "../types/index";
 
 export function RootLayout() {
-  const { user, fetchWithAuth, logout } = useAuth();
+  const { user, role, fetchWithAuth, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
   const [activeConvId, setActiveConvId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     const saved = localStorage.getItem("sidebar_open");
@@ -51,7 +52,23 @@ export function RootLayout() {
     }
   }, [user, fetchWithAuth]);
 
-  useEffect(() => { loadConversations(); }, [loadConversations]);
+  const loadProjects = useCallback(async () => {
+    if (!user) return;
+    try {
+      const res = await fetchWithAuth("/api/v1/projects");
+      if (res.ok) {
+        const data = await res.json();
+        setProjects(data);
+      }
+    } catch (err) {
+      console.error("Failed to load projects", err);
+    }
+  }, [user, fetchWithAuth]);
+
+  useEffect(() => { 
+    loadConversations();
+    loadProjects();
+  }, [loadConversations, loadProjects]);
 
   const handleConversationSelect = useCallback((id: string, _title: string) => {
     setActiveConvId(id);
@@ -84,7 +101,7 @@ export function RootLayout() {
     }
   }, [fetchWithAuth, activeConvId, navigate]);
   
-  const handleSearch = useCallback(async (query: string) => {
+  const handleSearch = useCallback(async (query: string, projectId?: string, after?: string, before?: string) => {
     if (!query || query.trim().length < 2) {
       setSearchResults(null);
       return;
@@ -92,7 +109,11 @@ export function RootLayout() {
     
     setIsSearching(true);
     try {
-      const res = await fetchWithAuth(`/api/history/search?q=${encodeURIComponent(query)}`);
+      let url = `/api/history/search?q=${encodeURIComponent(query)}`;
+      if (projectId) url += `&projectId=${projectId}`;
+      if (after) url += `&after=${after}`;
+      if (before) url += `&before=${before}`;
+      const res = await fetchWithAuth(url);
       if (res.ok) {
         const data = await res.json();
         setSearchResults(data);
@@ -145,6 +166,7 @@ export function RootLayout() {
         conversations={conversations}
         activeId={activeConvId}
         username={user || "User"}
+        role={role}
         isOpen={sidebarOpen}
         onSelect={handleConversationSelect}
         onHome={handleHome}
@@ -157,6 +179,7 @@ export function RootLayout() {
         isSearching={isSearching}
         width={sidebarWidth}
         onWidthChange={setSidebarWidth}
+        projects={projects}
       />
 
       {/* Main Content */}

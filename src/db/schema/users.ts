@@ -20,6 +20,7 @@ export const users = pgTable("User", {
   customInstructions: text("customInstructions").default("").notNull(),
   createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
   role: text("role").default("member").notNull(),
+  isActive: boolean("isActive").default(true).notNull(),
 });
 
 // ─── UserSettings ───────────────────────────────────────────────────────────

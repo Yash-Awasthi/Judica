@@ -1,565 +1,243 @@
 import { FastifyPluginAsync } from "fastify";
 import { db } from "../lib/drizzle.js";
 import { users } from "../db/schema/users.js";
-import { userGroups, groupMemberships } from "../db/schema/social.js";
-import { conversations, chats } from "../db/schema/conversations.js";
 import { customProviders } from "../db/schema/council.js";
-import { memoryBackends } from "../db/schema/memory.js";
-import { eq, and, desc, count } from "drizzle-orm";
-import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
+import { eq, desc, ilike, or, sql } from "drizzle-orm";
+import { fastifyRequireAdmin } from "../middleware/fastifyAuth.js";
+import { AdminService } from "../services/adminService.js";
 import { AppError } from "../middleware/errorHandler.js";
-import { randomBytes, createCipheriv, createDecipheriv, scryptSync } from "crypto";
-import logger from "../lib/logger.js";
-
-function fastifyRequireRole(role: string) {
-  return async (request: any, reply: any) => {
-    // First run fastifyRequireAuth logic
-    await fastifyRequireAuth(request, reply);
-    // Then check role
-    const [row] = await db.select({ role: users.role }).from(users).where(eq(users.id, request.userId)).limit(1);
-    if (!row || row.role !== role) {
-      throw new AppError(403, `Role '${role}' required`, "FORBIDDEN");
-    }
-  };
-}
+import redis from "../lib/redis.js";
 
 const adminPlugin: FastifyPluginAsync = async (fastify) => {
-  /**
-   * @openapi
-   * /admin/users:
-   *   get:
-   *     summary: List all users
-   *     description: Returns a list of all users with basic profile information. Requires admin role.
-   *     tags:
-   *       - Admin
-   *     security:
-   *       - bearerAuth: []
-   *     responses:
-   *       200:
-   *         description: A list of users
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 users:
-   *                   type: array
-   *                   items:
-   *                     type: object
-   *                     properties:
-   *                       id:
-   *                         type: integer
-   *                       email:
-   *                         type: string
-   *                       username:
-   *                         type: string
-   *                       role:
-   *                         type: string
-   *                       createdAt:
-   *                         type: string
-   *                         format: date-time
-   *       401:
-   *         description: Unauthorized
-   *       403:
-   *         description: Forbidden — admin role required
-   */
-  // GET /users — list all users
-  fastify.get("/users", { preHandler: fastifyRequireRole("admin") }, async (request, reply) => {
-    const allUsers = await db
-      .select({
-        id: users.id,
-        email: users.email,
-        username: users.username,
-        role: users.role,
-        createdAt: users.createdAt,
-      })
-      .from(users)
-      .orderBy(desc(users.createdAt));
-    return { users: allUsers };
-  });
+  // All routes in this plugin require admin role
+  fastify.addHook("preHandler", fastifyRequireAdmin);
 
-  /**
-   * @openapi
-   * /admin/users/{id}/role:
-   *   put:
-   *     summary: Change a user's role
-   *     description: Updates the role for the specified user. Valid roles are admin, member, and viewer. Requires admin role.
-   *     tags:
-   *       - Admin
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: integer
-   *         description: The user ID
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             required:
-   *               - role
-   *             properties:
-   *               role:
-   *                 type: string
-   *                 enum: [admin, member, viewer]
-   *     responses:
-   *       200:
-   *         description: Updated user object
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 id:
-   *                   type: integer
-   *                 email:
-   *                   type: string
-   *                 role:
-   *                   type: string
-   *       400:
-   *         description: Invalid role provided
-   *       401:
-   *         description: Unauthorized
-   *       403:
-   *         description: Forbidden — admin role required
-   */
-  // PUT /users/:id/role — change user role
-  fastify.put("/users/:id/role", { preHandler: fastifyRequireRole("admin") }, async (request, reply) => {
-    const { role } = request.body as any;
-    const validRoles = ["admin", "member", "viewer"];
-    if (!validRoles.includes(role)) {
-      throw new AppError(400, `Role must be: ${validRoles.join(", ")}`, "INVALID_ROLE");
-    }
+  // ─── USER MANAGEMENT ───────────────────────────────────────────────────────
 
-    const { id } = request.params as any;
-    const [updated] = await db
-      .update(users)
-      .set({ role })
-      .where(eq(users.id, parseInt(String(id))))
-      .returning({ id: users.id, email: users.email, role: users.role });
-
-    return updated;
-  });
-
-  /**
-   * @openapi
-   * /admin/groups:
-   *   post:
-   *     summary: Create a group
-   *     description: Creates a new user group. Requires admin role.
-   *     tags:
-   *       - Admin
-   *     security:
-   *       - bearerAuth: []
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             required:
-   *               - name
-   *             properties:
-   *               name:
-   *                 type: string
-   *     responses:
-   *       201:
-   *         description: The created group
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 id:
-   *                   type: string
-   *                 name:
-   *                   type: string
-   *       400:
-   *         description: Name is required
-   *       401:
-   *         description: Unauthorized
-   *       403:
-   *         description: Forbidden — admin role required
-   */
-  // POST /groups — create group
-  fastify.post("/groups", { preHandler: fastifyRequireRole("admin") }, async (request, reply) => {
-    const { name } = request.body as any;
-    if (!name) throw new AppError(400, "Name required", "GROUP_NAME_REQUIRED");
-
-    const [group] = await db.insert(userGroups).values({ id: crypto.randomUUID(), name }).returning();
-    reply.code(201);
-    return group;
-  });
-
-  /**
-   * @openapi
-   * /admin/groups:
-   *   get:
-   *     summary: List all groups
-   *     description: Returns all user groups with their members. Requires admin role.
-   *     tags:
-   *       - Admin
-   *     security:
-   *       - bearerAuth: []
-   *     responses:
-   *       200:
-   *         description: A list of groups with members
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 groups:
-   *                   type: array
-   *                   items:
-   *                     type: object
-   *                     properties:
-   *                       id:
-   *                         type: string
-   *                       name:
-   *                         type: string
-   *                       members:
-   *                         type: array
-   *                         items:
-   *                           type: object
-   *                           properties:
-   *                             user:
-   *                               type: object
-   *                               properties:
-   *                                 id:
-   *                                   type: integer
-   *                                 email:
-   *                                   type: string
-   *                                 username:
-   *                                   type: string
-   *       401:
-   *         description: Unauthorized
-   *       403:
-   *         description: Forbidden — admin role required
-   */
-  // GET /groups — list groups
-  fastify.get("/groups", { preHandler: fastifyRequireRole("admin") }, async (request, reply) => {
-    const allGroups = await db.select().from(userGroups);
-
-    const memberships = await db
-      .select({
-        userId: groupMemberships.userId,
-        groupId: groupMemberships.groupId,
-        userIdRef: users.id,
-        email: users.email,
-        username: users.username,
-      })
-      .from(groupMemberships)
-      .innerJoin(users, eq(groupMemberships.userId, users.id));
-
-    const groups = allGroups.map((g) => ({
-      ...g,
-      members: memberships
-        .filter((m) => m.groupId === g.id)
-        .map((m) => ({ user: { id: m.userIdRef, email: m.email, username: m.username } })),
-    }));
-
-    return { groups };
-  });
-
-  /**
-   * @openapi
-   * /admin/groups/{id}/members:
-   *   post:
-   *     summary: Add a member to a group
-   *     description: Adds a user to the specified group. Requires admin role.
-   *     tags:
-   *       - Admin
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: The group ID
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             required:
-   *               - userId
-   *             properties:
-   *               userId:
-   *                 type: integer
-   *     responses:
-   *       200:
-   *         description: Member added successfully
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 success:
-   *                   type: boolean
-   *       400:
-   *         description: userId is required
-   *       401:
-   *         description: Unauthorized
-   *       403:
-   *         description: Forbidden — admin role required
-   */
-  // POST /groups/:id/members — add member
-  fastify.post("/groups/:id/members", { preHandler: fastifyRequireRole("admin") }, async (request, reply) => {
-    const { userId } = request.body as any;
-    if (!userId) throw new AppError(400, "userId required", "USER_ID_REQUIRED");
-
-    const { id } = request.params as any;
-    await db.insert(groupMemberships).values({
-      userId: parseInt(userId),
-      groupId: String(id),
+  // GET /users — search and list users
+  fastify.get("/users", async (request, reply) => {
+    const { 
+      search, 
+      limit = 20, 
+      offset = 0, 
+      sortBy = "createdAt", 
+      sortOrder = "desc" 
+    } = request.query as any;
+    
+    return AdminService.getUsers({
+      search,
+      limit: parseInt(limit),
+      offset: parseInt(offset),
+      sortBy,
+      sortOrder
     });
-
-    return { success: true };
   });
 
-  /**
-   * @openapi
-   * /admin/groups/{id}/members/{userId}:
-   *   delete:
-   *     summary: Remove a member from a group
-   *     description: Removes a user from the specified group. Requires admin role.
-   *     tags:
-   *       - Admin
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: The group ID
-   *       - in: path
-   *         name: userId
-   *         required: true
-   *         schema:
-   *           type: integer
-   *         description: The user ID to remove
-   *     responses:
-   *       200:
-   *         description: Member removed successfully
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 success:
-   *                   type: boolean
-   *       401:
-   *         description: Unauthorized
-   *       403:
-   *         description: Forbidden — admin role required
-   */
-  // DELETE /groups/:id/members/:userId — remove member
-  fastify.delete("/groups/:id/members/:userId", { preHandler: fastifyRequireRole("admin") }, async (request, reply) => {
-    const { id, userId } = request.params as any;
-    await db
-      .delete(groupMemberships)
-      .where(
-        and(
-          eq(groupMemberships.userId, parseInt(String(userId))),
-          eq(groupMemberships.groupId, String(id)),
-        ),
-      );
-    return { success: true };
-  });
+  // GET /users/:id — user detail for modal
+  fastify.get("/users/:id", async (request, reply) => {
+    const { id } = request.params as any;
+    const userId = parseInt(id);
+    const detail = await AdminService.getUserDetail(userId);
+    if (!detail) throw new AppError(404, "User not found");
 
-  /**
-   * @openapi
-   * /admin/stats:
-   *   get:
-   *     summary: Get system statistics
-   *     description: Returns aggregate counts for users, conversations, and chats. Requires admin role.
-   *     tags:
-   *       - Admin
-   *     security:
-   *       - bearerAuth: []
-   *     responses:
-   *       200:
-   *         description: System statistics
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 totalUsers:
-   *                   type: integer
-   *                 totalConversations:
-   *                   type: integer
-   *                 totalChats:
-   *                   type: integer
-   *       401:
-   *         description: Unauthorized
-   *       403:
-   *         description: Forbidden — admin role required
-   */
-  // GET /stats — system stats
-  fastify.get("/stats", { preHandler: fastifyRequireRole("admin") }, async (request, reply) => {
-    const [[userCount], [convCount], [chatCount]] = await Promise.all([
-      db.select({ value: count() }).from(users),
-      db.select({ value: count() }).from(conversations),
-      db.select({ value: count() }).from(chats),
-    ]);
-
-    return {
-      totalUsers: userCount.value,
-      totalConversations: convCount.value,
-      totalChats: chatCount.value,
+    const apiKeys = await AdminService.getUserApiKeys(userId);
+    
+    return { 
+      user: {
+        ...detail,
+        apiKeys
+      }
     };
   });
 
-  /**
-   * @openapi
-   * /admin/rotate-keys:
-   *   post:
-   *     summary: Rotate AES encryption keys
-   *     description: Re-encrypts all stored secrets (custom provider auth keys and memory backend configs) from the old encryption key to a new one. Requires admin role.
-   *     tags:
-   *       - Admin
-   *     security:
-   *       - bearerAuth: []
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             required:
-   *               - old_key
-   *               - new_key
-   *             properties:
-   *               old_key:
-   *                 type: string
-   *                 description: The current encryption key
-   *               new_key:
-   *                 type: string
-   *                 description: The new encryption key (minimum 32 characters)
-   *                 minLength: 32
-   *     responses:
-   *       200:
-   *         description: Key rotation result
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 message:
-   *                   type: string
-   *                 rotated:
-   *                   type: integer
-   *                   description: Number of secrets successfully re-encrypted
-   *       400:
-   *         description: Missing keys or new_key too short
-   *       401:
-   *         description: Unauthorized
-   *       403:
-   *         description: Forbidden — admin role required
-   */
-  // POST /rotate-keys — rotate AES encryption key (admin only)
-  fastify.post("/rotate-keys", { preHandler: fastifyRequireRole("admin") }, async (request, reply) => {
+  // PUT /users/:id/role — change user role
+  fastify.put("/users/:id/role", async (request, reply) => {
+    const { role } = request.body as any;
+    const { id } = request.params as any;
+    
+    const validRoles = ["admin", "member", "viewer"];
+    if (!validRoles.includes(role)) {
+      throw new AppError(400, `Role must be: ${validRoles.join(", ")}`);
+    }
+
+    await AdminService.updateUserRole(parseInt(id), role, request.userId!);
+    return { success: true, role };
+  });
+
+  // POST /users/:id/suspend — suspend user and revoke sessions
+  fastify.post("/users/:id/suspend", async (request, reply) => {
+    const { id } = request.params as any;
+    const userId = parseInt(id);
+
+    await AdminService.setUserStatus(userId, false, request.userId!);
+
+    // Revoke all sessions for this user in Redis
+    await redis.set(`user:status:${userId}`, "suspended", { EX: 86400 * 30 });
+    
+    return { success: true };
+  });
+
+  // POST /users/:id/activate — reactivate user
+  fastify.post("/users/:id/activate", async (request, reply) => {
+    const { id } = request.params as any;
+    const userId = parseInt(id);
+
+    await AdminService.setUserStatus(userId, true, request.userId!);
+    await redis.del(`user:status:${userId}`);
+
+    return { success: true };
+  });
+
+  // DELETE /users/:id — hard delete user
+  fastify.delete("/users/:id", async (request, reply) => {
+    const { id } = request.params as any;
+    await AdminService.deleteUser(parseInt(id), request.userId!);
+    return { success: true };
+  });
+
+  // ─── GROUP MANAGEMENT ───────────────────────────────────────────────────────
+
+  // GET /groups — list all groups with member counts
+  fastify.get("/groups", async (request, reply) => {
+    const groups = await AdminService.getGroups();
+    return { groups };
+  });
+
+  // POST /groups — create new organizational group
+  fastify.post("/groups", async (request, reply) => {
+    const { name, description } = request.body as any;
+    if (!name) throw new AppError(400, "Group name is required");
+    
+    const group = await AdminService.createGroup(name, description, request.userId!);
+    reply.code(201);
+    return { success: true, group };
+  });
+
+  // POST /groups/:id/members — add member to group
+  fastify.post("/groups/:id/members", async (request, reply) => {
+    const { id } = request.params as any;
+    const { userId } = request.body as any;
+    
+    if (!userId) throw new AppError(400, "User ID is required");
+    
+    await AdminService.addMemberToGroup(parseInt(id), parseInt(userId), request.userId!);
+    return { success: true };
+  });
+
+  // DELETE /groups/:id/members/:userId — remove member from group
+  fastify.delete("/groups/:id/members/:userId", async (request, reply) => {
+    const { id, userId } = request.params as any;
+    
+    await AdminService.removeMemberFromGroup(parseInt(id), parseInt(userId), request.userId!);
+    return { success: true };
+  });
+
+  // ─── SYSTEM CONFIGURATION ──────────────────────────────────────────────────
+
+  // GET /config — get all system settings
+  fastify.get("/config", async (request, reply) => {
+    return AdminService.getConfig();
+  });
+
+  // PATCH /config — update system settings
+  fastify.patch("/config", async (request, reply) => {
+    const body = request.body as Record<string, any>;
+    for (const [key, value] of Object.entries(body)) {
+      await AdminService.updateConfig(key, value, request.userId!);
+    }
+    return { success: true };
+  });
+
+  // ─── PROVIDERS ─────────────────────────────────────────────────────────────
+
+  // GET /providers — list API provider statuses
+  fastify.get("/providers", async (request, reply) => {
+    const providers = await db.select().from(customProviders);
+    const config = await AdminService.getConfig();
+    const defaultId = config.default_provider_id;
+
+    return {
+      providers: providers.map(p => ({
+        id: p.id,
+        name: p.name,
+        baseUrl: p.baseUrl,
+        status: "operational",
+        models: p.models,
+        isDefault: p.id.toString() === defaultId,
+      }))
+    };
+  });
+
+  // POST /providers/:id/default — set global default
+  fastify.post("/providers/:id/default", async (request, reply) => {
+    const { id } = request.params as any;
+    await AdminService.setProviderDefault(parseInt(id), request.userId!);
+    return { success: true };
+  });
+
+  // ─── ANALYTICS ─────────────────────────────────────────────────────────────
+  
+  // GET /analytics/metrics — system-wide totals
+  fastify.get("/analytics/metrics", async (request, reply) => {
+    return AdminService.getSystemStats();
+  });
+
+  // GET /analytics/daily-volume — time-series usage data
+  fastify.get("/analytics/daily-volume", async (request, reply) => {
+    const { days = 30 } = request.query as any;
+    const data = await AdminService.getUsageAnalytics(parseInt(days));
+    return { data };
+  });
+
+  // GET /analytics/provider-breakdown — tokens per provider
+  fastify.get("/analytics/provider-breakdown", async (request, reply) => {
+    const providers = await AdminService.getProviderBreakdown();
+    return { providers };
+  });
+
+  // ─── SECURITY & AUDIT ──────────────────────────────────────────────────────
+
+  // GET /audit-log — view administrative actions
+  fastify.get("/audit-log", async (request, reply) => {
+    const { actionType, limit, offset, startDate, endDate } = request.query as any;
+    const logs = await AdminService.getAuditLogs({
+      actionType,
+      limit: limit ? parseInt(limit) : 50,
+      offset: offset ? parseInt(offset) : 0,
+      startDate: startDate ? new Date(startDate) : undefined,
+      endDate: endDate ? new Date(endDate) : undefined,
+    });
+    return logs;
+  });
+
+  // GET /security/key-rotation — encryption status
+  fastify.get("/security/key-rotation", async (request, reply) => {
+    const configs = await AdminService.getConfig();
+    return {
+      currentRotation: new Date(), // Mock for UI
+      nextRotation: new Date(Date.now() + 86400000 * 30),
+      keyVersion: configs.encryption_key_version || 1,
+      algorithm: "AES-256-GCM",
+    };
+  });
+
+  // POST /security/key-rotation — trigger manual rotation
+  fastify.post("/security/key-rotation", async (request, reply) => {
     const { old_key, new_key } = request.body as any;
+    
     if (!old_key || !new_key) {
-      throw new AppError(400, "old_key and new_key are required", "MISSING_KEYS");
+      throw new AppError(400, "old_key and new_key are required");
     }
+    
     if (new_key.length < 32) {
-      throw new AppError(400, "new_key must be at least 32 characters", "KEY_TOO_SHORT");
+      throw new AppError(400, "new_key must be at least 32 characters");
     }
 
-    const ALGO = "aes-256-gcm";
-
-    function decrypt(encrypted: string, key: string): string {
-      const buf = Buffer.from(encrypted, "base64");
-      const iv = buf.subarray(0, 16);
-      const tag = buf.subarray(16, 32);
-      const ciphertext = buf.subarray(32);
-      // Legacy data used hardcoded "salt"; use IV as salt for key derivation
-      // to provide per-record uniqueness (BE-4: per-user random salt)
-      const derivedKey = scryptSync(key, iv, 32);
-      const decipher = createDecipheriv(ALGO, derivedKey, iv);
-      decipher.setAuthTag(tag);
-      try {
-        return decipher.update(ciphertext, undefined, "utf8") + decipher.final("utf8");
-      } catch {
-        // Fallback: try legacy hardcoded salt for pre-migration data.
-        // This path only runs once per record — after decryption succeeds,
-        // the record is immediately re-encrypted with IV-as-salt (line 508-515),
-        // permanently removing the legacy salt dependency.
-        // SECURITY: Legacy salt compatibility. This branch handles data encrypted
-        // with an older version that used a hardcoded salt. New encryptions use
-        // the IV as salt (line above). The legacy path should be removed after
-        // all data has been re-encrypted with the new method.
-        const legacySalt = "salt";
-        const legacyKey = scryptSync(key, legacySalt, 32);
-        const legacyDecipher = createDecipheriv(ALGO, legacyKey, iv);
-        legacyDecipher.setAuthTag(tag);
-        logger.warn("Decrypting with legacy hardcoded salt — record will be re-encrypted with per-record salt on this rotation");
-        return legacyDecipher.update(ciphertext, undefined, "utf8") + legacyDecipher.final("utf8");
-      }
-    }
-
-    function encrypt(text: string, key: string): string {
-      const iv = randomBytes(16);
-      const derivedKey = scryptSync(key, iv, 32);
-      const cipher = createCipheriv(ALGO, derivedKey, iv);
-      const encrypted = Buffer.concat([cipher.update(text, "utf8"), cipher.final()]);
-      const tag = cipher.getAuthTag();
-      return Buffer.concat([iv, tag, encrypted]).toString("base64");
-    }
-
-    let rotated = 0;
-
-    // Rotate CustomProvider authKey fields
-    const providers = await db
-      .select({ id: customProviders.id, authKey: customProviders.authKey })
-      .from(customProviders);
-    for (const p of providers) {
-      try {
-        const decrypted = decrypt(p.authKey, old_key);
-        const reEncrypted = encrypt(decrypted, new_key);
-        await db
-          .update(customProviders)
-          .set({ authKey: reEncrypted })
-          .where(eq(customProviders.id, p.id));
-        rotated++;
-      } catch (err) {
-        logger.warn({ err, providerId: p.id }, "Failed to rotate key for provider");
-      }
-    }
-
-    // Rotate MemoryBackend config fields
-    const backends = await db
-      .select({ id: memoryBackends.id, config: memoryBackends.config })
-      .from(memoryBackends);
-    for (const b of backends) {
-      try {
-        const decrypted = decrypt(b.config, old_key);
-        const reEncrypted = encrypt(decrypted, new_key);
-        await db
-          .update(memoryBackends)
-          .set({ config: reEncrypted })
-          .where(eq(memoryBackends.id, b.id));
-        rotated++;
-      } catch (err) {
-        logger.warn({ err, backendId: b.id }, "Failed to rotate key for memory backend");
-      }
-    }
-
-    logger.info({ rotated, adminId: request.userId }, "Encryption key rotation completed");
-    return { message: "Key rotation complete", rotated };
+    return AdminService.rotateEncryptionKeys({
+      adminId: request.userId!,
+      oldKey: old_key,
+      newKey: new_key
+    });
   });
 };
 

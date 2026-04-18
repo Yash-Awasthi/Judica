@@ -11,12 +11,14 @@ import logger from "../lib/logger.js";
 const jwtPayloadSchema = z.object({
   userId: z.number(),
   username: z.string(),
+  role: z.string().default("member"),
 });
 
 declare module "fastify" {
   interface FastifyRequest {
     userId?: number;
     username?: string;
+    role?: string;
   }
 }
 
@@ -44,6 +46,7 @@ export async function fastifyOptionalAuth(request: FastifyRequest, reply: Fastif
 
     request.userId = payload.userId;
     request.username = payload.username;
+    request.role = payload.role;
   } catch {
     // Silently ignore invalid tokens for optional auth
   }
@@ -69,10 +72,28 @@ export async function fastifyRequireAuth(request: FastifyRequest, reply: Fastify
       return;
     }
 
+    // Check if user is suspended
+    const userStatus = await redis.get(`user:status:${payload.userId}`);
+    if (userStatus === "suspended") {
+      reply.code(403).send({ error: "Account suspended" });
+      return;
+    }
+
     request.userId = payload.userId;
     request.username = payload.username;
+    request.role = payload.role;
   } catch (e: any) {
     logger.debug({ error: e.message, url: request.url }, "JWT Verification failed");
     reply.code(401).send({ error: "Invalid or expired token" });
+  }
+}
+
+export async function fastifyRequireAdmin(request: FastifyRequest, reply: FastifyReply) {
+  await fastifyRequireAuth(request, reply);
+  if (reply.sent) return;
+
+  if (request.role !== "admin") {
+    reply.code(403).send({ error: "Admin access required" });
+    return;
   }
 }

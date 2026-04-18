@@ -15,18 +15,18 @@
 
 ## Phase 1: Production Hardening (Q2 2026)
 
-> **Status: In Progress** — Security remediation complete. 86%+ test coverage achieved. Middleware modernized. Remaining: E2E testing, performance tuning, observability alerts.
+> **Status: In Progress** — Security remediation complete. 86%+ test coverage achieved. Admin Governance Dashboard (REQ-16) and Collaborative Workspace (REQ-15) finalized. Middleware modernized. Remaining: E2E testing, Integration Test Refactoring, Observability.
 
 ### Testing
 
 - [ ] E2E tests with Playwright — 5 critical user flows (signup → deliberation → KB upload → workflow → marketplace)
-- [ ] Rewrite route-level integration tests to use `fastify.inject()` against the real app instead of local mocks
+- [/] Rewrite route-level integration tests to use `fastify.inject()` against the real app instead of local mocks
 - [ ] Contract tests for SSE streaming format (verify event shapes for all deliberation stages)
 - [ ] Load testing with autocannon: target 200 concurrent deliberations, < 2s p95 latency
 
 ### Performance
 
-- [ ] PostgreSQL connection pooling via `pg-pool` (currently one connection per request)
+- [x] PostgreSQL connection pooling via `pg-pool` (Implemented using node-postgres Pool in src/lib/db.ts)
 - [ ] Frontend bundle splitting — lazy load Workflow Editor, Marketplace, Analytics views
 - [ ] CDN configuration for static assets (Vite build output)
 - [ ] Redis pipeline batching for rate limit checks (currently one round-trip per check)

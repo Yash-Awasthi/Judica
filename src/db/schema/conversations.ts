@@ -7,8 +7,10 @@ import {
   integer,
   jsonb,
   index,
+  uuid,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
+import { projects } from "./projects.js";
 import { vector } from "./types.js";
 
 // ─── Conversation ────────────────────────────────────────────────────────────
@@ -22,6 +24,9 @@ export const conversations = pgTable(
     updatedAt: timestamp("updatedAt", { mode: "date" }).notNull(),
     isPublic: boolean("isPublic").default(false).notNull(),
     sessionSummary: text("sessionSummary"),
+    projectId: text("projectId").references(() => projects.id, { onDelete: "set null" }),
+    activeTab: text("activeTab").default("discussion").notNull(),
+    summaryData: jsonb("summaryData"),
   },
   (table) => [
     index("Conversation_userId_idx").on(table.userId),

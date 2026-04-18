@@ -4,6 +4,7 @@ import { RootLayout } from "./layouts/RootLayout";
 import { ViewSkeleton } from "./components/ViewSkeleton";
 import { Settings } from "./components/Settings";
 import { Link } from "react-router-dom";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 
 // Lazy-loaded views
 const ChatView = lazy(() => import("./views/ChatView").then(m => ({ default: m.ChatView })));
@@ -21,6 +22,7 @@ const SkillsView = lazy(() => import("./views/SkillsView").then(m => ({ default:
 const ReposView = lazy(() => import("./views/ReposView").then(m => ({ default: m.ReposView })));
 const EvaluationView = lazy(() => import("./views/EvaluationView").then(m => ({ default: m.EvaluationView })));
 const TrainingLabView = lazy(() => import("./views/TrainingLabView").then(m => ({ default: m.TrainingLabView })));
+const ProjectsView = lazy(() => import("./views/ProjectsView"));
 
 function NotFoundView() {
   return (
@@ -55,6 +57,14 @@ export const router = createBrowserRouter([
         element: (
           <Suspense fallback={<ViewSkeleton />}>
             <ChatView />
+          </Suspense>
+        ) 
+      },
+      { 
+        path: "projects", 
+        element: (
+          <Suspense fallback={<ViewSkeleton />}>
+            <ProjectsView />
           </Suspense>
         ) 
       },
@@ -126,7 +136,9 @@ export const router = createBrowserRouter([
         path: "admin", 
         element: (
           <Suspense fallback={<ViewSkeleton />}>
-            <AdminView />
+            <ProtectedRoute requireAdmin>
+              <AdminView />
+            </ProtectedRoute>
           </Suspense>
         ) 
       },
@@ -134,7 +146,9 @@ export const router = createBrowserRouter([
         path: "analytics", 
         element: (
           <Suspense fallback={<ViewSkeleton />}>
-            <AnalyticsView />
+            <ProtectedRoute requireAdmin>
+              <AnalyticsView />
+            </ProtectedRoute>
           </Suspense>
         ) 
       },

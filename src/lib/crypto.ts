@@ -6,8 +6,8 @@ const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
 const TAG_LENGTH = 16;
 
-function getMasterKey(): Buffer {
-  const keyStr = env.MASTER_ENCRYPTION_KEY;
+function getMasterKey(customKey?: string): Buffer {
+  const keyStr = customKey || env.MASTER_ENCRYPTION_KEY;
   if (!keyStr) {
     throw new Error("CRITICAL: MASTER_ENCRYPTION_KEY environment variable is not set");
   }
@@ -15,10 +15,10 @@ function getMasterKey(): Buffer {
   return crypto.createHash("sha256").update(keyStr).digest();
 }
 
-export function encrypt(text: string): string {
+export function encrypt(text: string, customKey?: string): string {
   try {
     const iv = crypto.randomBytes(IV_LENGTH);
-    const key = getMasterKey();
+    const key = getMasterKey(customKey);
     const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
     
     let encrypted = cipher.update(text, "utf8", "hex");
@@ -33,7 +33,7 @@ export function encrypt(text: string): string {
   }
 }
 
-export function decrypt(encryptedText: string): string {
+export function decrypt(encryptedText: string, customKey?: string): string {
   try {
     const [ivHex, tagHex, encryptedData] = encryptedText.split(":");
     if (!ivHex || !tagHex || !encryptedData) {
@@ -42,7 +42,7 @@ export function decrypt(encryptedText: string): string {
     
     const iv = Buffer.from(ivHex, "hex");
     const tag = Buffer.from(tagHex, "hex");
-    const key = getMasterKey();
+    const key = getMasterKey(customKey);
     const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
     
     decipher.setAuthTag(tag);
