@@ -21,9 +21,17 @@ vi.mock("../../src/lib/drizzle.js", () => ({
   },
 }));
 
+const mockPipelineExec = vi.fn().mockResolvedValue([[null, null], [null, null]]);
+const mockPipelineGet = vi.fn().mockReturnThis();
+const mockPipeline = vi.fn(() => ({ get: mockPipelineGet, exec: mockPipelineExec }));
+
 vi.mock("../../src/lib/redis.js", () => ({
-  default: { get: vi.fn().mockResolvedValue(null) },
+  default: {
+    get: vi.fn().mockResolvedValue(null),
+    pipeline: () => mockPipeline(),
+  },
   get: vi.fn().mockResolvedValue(null),
+  pipeline: () => mockPipeline(),
 }));
 
 vi.mock("../../src/config/env.js", () => ({
@@ -178,8 +186,8 @@ describe("fastifyRequireAuth", () => {
     const mockPayload = { userId: 42, username: "testuser" };
     vi.mocked(jwt.verify).mockReturnValue(mockPayload as any);
 
-    const redis = await import("../../src/lib/redis.js");
-    vi.mocked((redis.default as any).get).mockResolvedValueOnce("true");
+    // Pipeline returns: [revokedResult, statusResult] — revoked is truthy
+    mockPipelineExec.mockResolvedValueOnce([[null, "true"], [null, null]]);
 
     const request = createFastifyRequest({ authorization: "Bearer revoked-token" });
     const reply = createFastifyReply();
@@ -194,6 +202,9 @@ describe("fastifyRequireAuth", () => {
     const mockPayload = { userId: 99, username: "admin" };
     vi.mocked(jwt.verify).mockReturnValue(mockPayload as any);
 
+    // Pipeline returns: both null (not revoked, not suspended)
+    mockPipelineExec.mockResolvedValueOnce([[null, null], [null, null]]);
+
     const request = createFastifyRequest({ authorization: "Bearer good-token" });
     const reply = createFastifyReply();
 
@@ -202,5 +213,21 @@ describe("fastifyRequireAuth", () => {
     expect(request.userId).toBe(99);
     expect(request.username).toBe("admin");
     expect(reply.code).not.toHaveBeenCalled();
+  });
+
+  it("returns 403 for a suspended user", async () => {
+    const mockPayload = { userId: 42, username: "suspended-user" };
+    vi.mocked(jwt.verify).mockReturnValue(mockPayload as any);
+
+    // Pipeline returns: not revoked, but suspended
+    mockPipelineExec.mockResolvedValueOnce([[null, null], [null, "suspended"]]);
+
+    const request = createFastifyRequest({ authorization: "Bearer valid-token" });
+    const reply = createFastifyReply();
+
+    await fastifyRequireAuth(request, reply);
+
+    expect(reply.code).toHaveBeenCalledWith(403);
+    expect(reply.send).toHaveBeenCalledWith({ error: "Account suspended" });
   });
 });

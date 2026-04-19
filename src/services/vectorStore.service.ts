@@ -1,6 +1,7 @@
 import { db } from "../lib/drizzle.js";
 import { sql } from "drizzle-orm";
 import { embed } from "./embeddings.service.js";
+import { routeAndCollect } from "../router/index.js";
 import logger from "../lib/logger.js";
 
 /**
@@ -33,14 +34,15 @@ export async function storeChunk(
   content: string,
   chunkIndex: number,
   sourceName?: string,
-  sourceUrl?: string
+  sourceUrl?: string,
+  parentChunkId?: string,
 ): Promise<string> {
   const embedding = await embed(content);
   const vectorStr = safeVectorLiteral(embedding);
 
   const result = await db.execute(sql`
-    INSERT INTO "Memory" ("id", "userId", "kbId", "content", "chunkIndex", "sourceName", "sourceUrl", "embedding", "createdAt")
-    VALUES (gen_random_uuid()::text, ${userId}, ${kbId}, ${content}, ${chunkIndex}, ${sourceName || null}, ${sourceUrl || null}, ${vectorStr}::vector, NOW())
+    INSERT INTO "Memory" ("id", "userId", "kbId", "content", "chunkIndex", "sourceName", "sourceUrl", "parentChunkId", "embedding", "createdAt")
+    VALUES (gen_random_uuid()::text, ${userId}, ${kbId}, ${content}, ${chunkIndex}, ${sourceName || null}, ${sourceUrl || null}, ${parentChunkId || null}, ${vectorStr}::vector, NOW())
     RETURNING "id"
   `);
 
@@ -67,6 +69,16 @@ export async function searchSimilar(
     ORDER BY score DESC
     LIMIT ${limit}
   `);
+
+  // Refresh lastAccessedAt for accessed memories (fire-and-forget)
+  const ids = (results.rows as any[]).map((r) => r.id);
+  if (ids.length > 0) {
+    db.execute(sql`
+      UPDATE "Memory"
+      SET "lastAccessedAt" = NOW(), "accessCount" = COALESCE("accessCount", 0) + 1
+      WHERE "id" = ANY(${ids}::text[])
+    `).catch(() => {});
+  }
 
   return results.rows as unknown as MemoryChunk[];
 }
@@ -153,4 +165,154 @@ export async function deleteDocChunks(kbId: string, sourceName: string): Promise
     DELETE FROM "Memory" WHERE "kbId" = ${kbId} AND "sourceName" = ${sourceName}
   `);
   return result.rowCount ?? 0;
+}
+
+/**
+ * Enrich search results with parent chunk context.
+ * When a child chunk matches, fetches the parent chunk and prepends it
+ * for broader context comprehension.
+ */
+export async function enrichWithParentContext(chunks: MemoryChunk[]): Promise<MemoryChunk[]> {
+  if (chunks.length === 0) return chunks;
+
+  // Get parentChunkIds for all results
+  const ids = chunks.map((c) => c.id);
+  const parentInfo = await db.execute(sql`
+    SELECT "id", "parentChunkId" FROM "Memory"
+    WHERE "id" = ANY(${ids}::text[])
+    AND "parentChunkId" IS NOT NULL
+  `);
+
+  const parentIdMap = new Map<string, string>();
+  for (const row of parentInfo.rows as any[]) {
+    if (row.parentChunkId) {
+      parentIdMap.set(row.id, row.parentChunkId);
+    }
+  }
+
+  if (parentIdMap.size === 0) return chunks;
+
+  // Fetch parent chunk contents
+  const parentIds = [...new Set(parentIdMap.values())];
+  const parents = await db.execute(sql`
+    SELECT "id", "content" FROM "Memory"
+    WHERE "id" = ANY(${parentIds}::text[])
+  `);
+
+  const parentContentMap = new Map<string, string>();
+  for (const row of parents.rows as any[]) {
+    parentContentMap.set(row.id, row.content);
+  }
+
+  // Enrich chunks: prepend parent context to child chunks
+  return chunks.map((chunk) => {
+    const parentId = parentIdMap.get(chunk.id);
+    if (!parentId) return chunk;
+
+    const parentContent = parentContentMap.get(parentId);
+    if (!parentContent) return chunk;
+
+    return {
+      ...chunk,
+      content: `[PARENT CONTEXT]\n${parentContent}\n[/PARENT CONTEXT]\n\n[MATCHED SECTION]\n${chunk.content}\n[/MATCHED SECTION]`,
+    };
+  });
+}
+
+// ─── HyDE: Hypothetical Document Embeddings ────────────────────────────────────
+// Generates a hypothetical answer to the query, then uses that document's
+// embedding for retrieval. This bridges the gap between short queries
+// and longer documents, improving recall on abstract queries.
+
+async function generateHypotheticalDocument(query: string): Promise<string> {
+  try {
+    const result = await routeAndCollect({
+      model: "auto",
+      messages: [
+        {
+          role: "user",
+          content: `Write a short, factual paragraph (3-5 sentences) that directly answers this question. Do not include disclaimers or hedging — just provide a confident, informative answer as if it were from a knowledge base document.\n\nQuestion: ${query}`,
+        },
+      ],
+      temperature: 0,
+    });
+    return result.text;
+  } catch (err) {
+    logger.warn({ err, query }, "HyDE generation failed, falling back to raw query");
+    return query;
+  }
+}
+
+/**
+ * HyDE-enhanced vector search. Generates a hypothetical document from the query,
+ * embeds it, and uses that embedding for retrieval. Falls back to standard search
+ * if HyDE generation fails.
+ */
+export async function hydeSearch(
+  userId: number,
+  query: string,
+  kbId?: string | null,
+  limit: number = 5,
+): Promise<MemoryChunk[]> {
+  const hypotheticalDoc = await generateHypotheticalDocument(query);
+  const hydeEmbedding = await embed(hypotheticalDoc);
+  const vectorStr = safeVectorLiteral(hydeEmbedding);
+
+  const kbCondition = kbId ? sql`AND "kbId" = ${kbId}` : sql``;
+
+  const results = await db.execute(sql`
+    SELECT "id", "content", "sourceName", "sourceUrl",
+           1 - ("embedding" <=> ${vectorStr}::vector) AS score
+    FROM "Memory"
+    WHERE "userId" = ${userId} ${kbCondition}
+    ORDER BY score DESC
+    LIMIT ${limit}
+  `);
+
+  return results.rows as unknown as MemoryChunk[];
+}
+
+/**
+ * Enhanced hybrid search: combines standard vector, HyDE vector, and keyword
+ * results using Reciprocal Rank Fusion for maximum recall.
+ * Set useHyde=true for abstract queries where the user's question is
+ * semantically distant from the document language.
+ */
+export async function enhancedHybridSearch(
+  userId: number,
+  query: string,
+  kbId?: string | null,
+  limit: number = 5,
+  useHyde: boolean = false,
+): Promise<MemoryChunk[]> {
+  const k = 60;
+
+  const searches: Promise<MemoryChunk[]>[] = [
+    searchSimilar(userId, query, kbId, limit * 2),
+    keywordSearch(userId, query, kbId, limit * 2),
+  ];
+
+  if (useHyde) {
+    searches.push(hydeSearch(userId, query, kbId, limit * 2));
+  }
+
+  const allResults = await Promise.all(searches);
+  const scoreMap = new Map<string, { chunk: MemoryChunk; rrfScore: number }>();
+
+  for (const resultSet of allResults) {
+    resultSet.forEach((chunk, rank) => {
+      const existing = scoreMap.get(chunk.id);
+      const rrfContrib = 1 / (rank + 1 + k);
+      if (existing) {
+        existing.rrfScore += rrfContrib;
+      } else {
+        scoreMap.set(chunk.id, { chunk, rrfScore: rrfContrib });
+      }
+    });
+  }
+
+  return Array.from(scoreMap.values())
+    .sort((a, b) => b.rrfScore - a.rrfScore)
+    .slice(0, limit)
+    .map(({ chunk, rrfScore }) => ({ ...chunk, score: rrfScore }));
 }

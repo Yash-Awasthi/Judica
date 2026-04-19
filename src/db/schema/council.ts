@@ -90,3 +90,40 @@ export const promptDnas = pgTable(
   },
   (table) => [index("PromptDNA_userId_idx").on(table.userId)],
 );
+
+// ─── ContradictionRecord ────────────────────────────────────────────────────
+// Tracks contradictions detected during deliberation, with versioned
+// resolution records instead of silent overwrite.
+export const contradictionRecords = pgTable(
+  "ContradictionRecord",
+  {
+    id: text("id").primaryKey(),
+    conversationId: text("conversationId").notNull(),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    claimA: text("claimA").notNull(),
+    sourceA: text("sourceA").notNull(),
+    claimB: text("claimB").notNull(),
+    sourceB: text("sourceB").notNull(),
+    resolution: text("resolution"),
+    resolvedBy: text("resolvedBy"),
+    status: text("status").notNull().default("open"),
+    confidence: real("confidence"),
+    versions: jsonb("versions").$type<ContradictionVersion[]>().default([]).notNull(),
+    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+    resolvedAt: timestamp("resolvedAt", { mode: "date" }),
+  },
+  (table) => [
+    index("ContradictionRecord_conversationId_idx").on(table.conversationId),
+    index("ContradictionRecord_userId_status_idx").on(table.userId, table.status),
+  ],
+);
+
+export interface ContradictionVersion {
+  resolution: string;
+  resolvedBy: string;
+  confidence: number;
+  timestamp: string;
+  reason: string;
+}

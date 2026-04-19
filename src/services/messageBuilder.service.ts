@@ -1,7 +1,8 @@
 import { db } from "../lib/drizzle.js";
 import { uploads } from "../db/schema/uploads.js";
 import { eq, inArray, and } from "drizzle-orm";
-import { hybridSearch, type MemoryChunk } from "./vectorStore.service.js";
+import { hybridSearch, enhancedHybridSearch, enrichWithParentContext, type MemoryChunk } from "./vectorStore.service.js";
+import { getAdaptiveK } from "./adaptiveK.service.js";
 import { readFile } from "fs/promises";
 import path from "path";
 import logger from "../lib/logger.js";
@@ -64,10 +65,16 @@ export async function loadRAGContext(
   userId: number,
   query: string,
   kbId: string,
-  limit: number = 5
+  limit?: number
 ): Promise<{ context: string; citations: { source: string; score: number }[] }> {
   try {
-    const chunks = await hybridSearch(userId, query, kbId, limit);
+    const { k, useHyde } = getAdaptiveK(query, limit);
+    let chunks = useHyde
+      ? await enhancedHybridSearch(userId, query, kbId, k, true)
+      : await hybridSearch(userId, query, kbId, k);
+
+    // Enrich child chunks with parent context
+    chunks = await enrichWithParentContext(chunks);
 
     if (chunks.length === 0) {
       return { context: "", citations: [] };

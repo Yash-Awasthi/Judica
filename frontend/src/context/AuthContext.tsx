@@ -1,7 +1,18 @@
 import { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from "react";
 
+function parseJwtRole(token: string | null): string {
+  if (!token) return "viewer";
+  try {
+    const payload = JSON.parse(atob(token.split(".")[1]));
+    return payload.role || "viewer";
+  } catch {
+    return "viewer";
+  }
+}
+
 interface AuthContextType {
   user: string;
+  role: string;
   token: string | null;
   login: (emailOrToken: string, password: string) => void | Promise<void>;
   register: (username: string, password: string) => Promise<void>;
@@ -17,16 +28,15 @@ interface AuthProviderProps {
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
-  // Token kept in memory only (also set as httpOnly cookie by backend)
   const [token, setToken] = useState<string | null>(null);
   const [user, setUser] = useState<string>(() => localStorage.getItem("council_user") || "");
+  const [role, setRole] = useState<string>("viewer");
 
   const tokenRef = useRef<string | null>(token);
   useEffect(() => {
     tokenRef.current = token;
   }, [token]);
 
-  // On mount, try to restore session via refresh endpoint (cookie-based)
   useEffect(() => {
     if (user && !token) {
       fetch("/api/auth/refresh", { method: "POST", credentials: "include" })
@@ -36,6 +46,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
             tokenRef.current = data.token;
             setToken(data.token);
             setUser(data.username || user);
+            setRole(parseJwtRole(data.token));
           }
         })
         .catch(() => { /* no valid refresh token */ });
@@ -55,8 +66,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     tokenRef.current = null;
     setToken(null);
     setUser("");
+    setRole("viewer");
     localStorage.removeItem("council_user");
-    // Remove legacy keys
     localStorage.removeItem("council_token");
   }, []);
 
@@ -73,6 +84,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         tokenRef.current = data.token;
         setToken(data.token);
         setUser(data.username || emailOrToken);
+        setRole(parseJwtRole(data.token));
         localStorage.setItem("council_user", data.username || emailOrToken);
         return;
       }
@@ -98,6 +110,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     tokenRef.current = data.token;
     setToken(data.token);
     setUser(data.username || username);
+    setRole(parseJwtRole(data.token));
     localStorage.setItem("council_user", data.username || username);
   }, []);
 
@@ -108,7 +121,6 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const currentToken = tokenRef.current;
     const headers = new Headers(options?.headers || {});
 
-    // Still send Bearer token in header for backward compat + non-cookie clients
     if (currentToken && !headers.has("Authorization")) {
       headers.set("Authorization", `Bearer ${currentToken}`);
     }
@@ -116,13 +128,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const response = await fetch(url, { ...options, headers, credentials: "include" });
 
     if (response.status === 401) {
-      // Try to refresh the token via cookie
       const refreshRes = await fetch("/api/auth/refresh", { method: "POST", credentials: "include" });
       if (refreshRes.ok) {
         const data = await refreshRes.json();
         tokenRef.current = data.token;
         setToken(data.token);
-        // Retry the original request with new token
+        setRole(parseJwtRole(data.token));
         const retryHeaders = new Headers(options?.headers || {});
         retryHeaders.set("Authorization", `Bearer ${data.token}`);
         return fetch(url, { ...options, headers: retryHeaders, credentials: "include" });
@@ -154,12 +165,13 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const handleMessage = (event: MessageEvent) => {
         if (event.origin !== window.location.origin) return;
         
-        const { type, token: newToken, username: newUsername, error } = event.data;
+        const { type, token: newToken, username: newUsername, role: newRole, error } = event.data;
         
         if (type === "AUTH_SUCCESS") {
           tokenRef.current = newToken;
           setToken(newToken);
           setUser(newUsername);
+          setRole(parseJwtRole(newToken));
           localStorage.setItem("council_user", newUsername);
           window.removeEventListener("message", handleMessage);
           resolve();
@@ -171,12 +183,10 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       window.addEventListener("message", handleMessage);
 
-      // Check if popup closed without message
       const checkClosed = setInterval(() => {
         if (popup.closed) {
           clearInterval(checkClosed);
           window.removeEventListener("message", handleMessage);
-          // Small delay to allow message to arrive
           setTimeout(() => reject(new Error("Login cancelled")), 100);
         }
       }, 1000);
@@ -184,7 +194,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, token, login, register, logout, fetchWithAuth, loginWithGoogle }}>
+    <AuthContext.Provider value={{ user, role, token, login, register, logout, fetchWithAuth, loginWithGoogle }}>
       {children}
     </AuthContext.Provider>
   );

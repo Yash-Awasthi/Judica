@@ -17,6 +17,8 @@ vi.mock("ws", () => {
 
   const WebSocketServerMock = vi.fn().mockImplementation(function (this: any) {
     this.on = vi.fn();
+    this.emit = vi.fn();
+    this.handleUpgrade = vi.fn();
     this.clients = mockClients;
   });
 
@@ -36,7 +38,35 @@ vi.mock("../../src/lib/logger.js", () => ({
 }));
 
 vi.mock("../../src/config/env.js", () => ({
-  env: {},
+  env: {
+    JWT_SECRET: "test-secret-key-min-16",
+    DATABASE_URL: "postgresql://test:test@localhost:5432/test",
+    REDIS_URL: "redis://localhost:6379",
+  },
+}));
+
+vi.mock("jsonwebtoken", () => ({
+  default: {
+    verify: vi.fn(),
+  },
+}));
+
+vi.mock("../../src/lib/redis.js", () => ({
+  default: {
+    get: vi.fn().mockResolvedValue(null),
+  },
+}));
+
+vi.mock("../../src/services/conversationService.js", () => ({
+  findConversationById: vi.fn().mockResolvedValue({ id: "conv-1", userId: 1, isPublic: false }),
+}));
+
+vi.mock("../../src/lib/drizzle.js", () => ({
+  db: {},
+}));
+
+vi.mock("../../src/lib/db.js", () => ({
+  pool: { query: vi.fn(), on: vi.fn(), totalCount: 0, idleCount: 0 },
 }));
 
 describe("Socket (extended)", () => {
@@ -49,7 +79,7 @@ describe("Socket (extended)", () => {
     vi.useRealTimers();
   });
 
-  it("initializes WebSocket server with correct path", async () => {
+  it("initializes WebSocket server with noServer mode", async () => {
     const { initSocket } = await import("../../src/lib/socket.js");
     const { WebSocketServer } = await import("ws");
     const server = new HttpServer();
@@ -57,7 +87,7 @@ describe("Socket (extended)", () => {
     const wss = initSocket(server);
 
     expect(WebSocketServer).toHaveBeenCalledWith(
-      expect.objectContaining({ server, path: "/ws" })
+      expect.objectContaining({ noServer: true })
     );
     expect(wss).toBeDefined();
   });
@@ -77,6 +107,8 @@ describe("Socket (extended)", () => {
       const mockWs = {
         isAlive: false,
         rooms: undefined as any,
+        userId: undefined as any,
+        username: undefined as any,
         on: vi.fn(),
         send: vi.fn(),
         ping: vi.fn(),
@@ -183,6 +215,8 @@ describe("Socket (extended)", () => {
       const mockWs = {
         isAlive: false,
         rooms: undefined as any,
+        userId: 42,
+        username: "testuser",
         on: vi.fn(),
         send: vi.fn(),
         ping: vi.fn(),
@@ -197,7 +231,10 @@ describe("Socket (extended)", () => {
 
       if (closeCall) {
         closeCall[1](); // trigger disconnect
-        expect(logger.info).toHaveBeenCalledWith("WebSocket client disconnected");
+        expect(logger.info).toHaveBeenCalledWith(
+          expect.objectContaining({ userId: 42 }),
+          "WebSocket client disconnected"
+        );
       }
     }
   });

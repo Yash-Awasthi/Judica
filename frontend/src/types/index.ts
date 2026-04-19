@@ -56,12 +56,30 @@ export interface CouncilMember {
   customBehaviour: string;
 }
 
+export interface Project {
+  id: string;
+  name: string;
+  description?: string;
+  color?: string;
+  icon?: string;
+  conversationCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface Conversation {
   id: string;
   title: string;
   createdAt?: string;
   updatedAt?: string;
   messageCount?: number;
+  activeTab?: string;
+  summaryData?: {
+    keyDecisions: string[];
+    actionItems: string[];
+    followUps: string[];
+    lastUpdated?: string;
+  };
 }
 
 export interface UserMetrics {

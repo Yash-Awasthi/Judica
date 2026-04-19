@@ -118,7 +118,7 @@ export function MessageList({
 
           {/* Opinions */}
           {(msg.opinions?.length ?? 0) > 0 && (
-            <div className="space-y-6 mt-6">
+            <div className="space-y-6 mt-6" aria-live="polite" aria-atomic="false">
               {msg.opinions?.map((op, i) => {
                 const color = getMemberColor(op.name);
                 return (
@@ -181,6 +181,8 @@ export function MessageList({
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.4 }}
               className="mt-8"
+              aria-live="polite"
+              aria-label="Council verdict"
             >
               <div className="flex items-center gap-3 mb-4">
                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--accent-mint)] to-emerald-500 flex items-center justify-center shadow-glow-sm">

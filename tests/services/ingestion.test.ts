@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("../../src/services/chunker.service.js", () => ({
   chunkText: vi.fn(),
+  chunkHierarchical: vi.fn(),
 }));
 
 vi.mock("../../src/services/vectorStore.service.js", () => ({
@@ -36,7 +37,7 @@ vi.mock("../../src/lib/logger.js", () => ({
   },
 }));
 
-import { chunkText } from "../../src/services/chunker.service.js";
+import { chunkHierarchical } from "../../src/services/chunker.service.js";
 import { storeChunk } from "../../src/services/vectorStore.service.js";
 import { db } from "../../src/lib/drizzle.js";
 import { kbDocuments } from "../../src/db/schema/uploads.js";
@@ -44,11 +45,21 @@ import { eq } from "drizzle-orm";
 import logger from "../../src/lib/logger.js";
 import { ingestDocument } from "../../src/services/ingestion.service.js";
 
-const mockedChunkText = vi.mocked(chunkText);
+const mockedChunkHierarchical = vi.mocked(chunkHierarchical);
 const mockedStoreChunk = vi.mocked(storeChunk);
 const mockedDb = vi.mocked(db);
 const mockedLogger = vi.mocked(logger);
 const mockedEq = vi.mocked(eq);
+
+/** Helper: create a standalone parent chunk (no hierarchy needed) */
+function parentChunk(content: string) {
+  return { content, parentContent: null, level: "parent" as const };
+}
+
+/** Helper: create a child chunk with parent reference */
+function childChunk(content: string, parentContent: string) {
+  return { content, parentContent, level: "child" as const };
+}
 
 describe("ingestDocument", () => {
   const userId = 42;
@@ -56,41 +67,102 @@ describe("ingestDocument", () => {
   const docId = "doc-abc";
   const filename = "report.pdf";
 
+  let parentIdCounter: number;
+
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
-    mockedStoreChunk.mockResolvedValue(undefined as any);
+    parentIdCounter = 0;
+    mockedStoreChunk.mockImplementation(async () => {
+      return `uuid-${parentIdCounter++}`;
+    });
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  it("should ingest a document with fewer than 10 chunks (single batch, no delay)", async () => {
-    const chunks = ["c1", "c2", "c3"];
-    mockedChunkText.mockReturnValue(chunks);
+  it("should ingest a document with standalone parent chunks (no hierarchy)", async () => {
+    const chunks = [parentChunk("c1"), parentChunk("c2"), parentChunk("c3")];
+    mockedChunkHierarchical.mockReturnValue(chunks);
 
     const promise = ingestDocument(userId, kbId, docId, filename, "some text");
     await vi.runAllTimersAsync();
     const result = await promise;
 
     expect(result).toBe(3);
-    expect(mockedChunkText).toHaveBeenCalledWith("some text");
+    expect(mockedChunkHierarchical).toHaveBeenCalledWith("some text");
     expect(mockedStoreChunk).toHaveBeenCalledTimes(3);
     expect(mockedStoreChunk).toHaveBeenCalledWith(userId, kbId, "c1", 0, filename);
     expect(mockedStoreChunk).toHaveBeenCalledWith(userId, kbId, "c2", 1, filename);
     expect(mockedStoreChunk).toHaveBeenCalledWith(userId, kbId, "c3", 2, filename);
   });
 
-  it("should process chunks in batches of 10 with 200ms delay between batches", async () => {
-    const chunks = Array.from({ length: 25 }, (_, i) => `chunk-${i}`);
-    mockedChunkText.mockReturnValue(chunks);
+  it("should store parent chunk first, then child with parentChunkId", async () => {
+    const pContent = "parent text that is long enough";
+    const chunks = [
+      childChunk("child-1", pContent),
+      childChunk("child-2", pContent),
+    ];
+    mockedChunkHierarchical.mockReturnValue(chunks);
 
-    const storeCallOrder: number[] = [];
-    mockedStoreChunk.mockImplementation(async (_u, _k, _c, idx) => {
-      storeCallOrder.push(idx as number);
-      return undefined as any;
-    });
+    // First storeChunk call (parent) returns "parent-uuid"
+    // Subsequent calls (children) return sequential uuids
+    mockedStoreChunk
+      .mockResolvedValueOnce("parent-uuid")   // parent store
+      .mockResolvedValueOnce("child-1-uuid")   // child-1 store
+      .mockResolvedValueOnce("child-2-uuid");  // child-2 store
+
+    const promise = ingestDocument(userId, kbId, docId, filename, "text");
+    await vi.runAllTimersAsync();
+    const result = await promise;
+
+    expect(result).toBe(2);
+
+    // Parent stored first (no parentChunkId)
+    expect(mockedStoreChunk).toHaveBeenCalledWith(
+      userId, kbId, pContent, 0, filename, undefined,
+    );
+
+    // Children stored with parent reference
+    expect(mockedStoreChunk).toHaveBeenCalledWith(
+      userId, kbId, "child-1", 0, filename, undefined, "parent-uuid",
+    );
+    expect(mockedStoreChunk).toHaveBeenCalledWith(
+      userId, kbId, "child-2", 1, filename, undefined, "parent-uuid",
+    );
+  });
+
+  it("should deduplicate parent storage for children sharing the same parent", async () => {
+    const pContent = "shared parent content";
+    const chunks = [
+      childChunk("child-a", pContent),
+      childChunk("child-b", pContent),
+      childChunk("child-c", pContent),
+    ];
+    mockedChunkHierarchical.mockReturnValue(chunks);
+
+    mockedStoreChunk
+      .mockResolvedValueOnce("parent-id")  // parent stored once
+      .mockResolvedValue("child-id");       // children
+
+    const promise = ingestDocument(userId, kbId, docId, filename, "text");
+    await vi.runAllTimersAsync();
+    await promise;
+
+    // 1 parent store + 3 child stores = 4 total calls
+    expect(mockedStoreChunk).toHaveBeenCalledTimes(4);
+
+    // Parent content stored exactly once
+    const parentCalls = mockedStoreChunk.mock.calls.filter(
+      (args) => args[2] === pContent
+    );
+    expect(parentCalls).toHaveLength(1);
+  });
+
+  it("should process chunks in batches of 10 with 200ms delay between batches", async () => {
+    const chunks = Array.from({ length: 25 }, (_, i) => parentChunk(`chunk-${i}`));
+    mockedChunkHierarchical.mockReturnValue(chunks);
 
     const promise = ingestDocument(userId, kbId, docId, filename, "long text");
 
@@ -117,8 +189,8 @@ describe("ingestDocument", () => {
 
   it("should not delay after the last batch", async () => {
     // Exactly 10 chunks = 1 batch, no delay needed
-    const chunks = Array.from({ length: 10 }, (_, i) => `c${i}`);
-    mockedChunkText.mockReturnValue(chunks);
+    const chunks = Array.from({ length: 10 }, (_, i) => parentChunk(`c${i}`));
+    mockedChunkHierarchical.mockReturnValue(chunks);
 
     const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
 
@@ -136,7 +208,7 @@ describe("ingestDocument", () => {
   });
 
   it("should handle empty text (zero chunks)", async () => {
-    mockedChunkText.mockReturnValue([]);
+    mockedChunkHierarchical.mockReturnValue([]);
 
     const promise = ingestDocument(userId, kbId, docId, filename, "");
     await vi.runAllTimersAsync();
@@ -147,8 +219,8 @@ describe("ingestDocument", () => {
   });
 
   it("should update kbDocuments with chunkCount, indexed flag, and indexedAt", async () => {
-    const chunks = ["a", "b"];
-    mockedChunkText.mockReturnValue(chunks);
+    const chunks = [parentChunk("a"), parentChunk("b")];
+    mockedChunkHierarchical.mockReturnValue(chunks);
 
     const fakeDate = new Date("2026-04-14T12:00:00Z");
     vi.setSystemTime(fakeDate);
@@ -170,7 +242,7 @@ describe("ingestDocument", () => {
   });
 
   it("should log start and completion messages", async () => {
-    mockedChunkText.mockReturnValue(["x"]);
+    mockedChunkHierarchical.mockReturnValue([parentChunk("x")]);
 
     const promise = ingestDocument(userId, kbId, docId, filename, "t");
     await vi.runAllTimersAsync();
@@ -178,16 +250,16 @@ describe("ingestDocument", () => {
 
     expect(mockedLogger.info).toHaveBeenCalledWith(
       { docId, filename, chunkCount: 1 },
-      "Starting document ingestion"
+      "Starting document ingestion (hierarchical)"
     );
     expect(mockedLogger.info).toHaveBeenCalledWith(
       { docId, filename, chunkCount: 1 },
-      "Document ingestion complete"
+      "Document ingestion complete (hierarchical)"
     );
   });
 
   it("should propagate errors from storeChunk", async () => {
-    mockedChunkText.mockReturnValue(["a"]);
+    mockedChunkHierarchical.mockReturnValue([parentChunk("a")]);
     mockedStoreChunk.mockRejectedValueOnce(new Error("vector store down"));
 
     const promise = ingestDocument(userId, kbId, docId, filename, "text");
@@ -199,7 +271,7 @@ describe("ingestDocument", () => {
   });
 
   it("should propagate errors from the DB update", async () => {
-    mockedChunkText.mockReturnValue(["a"]);
+    mockedChunkHierarchical.mockReturnValue([parentChunk("a")]);
 
     const originalUpdate = mockedDb.update;
     const whereStub = vi.fn().mockRejectedValueOnce(new Error("db write failed"));
@@ -217,8 +289,8 @@ describe("ingestDocument", () => {
   });
 
   it("should handle exactly 20 chunks (2 full batches, one delay)", async () => {
-    const chunks = Array.from({ length: 20 }, (_, i) => `c${i}`);
-    mockedChunkText.mockReturnValue(chunks);
+    const chunks = Array.from({ length: 20 }, (_, i) => parentChunk(`c${i}`));
+    mockedChunkHierarchical.mockReturnValue(chunks);
 
     const setTimeoutSpy = vi.spyOn(globalThis, "setTimeout");
 
@@ -238,8 +310,8 @@ describe("ingestDocument", () => {
   });
 
   it("should pass correct global index to storeChunk across batches", async () => {
-    const chunks = Array.from({ length: 12 }, (_, i) => `chunk-${i}`);
-    mockedChunkText.mockReturnValue(chunks);
+    const chunks = Array.from({ length: 12 }, (_, i) => parentChunk(`chunk-${i}`));
+    mockedChunkHierarchical.mockReturnValue(chunks);
 
     const promise = ingestDocument(userId, kbId, docId, filename, "text");
     await vi.runAllTimersAsync();
@@ -248,5 +320,40 @@ describe("ingestDocument", () => {
     // Second batch starts at index 10
     expect(mockedStoreChunk).toHaveBeenCalledWith(userId, kbId, "chunk-10", 10, filename);
     expect(mockedStoreChunk).toHaveBeenCalledWith(userId, kbId, "chunk-11", 11, filename);
+  });
+
+  it("should handle a mix of parent and child chunks", async () => {
+    const pContent = "big parent content here";
+    const chunks = [
+      parentChunk("standalone"),
+      childChunk("child-1", pContent),
+      childChunk("child-2", pContent),
+    ];
+    mockedChunkHierarchical.mockReturnValue(chunks);
+
+    mockedStoreChunk
+      .mockResolvedValueOnce("standalone-id")  // standalone parent
+      .mockResolvedValueOnce("parent-id")       // parent for children
+      .mockResolvedValueOnce("child-1-id")      // child-1
+      .mockResolvedValueOnce("child-2-id");     // child-2
+
+    const promise = ingestDocument(userId, kbId, docId, filename, "text");
+    await vi.runAllTimersAsync();
+    const result = await promise;
+
+    expect(result).toBe(3);
+    // 1 standalone + 1 parent + 2 children = 4 storeChunk calls
+    expect(mockedStoreChunk).toHaveBeenCalledTimes(4);
+
+    // Standalone stored without parentChunkId
+    expect(mockedStoreChunk).toHaveBeenCalledWith(userId, kbId, "standalone", 0, filename);
+
+    // Children stored with parent reference
+    expect(mockedStoreChunk).toHaveBeenCalledWith(
+      userId, kbId, "child-1", 1, filename, undefined, "parent-id",
+    );
+    expect(mockedStoreChunk).toHaveBeenCalledWith(
+      userId, kbId, "child-2", 2, filename, undefined, "parent-id",
+    );
   });
 });

@@ -81,8 +81,8 @@ export function SkillsView() {
                    />
                  </div>
                  <div className="flex p-1 bg-white/[0.02] border border-white/5 rounded-2xl items-center">
-                    <button onClick={() => setViewMode("grid")} className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${viewMode === "grid" ? "bg-[var(--accent-blue)] text-black" : "text-white/20 hover:text-white"}`}><Grid size={16} /></button>
-                    <button onClick={() => setViewMode("list")} className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${viewMode === "list" ? "bg-[var(--accent-blue)] text-black" : "text-white/20 hover:text-white"}`}><List size={16} /></button>
+                    <button onClick={() => setViewMode("grid")} aria-label="Grid view" className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${viewMode === "grid" ? "bg-[var(--accent-blue)] text-black" : "text-white/20 hover:text-white"}`}><Grid size={16} /></button>
+                    <button onClick={() => setViewMode("list")} aria-label="List view" className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${viewMode === "list" ? "bg-[var(--accent-blue)] text-black" : "text-white/20 hover:text-white"}`}><List size={16} /></button>
                  </div>
             </div>
 

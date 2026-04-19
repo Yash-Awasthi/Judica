@@ -6,10 +6,10 @@ import {
   Brain, Store, BarChart3, Activity, Terminal,
   Shield, Settings, ChevronLeft, ChevronRight, LogOut, Trash2,
   MessageCircle, ChevronDown, ChevronUp, Search, Loader2, Zap,
-  Cpu, Database, Network
+  Cpu, Database, Network, Folder, FolderPlus
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
-import type { Conversation } from "../types/index";
+import type { Conversation, Project } from "../types/index";
 
 function IntelligencePulse() {
   return (
@@ -59,11 +59,13 @@ interface SidebarProps {
   onDelete: (id: string) => void;
   onLogout: () => void;
   onShowMetrics: () => void;
-  onSearch?: (query: string) => void;
+  onSearch: (query: string, projectId?: string, after?: string, before?: string) => void;
   searchResults?: any[] | null;
   isSearching?: boolean;
   width: number;
   onWidthChange: (width: number) => void;
+  projects?: Project[];
+  role?: string;
 }
 
 function timeAgo(dateStr?: string): string {
@@ -77,6 +79,23 @@ function timeAgo(dateStr?: string): string {
   const d = Math.floor(h / 24);
   if (d < 7) return `${d}d`;
   return new Date(dateStr).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function getDateRange(filter: string): { after?: string; before?: string } {
+  const now = new Date();
+  if (filter === "24h") {
+    const after = new Date(now.getTime() - 24 * 60 * 60 * 1000);
+    return { after: after.toISOString() };
+  }
+  if (filter === "7d") {
+    const after = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    return { after: after.toISOString() };
+  }
+  if (filter === "30d") {
+    const after = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+    return { after: after.toISOString() };
+  }
+  return {};
 }
 
 interface NavItemProps {
@@ -150,11 +169,16 @@ export function Sidebar({
   searchResults: _searchResults,
   isSearching,
   width,
-  onWidthChange
+  onWidthChange,
+  projects = [],
+  role = "viewer"
 }: SidebarProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(true);
+  const [projectsOpen, setProjectsOpen] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedSearchProjectId, setSelectedSearchProjectId] = useState<string>("");
+  const [selectedDateFilter, setSelectedDateFilter] = useState<string>("all");
   const location = useLocation();
   const currentPath = location.pathname;
 
@@ -225,6 +249,7 @@ export function Sidebar({
         </button>
         <button
           onClick={() => setCollapsed(!collapsed)}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           className="p-2 rounded-xl text-white/10 hover:text-white hover:bg-white/5 transition-all hidden md:flex"
         >
           {collapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
@@ -255,10 +280,70 @@ export function Sidebar({
         <NavItem to="/training" icon={<Cpu size={18} />} label="Neuro_Forge" sector="GEN-07" active={currentPath === "/training"} collapsed={collapsed} />
 
         <SectionHeader label="Diagnostics" collapsed={collapsed} />
-        <NavItem to="/analytics" icon={<BarChart3 size={18} />} label="Global_Telemetry" sector="TELE-08" active={currentPath === "/analytics"} collapsed={collapsed} />
-        <NavItem to="/admin" icon={<Shield size={18} />} label="Root_Admin" sector="SYS-AD" active={currentPath === "/admin"} collapsed={collapsed} />
+        {role === "admin" && (
+          <>
+            <NavItem to="/analytics" icon={<BarChart3 size={18} />} label="Global_Telemetry" sector="TELE-08" active={currentPath === "/analytics"} collapsed={collapsed} />
+            <NavItem to="/admin" icon={<Shield size={18} />} label="Root_Admin" sector="SYS-AD" active={currentPath === "/admin"} collapsed={collapsed} />
+          </>
+        )}
         <NavItem to="/settings" icon={<Settings size={18} />} label="Global_Settings" sector="CONF" active={currentPath === "/settings"} collapsed={collapsed} />
       </nav>
+
+      {/* Projects Section */}
+      {!collapsed && (
+        <div className="shrink-0 flex flex-col px-4 min-h-0 z-10 pb-4 border-t border-white/5 pt-6 bg-black">
+          <button
+            onClick={() => setProjectsOpen(!projectsOpen)}
+            className="flex items-center justify-between px-3 mb-4 w-full text-[9px] font-black text-white/20 uppercase tracking-[0.4em] font-diag hover:text-white transition-all"
+          >
+            <span>Operational_Projects</span>
+            {projectsOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          </button>
+
+          <AnimatePresence>
+            {projectsOpen && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", maxHeight: 200, opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="overflow-y-auto scrollbar-custom space-y-1.5 pr-2 mb-4"
+              >
+                <Link
+                  to="/projects"
+                  className={`group flex items-center gap-3 px-4 py-3 rounded-2xl cursor-pointer transition-all border relative overflow-hidden
+                    ${currentPath === "/projects"
+                      ? "bg-[var(--accent-mint)]/10 text-white border-[var(--accent-mint)]/30"
+                      : "bg-white/[0.02] text-white/40 border-transparent hover:border-white/10 hover:bg-white/[0.04] hover:text-white"
+                    }`}
+                >
+                  <FolderPlus size={14} className={`shrink-0 ${currentPath === "/projects" ? "text-[var(--accent-mint)]" : "opacity-20"}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="truncate text-[11px] font-black uppercase tracking-tight italic">Manage_Projects</p>
+                  </div>
+                </Link>
+
+                {projects.slice(0, 5).map(p => (
+                  <Link
+                    key={p.id}
+                    to={`/projects/${p.id}`}
+                    className={`group flex items-center gap-3 px-4 py-3 rounded-2xl cursor-pointer transition-all border relative overflow-hidden
+                      ${currentPath === `/projects/${p.id}`
+                        ? "bg-[var(--accent-mint)]/10 text-white border-[var(--accent-mint)]/30"
+                        : "bg-white/[0.02] text-white/40 border-transparent hover:border-white/10 hover:bg-white/[0.04] hover:text-white"
+                      }`}
+                  >
+                    <Folder size={14} className={`shrink-0 ${currentPath === `/projects/${p.id}` ? "text-[var(--accent-mint)]" : "opacity-20"}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="truncate text-[11px] font-black uppercase tracking-tight italic">{p.name}</p>
+                      <p className="text-[7px] font-diag uppercase tracking-widest mt-1 opacity-40">{p.conversationCount || 0} SECTOR_DATA</p>
+                    </div>
+                  </Link>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
 
       {/* Recent Sessions */}
       {!collapsed && (
@@ -271,19 +356,57 @@ export function Sidebar({
             {historyOpen ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
           </button>
 
-          {/* Search Bar */}
-          <div className="px-1 mb-4">
+          {/* Search Bar & Filters */}
+          <div className="px-1 mb-4 space-y-2">
             <div className="relative group">
               <Search size={14} className={`absolute left-4 top-1/2 -translate-y-1/2 transition-colors ${searchQuery ? "text-[var(--accent-mint)]" : "text-white/20"}`} />
               <input
                 type="text"
                 value={searchQuery}
-                onChange={(e) => { setSearchQuery(e.target.value); onSearch?.(e.target.value); }}
+                onChange={(e) => { 
+                  setSearchQuery(e.target.value); 
+                  const dates = getDateRange(selectedDateFilter);
+                  onSearch(e.target.value, selectedSearchProjectId || undefined, dates.after, dates.before); 
+                }}
                 placeholder="TRACE_HISTORY..."
                 className="w-full bg-white/[0.02] border border-white/5 focus:border-[var(--accent-mint)]/30 rounded-2xl py-3 pl-12 pr-10 text-[10px] text-white font-diag uppercase tracking-widest placeholder:text-white/5 focus:outline-none transition-all"
               />
               {isSearching && <Loader2 size={12} className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-[var(--accent-mint)]" />}
             </div>
+            
+            {!collapsed && (
+              <div className="flex gap-2">
+                <select 
+                  value={selectedSearchProjectId}
+                  onChange={(e) => {
+                    setSelectedSearchProjectId(e.target.value);
+                    const dates = getDateRange(selectedDateFilter);
+                    onSearch(searchQuery, e.target.value || undefined, dates.after, dates.before);
+                  }}
+                  className="flex-1 bg-white/[0.02] border border-white/5 focus:border-[var(--accent-mint)]/30 rounded-xl py-2 px-3 text-[9px] text-white/40 font-diag uppercase tracking-widest focus:outline-none transition-all appearance-none cursor-pointer hover:bg-white/[0.04]"
+                >
+                  <option value="" className="bg-black text-white italic">ALL_SECTORS</option>
+                  {projects.map(p => (
+                    <option key={p.id} value={p.id} className="bg-black text-white italic">{p.name}</option>
+                  ))}
+                </select>
+
+                <select 
+                  value={selectedDateFilter}
+                  onChange={(e) => {
+                    setSelectedDateFilter(e.target.value);
+                    const dates = getDateRange(e.target.value);
+                    onSearch(searchQuery, selectedSearchProjectId || undefined, dates.after, dates.before);
+                  }}
+                  className="flex-1 bg-white/[0.02] border border-white/5 focus:border-[var(--accent-mint)]/30 rounded-xl py-2 px-3 text-[9px] text-white/40 font-diag uppercase tracking-widest focus:outline-none transition-all appearance-none cursor-pointer hover:bg-white/[0.04]"
+                >
+                  <option value="all" className="bg-black text-white italic">ALL_TIME</option>
+                  <option value="24h" className="bg-black text-white italic">LAST_24H</option>
+                  <option value="7d" className="bg-black text-white italic">LAST_7D</option>
+                  <option value="30d" className="bg-black text-white italic">LAST_30D</option>
+                </select>
+              </div>
+            )}
           </div>
 
           <AnimatePresence>
@@ -309,7 +432,7 @@ export function Sidebar({
                         <p className="truncate text-[11px] font-black uppercase tracking-tight italic">{c.title}</p>
                         <p className="text-[8px] font-diag uppercase tracking-widest mt-1 opacity-40">{timeAgo(c.updatedAt)}</p>
                       </div>
-                      <button onClick={(e) => { e.stopPropagation(); onDelete(c.id); }} className="opacity-0 group-hover:opacity-40 hover:!opacity-100 text-red-400 p-1">
+                      <button onClick={(e) => { e.stopPropagation(); onDelete(c.id); }} aria-label="Delete conversation" className="opacity-0 group-hover:opacity-40 hover:!opacity-100 text-red-400 p-1">
                         <Trash2 size={12} />
                       </button>
                     </div>
@@ -339,8 +462,9 @@ export function Sidebar({
                 </div>
               </div>
               <ThemeToggle />
-              <button 
-                onClick={onLogout} 
+              <button
+                onClick={onLogout}
+                aria-label="Log out"
                 className="p-2 text-white/20 hover:text-red-400 hover:bg-red-400/10 rounded-xl transition-all"
               >
                 <LogOut size={16} />

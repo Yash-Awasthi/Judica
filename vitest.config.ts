@@ -4,6 +4,8 @@ import { resolve } from "path";
 export default defineConfig({
   test: {
     environment: "node",
+    include: ["tests/**/*.test.ts"],
+    exclude: ["tests/e2e/**", "**/node_modules/**"],
 
     // Ensure test fallbacks work (e.g. token similarity instead of ML worker)
     env: {
@@ -33,6 +35,12 @@ export default defineConfig({
       include: ["src/**/*.ts"],
       exclude: ["src/**/*.test.ts", "src/types/**", "src/**/index.ts", "src/db/schema/**"],
       all: true,
+      thresholds: {
+        lines: 75,
+        functions: 70,
+        branches: 65,
+        statements: 75,
+      },
     },
   },
   resolve: {

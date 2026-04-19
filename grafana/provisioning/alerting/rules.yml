@@ -1,0 +1,119 @@
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: aibyai-alerts
+    folder: AIBYAI Alerts
+    interval: 1m
+    rules:
+      # ── Error rate > 5% of all requests ──
+      - uid: alert-error-rate
+        title: High Error Rate (>5%)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: sum(rate(aibyai_http_requests_total{status_code=~"5.."}[5m]))
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: sum(rate(aibyai_http_requests_total[5m]))
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: math
+              expression: ($A / $B) * 100 > 5
+              refId: C
+        noDataState: OK
+        execErrState: Alerting
+        for: 2m
+        annotations:
+          summary: "5xx error rate exceeds 5% of all requests"
+        labels:
+          severity: critical
+
+      # ── p99 latency > 5s ──
+      - uid: alert-p99-latency
+        title: High p99 Latency (>5s)
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: histogram_quantile(0.99, sum(rate(aibyai_http_request_duration_seconds_bucket[5m])) by (le)) > 5
+              refId: A
+        noDataState: OK
+        execErrState: Alerting
+        for: 3m
+        annotations:
+          summary: "p99 request latency exceeds 5 seconds"
+        labels:
+          severity: warning
+
+      # ── Queue backlog > 100 ──
+      - uid: alert-queue-backlog
+        title: Queue Backlog (>100)
+        condition: A
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: sum(aibyai_queue_depth) > 100
+              refId: A
+        noDataState: OK
+        execErrState: Alerting
+        for: 2m
+        annotations:
+          summary: "Job queue backlog exceeds 100 items"
+        labels:
+          severity: warning
+
+      # ── Provider failure rate > 20% ──
+      - uid: alert-provider-failures
+        title: Provider Failure Rate (>20%)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: sum(rate(aibyai_provider_call_duration_seconds_count{status="error"}[5m])) by (provider)
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 300
+              to: 0
+            datasourceUid: PBFA97CFB590B2093
+            model:
+              expr: sum(rate(aibyai_provider_call_duration_seconds_count[5m])) by (provider)
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              type: math
+              expression: ($A / $B) * 100 > 20
+              refId: C
+        noDataState: OK
+        execErrState: Alerting
+        for: 3m
+        annotations:
+          summary: "AI provider failure rate exceeds 20%"
+        labels:
+          severity: critical

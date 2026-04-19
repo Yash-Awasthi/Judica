@@ -1,5 +1,8 @@
 # 1. Builder Stage
-FROM node:22-alpine AS builder
+FROM node:22-alpine@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f AS builder
+
+# Build tools needed for native modules (argon2, isolated-vm)
+RUN apk add --no-cache python3 make g++
 
 WORKDIR /app
 
@@ -20,16 +23,19 @@ COPY frontend/ ./frontend/
 # Build everything (frontend + TypeScript compile)
 RUN npm run build
 
+# Install production-only dependencies in a clean directory
+RUN mkdir /app/prod_modules && cp package*.json /app/prod_modules/ && cd /app/prod_modules && npm ci --omit=dev
+
 # 2. Production Stage
-FROM node:22-alpine AS runner
+FROM node:22-alpine@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f AS runner
 
 WORKDIR /app
 
 ENV NODE_ENV=production
 
-# Copy package files and install only production dependencies
-COPY package*.json ./
-RUN npm ci --omit=dev
+# Copy production node_modules from builder (already compiled native modules)
+COPY --from=builder /app/prod_modules/node_modules ./node_modules
+COPY --from=builder /app/package.json ./
 
 # Copy built artifacts from the builder stage
 COPY --from=builder /app/dist ./dist

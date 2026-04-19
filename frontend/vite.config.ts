@@ -80,6 +80,7 @@ export default defineConfig({
           motion: ['framer-motion'],
           icons: ['lucide-react'],
           workflow: ['@xyflow/react'],
+          echarts: ['echarts', 'echarts-for-react'],
         },
       },
     },

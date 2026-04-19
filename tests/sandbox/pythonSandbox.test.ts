@@ -139,7 +139,7 @@ describe("pythonSandbox – executePython", () => {
     // Should write the script file inside the sandbox directory
     expect(mockWriteFileSync).toHaveBeenCalledTimes(1);
     const writtenPath = mockWriteFileSync.mock.calls[0][0] as string;
-    expect(writtenPath).toMatch(/sandbox_.*\/script\.py$/);
+    expect(writtenPath).toMatch(/sandbox_.*[/\\]script\.py$/);
 
     // Should clean up with rmSync (recursive directory removal)
     expect(mockRmSync).toHaveBeenCalledTimes(1);

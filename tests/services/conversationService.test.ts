@@ -42,7 +42,7 @@ vi.mock("../../src/lib/cache.js", () => ({
 }));
 
 vi.mock("../../src/lib/logger.js", () => ({
-  default: { error: vi.fn(), warn: vi.fn(), debug: vi.fn() }
+  default: { error: vi.fn(), warn: vi.fn(), debug: vi.fn(), info: vi.fn() }
 }));
 
 describe("Conversation Service", () => {
@@ -210,18 +210,25 @@ describe("Conversation Service", () => {
     });
   });
 
-  describe("getConversationList", () => {
     it("should fetch list with pagination", async () => {
-      vi.mocked(db.select).mockReturnValue({
+      const mockResult = [{ id: "c1" }];
+      const mockCount = [{ count: 1 }];
+
+      vi.mocked(db.select).mockReturnValueOnce({
         from: vi.fn().mockReturnThis(),
         where: vi.fn().mockReturnThis(),
         orderBy: vi.fn().mockReturnThis(),
         offset: vi.fn().mockReturnThis(),
-        limit: vi.fn().mockResolvedValue([{ id: "c1" }])
+        limit: vi.fn().mockResolvedValue(mockResult)
       } as any);
 
-      const list = await getConversationList(1, 10, 0);
-      expect(list).toHaveLength(1);
+      vi.mocked(db.select).mockReturnValueOnce({
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockResolvedValue(mockCount)
+      } as any);
+
+      const result = await getConversationList(1, 10, 0);
+      expect(result.data).toHaveLength(1);
+      expect(result.total).toBe(1);
     });
-  });
 });

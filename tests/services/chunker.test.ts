@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { chunkText } from "../../src/services/chunker.service";
+import { chunkText, chunkHierarchical } from "../../src/services/chunker.service";
 
 describe("chunkText", () => {
   // --- Empty / whitespace input ---
@@ -238,5 +238,48 @@ describe("chunkText", () => {
     const result = chunkText(para, 70);
     // Sentences get grouped: s1+s2 = 64 <= 70, then s3+s4 = 64 <= 70
     expect(result.length).toBe(2);
+  });
+});
+
+describe("chunkHierarchical", () => {
+  it("returns empty array for empty string", () => {
+    expect(chunkHierarchical("")).toEqual([]);
+  });
+
+  it("returns standalone parent for short text", () => {
+    const result = chunkHierarchical("Short text.", 1536, 512, 64);
+    expect(result).toHaveLength(1);
+    expect(result[0].level).toBe("parent");
+    expect(result[0].parentContent).toBeNull();
+    expect(result[0].content).toBe("Short text.");
+  });
+
+  it("produces child chunks with parent references for long text", () => {
+    // Build text large enough to need hierarchy: parent=200, child=50
+    const text = Array.from({ length: 10 }, (_, i) => `Sentence number ${i + 1} with some extra words to add length.`).join(" ");
+    const result = chunkHierarchical(text, 200, 50, 10);
+
+    const children = result.filter((c) => c.level === "child");
+    expect(children.length).toBeGreaterThan(0);
+
+    for (const child of children) {
+      expect(child.parentContent).toBeTruthy();
+      expect(child.parentContent!.length).toBeGreaterThan(child.content.length);
+    }
+  });
+
+  it("all child chunks reference valid parent content", () => {
+    const paragraphs = Array.from({ length: 5 }, (_, i) =>
+      `Paragraph ${i + 1}. This is a longer paragraph with multiple sentences. It has enough content to be chunked. More text here for good measure.`
+    ).join("\n\n");
+
+    const result = chunkHierarchical(paragraphs, 200, 60, 10);
+    const children = result.filter((c) => c.level === "child");
+
+    for (const child of children) {
+      // Child content should be a substring of its parent
+      expect(child.parentContent).toBeTruthy();
+      expect(child.parentContent!).toContain(child.content.substring(0, 20));
+    }
   });
 });

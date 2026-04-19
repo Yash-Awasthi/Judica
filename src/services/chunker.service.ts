@@ -1,3 +1,12 @@
+export interface HierarchicalChunk {
+  content: string;
+  parentContent: string | null;
+  level: "parent" | "child";
+}
+
+/**
+ * Chunk text into flat chunks (original behavior).
+ */
 export function chunkText(text: string, chunkSize: number = 512, overlap: number = 64): string[] {
   if (!text || text.trim().length === 0) return [];
 
@@ -43,4 +52,50 @@ export function chunkText(text: string, chunkSize: number = 512, overlap: number
 
   if (buffer.trim()) chunks.push(buffer.trim());
   return chunks;
+}
+
+/**
+ * Parent-child chunking: produces large parent chunks (1536 chars) and
+ * smaller child chunks (512 chars) within each parent. When a child chunk
+ * matches a query, the parent context can be injected for better comprehension.
+ *
+ * Returns flat array of HierarchicalChunk with parent references.
+ */
+export function chunkHierarchical(
+  text: string,
+  parentSize: number = 1536,
+  childSize: number = 512,
+  childOverlap: number = 64,
+): HierarchicalChunk[] {
+  if (!text || text.trim().length === 0) return [];
+
+  // Step 1: Create parent chunks (large)
+  const parentChunks = chunkText(text, parentSize, 128);
+
+  const result: HierarchicalChunk[] = [];
+
+  for (const parentContent of parentChunks) {
+    // Step 2: Split each parent into child chunks
+    const children = chunkText(parentContent, childSize, childOverlap);
+
+    if (children.length <= 1) {
+      // Parent is small enough to be its own chunk — no hierarchy needed
+      result.push({
+        content: parentContent,
+        parentContent: null,
+        level: "parent",
+      });
+    } else {
+      // Store each child with a reference to its parent
+      for (const childContent of children) {
+        result.push({
+          content: childContent,
+          parentContent,
+          level: "child",
+        });
+      }
+    }
+  }
+
+  return result;
 }

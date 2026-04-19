@@ -32,7 +32,8 @@ const mockDb: any = {
 vi.mock("../../src/lib/drizzle.js", () => ({ db: mockDb }));
 
 vi.mock("../../src/services/conversationService.js", () => ({
-  getConversationList: vi.fn().mockResolvedValue([]),
+  getConversationList: vi.fn().mockResolvedValue({ data: [], total: 0 }),
+  searchChats: vi.fn().mockResolvedValue([]),
   deleteConversation: vi.fn().mockResolvedValue(true),
   updateConversationTitle: vi.fn().mockResolvedValue(true),
 }));
@@ -130,6 +131,7 @@ import {
   getConversationList,
   deleteConversation,
   updateConversationTitle,
+  searchChats,
 } from "../../src/services/conversationService.js";
 
 describe("History Routes", () => {
@@ -171,47 +173,34 @@ describe("History Routes", () => {
     });
 
     it("escapes LIKE wildcard characters in the search term", async () => {
-      const { ilike } = await import("drizzle-orm");
+      // In our refactored code, escaping is done in the searchChats service.
+      // The route just calls the service.
       const mockResults = [{ id: 1, conversationId: "c1", question: "100% done", verdict: "ok", createdAt: new Date() }];
-      selectQueue.push(createChain(mockResults));
+      vi.mocked(searchChats).mockResolvedValueOnce(mockResults as any);
 
       const result = await handler()(makeRequest({ query: { q: "100% _test\\" } }), makeReply());
 
       expect(result).toEqual(mockResults);
-      expect(ilike).toHaveBeenCalledWith(expect.anything(), expect.stringContaining("\\%"));
-      expect(ilike).toHaveBeenCalledWith(expect.anything(), expect.stringContaining("\\_"));
-      expect(ilike).toHaveBeenCalledWith(expect.anything(), expect.stringContaining("\\\\"));
+      expect(searchChats).toHaveBeenCalledWith(1, "100% _test\\", 10, expect.any(Object));
     });
 
     it("limits results to 50 maximum", async () => {
-      const chain = createChain([]);
-      selectQueue.push(chain);
-
       await handler()(makeRequest({ query: { q: "test", limit: "999" } }), makeReply());
-
-      expect(chain.limit).toHaveBeenCalledWith(50);
+      expect(searchChats).toHaveBeenCalledWith(1, "test", 50, expect.any(Object));
     });
 
     it("defaults limit to 10", async () => {
-      const chain = createChain([]);
-      selectQueue.push(chain);
-
       await handler()(makeRequest({ query: { q: "test" } }), makeReply());
-
-      expect(chain.limit).toHaveBeenCalledWith(10);
+      expect(searchChats).toHaveBeenCalledWith(1, "test", 10, expect.any(Object));
     });
 
     it("clamps limit minimum to 1", async () => {
-      const chain = createChain([]);
-      selectQueue.push(chain);
-
       await handler()(makeRequest({ query: { q: "test", limit: "-5" } }), makeReply());
-
-      expect(chain.limit).toHaveBeenCalledWith(1);
+      expect(searchChats).toHaveBeenCalledWith(1, "test", 1, expect.any(Object));
     });
 
     it("returns empty array on db error", async () => {
-      mockDb.select.mockImplementationOnce(() => { throw new Error("db down"); });
+      vi.mocked(searchChats).mockRejectedValueOnce(new Error("db down"));
 
       const result = await handler()(makeRequest({ query: { q: "test" } }), makeReply());
 
@@ -222,7 +211,7 @@ describe("History Routes", () => {
       const mockResults = [
         { id: 1, conversationId: "c1", question: "Hello world", verdict: "Good", createdAt: new Date() },
       ];
-      selectQueue.push(createChain(mockResults));
+      vi.mocked(searchChats).mockResolvedValueOnce(mockResults as any);
 
       const result = await handler()(makeRequest({ query: { q: "hello" } }), makeReply());
 
@@ -241,50 +230,44 @@ describe("History Routes", () => {
 
     it("returns paginated conversations with defaults (page 1, limit 20)", async () => {
       const mockList = [{ id: "c1", title: "Test" }];
-      vi.mocked(getConversationList).mockResolvedValueOnce(mockList as any);
-      // count query: db.select().from().where()
-      selectQueue.push(createChain([{ value: 1 }]));
+      vi.mocked(getConversationList).mockResolvedValueOnce({ data: mockList as any, total: 1 });
 
       const result = await handler()(makeRequest({ query: {} }), makeReply());
 
-      expect(getConversationList).toHaveBeenCalledWith(1, 20, 0);
+      expect(getConversationList).toHaveBeenCalledWith(1, 20, 0, expect.any(Object));
       expect(result.data).toEqual(mockList);
       expect(result.pagination).toEqual({ page: 1, limit: 20, total: 1, totalPages: 1 });
     });
 
     it("handles custom page and limit", async () => {
-      vi.mocked(getConversationList).mockResolvedValueOnce([] as any);
-      selectQueue.push(createChain([{ value: 50 }]));
+      vi.mocked(getConversationList).mockResolvedValueOnce({ data: [], total: 50 });
 
       const result = await handler()(makeRequest({ query: { page: "3", limit: "10" } }), makeReply());
 
-      expect(getConversationList).toHaveBeenCalledWith(1, 10, 20);
+      expect(getConversationList).toHaveBeenCalledWith(1, 10, 20, expect.any(Object));
       expect(result.pagination.page).toBe(3);
       expect(result.pagination.limit).toBe(10);
       expect(result.pagination.totalPages).toBe(5);
     });
 
     it("clamps limit to max 100", async () => {
-      vi.mocked(getConversationList).mockResolvedValueOnce([] as any);
-      selectQueue.push(createChain([{ value: 0 }]));
+      vi.mocked(getConversationList).mockResolvedValueOnce({ data: [], total: 0 });
 
       await handler()(makeRequest({ query: { limit: "500" } }), makeReply());
 
-      expect(getConversationList).toHaveBeenCalledWith(1, 100, 0);
+      expect(getConversationList).toHaveBeenCalledWith(1, 100, 0, expect.any(Object));
     });
 
     it("clamps page minimum to 1", async () => {
-      vi.mocked(getConversationList).mockResolvedValueOnce([] as any);
-      selectQueue.push(createChain([{ value: 0 }]));
+      vi.mocked(getConversationList).mockResolvedValueOnce({ data: [], total: 0 });
 
       await handler()(makeRequest({ query: { page: "-1" } }), makeReply());
 
-      expect(getConversationList).toHaveBeenCalledWith(1, 20, 0);
+      expect(getConversationList).toHaveBeenCalledWith(1, 20, 0, expect.any(Object));
     });
 
-    it("returns 0 total when count row has no value", async () => {
-      vi.mocked(getConversationList).mockResolvedValueOnce([] as any);
-      selectQueue.push(createChain([{}]));
+    it("returns 0 total when count is 0", async () => {
+      vi.mocked(getConversationList).mockResolvedValueOnce({ data: [], total: 0 });
 
       const result = await handler()(makeRequest({ query: {} }), makeReply());
 

@@ -2,7 +2,7 @@ import { useReducer, useRef, useEffect, useMemo, Dispatch, SetStateAction } from
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   Settings2, Download, FileText, FileJson, Share2, Network, 
-  ShieldCheck, Maximize2, Layers, Zap
+  ShieldCheck, Maximize2, Layers, Zap, MessageCircle
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { MessageList } from "./MessageList";
@@ -13,6 +13,7 @@ import { SkeletonLoader } from "./SkeletonLoader";
 import { SectorHUD } from "./SectorHUD";
 import { TechnicalGrid } from "./TechnicalGrid";
 import { ConsensusVisualizer } from "./ConsensusVisualizer";
+import { SummaryView } from "./SummaryView";
 import type { ChatMessage, CouncilMember, Link } from "../types";
 
 interface ChatAreaProps {
@@ -27,6 +28,9 @@ interface ChatAreaProps {
   members: CouncilMember[];
   onUpdateMembers: (members: CouncilMember[]) => void;
   isLoading?: boolean;
+  summaryData?: any;
+  onGenerateSummary?: () => void;
+  isGeneratingSummary?: boolean;
 }
 
 const MEMBER_COLORS = [
@@ -47,6 +51,7 @@ interface ChatAreaState {
   showVisualizer: boolean;
   playingAudioId: string | null;
   visibleKeyIds: Record<string, boolean>;
+  activeTab: "discussion" | "summary";
 }
 
 type ChatAreaAction =
@@ -58,7 +63,8 @@ type ChatAreaAction =
   | { type: "SET_SHOW_MEMBER_CONFIG"; payload: boolean }
   | { type: "SET_SHOW_VISUALIZER"; payload: boolean }
   | { type: "SET_PLAYING_AUDIO_ID"; payload: string | null }
-  | { type: "SET_VISIBLE_KEY_IDS"; payload: Record<string, boolean> };
+  | { type: "SET_VISIBLE_KEY_IDS"; payload: Record<string, boolean> }
+  | { type: "SET_ACTIVE_TAB"; payload: "discussion" | "summary" };
 
 function chatAreaReducer(state: ChatAreaState, action: ChatAreaAction): ChatAreaState {
   switch (action.type) {
@@ -71,6 +77,7 @@ function chatAreaReducer(state: ChatAreaState, action: ChatAreaAction): ChatArea
     case "SET_SHOW_VISUALIZER": return { ...state, showVisualizer: action.payload };
     case "SET_PLAYING_AUDIO_ID": return { ...state, playingAudioId: action.payload };
     case "SET_VISIBLE_KEY_IDS": return { ...state, visibleKeyIds: action.payload };
+    case "SET_ACTIVE_TAB": return { ...state, activeTab: action.payload };
     default: return state;
   }
 }
@@ -85,7 +92,10 @@ export function ChatArea({
   onExport,
   members,
   onUpdateMembers,
-  isLoading = false
+  isLoading = false,
+  summaryData,
+  onGenerateSummary,
+  isGeneratingSummary = false
 }: ChatAreaProps) {
   const { fetchWithAuth } = useAuth();
   const [state, dispatch] = useReducer(chatAreaReducer, {
@@ -98,6 +108,7 @@ export function ChatArea({
     showVisualizer: true, // Default to true for premium feel
     playingAudioId: null,
     visibleKeyIds: {},
+    activeTab: "discussion",
   });
 
   const { input, summon, rounds, useStream, showExport, showMemberConfig, showVisualizer, playingAudioId, visibleKeyIds } = state;
@@ -113,6 +124,7 @@ export function ChatArea({
     const value = typeof v === "function" ? v(state.visibleKeyIds) : v;
     dispatch({ type: "SET_VISIBLE_KEY_IDS", payload: value });
   };
+  const setActiveTab = (v: "discussion" | "summary") => dispatch({ type: "SET_ACTIVE_TAB", payload: v });
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -237,6 +249,31 @@ export function ChatArea({
         ]}
       />
 
+      <div className="absolute top-24 left-1/2 -translate-x-1/2 z-[45] flex bg-white/[0.03] border border-white/10 rounded-2xl p-1 backdrop-blur-3xl pointer-events-auto">
+        <button 
+          onClick={() => setActiveTab("discussion")}
+          className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-2 ${
+            state.activeTab === "discussion" 
+              ? "bg-[var(--accent-mint)] text-black shadow-[0_0_20px_rgba(110,231,183,0.3)]" 
+              : "text-white/20 hover:text-white"
+          }`}
+        >
+          <MessageCircle size={14} />
+          Discussion
+        </button>
+        <button 
+          onClick={() => setActiveTab("summary")}
+          className={`px-6 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-[0.2em] transition-all flex items-center gap-2 ${
+            state.activeTab === "summary" 
+              ? "bg-[var(--accent-blue)] text-black shadow-[0_0_20px_rgba(96,165,250,0.3)]" 
+              : "text-white/20 hover:text-white"
+          }`}
+        >
+          <FileText size={14} />
+          Summary
+        </button>
+      </div>
+
       {/* ━━━ Header Actions (Secondary) ━━━ */}
       <div className="absolute top-24 right-8 z-40 flex items-center gap-3">
           {/* Neural Map Toggle */}
@@ -265,6 +302,7 @@ export function ChatArea({
           <div className="relative pointer-events-auto">
             <button
                onClick={() => setShowExport(!showExport)}
+               aria-label="Export manifest"
                className="h-11 w-11 lg:w-32 lg:px-5 rounded-2xl bg-white/5 border border-white/10 text-[10px] font-black text-white/40 uppercase tracking-widest hover:text-white hover:border-white/30 transition-all flex items-center justify-center lg:justify-between group"
             >
               <Download size={14} />
@@ -360,6 +398,12 @@ export function ChatArea({
               <div className="grid grid-cols-2 gap-8"><SkeletonLoader variant="card" /><SkeletonLoader variant="card" /></div>
               <SkeletonLoader variant="text" count={5} />
             </div>
+          ) : state.activeTab === "summary" ? (
+             <SummaryView 
+               data={summaryData} 
+               onGenerate={onGenerateSummary || (() => {})} 
+               isGenerating={isGeneratingSummary} 
+             />
           ) : (
             <MessageList
               messages={messages}
@@ -388,7 +432,8 @@ export function ChatArea({
       </div>
 
       {/* ━━━ Command Input Hub ━━━ */}
-      <footer className="shrink-0 absolute bottom-0 left-0 w-full z-50 pointer-events-none">
+      {state.activeTab === "discussion" && (
+        <footer className="shrink-0 absolute bottom-0 left-0 w-full z-50 pointer-events-none">
         <div className="max-w-4xl mx-auto px-6 pb-10 pointer-events-auto">
            <div className="relative group">
               <div className="absolute inset-0 bg-[var(--accent-mint)]/5 blur-[40px] rounded-[3rem] opacity-0 group-focus-within:opacity-100 transition-opacity duration-1000" />
@@ -438,6 +483,7 @@ export function ChatArea({
            </div>
         </div>
       </footer>
+      )}
     </div>
   );
 }
