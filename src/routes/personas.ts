@@ -9,7 +9,7 @@ import { BUILT_IN_PERSONAS } from "../agents/personas.js";
 
 const personasPlugin: FastifyPluginAsync = async (fastify) => {
     // GET / — list built-in + user's custom personas
-  fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const custom = await db
       .select()
       .from(customPersonas)
@@ -62,7 +62,7 @@ const personasPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // PUT /:id — update custom persona
-  fastify.put("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.put("/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [existing] = await db
@@ -94,7 +94,7 @@ const personasPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // DELETE /:id — delete custom persona
-  fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [existing] = await db

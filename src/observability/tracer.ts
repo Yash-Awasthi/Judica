@@ -110,7 +110,7 @@ async function sendToLangfuse(
         totalTokens,
         totalCostUsd,
       },
-    });
+    }) as unknown as { span: (opts: Record<string, unknown>) => unknown; generation: (opts: Record<string, unknown>) => unknown };
 
     for (const step of ctx.steps) {
       if (step.type === "llm_call") {

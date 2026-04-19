@@ -9,7 +9,7 @@ vi.mock("ioredis", () => {
       callArgs.push(args);
     }
   }
-  return { default: MockIORedis };
+  return { default: MockIORedis, Redis: MockIORedis };
 });
 
 describe("queue connection", () => {

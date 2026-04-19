@@ -41,7 +41,7 @@ async function getQueueStats(queue: typeof ingestionQueue) {
 
 const queuePlugin: FastifyPluginAsync = async (fastify) => {
     // GET /stats — queue stats (admin only)
-  fastify.get("/stats", { onRequest: fastifyRequireRole("admin") }, async (request, reply) => {
+  fastify.get("/stats", { onRequest: fastifyRequireRole("admin") }, async (_request, _reply) => {
     const [ingestion, research, repo, compaction] = await Promise.all([
       getQueueStats(ingestionQueue),
       getQueueStats(researchQueue),

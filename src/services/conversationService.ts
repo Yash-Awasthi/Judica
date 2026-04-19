@@ -110,7 +110,7 @@ export async function createChat(input: CreateChatInput, generateEmbedding: bool
         RETURNING *
       `);
 
-      return (result as { rows: Chat[] }).rows[0] as Chat;
+      return (result as unknown as { rows: Chat[] }).rows[0] as Chat;
     }
 
     const [chat] = await db
@@ -297,7 +297,7 @@ export async function retrieveRelevantContext(
           LIMIT ${maxResults}
         `);
 
-        const rows = (result as { rows: Array<{ question: string; verdict: string; distance?: number }> }).rows;
+        const rows = (result as unknown as { rows: Array<{ question: string; verdict: string; distance?: number }> }).rows;
         if (rows && rows.length > 0) {
           const contexts: RelevantContext[] = rows.map((row) => ({
             question: row.question,

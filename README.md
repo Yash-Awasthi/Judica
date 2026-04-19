@@ -10,7 +10,7 @@
 [![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Redis](https://img.shields.io/badge/Redis-7-DC382D?style=for-the-badge&logo=redis&logoColor=white)](https://redis.io/)
 [![Docker](https://img.shields.io/badge/Docker-Ready-2496ED?style=for-the-badge&logo=docker&logoColor=white)](https://www.docker.com/)
-[![Tests](https://img.shields.io/badge/Tests-2700+-22C55E?style=for-the-badge)](./tests/)
+[![Tests](https://img.shields.io/badge/Tests-2950+-22C55E?style=for-the-badge)](./tests/)
 [![MCP](https://img.shields.io/badge/MCP-Compatible-8B5CF6?style=for-the-badge)](https://modelcontextprotocol.io/)
 
 
@@ -103,7 +103,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    FE["Frontend\nReact 19 · Vite · Tailwind"]
+    FE["Frontend\nReact 19 · Vite 7 · Tailwind"]
     GW["API Gateway\nFastify 5 · JWT · RBAC · Rate Limit"]
     EN["Deliberation Engine\nRouter · Agents · Conflict\nDebate · Synthesis · Validator"]
     INT["Intelligence Layer\nHyDE · Federated Search\nTopic Graph · Reranker"]
@@ -180,9 +180,9 @@ Publish and install prompts, workflows, personas, and custom tools. Star ratings
 
 | Layer | Technology |
 |---|---|
-| **Runtime** | Node.js 22, TypeScript 6.0 (strict) |
-| **API** | Fastify 5 — 35 route plugins, Swagger UI |
-| **Frontend** | React 19, Vite 6, Tailwind CSS |
+| **Runtime** | Node.js 22+, TypeScript 6.0 (strict) |
+| **API** | Fastify 5 — 36 route plugins, Swagger UI |
+| **Frontend** | React 19, Vite 7, Tailwind CSS |
 | **Database** | PostgreSQL 16 + pgvector + HNSW indexes, Drizzle ORM |
 | **Cache / Queues** | Redis 7, BullMQ with dead-letter queue |
 | **Realtime** | Native WebSocket (ws) + SSE streaming |
@@ -223,7 +223,7 @@ cd frontend && npm install && cd ..
 cp .env.example .env
 # Add DATABASE_URL, JWT_SECRET, MASTER_ENCRYPTION_KEY, and at least one AI provider key
 
-npx drizzle-kit push
+npm run db:push
 npm run dev:all
 ```
 
@@ -272,7 +272,7 @@ aibyai/
 │   ├── processors/         # File ingestion (PDF, DOCX, XLSX, CSV, images)
 │   ├── queue/              # BullMQ workers + dead-letter queue
 │   ├── router/             # Smart routing, token estimation, quota tracking
-│   ├── routes/             # 35 Fastify route plugins
+│   ├── routes/             # 36 Fastify route plugins
 │   ├── sandbox/            # V8 isolate (JS) + subprocess (Python) + seccomp-bpf
 │   ├── services/           # Council, RAG, memory, reliability, specialization,
 │   │                       # goal decomposition, tool chains, code gen, MCP, plugins,
@@ -280,15 +280,15 @@ aibyai/
 │   │                       # audio/video, tool federation, workflow nodes,
 │   │                       # annotations, voting, multi-user, live presence
 │   ├── types/              # TypeScript declarations
-│   └── workflow/           # Executor + 9 node type handlers
+│   └── workflow/           # Executor + 12 node types (9 dedicated handlers)
 ├── frontend/src/
 │   ├── components/         # React components + 12 workflow node UIs
 │   ├── context/            # Auth + Theme contexts
 │   ├── hooks/              # Council stream, deliberation, member hooks
 │   ├── layouts/            # Root layout
-│   ├── views/              # 13 views (Chat, Debate, Workflows, Marketplace, etc.)
+│   ├── views/              # 18 views (Chat, Debate, Workflows, Marketplace, etc.)
 │   └── router.tsx          # React Router 7
-├── tests/                  # 180+ test files, 2700+ tests
+├── tests/                  # 200+ test files, 2950+ tests
 ├── grafana/                # Auto-provisioned dashboards
 ├── scripts/                # Setup, load tests, provider diagnostics
 ├── .github/workflows/      # CI: lint, typecheck, test, security audit, CodeQL

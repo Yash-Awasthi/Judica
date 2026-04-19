@@ -72,15 +72,15 @@ export default defineConfig({
   build: {
     outDir: 'dist',
     sourcemap: false,
+    chunkSizeWarningLimit: 1200,
     rollupOptions: {
       output: {
-        manualChunks: {
-          vendor: ['react', 'react-dom'],
-          markdown: ['react-markdown', 'remark-gfm'],
-          motion: ['framer-motion'],
-          icons: ['lucide-react'],
-          workflow: ['@xyflow/react'],
-          echarts: ['echarts', 'echarts-for-react'],
+        manualChunks(id: string) {
+          if (id.includes('react-markdown') || id.includes('remark-gfm')) return 'markdown';
+          if (id.includes('framer-motion')) return 'motion';
+          if (id.includes('lucide-react')) return 'icons';
+          if (id.includes('@xyflow/react')) return 'workflow';
+          if (id.includes('echarts')) return 'echarts';
         },
       },
     },

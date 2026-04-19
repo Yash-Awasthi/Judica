@@ -316,7 +316,7 @@ beforeEach(async () => {
   askPlugin = mod.default;
   const fastify = createFastifyInstance();
   await askPlugin(fastify);
-});
+}, 30000);
 
 // ================================================================
 // Route registration

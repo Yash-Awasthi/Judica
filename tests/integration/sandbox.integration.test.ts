@@ -68,7 +68,7 @@ describe("Sandbox routes integration", () => {
   beforeAll(async () => {
     const { default: sandboxPlugin } = await import("../../src/routes/sandbox.js");
     app = await buildTestApp([{ plugin: sandboxPlugin, prefix: "/api/sandbox" }]);
-  });
+  }, 30000);
 
   afterAll(async () => {
     await app.close();

@@ -186,7 +186,7 @@ export async function enrichWithParentContext(chunks: MemoryChunk[]): Promise<Me
   const parentIdMap = new Map<string, string>();
   for (const row of parentInfo.rows as Array<{ [key: string]: unknown }>) {
     if (row.parentChunkId) {
-      parentIdMap.set(row.id, row.parentChunkId);
+      parentIdMap.set(row.id as string, row.parentChunkId as string);
     }
   }
 
@@ -201,7 +201,7 @@ export async function enrichWithParentContext(chunks: MemoryChunk[]): Promise<Me
 
   const parentContentMap = new Map<string, string>();
   for (const row of parents.rows as Array<{ [key: string]: unknown }>) {
-    parentContentMap.set(row.id, row.content);
+    parentContentMap.set(row.id as string, row.content as string);
   }
 
   // Enrich chunks: prepend parent context to child chunks

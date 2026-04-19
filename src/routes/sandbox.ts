@@ -31,7 +31,7 @@ function sandboxRateLimiter(request: FastifyRequest, reply: FastifyReply, done: 
 
 const sandboxPlugin: FastifyPluginAsync = async (fastify) => {
     // POST /api/sandbox/execute
-  fastify.post("/execute", { preHandler: [fastifyRequireAuth, sandboxRateLimiter] }, async (request, reply) => {
+  fastify.post("/execute", { preHandler: [fastifyRequireAuth, sandboxRateLimiter] }, async (request, _reply) => {
     const { language, code } = request.body as { language?: string; code?: string };
 
     if (!language || !code) {
@@ -68,7 +68,7 @@ const sandboxPlugin: FastifyPluginAsync = async (fastify) => {
     } catch (err: unknown) {
       if (err instanceof AppError) throw err;
       logger.error({ err }, "Sandbox execution error");
-      throw new AppError(500, `Execution failed: ${err.message}`, "SANDBOX_EXEC_FAILED");
+      throw new AppError(500, `Execution failed: ${(err as Error).message}`, "SANDBOX_EXEC_FAILED");
     }
   });
 };

@@ -99,7 +99,7 @@ class MLWorker {
         if (data.error) {
           reject(new Error(data.error));
         } else {
-          resolve(data.score);
+          resolve(data.score ?? 0);
         }
       });
 

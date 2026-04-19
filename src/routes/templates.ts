@@ -2,7 +2,7 @@ import { FastifyPluginAsync } from "fastify";
 import { TEMPLATES } from "../lib/templates.js";
 
 const templatesPlugin: FastifyPluginAsync = async (fastify) => {
-  fastify.get("/", async (request, reply) => {
+  fastify.get("/", async (_request, _reply) => {
     return TEMPLATES;
   });
 

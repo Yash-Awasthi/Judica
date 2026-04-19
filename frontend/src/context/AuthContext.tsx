@@ -167,7 +167,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const handleMessage = (event: MessageEvent) => {
         if (event.origin !== window.location.origin) return;
         
-        const { type, token: newToken, username: newUsername, role: newRole, error } = event.data;
+        const { type, token: newToken, username: newUsername, role: _newRole, error } = event.data;
         
         if (type === "AUTH_SUCCESS") {
           tokenRef.current = newToken;

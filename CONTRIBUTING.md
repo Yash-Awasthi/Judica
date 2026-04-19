@@ -19,7 +19,7 @@ Thanks for your interest in contributing! AIBYAI is a multi-agent deliberative i
 
 ### Prerequisites
 
-- **Node.js** 20+
+- **Node.js** 22+
 - **Docker & Docker Compose** (for Postgres + Redis)
 - At least one AI provider API key (OpenAI, Anthropic, or Google)
 
@@ -88,7 +88,7 @@ aibyai/
 │   ├── views/                  # Page-level views
 │   └── router.tsx              # React Router config
 │
-├── tests/                      # Vitest tests (2700+ test cases)
+├── tests/                      # Vitest tests (2950+ test cases)
 │   ├── config/                 # Archetype + config tests
 │   ├── routes/                 # Route handler unit tests
 │   ├── services/               # Service-layer unit tests

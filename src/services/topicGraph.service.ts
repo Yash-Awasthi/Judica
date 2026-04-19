@@ -90,9 +90,9 @@ export async function linkConversationTopics(
 
     const topRow = (existing.rows as Array<{ [key: string]: unknown }>)[0];
 
-    if (topRow && topRow.similarity > 0.88) {
+    if (topRow && (topRow.similarity as number) > 0.88) {
       // Merge with existing topic
-      const existingIds: string[] = topRow.conversationIds || [];
+      const existingIds: string[] = (topRow.conversationIds as string[]) || [];
       if (!existingIds.includes(conversationId)) {
         existingIds.push(conversationId);
         await db.execute(sql`
@@ -105,11 +105,11 @@ export async function linkConversationTopics(
       }
 
       linkedNodes.push({
-        id: topRow.id,
-        label: topRow.label,
-        summary: topRow.summary,
+        id: topRow.id as string,
+        label: topRow.label as string,
+        summary: topRow.summary as string | null,
         conversationIds: existingIds,
-        strength: topRow.strength + 1,
+        strength: (topRow.strength as number) + 1,
       });
     } else {
       // Create new topic node
@@ -183,15 +183,15 @@ export async function findRelatedConversations(
   const convMap = new Map<string, { topics: string[]; score: number }>();
 
   for (const row of result.rows as Array<{ [key: string]: unknown }>) {
-    if (row.score < 0.5) continue;
-    const convIds: string[] = row.conversationIds || [];
+    if ((row.score as number) < 0.5) continue;
+    const convIds: string[] = (row.conversationIds as string[]) || [];
     for (const convId of convIds) {
       const existing = convMap.get(convId);
       if (existing) {
-        existing.topics.push(row.label);
-        existing.score = Math.max(existing.score, row.score);
+        existing.topics.push(row.label as string);
+        existing.score = Math.max(existing.score, row.score as number);
       } else {
-        convMap.set(convId, { topics: [row.label], score: row.score });
+        convMap.set(convId, { topics: [row.label as string], score: row.score as number });
       }
     }
   }
@@ -230,9 +230,9 @@ export async function getTopicGraph(userId: number): Promise<TopicGraph> {
   return {
     nodes: nodes as TopicNode[],
     edges: (edges.rows as Array<{ [key: string]: unknown }>).map((e) => ({
-      sourceTopicId: e.sourceTopicId,
-      targetTopicId: e.targetTopicId,
-      weight: e.weight,
+      sourceTopicId: e.sourceTopicId as string,
+      targetTopicId: e.targetTopicId as string,
+      weight: e.weight as number,
     })),
   };
 }

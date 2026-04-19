@@ -8,7 +8,8 @@ import {
   cloneDefaultArchetype,
   exportUserArchetypes,
   importArchetypes,
-  getArchetypeUsage
+  getArchetypeUsage,
+  type UserArchetypeInput
 } from "../lib/archetypes.js";
 import { fastifyOptionalAuth } from "../middleware/fastifyAuth.js";
 import { AppError } from "../middleware/errorHandler.js";
@@ -40,12 +41,12 @@ const archetypesPlugin: FastifyPluginAsync = async (fastify) => {
 
     const { archetypeId, ...archetypeData } = request.body as Record<string, unknown>;
 
-    const validation = validateArchetype(archetypeData);
+    const validation = validateArchetype(archetypeData as unknown as UserArchetypeInput);
     if (!validation.valid) {
       throw new AppError(400, `Validation failed: ${validation.errors.join(", ")}`);
     }
 
-    const archetype = await upsertUserArchetype(userId, archetypeData, archetypeId);
+    const archetype = await upsertUserArchetype(userId, archetypeData as unknown as UserArchetypeInput, archetypeId as string | undefined);
 
     return {
       message: archetypeId ? "Archetype updated successfully" : "Archetype created successfully",

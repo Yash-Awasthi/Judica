@@ -79,7 +79,7 @@ export class AdminService {
   static async getConfig() {
     const configs = await db.select().from(systemConfigs);
     return configs.reduce((acc, curr) => {
-      acc[curr.key] = curr.value;
+      acc[curr.key] = curr.value as string;
       return acc;
     }, {} as Record<string, string>);
   }

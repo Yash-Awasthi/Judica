@@ -39,11 +39,11 @@ async function searchConversations(
     `);
 
     return (result.rows as Array<{ [key: string]: unknown }>).map((row) => ({
-      id: row.id,
+      id: row.id as string,
       content: `Q: ${row.question}\nA: ${row.verdict}`,
       source: "conversation" as const,
       sourceName: "conversation history",
-      score: row.score,
+      score: row.score as number,
     }));
   } catch (err) {
     logger.warn({ err }, "Federated search: conversation search failed");
@@ -115,11 +115,11 @@ async function searchFacts(
     `);
 
     return (result.rows as Array<{ [key: string]: unknown }>).map((row) => ({
-      id: row.id,
+      id: row.id as string,
       content: `[${row.type}] ${row.content} (confidence: ${row.confidence}, source: ${row.sourceAgent})`,
       source: "fact" as const,
-      sourceName: row.sourceAgent,
-      score: row.confidence || 0.5,
+      sourceName: row.sourceAgent as string | null,
+      score: (row.confidence as number) || 0.5,
     }));
   } catch (err) {
     logger.warn({ err }, "Federated search: fact search failed");

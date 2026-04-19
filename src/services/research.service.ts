@@ -212,6 +212,6 @@ Format with proper Markdown: headers, bullet points, bold for emphasis.`,
   } catch (err: unknown) {
     logger.error({ err, jobId }, "Research job failed");
     await db.update(researchJobs).set({ status: "failed" }).where(eq(researchJobs.id, jobId));
-    emit?.("error", { message: err.message });
+    emit?.("error", { message: err instanceof Error ? err.message : String(err) });
   }
 }

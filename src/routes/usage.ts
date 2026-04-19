@@ -8,7 +8,7 @@ const usagePlugin: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     "/",
     { preHandler: fastifyRequireAuth },
-    async (request, reply) => {
+    async (request, _reply) => {
       const userId = request.userId!;
       const { start_date, end_date } = request.query as {
         start_date?: string;

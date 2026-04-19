@@ -126,12 +126,12 @@ function validateAskBody(request: FastifyRequest, reply: FastifyReply) {
 const askPlugin: FastifyPluginAsync = async (fastify) => {
 
   // GET / - Health check
-  fastify.get("/", async (request, reply) => {
+  fastify.get("/", async (_request, _reply) => {
     return { message: "Council is listening. Use POST to ask." };
   });
 
   // POST / - Ask the council (non-streaming)
-  fastify.post("/", { preHandler: [fastifyOptionalAuth, fastifyCheckQuota, validateAskBody] }, async (request, reply) => {
+  fastify.post("/", { preHandler: [fastifyOptionalAuth, fastifyCheckQuota, validateAskBody] }, async (request, _reply) => {
     const startTime = Date.now();
 
     const { question, conversationId, summon, maxTokens, rounds = 1, context, mode, userConfig } = request.body as AskBody;
@@ -247,7 +247,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     const enrichedQuestion = codeContext
       ? `${codeContext}\n\n${questionWithContext}`
       : questionWithContext;
-    const currentMessages = [...messages, { role: "user" as const, content: enrichedQuestion }];
+    const currentMessages = [...messages, { role: "user" as const, content: enrichedQuestion }] as Message[];
 
     // Start trace for observability
     const traceCtx = userId
@@ -256,8 +256,8 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
 
     const cached = await getCachedResponse(question, councilMembers, master, messages);
 
-    let verdict = "";
-    let finalOpinions: { name: string; opinion: string; [key: string]: unknown }[] = [];
+    let verdict;
+    let finalOpinions: { name: string; opinion: string; [key: string]: unknown }[];
     let tokensUsed = 0;
     let isCacheHit = false;
 
@@ -342,7 +342,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         conversationId: effectiveConversationId,
         question,
         verdict,
-        opinions: finalOpinions,
+        opinions: finalOpinions as unknown as Record<string, unknown>,
         durationMs: Date.now() - startTime,
         tokensUsed,
         cacheHit: isCacheHit,
@@ -463,7 +463,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       }
 
       const questionWithContext = buildEnrichedQuestion(question, fileContext, ragContext, memoryContext, context);
-      const currentMessages = [...messages, { role: "user" as const, content: questionWithContext }];
+      const currentMessages = [...messages, { role: "user" as const, content: questionWithContext }] as Message[];
 
       const controller = new AbortController();
       request.raw.on("close", () => {
@@ -586,7 +586,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
             conversationId: effectiveConversationId,
             question,
             verdict: finalVerdict,
-            opinions: finalOpinions,
+            opinions: finalOpinions as unknown as Record<string, unknown>,
             durationMs: Date.now() - startTime,
             tokensUsed,
             cacheHit: isCacheHit

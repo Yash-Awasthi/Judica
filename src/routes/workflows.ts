@@ -6,7 +6,7 @@ import { eq, and, desc, count } from "drizzle-orm";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { AppError } from "../middleware/errorHandler.js";
 import logger from "../lib/logger.js";
-import type { ExecutionEvent } from "../workflow/types.js";
+import type { ExecutionEvent, WorkflowDefinition } from "../workflow/types.js";
 import type { WorkflowExecutor } from "../workflow/executor.js";
 
 /**
@@ -276,7 +276,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
 
     // Import executor dynamically and start execution in background
     const { WorkflowExecutor: ExecutorClass } = await import("../workflow/executor.js");
-    const executor = new ExecutorClass(workflow.definition as Record<string, unknown>, run.id, request.userId!);
+    const executor = new ExecutorClass(workflow.definition as WorkflowDefinition, run.id, request.userId!);
 
     // Enforce bounded map size — evict oldest entry if at capacity
     if (activeRuns.size >= MAX_ACTIVE_RUNS) {
@@ -447,7 +447,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(400, "No active executor for this run", "GATE_NO_ACTIVE_RUN");
     }
 
-    active.executor.resumeGate(nodeId, choice);
+    active.executor.resumeGate(nodeId!, choice);
     return { success: true };
   });
 };

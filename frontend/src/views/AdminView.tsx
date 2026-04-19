@@ -265,7 +265,7 @@ export function AdminView() {
   const [usageData, setUsageData] = useState<UsagePoint[]>([]);
   const [providerBreakdown, setProviderBreakdown] = useState<ProviderBreakdownEntry[]>([]);
   
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sortBy, setSortBy] = useState<"email" | "username" | "createdAt">("createdAt");
@@ -342,9 +342,9 @@ export function AdminView() {
     } finally {
       setLoading(false);
     }
-  }, [fetchWithAuth, userPage, auditPage]);
+  }, [fetchWithAuth, userPage, auditPage, debouncedSearch, sortBy, sortOrder, auditActionFilter, auditDateStart, auditDateEnd]);
 
-  useEffect(() => { loadAllData(); }, [loadAllData, userPage, auditPage, debouncedSearch, sortBy, sortOrder, auditActionFilter, auditDateStart, auditDateEnd]);
+  useEffect(() => { loadAllData(); }, [loadAllData]);
 
   // Actions
   const toggleUserStatus = async (user: UserRow) => {
@@ -456,7 +456,7 @@ export function AdminView() {
           itemStyle: { color: "rgba(16, 185, 129, 0.6)" }
         }
       ]
-    }), [usageData]);
+    }), []);
 
     return (
       <motion.div variants={stagger.container} initial="initial" animate="animate" className="space-y-8">

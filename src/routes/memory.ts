@@ -10,13 +10,13 @@ import { summarizeSession } from "../services/sessionSummary.service.js";
 
 const memoryPlugin: FastifyPluginAsync = async (fastify) => {
     // POST /compact — manual memory compaction
-  fastify.post("/compact", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.post("/compact", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const result = await compact(request.userId!);
     return result;
   });
 
     // GET /stats — memory statistics
-  fastify.get("/stats", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/stats", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const [{ value: chunkCount }] = await db
       .select({ value: count() })
       .from(memories)
@@ -32,7 +32,7 @@ const memoryPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // DELETE /all — clear all memory (with confirmation)
-  fastify.delete("/all", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.delete("/all", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { confirm } = request.body as { confirm?: string };
     if (confirm !== "DELETE_ALL_MEMORY") {
       throw new AppError(400, "Must confirm with DELETE_ALL_MEMORY", "CONFIRM_REQUIRED");
@@ -47,7 +47,7 @@ const memoryPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // GET /backend — get user's memory backend config
-  fastify.get("/backend", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/backend", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const backend = await getBackend(request.userId!);
 
     if (!backend) {
@@ -67,7 +67,7 @@ const memoryPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // POST /backend — set memory backend
-  fastify.post("/backend", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.post("/backend", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { type, config } = request.body as { type: string; config?: Record<string, unknown> };
 
     const validTypes = ["local", "qdrant", "getzep", "google_drive"];
@@ -85,13 +85,13 @@ const memoryPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // DELETE /backend — reset to local
-  fastify.delete("/backend", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.delete("/backend", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     await removeBackend(request.userId!);
     return { type: "local", active: true };
   });
 
     // POST /summarize/:conversationId — manually trigger session summary
-  fastify.post("/summarize/:conversationId", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.post("/summarize/:conversationId", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { conversationId } = request.params as { conversationId: string };
     const summary = await summarizeSession(String(conversationId), request.userId!);
     return { summary };

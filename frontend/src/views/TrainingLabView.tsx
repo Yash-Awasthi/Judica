@@ -74,7 +74,7 @@ export function TrainingLabView() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       if (dna) setDnaDraft({ ...dna });
     } else {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setDnaDraft({});
     }
   }, [selectedDna, dnas]);

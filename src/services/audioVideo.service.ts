@@ -130,9 +130,9 @@ async function transcribeWithWhisper(
     throw new Error(`Whisper API error: ${response.status} ${response.statusText}`);
   }
 
-  const data = await response.json() as { results: Array<{ text: string }>; text?: string };
+  const data = await response.json() as { results: Array<{ text: string }>; text?: string; segments?: Array<{ text: string; start: number; end: number; avg_logprob?: number }> };
 
-  const segments: TranscriptionSegment[] = (data.segments || []).map((s: { text: string; start: number; end: number }) => ({
+  const segments: TranscriptionSegment[] = (data.segments || []).map((s) => ({
     start: s.start,
     end: s.end,
     text: s.text.trim(),
@@ -140,7 +140,7 @@ async function transcribeWithWhisper(
   }));
 
   return {
-    transcript: data.text,
+    transcript: data.text || "",
     segments,
   };
 }
@@ -180,11 +180,11 @@ async function transcribeWithGoogleSTT(
   const data = await response.json() as { results?: Array<{ text?: string; alternatives?: Array<{ transcript?: string }> }>; text?: string };
   const results = data.results || [];
 
-  const segments: TranscriptionSegment[] = results.map((r: { text: string }, i: number) => ({
+  const segments: TranscriptionSegment[] = results.map((r, i: number) => ({
     start: i * 30,
     end: (i + 1) * 30,
-    text: r.alternatives?.[0]?.transcript || "",
-    confidence: r.alternatives?.[0]?.confidence || 0,
+    text: r.alternatives?.[0]?.transcript || r.text || "",
+    confidence: 0,
   }));
 
   const transcript = segments.map((s) => s.text).join(" ");
@@ -321,10 +321,10 @@ export async function processMedia(
 
   } catch (err: unknown) {
     result.status = "failed";
-    result.error = err.message;
+    result.error = err instanceof Error ? err.message : String(err);
     result.processingMs = Date.now() - start;
 
-    logger.error({ mediaId: id, err: err.message }, "Media processing failed");
+    logger.error({ mediaId: id, err: err instanceof Error ? err.message : String(err) }, "Media processing failed");
   }
 
   return result;

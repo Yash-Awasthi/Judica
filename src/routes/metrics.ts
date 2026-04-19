@@ -31,7 +31,7 @@ async function fastifyRequireAdmin(request: FastifyRequest, reply: FastifyReply)
 // ─── Plugin ─────────────────────────────────────────────────────────────────
 
 const metricsPlugin: FastifyPluginAsync = async (fastify) => {
-    fastify.get("/usage", { preHandler: fastifyRequireAuth }, async (request: FastifyRequest, reply) => {
+    fastify.get("/usage", { preHandler: fastifyRequireAuth }, async (request: FastifyRequest, _reply) => {
     try {
       const userId = request.userId!;
       const { days = "30" } = request.query as { days?: string };
@@ -90,7 +90,7 @@ const metricsPlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-    fastify.get("/system", { preHandler: fastifyRequireAdmin }, async (request: FastifyRequest, reply) => {
+    fastify.get("/system", { preHandler: fastifyRequireAdmin }, async (_request: FastifyRequest, _reply) => {
     try {
       const [totalUsersRow] = await db.select({ value: count() }).from(users);
 

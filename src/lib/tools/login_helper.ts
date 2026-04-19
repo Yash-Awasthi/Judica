@@ -36,13 +36,8 @@ export async function runLoginHelper(targetName: "chatgpt" | "claude" | "deepsee
   const page = await context.newPage();
   await page.goto(url);
 
-  console.log("\n---------------------------------------------------------");
-  console.log(`PLEASE LOG IN MANUALLY TO ${targetName.toUpperCase()}`);
-  console.log("---------------------------------------------------------");
-  console.log("1. Perform the sign-in / verification process in the browser window.");
-  console.log("2. Once you are fully logged in and see the chat interface,");
-  console.log("3. Return to this terminal and press ENTER to save the session.");
-  console.log("---------------------------------------------------------\n");
+  // eslint-disable-next-line no-console
+  console.log(`\n---------------------------------------------------------\nPLEASE LOG IN MANUALLY TO ${targetName.toUpperCase()}\n---------------------------------------------------------\n1. Perform the sign-in / verification process in the browser window.\n2. Once you are fully logged in and see the chat interface,\n3. Return to this terminal and press ENTER to save the session.\n---------------------------------------------------------\n`);
 
   await new Promise((resolve) => process.stdin.once("data", resolve));
 
@@ -62,6 +57,7 @@ if (process.argv[1]?.includes("login_helper.ts")) {
       process.exit(1);
     });
   } else {
+    // eslint-disable-next-line no-console
     console.log("Usage: tsx src/lib/tools/login_helper.ts <chatgpt|claude|deepseek|gemini>");
     process.exit(1);
   }

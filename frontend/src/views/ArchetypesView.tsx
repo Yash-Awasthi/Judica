@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Pencil, Trash2, Download, Upload, Star, Copy,
-  ChevronDown, ChevronUp, Save, X
+  ChevronDown, ChevronUp, Save
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 

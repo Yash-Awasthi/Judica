@@ -9,7 +9,7 @@ import { routeAndCollect } from "../router/index.js";
 
 const promptsPlugin: FastifyPluginAsync = async (fastify) => {
     // GET / — list user's prompts
-  fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const userPrompts = await db
       .select()
       .from(prompts)
@@ -39,7 +39,7 @@ const promptsPlugin: FastifyPluginAsync = async (fastify) => {
 
     // POST / — create prompt + first version
   fastify.post("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
-    const { name, description, content, model, temperature } = request.body as { name?: string; content?: string; description?: string; tags?: string[]; category?: string; isPublic?: boolean; model?: string; [key: string]: unknown };
+    const { name, description, content, model, temperature } = request.body as { name?: string; content?: string; description?: string; tags?: string[]; category?: string; isPublic?: boolean; model?: string; temperature?: number };
 
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       throw new AppError(400, "Name is required", "PROMPT_NAME_REQUIRED");
@@ -78,7 +78,7 @@ const promptsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // GET /:id — get prompt detail with latest version
-  fastify.get("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [prompt] = await db
@@ -99,7 +99,7 @@ const promptsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // DELETE /:id — delete prompt (cascades versions)
-  fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [prompt] = await db
@@ -114,7 +114,7 @@ const promptsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // GET /:id/versions — list all versions for prompt
-  fastify.get("/:id/versions", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/:id/versions", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [prompt] = await db
@@ -144,7 +144,7 @@ const promptsPlugin: FastifyPluginAsync = async (fastify) => {
 
     if (!prompt) throw new AppError(404, "Prompt not found", "PROMPT_NOT_FOUND");
 
-    const { content, model, temperature, notes } = request.body as { name?: string; content?: string; description?: string; tags?: string[]; category?: string; isPublic?: boolean; model?: string; [key: string]: unknown };
+    const { content, model, temperature, notes } = request.body as { name?: string; content?: string; description?: string; tags?: string[]; category?: string; isPublic?: boolean; model?: string; temperature?: number; notes?: string };
     if (!content || typeof content !== "string" || content.trim().length === 0) {
       throw new AppError(400, "Content is required", "VERSION_CONTENT_REQUIRED");
     }
@@ -177,7 +177,7 @@ const promptsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // GET /:id/versions/:versionNum — get specific version
-  fastify.get("/:id/versions/:versionNum", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/:id/versions/:versionNum", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id, versionNum: versionNumParam } = request.params as { id: string; versionNum: string };
 
     const [prompt] = await db
@@ -208,8 +208,8 @@ const promptsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // POST /test — test a prompt against LLM
-  fastify.post("/test", { preHandler: fastifyRequireAuth }, async (request, reply) => {
-    const { content, model, temperature, test_input } = request.body as { name?: string; content?: string; description?: string; tags?: string[]; category?: string; isPublic?: boolean; model?: string; [key: string]: unknown };
+  fastify.post("/test", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
+    const { content, model, temperature, test_input } = request.body as { name?: string; content?: string; description?: string; tags?: string[]; category?: string; isPublic?: boolean; model?: string; temperature?: number; test_input?: string };
 
     if (!content || typeof content !== "string" || content.trim().length === 0) {
       throw new AppError(400, "Content is required", "TEST_CONTENT_REQUIRED");

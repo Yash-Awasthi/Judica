@@ -4,10 +4,9 @@
 
 **Multi-Agent Deliberative Intelligence Platform**
 
-[![Phase 10](https://img.shields.io/badge/Phase_10-Complete-22C55E?style=flat-square)](#phase-10-multi-modal-input)
-[![Phase 11](https://img.shields.io/badge/Phase_11-Complete-22C55E?style=flat-square)](#phase-11-agent-marketplace--sharing)
-[![Phase 12](https://img.shields.io/badge/Phase_12-Complete-22C55E?style=flat-square)](#phase-12-workspace-roles--audit-logs)
-[![Phase 13](https://img.shields.io/badge/Phase_13-Complete-22C55E?style=flat-square)](#phase-13-advanced-reasoning-modes)
+[![Phase 14](https://img.shields.io/badge/Phase_14-Planned-3B82F6?style=flat-square)](#phase-14-enterprise-deployment--sso)
+[![Phase 15](https://img.shields.io/badge/Phase_15-Planned-3B82F6?style=flat-square)](#phase-15-agent-observability--evaluation)
+[![Phase 16](https://img.shields.io/badge/Phase_16-Planned-3B82F6?style=flat-square)](#phase-16-multi-tenant-saas)
 
 </div>
 
@@ -23,55 +22,53 @@
 
 ---
 
-## Phase 10: Multi-Modal Input ✅
+## Completed Phases
 
-> Extend the deliberation council to reason over images, audio, and documents — not just text.
+Phases 1–13 are complete and shipped. Highlights from the most recent phases:
 
-| Feature | Status |
-|---------|--------|
-| **File Attachment UI** — paperclip button in InputArea; preview chips with remove; drag-and-drop | ✅ |
-| **Inline Image Rendering** — user messages display image thumbnails; council receives base64 vision blocks | ✅ |
-| **Audio Transcription** — upload audio file → Whisper transcription → injected as text context | ✅ |
-| **Multi-modal Conflict Detection** — vision model extracts claims from images; conflict detector runs on mixed content | ✅ |
+- **Phase 10 — Multi-Modal Input** ✅: File attachments, inline image rendering, audio transcription (Whisper), multi-modal conflict detection.
+- **Phase 11 — Agent Marketplace & Sharing** ✅: Archetype builder UI, one-click publish, council template export/import, ratings and usage stats.
+- **Phase 12 — Workspace Roles & Audit Logs** ✅: Owner/Admin/Member/Viewer roles, role-based route guards, JSONL audit export, role management UI.
+- **Phase 13 — Advanced Reasoning Modes** ✅: Socratic dialogue, Red Team / Blue Team, iterative hypothesis refinement, confidence calibration.
 
 ---
 
-## Phase 11: Agent Marketplace & Sharing ✅
+## Phase 14: Enterprise Deployment & SSO 🔵
 
-> Let users publish custom archetypes and council templates, and discover ones built by the community.
+> Production-ready features for team and enterprise adoption.
 
 | Feature | Status |
 |---------|--------|
-| **Archetype Builder UI** — no-code form: system prompt, tools, icon, color, blind spot | ✅ |
-| **Publish to Marketplace** — one-click publish with version + changelog per archetype | ✅ |
-| **Council Template Export / Import** — share SUMMONS configs as portable JSON | ✅ |
-| **Ratings & Usage Stats** — star rating, fork count, weekly usage per published archetype | ✅ |
+| **SAML / OIDC SSO** — federated login for enterprise identity providers (Okta, Azure AD, Auth0) | 🔵 |
+| **Org-level API Keys** — scoped API keys with per-key rate limits and audit trails | 🔵 |
+| **Self-hosted Helm Chart** — Kubernetes deployment with horizontal scaling and health probes | 🔵 |
+| **Data Residency Controls** — configurable regions for vector storage and conversation data | 🔵 |
 
 ---
 
-## Phase 12: Workspace Roles & Audit Logs ✅
+## Phase 15: Agent Observability & Evaluation 🔵
 
-> Structured access control and immutable audit trails for team deployments.
+> Measure, compare, and improve deliberation quality over time.
 
 | Feature | Status |
 |---------|--------|
-| **Workspace Roles** — Owner / Admin / Member / Viewer with per-resource permission matrix | ✅ |
-| **Role-Based Route Guards** — middleware enforces minimum role per API endpoint | ✅ |
-| **Audit Log JSONL Export** — immutable export of every deliberation, approval, and config change event | ✅ |
-| **Role Management UI** — admin panel to invite, promote, and remove workspace members | ✅ |
+| **Evaluation Harness** — automated benchmarking of council accuracy against labeled datasets | 🔵 |
+| **Deliberation Replay** — step-through replay of past councils with claim-level diff view | 🔵 |
+| **Provider Cost Dashboard** — per-provider, per-model cost breakdown with budget alerts | 🔵 |
+| **A/B Council Configs** — run two SUMMONS configs side-by-side and compare consensus quality | 🔵 |
 
 ---
 
-## Phase 13: Advanced Reasoning Modes ✅
+## Phase 16: Multi-Tenant SaaS 🔵
 
-> New deliberation strategies beyond the round-robin debate loop.
+> Hosted offering with billing, onboarding, and tenant isolation.
 
 | Feature | Status |
 |---------|--------|
-| **Socratic Dialogue Mode** — agents ask clarifying questions before forming opinions; second pass uses answers | ✅ |
-| **Red Team / Blue Team** — fixed two-faction structure with a neutral judge archetype | ✅ |
-| **Iterative Hypothesis Refinement** — agents propose, falsify, and revise hypotheses across rounds | ✅ |
-| **Confidence Calibration** — agents declare uncertainty levels; synthesis weights by calibrated confidence | ✅ |
+| **Tenant Isolation** — per-tenant database schemas, encryption keys, and vector namespaces | 🔵 |
+| **Usage-Based Billing** — Stripe integration with metered billing per deliberation and per token | 🔵 |
+| **Onboarding Wizard** — guided setup flow: provider keys, first council, sample deliberation | 🔵 |
+| **Admin Super-Dashboard** — cross-tenant usage metrics, health checks, and feature flags | 🔵 |
 
 ---
 

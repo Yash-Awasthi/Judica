@@ -130,7 +130,7 @@ export function HeroScene({ className = "" }: { className?: string }) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       if (!gl) setWebGLAvailable(false);
     } catch {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setWebGLAvailable(false);
     }
   }, []);

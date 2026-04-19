@@ -43,7 +43,7 @@ function fastifyValidate(schema: z.ZodSchema) {
 
 const councilPlugin: FastifyPluginAsync = async (fastify) => {
     fastify.get("/archetypes", async (_request, _reply) => {
-    const archetypes = Object.values(ARCHETYPES).map((a: { name: string; role: string; description: string }) => ({
+    const archetypes = Object.values(ARCHETYPES).map((a) => ({
       id: a.id,
       name: a.name,
       thinkingStyle: a.thinkingStyle,
@@ -100,7 +100,7 @@ const councilPlugin: FastifyPluginAsync = async (fastify) => {
       } else {
         [updated] = await db
           .insert(councilConfigs)
-          .values({ userId, config, updatedAt: new Date() } as typeof import('../db/schema/council.js').councilConfig.$inferInsert)
+          .values({ userId, config, updatedAt: new Date() } as typeof councilConfigs.$inferInsert)
           .returning();
       }
 

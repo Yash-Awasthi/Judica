@@ -1,6 +1,6 @@
 import { Message, Provider, askProvider, askProviderStream } from "./providers.js";
 import logger from "./logger.js";
-import { parseAgentOutput, AgentOutput, PeerReview, PeerReviewFlaw, ValidatorResult, ScoredOpinion } from "./schemas.js";
+import { parseAgentOutput, AgentOutput, PeerReview, PeerReviewFlaw, ValidatorResult, ScoredOpinion, AdversarialResult, GroundingResult } from "./schemas.js";
 import { adversarialModule } from "./adversarial.js";
 import { groundingModule } from "./grounding.js";
 import { computeConsensus } from "./metrics.js";
@@ -270,8 +270,8 @@ Do not include any text outside the JSON object.`;
       opinion: o.opinion, 
       structured: o.structured!,
       isFallback: o.isFallback,
-      adversarial: (o as unknown as { adversarial?: unknown }).adversarial,
-      grounding: (o as unknown as { grounding?: unknown }).grounding
+      adversarial: (o as unknown as { adversarial?: AdversarialResult }).adversarial,
+      grounding: (o as unknown as { grounding?: GroundingResult }).grounding
     })),
     reviews,
     anonymizedLabels

@@ -53,7 +53,7 @@ export function AnimatedCounter({
       const eased = easeOutCubic(progress);
       const current = startValueRef.current + (value - startValueRef.current) * eased;
 
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setDisplayValue(current);
       displayValueRef.current = current;
 

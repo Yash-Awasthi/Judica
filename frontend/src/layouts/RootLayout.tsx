@@ -83,7 +83,7 @@ export function RootLayout() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadConversations();
-    // eslint-disable-next-line react-hooks/set-state-in-effect
+     
     loadProjects();
   }, [loadConversations, loadProjects]);
 
@@ -153,7 +153,7 @@ export function RootLayout() {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveConvId(match[1]);
     } else if (location.pathname === "/" || location.pathname === "/chat") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
+       
       setActiveConvId(null);
     }
   }, [location.pathname]);

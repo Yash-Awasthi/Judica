@@ -123,7 +123,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
       reply.code(201);
       return issueTokenPair(user.id, username, user.role, reply);
     } catch (e: unknown) {
-      if (e.code === "23505") {
+      if ((e as Record<string, unknown>).code === "23505") {
         throw new AppError(409, "Username already taken");
       }
       throw e;

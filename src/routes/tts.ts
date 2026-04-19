@@ -10,7 +10,7 @@ const ttsSchema = z.object({
 
 const ttsPlugin: FastifyPluginAsync = async (fastify) => {
     fastify.post("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
-    const body = request.body as { text?: string; voice?: string; speed?: number };
+    const body = request.body as { text?: string; input?: string; voice?: string; speed?: number };
     const rawInput = body.text || body.input;
     if (!rawInput) {
       reply.code(400);
@@ -49,7 +49,7 @@ const ttsPlugin: FastifyPluginAsync = async (fastify) => {
         voice: "random"
       });
     } catch (e1: unknown) {
-      logger.warn({ err: e1.message }, "TTS Attempt 1 (xiaomi/MiMo-TTS-v2) failed");
+      logger.warn({ err: (e1 as Error).message }, "TTS Attempt 1 (xiaomi/MiMo-TTS-v2) failed");
       try {
         audioBuffer = await attemptTTS("https://api.siliconflow.cn/v1/audio/speech", {
           model: "FunAudioLLM/CosyVoice2-0.5B",
@@ -57,7 +57,7 @@ const ttsPlugin: FastifyPluginAsync = async (fastify) => {
           voice: "alex"
         });
       } catch (e2: unknown) {
-        logger.warn({ err: e2.message }, "TTS Attempt 2 (CosyVoice) failed");
+        logger.warn({ err: (e2 as Error).message }, "TTS Attempt 2 (CosyVoice) failed");
         audioBuffer = await attemptTTS("https://api.chatanywhere.tech/v1/audio/speech", {
           model: "tts-1",
           input: parsed.data.input,

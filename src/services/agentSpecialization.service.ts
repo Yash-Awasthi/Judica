@@ -1,6 +1,6 @@
 import { db } from "../lib/drizzle.js";
 import { modelReliability } from "../db/schema/traces.js";
-import { eq, sql } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { ARCHETYPES } from "../config/archetypes.js";
 import logger from "../lib/logger.js";
 
