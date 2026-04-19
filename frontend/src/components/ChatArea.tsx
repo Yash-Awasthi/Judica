@@ -20,7 +20,7 @@ import type { ChatMessage, CouncilMember, Link } from "../types";
 interface ChatAreaProps {
   messages: ChatMessage[];
   isStreaming: boolean;
-  onSendMessage: (text: string, summon: string, useStream: boolean, rounds: number, uploadIds?: string[]) => void;
+  onSendMessage: (text: string, summon: string, useStream: boolean, rounds: number, uploadIds?: string[], deliberationMode?: string) => void;
   onToggleSidebar: () => void;
   _onToggleSidebar?: () => void; // internal use or future proof
   activeTitle: string;
@@ -53,6 +53,7 @@ interface ChatAreaState {
   playingAudioId: string | null;
   visibleKeyIds: Record<string, boolean>;
   activeTab: "discussion" | "summary";
+  deliberationMode: string;
 }
 
 type ChatAreaAction =
@@ -65,7 +66,8 @@ type ChatAreaAction =
   | { type: "SET_SHOW_VISUALIZER"; payload: boolean }
   | { type: "SET_PLAYING_AUDIO_ID"; payload: string | null }
   | { type: "SET_VISIBLE_KEY_IDS"; payload: Record<string, boolean> }
-  | { type: "SET_ACTIVE_TAB"; payload: "discussion" | "summary" };
+  | { type: "SET_ACTIVE_TAB"; payload: "discussion" | "summary" }
+  | { type: "SET_DELIBERATION_MODE"; payload: string };
 
 function chatAreaReducer(state: ChatAreaState, action: ChatAreaAction): ChatAreaState {
   switch (action.type) {
@@ -79,6 +81,7 @@ function chatAreaReducer(state: ChatAreaState, action: ChatAreaAction): ChatArea
     case "SET_PLAYING_AUDIO_ID": return { ...state, playingAudioId: action.payload };
     case "SET_VISIBLE_KEY_IDS": return { ...state, visibleKeyIds: action.payload };
     case "SET_ACTIVE_TAB": return { ...state, activeTab: action.payload };
+    case "SET_DELIBERATION_MODE": return { ...state, deliberationMode: action.payload };
     default: return state;
   }
 }
@@ -110,15 +113,17 @@ export function ChatArea({
     playingAudioId: null,
     visibleKeyIds: {},
     activeTab: "discussion",
+    deliberationMode: "standard",
   });
 
-  const { input, summon, rounds, useStream, showExport, showMemberConfig, showVisualizer, playingAudioId, visibleKeyIds } = state;
+  const { input, summon, rounds, useStream, showExport, showMemberConfig, showVisualizer, playingAudioId, visibleKeyIds, deliberationMode } = state;
   const setInput = (v: string) => dispatch({ type: "SET_INPUT", payload: v });
   const setSummon = (v: string) => dispatch({ type: "SET_SUMMON", payload: v });
   const setRounds = (v: number) => dispatch({ type: "SET_ROUNDS", payload: v });
   const setUseStream = (v: boolean) => dispatch({ type: "SET_USE_STREAM", payload: v });
   const setShowExport = (v: boolean) => dispatch({ type: "SET_SHOW_EXPORT", payload: v });
   const setShowMemberConfig = (v: boolean) => dispatch({ type: "SET_SHOW_MEMBER_CONFIG", payload: v });
+  const setDeliberationMode = (v: string) => dispatch({ type: "SET_DELIBERATION_MODE", payload: v });
   const setShowVisualizer = (v: boolean) => dispatch({ type: "SET_SHOW_VISUALIZER", payload: v });
   const setPlayingAudioId = (v: string | null) => dispatch({ type: "SET_PLAYING_AUDIO_ID", payload: v });
   const setVisibleKeyIds: Dispatch<SetStateAction<Record<string, boolean>>> = (v) => {
@@ -213,7 +218,7 @@ export function ChatArea({
     attachedFiles.forEach((f) => { if (f.previewUrl) URL.revokeObjectURL(f.previewUrl); });
     setAttachedFiles([]);
     setUploadIds([]);
-    onSendMessage(text, summon, useStream, rounds, uploadIds);
+    onSendMessage(text, summon, useStream, rounds, uploadIds, deliberationMode);
   };
 
   const getMemberColor = (name: string) => {
@@ -502,6 +507,8 @@ export function ChatArea({
                        onAddMember={() => onUpdateMembers([...members, { id: Date.now().toString(), name: "New Unit", type: "openai-compat", role: "Generalist", tone: "Analytical", apiKey: "", model: "", active: true, customBehaviour: "" }])}
                        onRemoveMember={(id) => onUpdateMembers(members.filter(m => m.id !== id))}
                        onUpdateMember={(id, field, value) => onUpdateMembers(members.map(m => m.id === id ? { ...m, [field]: value } : m))}
+                       deliberationMode={deliberationMode}
+                       onDeliberationModeChange={setDeliberationMode}
                      />
                    </motion.div>
                 )}

@@ -62,7 +62,9 @@ export const askSchema = z
       maxAgents: z.number().int().min(1).max(6).optional(),
       allowRPA: z.boolean().optional(),
       preferLocalMix: z.boolean().optional()
-    }).optional()
+    }).optional(),
+    deliberation_mode: z.enum(["standard", "socratic", "red_blue", "hypothesis", "confidence"]).default("standard"),
+    repo_id: z.string().optional(),
   });
 
 export const renameConversationSchema = z.object({

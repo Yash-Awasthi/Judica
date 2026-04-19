@@ -1,6 +1,6 @@
 import fs from "fs";
 import FormData from "form-data";
-import fetch from "node-fetch";
+// node-fetch not needed — Node 18+ has native fetch
 import type { ProcessedFile } from "./types.js";
 import { assertFileSizeLimit } from "./types.js";
 import logger from "../lib/logger.js";
@@ -39,7 +39,7 @@ export async function processAudio(filePath: string, mimeType: string): Promise<
   form.append("file", fileBuffer, { filename, contentType: mimeType });
   form.append("model", "whisper-1");
 
-  let response: Awaited<ReturnType<typeof fetch>>;
+  let response: Response;
   try {
     response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
       method: "POST",
@@ -47,7 +47,7 @@ export async function processAudio(filePath: string, mimeType: string): Promise<
         Authorization: `Bearer ${apiKey}`,
         ...form.getHeaders(),
       },
-      body: form,
+      body: form as unknown as BodyInit,
     });
   } catch (err) {
     logger.error({ err, filePath }, "Whisper API request failed");

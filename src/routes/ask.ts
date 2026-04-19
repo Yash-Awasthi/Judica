@@ -27,6 +27,13 @@ import {
 } from "../services/councilService.js";
 import { loadFileContext, loadRAGContext, buildEnrichedQuestion } from "../services/messageBuilder.service.js";
 import { detectArtifact, saveArtifact } from "../services/artifacts.service.js";
+import {
+  runSocraticPrelude,
+  runRedBlueDebate,
+  runHypothesisRefinement,
+  runConfidenceCalibration,
+  type ReasoningMode,
+} from "../lib/reasoningModes.js";
 import { startTrace, addStep, endTrace } from "../observability/tracer.js";
 import { searchRepo } from "../services/repoSearch.service.js";
 import { db } from "../lib/drizzle.js";
@@ -127,6 +134,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     const { question, conversationId, summon, maxTokens, rounds = 1, context, mode, userConfig } = request.body as any;
     const upload_ids: string[] | undefined = (request.body as any).upload_ids;
     const kb_id: string | undefined = (request.body as any).kb_id;
+    const deliberation_mode: ReasoningMode = (request.body as any).deliberation_mode ?? "standard";
 
     let effectiveSummon: QueryType | "default" = summon || "default";
     let effectiveMembers = (request.body as any).members;
@@ -257,13 +265,49 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       logger.info({ question: question.slice(0, 50) }, "Serving from semantic cache");
       if (traceCtx) addStep(traceCtx, { name: "cache_hit", type: "retrieval", input: question.slice(0, 500), output: "served from cache", latencyMs: 0 });
     } else {
-      logger.info({ question: question.slice(0, 80), memberCount: councilMembers.length, summon: effectiveSummon, rounds: effectiveRounds }, "Council ask started");
+      logger.info({ question: question.slice(0, 80), memberCount: councilMembers.length, summon: effectiveSummon, rounds: effectiveRounds, deliberation_mode }, "Council ask started");
 
       const councilStart = Date.now();
-      const councilResponse = await askCouncil(councilMembers, master, currentMessages, maxTokens, effectiveRounds);
-      verdict = councilResponse.verdict;
-      finalOpinions = councilResponse.opinions;
-      tokensUsed = councilResponse.metrics?.totalTokens ?? 0;
+
+      if (deliberation_mode === "socratic") {
+        const { augmentedContext, qa } = await runSocraticPrelude(question, councilMembers);
+        const augmentedMessages = [
+          ...messages,
+          { role: "user" as const, content: augmentedContext + (typeof enrichedQuestion === "string" ? enrichedQuestion : question) },
+        ];
+        const councilResponse = await askCouncil(councilMembers, master, augmentedMessages, maxTokens, effectiveRounds);
+        verdict = councilResponse.verdict;
+        finalOpinions = [{ name: "Socratic Q&A", opinion: qa.map(({ q, a }) => `Q: ${q}\nA: ${a}`).join("\n\n") }, ...councilResponse.opinions];
+        tokensUsed = councilResponse.metrics?.totalTokens ?? 0;
+      } else if (deliberation_mode === "red_blue") {
+        const result = await runRedBlueDebate(question, councilMembers);
+        verdict = result.judgeVerdict;
+        finalOpinions = [
+          { name: "Red Team (FOR)", opinion: result.redArguments },
+          { name: "Blue Team (AGAINST)", opinion: result.blueArguments },
+          { name: "Judge", opinion: result.judgeVerdict },
+        ];
+      } else if (deliberation_mode === "hypothesis") {
+        const result = await runHypothesisRefinement(question, councilMembers);
+        verdict = result.finalSynthesis;
+        finalOpinions = result.rounds.flatMap((r) =>
+          r.hypotheses.map((h) => ({ name: `${h.agent} [${r.phase} R${r.round}]`, opinion: h.text }))
+        );
+      } else if (deliberation_mode === "confidence") {
+        const result = await runConfidenceCalibration(question, councilMembers);
+        verdict = result.weightedSynthesis;
+        finalOpinions = result.opinions.map((o) => ({
+          name: o.agent,
+          opinion: o.opinion,
+          confidence: o.confidence,
+          reasoning: o.reasoning,
+        }));
+      } else {
+        const councilResponse = await askCouncil(councilMembers, master, currentMessages, maxTokens, effectiveRounds);
+        verdict = councilResponse.verdict;
+        finalOpinions = councilResponse.opinions;
+        tokensUsed = councilResponse.metrics?.totalTokens ?? 0;
+      }
 
       if (traceCtx) {
         for (const op of finalOpinions) {
@@ -341,6 +385,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       const { question, conversationId, summon, maxTokens, rounds = 1, context, mode } = request.body as any;
       const upload_ids: string[] | undefined = (request.body as any).upload_ids;
       const kb_id: string | undefined = (request.body as any).kb_id;
+      const deliberation_mode: ReasoningMode = (request.body as any).deliberation_mode ?? "standard";
 
       let effectiveSummon: QueryType | "default" = summon || "default";
       let effectiveMembers = (request.body as any).members;
@@ -452,7 +497,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         })}\n\n`);
         reply.raw.end();
       } else {
-        logger.info({ question: question.slice(0, 80), memberCount: councilMembers.length, summon: effectiveSummon, rounds: effectiveRounds }, "Council SSE stream started");
+        logger.info({ question: question.slice(0, 80), memberCount: councilMembers.length, summon: effectiveSummon, rounds: effectiveRounds, deliberation_mode }, "Council SSE stream started");
 
         const emitEvent = (type: string, data: any) => {
           if (!controller.signal.aborted) {
@@ -463,21 +508,75 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
           }
         };
 
-        finalVerdict = await streamCouncil(
-          councilMembers,
-          master,
-          currentMessages,
-          (event, data) => {
-            if (event === "opinion") finalOpinions.push(data);
-            if (event === "done") tokensUsed = data.tokensUsed || 0;
-            emitEvent(event, data);
-          },
-          maxTokens,
-          effectiveRounds,
-          controller.signal
-        );
+        if (deliberation_mode !== "standard") {
+          // Emit a phase event so the frontend can show a spinner
+          emitEvent("mode_start", { mode: deliberation_mode });
 
-        reply.raw.end();
+          if (deliberation_mode === "socratic") {
+            const { augmentedContext, qa } = await runSocraticPrelude(question, councilMembers);
+            emitEvent("mode_phase", { phase: "socratic_prelude", qa });
+            const augmentedMessages = [
+              ...messages,
+              { role: "user" as const, content: augmentedContext + questionWithContext },
+            ];
+            finalVerdict = await streamCouncil(
+              councilMembers, master, augmentedMessages,
+              (event, data) => {
+                if (event === "opinion") finalOpinions.push(data);
+                if (event === "done") tokensUsed = data.tokensUsed || 0;
+                emitEvent(event, data);
+              },
+              maxTokens, effectiveRounds, controller.signal
+            );
+          } else if (deliberation_mode === "red_blue") {
+            const result = await runRedBlueDebate(question, councilMembers);
+            emitEvent("mode_phase", { phase: "red_blue_complete", redArguments: result.redArguments, blueArguments: result.blueArguments });
+            finalVerdict = result.judgeVerdict;
+            finalOpinions = [
+              { name: "Red Team (FOR)", opinion: result.redArguments },
+              { name: "Blue Team (AGAINST)", opinion: result.blueArguments },
+              { name: "Judge", opinion: result.judgeVerdict },
+            ];
+            emitEvent("done", { verdict: finalVerdict, opinions: finalOpinions, router: routerDecision ? formatRouterMetadata(routerDecision) : undefined });
+          } else if (deliberation_mode === "hypothesis") {
+            const result = await runHypothesisRefinement(question, councilMembers);
+            for (const round of result.rounds) {
+              emitEvent("mode_phase", { phase: "hypothesis_round", round });
+            }
+            finalVerdict = result.finalSynthesis;
+            finalOpinions = result.rounds.flatMap((r) =>
+              r.hypotheses.map((h) => ({ name: `${h.agent} [${r.phase} R${r.round}]`, opinion: h.text }))
+            );
+            emitEvent("done", { verdict: finalVerdict, opinions: finalOpinions, router: routerDecision ? formatRouterMetadata(routerDecision) : undefined });
+          } else if (deliberation_mode === "confidence") {
+            const result = await runConfidenceCalibration(question, councilMembers);
+            emitEvent("mode_phase", { phase: "calibrated_opinions", opinions: result.opinions });
+            finalVerdict = result.weightedSynthesis;
+            finalOpinions = result.opinions.map((o) => ({
+              name: o.agent, opinion: o.opinion, confidence: o.confidence, reasoning: o.reasoning,
+            }));
+            emitEvent("done", { verdict: finalVerdict, opinions: finalOpinions, router: routerDecision ? formatRouterMetadata(routerDecision) : undefined });
+          }
+
+          reply.raw.end();
+        } else {
+          finalVerdict = await streamCouncil(
+            councilMembers,
+            master,
+            currentMessages,
+            (event, data) => {
+              if (event === "opinion") finalOpinions.push(data);
+              if (event === "done") tokensUsed = data.tokensUsed || 0;
+              emitEvent(event, data);
+            },
+            maxTokens,
+            effectiveRounds,
+            controller.signal
+          );
+
+          reply.raw.end();
+        }
+
         await setCachedResponse(question, councilMembers, master, messages, finalVerdict, finalOpinions);
 
         if (effectiveConversationId && userId && finalVerdict) {
