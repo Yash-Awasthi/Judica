@@ -146,12 +146,16 @@ export const MainTabs: FC<MainTabsProps> = ({ initialTab = 'ask' }) => {
     // Call actual backend stream
     startStream({
       question: _text,
-      mode: 'auto', // Default to auto as per README
       rounds: _rounds,
-      useStream: _useStream,
-      summon: _summon
+      summon: _summon,
+      members: members
+        .filter((m) => m.active)
+        .map((m) => ({
+          ...m,
+          systemPrompt: m.customBehaviour || undefined,
+        })),
     });
-  }, [startStream]);
+  }, [startStream, members]);
   
   const handleToggleSidebar = useCallback(() => {
     // No-op in tab mode

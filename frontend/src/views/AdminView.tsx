@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Users, Shield, Plus, Trash2, MessageSquare, Terminal, 
+import {
+  Users, Shield, Trash2, MessageSquare, Terminal,
   Cpu, Search, Settings, Activity, Globe, History,
-  Lock, AlertTriangle, CheckCircle2, XCircle, RotateCcw,
+  Lock, CheckCircle2, XCircle, RotateCcw,
   LayoutGrid, ChevronRight, Zap, ChevronUp, ChevronDown,
-  ChevronLeft, User, Mail, Calendar, CreditCard, X
+  ChevronLeft, User, Mail, Calendar, X
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { AnimatedCounter } from "../components/AnimatedCounter";

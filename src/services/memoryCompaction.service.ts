@@ -13,17 +13,6 @@ export interface CompactionResult {
   expiredCount: number;
 }
 
-/**
- * Exponential decay score: returns 0..1 where 1 = just accessed, 0 = stale.
- * halfLifeDays controls how fast memories decay.
- */
-function decayScore(lastAccessedAt: Date | null, createdAt: Date, halfLifeDays: number = 14): number {
-  const referenceDate = lastAccessedAt || createdAt;
-  const ageMs = Date.now() - referenceDate.getTime();
-  const ageDays = ageMs / (24 * 60 * 60 * 1000);
-  return Math.pow(0.5, ageDays / halfLifeDays);
-}
-
 /** One-off facts with no access after 30 days are expired. */
 const ONE_OFF_TTL_DAYS = 30;
 

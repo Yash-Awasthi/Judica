@@ -15,21 +15,20 @@ import { SectorHUD } from "./SectorHUD";
 import { TechnicalGrid } from "./TechnicalGrid";
 import { ConsensusVisualizer } from "./ConsensusVisualizer";
 import { SummaryView } from "./SummaryView";
-import type { ChatMessage, CouncilMember, Link } from "../types";
+import type { ChatMessage, CouncilMember, Link, Conversation } from "../types";
 
 interface ChatAreaProps {
   messages: ChatMessage[];
   isStreaming: boolean;
   onSendMessage: (text: string, summon: string, useStream: boolean, rounds: number, uploadIds?: string[], deliberationMode?: string) => void;
   onToggleSidebar: () => void;
-  _onToggleSidebar?: () => void; // internal use or future proof
   activeTitle: string;
   defaultSummon?: string;
   onExport?: (format: "markdown" | "json") => void;
   members: CouncilMember[];
   onUpdateMembers: (members: CouncilMember[]) => void;
   isLoading?: boolean;
-  summaryData?: any;
+  summaryData?: Conversation["summaryData"] | null;
   onGenerateSummary?: () => void;
   isGeneratingSummary?: boolean;
 }
@@ -449,7 +448,7 @@ export function ChatArea({
             </div>
           ) : state.activeTab === "summary" ? (
              <SummaryView 
-               data={summaryData} 
+               data={summaryData ?? null}
                onGenerate={onGenerateSummary || (() => {})} 
                isGenerating={isGeneratingSummary} 
              />

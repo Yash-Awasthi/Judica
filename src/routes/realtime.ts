@@ -48,7 +48,7 @@ const realtimePlugin: FastifyPluginAsync = async (fastify) => {
             });
 
             logger.info({ userId }, "User authenticated for real-time updates");
-          } catch (err) {
+          } catch {
             ws.send(JSON.stringify({ event: 'error', data: { message: 'Invalid or expired token' } }));
           }
         } else if (msg.type === 'request-cost-data' && ws.userId) {

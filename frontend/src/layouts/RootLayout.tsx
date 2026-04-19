@@ -10,7 +10,7 @@ import { CommandPalette } from "../components/CommandPalette";
 import { ToastProvider } from "../components/ToastProvider";
 import { GlobalHUD } from "../components/GlobalHUD";
 import { KeyboardShortcutsPanel } from "../components/KeyboardShortcutsPanel";
-import type { Conversation, Project } from "../types/index";
+import type { Conversation, Project, SearchResult } from "../types/index";
 
 export function RootLayout() {
   const { user, role, fetchWithAuth, logout } = useAuth();
@@ -28,7 +28,7 @@ export function RootLayout() {
     return saved !== null ? parseInt(saved, 10) : 260;
   });
   const [error, setError] = useState<string | null>(null);
-  const [searchResults, setSearchResults] = useState<any[] | null>(null);
+  const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
   const [kbdShortcutsOpen, setKbdShortcutsOpen] = useState(false);
 

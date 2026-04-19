@@ -2,7 +2,7 @@ import { FastifyPluginAsync } from "fastify";
 import { randomUUID } from "crypto";
 import { db } from "../lib/drizzle.js";
 import { userSkills } from "../db/schema/marketplace.js";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { AppError } from "../middleware/errorHandler.js";
 import logger from "../lib/logger.js";

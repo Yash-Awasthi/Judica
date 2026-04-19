@@ -9,7 +9,7 @@ import {
   Cpu, Database, Network, Folder, FolderPlus, Users
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
-import type { Conversation, Project } from "../types/index";
+import type { Conversation, Project, SearchResult } from "../types/index";
 
 function IntelligencePulse() {
   return (
@@ -60,7 +60,7 @@ interface SidebarProps {
   onLogout: () => void;
   onShowMetrics: () => void;
   onSearch: (query: string, projectId?: string, after?: string, before?: string) => void;
-  searchResults?: any[] | null;
+  searchResults?: SearchResult[] | null;
   isSearching?: boolean;
   width: number;
   onWidthChange: (width: number) => void;

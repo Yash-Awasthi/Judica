@@ -3,12 +3,10 @@ import { conversations, chats } from "../db/schema/conversations.js";
 import { eq, and, desc, asc, sql, or, ilike } from "drizzle-orm";
 import { Message, askProvider } from "../lib/providers.js";
 import { selectProvider, FREE_TIER_CHAIN } from "../router/providerChain.js";
-import { getAdapter } from "../adapters/registry.js";
 import logger from "../lib/logger.js";
 import { getEmbeddingWithLock } from "../lib/cache.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { safeVectorLiteral } from "./vectorStore.service.js";
-import { env } from "../config/env.js";
 
 export interface Conversation {
   id: string;
@@ -254,24 +252,6 @@ export async function updateConversationTitle(id: string, userId: number, title:
   }
 }
 
-function cosineSimilarity(a: number[], b: number[]): number {
-  if (a.length !== b.length) return 0;
-
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
-
-  for (let i = 0; i < a.length; i++) {
-    dotProduct += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
-  }
-
-  if (normA === 0 || normB === 0) return 0;
-
-  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
-}
-
 function extractKeywords(text: string): Set<string> {
   return new Set(
     text
@@ -425,7 +405,6 @@ Respond ONLY with a JSON object in this format:
       throw new AppError(503, "No AI provider available for summary generation");
     }
 
-    const adapter = getAdapter(selected.provider);
     const providerConfig = {
       type: selected.provider,
       model: selected.model,

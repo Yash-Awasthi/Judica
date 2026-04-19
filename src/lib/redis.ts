@@ -2,8 +2,6 @@ import { createClient, RedisClientType } from "redis";
 import { env } from "../config/env.js";
 import logger from "./logger.js";
 
-let redis: RedisClientType;
-
 async function initRedis(): Promise<RedisClientType> {
   const client = createClient({
     url: env.REDIS_URL || "redis://localhost:6379",

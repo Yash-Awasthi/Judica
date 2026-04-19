@@ -100,9 +100,7 @@ export class AnthropicProvider extends BaseProvider {
                 if (parsed.type === "message_delta" && parsed.usage) {
                   streamOutputTokens = parsed.usage.output_tokens || 0;
                 }
-              } catch (e) {
-                // ignore unparseable chunk
-              }
+              } catch { /* ignore unparseable SSE chunk */ }
             }
           }
         }

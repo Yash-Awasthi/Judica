@@ -8,7 +8,6 @@ import {
 import {
   UserCouncilConfig,
   CouncilComposition,
-  ConfigValidationResult
 } from "../types/userConfig.js";
 import logger from "../lib/logger.js";
 

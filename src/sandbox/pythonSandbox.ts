@@ -244,6 +244,6 @@ export async function executePython(code: string, timeout: number = 10000): Prom
     });
   } finally {
     // Clean up sandbox directory
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* cleanup best-effort */ }
   }
 }

@@ -1,13 +1,13 @@
 import { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
 import { askCouncil } from "../lib/council.js";
-import { Message } from "../lib/providers.js";
+import { Message, Provider } from "../lib/providers.js";
 import logger from "../lib/logger.js";
 import { fastifyOptionalAuth } from "../middleware/fastifyAuth.js";
 import { askSchema } from "../middleware/validate.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { getCachedResponse, setCachedResponse } from "../lib/cache.js";
-import { prepareCouncilMembers as prepareCouncilWithArchetypes, streamCouncil } from "../lib/council.js";
-import { env } from "../config/env.js";
+import { prepareCouncilMembers as prepareCouncilWithArchetypes, streamCouncil, type CouncilMemberInput } from "../lib/council.js";
+import { z } from "zod";
 import {
   createConversation,
   findConversationById,
@@ -17,13 +17,14 @@ import {
   formatContextForInjection
 } from "../services/conversationService.js";
 import { updateDailyUsage } from "../services/usageService.js";
-import { classifyQuery, formatRouterMetadata, getAutoArchetypes, type QueryType } from "../lib/router.js";
+import { classifyQuery, formatRouterMetadata, getAutoArchetypes } from "../lib/router.js";
 import {
   getDefaultMembers,
   getDefaultMaster,
   resolveApiKey,
   CouncilServiceError,
-  prepareCouncilMembers
+  prepareCouncilMembers,
+  type ApiKeyResolutionInput
 } from "../services/councilService.js";
 import { loadFileContext, loadRAGContext, buildEnrichedQuestion } from "../services/messageBuilder.service.js";
 import { detectArtifact, saveArtifact } from "../services/artifacts.service.js";
@@ -42,6 +43,8 @@ import { and, eq } from "drizzle-orm";
 import { dailyUsage } from "../db/schema/users.js";
 import { sql } from "drizzle-orm";
 import { DAILY_REQUEST_LIMIT, DAILY_TOKEN_LIMIT } from "../config/quotas.js";
+
+type AskBody = z.infer<typeof askSchema>;
 
 const MAX_DAILY_REQUESTS = DAILY_REQUEST_LIMIT;
 const MAX_DAILY_TOKENS = DAILY_TOKEN_LIMIT;
@@ -110,14 +113,14 @@ function validateAskBody(request: FastifyRequest, reply: FastifyReply) {
   if (!result.success) {
     reply.code(400).send({
       error: "Validation failed",
-      details: result.error.issues.map((e: any) => ({
+      details: result.error.issues.map((e) => ({
         field: e.path.join("."),
         message: e.message,
       })),
     });
     return;
   }
-  (request as any).body = result.data;
+  (request as FastifyRequest<{ Body: AskBody }>).body = result.data;
 }
 
 const askPlugin: FastifyPluginAsync = async (fastify) => {
@@ -131,13 +134,13 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.post("/", { preHandler: [fastifyOptionalAuth, fastifyCheckQuota, validateAskBody] }, async (request, reply) => {
     const startTime = Date.now();
 
-    const { question, conversationId, summon, maxTokens, rounds = 1, context, mode, userConfig } = request.body as any;
-    const upload_ids: string[] | undefined = (request.body as any).upload_ids;
-    const kb_id: string | undefined = (request.body as any).kb_id;
-    const deliberation_mode: ReasoningMode = (request.body as any).deliberation_mode ?? "standard";
+    const { question, conversationId, summon, maxTokens, rounds = 1, context, mode, userConfig } = request.body as AskBody;
+    const upload_ids: string[] | undefined = (request.body as AskBody).upload_ids;
+    const kb_id: string | undefined = (request.body as AskBody).kb_id;
+    const deliberation_mode: ReasoningMode = (request.body as AskBody).deliberation_mode ?? "standard";
 
-    let effectiveSummon: QueryType | "default" = summon || "default";
-    let effectiveMembers = (request.body as any).members;
+    let effectiveSummon: string = summon || "default";
+    let effectiveMembers = (request.body as AskBody).members;
     let routerDecision: ReturnType<typeof classifyQuery> | null = null;
     let effectiveRounds = rounds;
 
@@ -160,21 +163,21 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       effectiveRounds = 0; // Skip rounds
     }
 
-    let resolvedMembers;
-    let master;
+    let resolvedMembers: CouncilMemberInput[];
+    let master: Provider;
     try {
       if (userConfig) {
         const composition = prepareCouncilMembers(undefined, userConfig);
-        resolvedMembers = composition.members;
-        master = composition.master;
+        resolvedMembers = composition.members as CouncilMemberInput[];
+        master = composition.master as Provider;
       } else {
-        resolvedMembers = (effectiveMembers || getDefaultMembers()).map((m: any) => {
-          if (!m.apiKey) m.apiKey = resolveApiKey(m);
-          return m;
+        resolvedMembers = (effectiveMembers || getDefaultMembers()).map((m) => {
+          if (!m.apiKey) m.apiKey = resolveApiKey(m as ApiKeyResolutionInput);
+          return m as CouncilMemberInput;
         });
-        const inputMaster = (request.body as any).master || getDefaultMaster();
-        if (!inputMaster.apiKey) inputMaster.apiKey = resolveApiKey(inputMaster);
-        master = inputMaster;
+        const inputMaster = (request.body as AskBody).master || getDefaultMaster();
+        if (!inputMaster.apiKey) inputMaster.apiKey = resolveApiKey(inputMaster as ApiKeyResolutionInput);
+        master = inputMaster as Provider;
       }
     } catch (err) {
       return handleCouncilError(err);
@@ -193,7 +196,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       messages = await getRecentHistory(effectiveConversationId);
     }
 
-    const councilMembers = await prepareCouncilWithArchetypes(resolvedMembers, effectiveSummon as any, userId);
+    const councilMembers = await prepareCouncilWithArchetypes(resolvedMembers, effectiveSummon, userId);
 
     let memoryContext = "";
     if (effectiveConversationId) {
@@ -212,7 +215,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     // Code-aware chat: inject repo context if repo_id is attached
-    const repo_id: string | undefined = (request.body as any).repo_id;
+    const repo_id: string | undefined = (request.body as AskBody).repo_id;
     let codeContext = "";
     if (repo_id && userId) {
       try {
@@ -254,13 +257,13 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     const cached = await getCachedResponse(question, councilMembers, master, messages);
 
     let verdict = "";
-    let finalOpinions: any[] = [];
+    let finalOpinions: { name: string; opinion: string; [key: string]: unknown }[] = [];
     let tokensUsed = 0;
     let isCacheHit = false;
 
     if (cached) {
       verdict = cached.verdict;
-      finalOpinions = cached.opinions as any;
+      finalOpinions = cached.opinions;
       isCacheHit = true;
       logger.info({ question: question.slice(0, 50) }, "Serving from semantic cache");
       if (traceCtx) addStep(traceCtx, { name: "cache_hit", type: "retrieval", input: question.slice(0, 500), output: "served from cache", latencyMs: 0 });
@@ -382,13 +385,13 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     });
 
     try {
-      const { question, conversationId, summon, maxTokens, rounds = 1, context, mode } = request.body as any;
-      const upload_ids: string[] | undefined = (request.body as any).upload_ids;
-      const kb_id: string | undefined = (request.body as any).kb_id;
-      const deliberation_mode: ReasoningMode = (request.body as any).deliberation_mode ?? "standard";
+      const { question, conversationId, summon, maxTokens, rounds = 1, context, mode } = request.body as AskBody;
+      const upload_ids: string[] | undefined = (request.body as AskBody).upload_ids;
+      const kb_id: string | undefined = (request.body as AskBody).kb_id;
+      const deliberation_mode: ReasoningMode = (request.body as AskBody).deliberation_mode ?? "standard";
 
-      let effectiveSummon: QueryType | "default" = summon || "default";
-      let effectiveMembers = (request.body as any).members;
+      let effectiveSummon: string = summon || "default";
+      let effectiveMembers = (request.body as AskBody).members;
       let routerDecision: ReturnType<typeof classifyQuery> | null = null;
       let effectiveRounds = rounds;
 
@@ -411,14 +414,14 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         effectiveRounds = 0; // Skip rounds
       }
 
-      const resolvedMembers = (effectiveMembers || getDefaultMembers()).map((m: any) => {
-        if (!m.apiKey) m.apiKey = resolveApiKey(m);
-        return m;
+      const resolvedMembers: CouncilMemberInput[] = (effectiveMembers || getDefaultMembers()).map((m) => {
+        if (!m.apiKey) m.apiKey = resolveApiKey(m as ApiKeyResolutionInput);
+        return m as CouncilMemberInput;
       });
 
-      const inputMaster = (request.body as any).master || getDefaultMaster();
-      if (!inputMaster.apiKey) inputMaster.apiKey = resolveApiKey(inputMaster);
-      const master = inputMaster;
+      const inputMaster = (request.body as AskBody).master || getDefaultMaster();
+      if (!inputMaster.apiKey) inputMaster.apiKey = resolveApiKey(inputMaster as ApiKeyResolutionInput);
+      const master = inputMaster as Provider;
 
       const userId = request.userId;
 
@@ -454,11 +457,9 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       // Load file attachments and RAG context
       const fileContext = await loadFileContext(upload_ids || [], userId || 0);
       let ragContext = "";
-      let ragCitations: { source: string; score: number }[] = [];
       if (kb_id && userId) {
         const rag = await loadRAGContext(userId, question, kb_id);
         ragContext = rag.context;
-        ragCitations = rag.citations;
       }
 
       const questionWithContext = buildEnrichedQuestion(question, fileContext, ragContext, memoryContext, context);
@@ -479,14 +480,14 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
 
       let isCacheHit = false;
       let finalVerdict = "";
-      let finalOpinions: any[] = [];
+      let finalOpinions: { name: string; opinion: string; [key: string]: unknown }[] = [];
       let tokensUsed = 0;
 
       const cached = await getCachedResponse(question, councilMembers, master, messages);
       if (cached) {
         isCacheHit = true;
         finalVerdict = cached.verdict;
-        finalOpinions = cached.opinions as any;
+        finalOpinions = cached.opinions;
         reply.raw.write(`data: ${JSON.stringify({
           type: "done",
           cached: true,
@@ -499,7 +500,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       } else {
         logger.info({ question: question.slice(0, 80), memberCount: councilMembers.length, summon: effectiveSummon, rounds: effectiveRounds, deliberation_mode }, "Council SSE stream started");
 
-        const emitEvent = (type: string, data: any) => {
+        const emitEvent = (type: string, data: Record<string, unknown>) => {
           if (!controller.signal.aborted) {
             const payload = type === "done"
               ? { ...data, conversationId: effectiveConversationId ?? null }
@@ -522,8 +523,8 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
             finalVerdict = await streamCouncil(
               councilMembers, master, augmentedMessages,
               (event, data) => {
-                if (event === "opinion") finalOpinions.push(data);
-                if (event === "done") tokensUsed = data.tokensUsed || 0;
+                if (event === "opinion") finalOpinions.push(data as { name: string; opinion: string });
+                if (event === "done") tokensUsed = (data as { tokensUsed?: number }).tokensUsed || 0;
                 emitEvent(event, data);
               },
               maxTokens, effectiveRounds, controller.signal
@@ -565,8 +566,8 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
             master,
             currentMessages,
             (event, data) => {
-              if (event === "opinion") finalOpinions.push(data);
-              if (event === "done") tokensUsed = data.tokensUsed || 0;
+              if (event === "opinion") finalOpinions.push(data as { name: string; opinion: string });
+              if (event === "done") tokensUsed = (data as { tokensUsed?: number }).tokensUsed || 0;
               emitEvent(event, data);
             },
             maxTokens,
@@ -604,8 +605,9 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         }
       }
 
-    } catch (e: any) {
-      reply.raw.write(`data: ${JSON.stringify({ type: "error", message: e.message })}\n\n`);
+    } catch (e: unknown) {
+      const message = e instanceof Error ? e.message : "Internal error";
+      reply.raw.write(`data: ${JSON.stringify({ type: "error", message })}\n\n`);
       reply.raw.end();
     }
   });

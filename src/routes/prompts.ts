@@ -6,7 +6,6 @@ import { eq, and, desc, max } from "drizzle-orm";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { routeAndCollect } from "../router/index.js";
-import logger from "../lib/logger.js";
 
 const promptsPlugin: FastifyPluginAsync = async (fastify) => {
     // GET / — list user's prompts

@@ -55,9 +55,12 @@ export async function runLoginHelper(targetName: "chatgpt" | "claude" | "deepsee
 }
 
 if (process.argv[1]?.includes("login_helper.ts")) {
-  const target = process.argv.slice(2).find(arg => !arg.startsWith("--")) as any;
+  const target = process.argv.slice(2).find(arg => !arg.startsWith("--")) as "chatgpt" | "claude" | "deepseek" | "gemini" | undefined;
   if (target) {
-    runLoginHelper(target).catch(console.error);
+    runLoginHelper(target).catch((err: unknown) => {
+      logger.error({ err }, "Login helper failed");
+      process.exit(1);
+    });
   } else {
     console.log("Usage: tsx src/lib/tools/login_helper.ts <chatgpt|claude|deepseek|gemini>");
     process.exit(1);

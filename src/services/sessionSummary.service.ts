@@ -6,7 +6,7 @@ import logger from "../lib/logger.js";
 
 export async function summarizeSession(
   conversationId: string,
-  userId: number
+  _userId: number
 ): Promise<string> {
   // Get last 20 messages (chats)
   const messages = await db

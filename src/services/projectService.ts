@@ -3,7 +3,6 @@ import { projects } from "../db/schema/projects.js";
 import { conversations } from "../db/schema/conversations.js";
 import { eq, and, desc, sql, count } from "drizzle-orm";
 import logger from "../lib/logger.js";
-import { AppError } from "../middleware/errorHandler.js";
 
 export interface Project {
   id: string;

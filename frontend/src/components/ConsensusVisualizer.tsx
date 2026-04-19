@@ -6,7 +6,6 @@ interface ConsensusVisualizerProps {
   nodes: Node[];
   links?: Link[];
   consensusScore?: number;
-  data?: any;
   streaming?: boolean;
   annotations?: { id: string; nodeId: string; title: string; content: string; type: 'conflict' | 'info' | 'warning' }[];
 }

@@ -133,10 +133,9 @@ interface ConductPeerReviewOptions {
 export async function conductPeerReview(
   options: ConductPeerReviewOptions
 ): Promise<{ reviews: PeerReview[]; scored: ScoredOpinion[]; totalTokens: number; cost: number }> {
-  const { members, opinions, currentMessages, round, validatorProvider, skipAdversarial, skipGrounding, abortSignal, maxTokens } = options;
+  const { members, opinions, currentMessages, validatorProvider, skipAdversarial, skipGrounding, abortSignal, maxTokens } = options;
   
   let totalTokens = 0;
-  const cost = 0;
 
   const labels = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   const anonymized = opinions.map((o, i) => ({
@@ -202,7 +201,7 @@ Do not include any text outside the JSON object.`;
       
       if (res.usage) totalTokens += res.usage.totalTokens;
 
-      const parsed = parseAgentOutput(res.text);
+      parseAgentOutput(res.text);
       let reviewData: { ranking: string[]; critique: string; identified_flaws: PeerReviewFlaw[] } | null = null;
       try {
         const jsonMatch = res.text.match(/\{[\s\S]*\}/);
@@ -300,7 +299,7 @@ export async function evaluateConsensus(
   haltReason?: string;
   totalTokens: number;
 }> {
-  const { master, opinions, currentMessages, round, abortSignal, maxTokens } = options;
+  const { master, opinions, currentMessages, round, abortSignal } = options;
   
   let totalTokens = 0;
 

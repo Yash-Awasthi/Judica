@@ -146,10 +146,6 @@ export async function visualizeDeliberation(
   const outputs: VisualOutput[] = [];
 
   // 1. Generate a Mermaid mindmap of agent positions
-  const positions = opinions
-    .map((o) => `  ${o.agent}: ${o.position.substring(0, 60)}`)
-    .join("\n");
-
   const mindmapContent = [
     "mindmap",
     `  root((${topic.substring(0, 40)}))`,

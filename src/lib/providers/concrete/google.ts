@@ -102,9 +102,7 @@ export class GoogleProvider extends BaseProvider {
                 if (parsed.usageMetadata) {
                   streamUsage = parsed.usageMetadata;
                 }
-              } catch (e) {
-                // ignore unparseable chunk
-              }
+              } catch { /* ignore unparseable SSE chunk */ }
             }
           }
         }

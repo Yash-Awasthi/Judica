@@ -1,13 +1,12 @@
 import type { FastifyPluginAsync } from "fastify";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { db } from "../lib/drizzle.js";
-import { memories, memoryBackends } from "../db/schema/memory.js";
-import { eq, count, sql } from "drizzle-orm";
+import { memories } from "../db/schema/memory.js";
+import { eq, count } from "drizzle-orm";
 import { AppError } from "../middleware/errorHandler.js";
 import { compact } from "../services/memoryCompaction.service.js";
-import { getBackend, setBackend, removeBackend, encryptConfig } from "../services/memoryRouter.service.js";
+import { getBackend, setBackend, removeBackend } from "../services/memoryRouter.service.js";
 import { summarizeSession } from "../services/sessionSummary.service.js";
-import logger from "../lib/logger.js";
 
 const memoryPlugin: FastifyPluginAsync = async (fastify) => {
     // POST /compact — manual memory compaction

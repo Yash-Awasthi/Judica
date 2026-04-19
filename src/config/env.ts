@@ -42,15 +42,15 @@ const envSchema = z.object({
 const parsed = envSchema.safeParse(process.env);
 
 if (!parsed.success) {
-  console.error("❌ Invalid environment variables:");
-  parsed.error.issues.forEach((e: any) => {
-    console.error(`   ${e.path.join(".")}: ${e.message}`);
-  });
+  process.stderr.write("Invalid environment variables:\n");
+  for (const issue of parsed.error.issues) {
+    process.stderr.write(`   ${issue.path.join(".")}: ${issue.message}\n`);
+  }
   process.exit(1);
 }
 
 export const env = parsed.data;
 
 if (!parsed.data.OPENAI_API_KEY && !parsed.data.ANTHROPIC_API_KEY && !parsed.data.GOOGLE_API_KEY) {
-  console.warn("⚠️  No AI provider API keys found (OPENAI_API_KEY / ANTHROPIC_API_KEY / GOOGLE_API_KEY). All council requests will fail at runtime.");
+  process.stderr.write("WARNING: No AI provider API keys found (OPENAI_API_KEY / ANTHROPIC_API_KEY / GOOGLE_API_KEY). All council requests will fail at runtime.\n");
 }

@@ -42,7 +42,7 @@ export async function evaluateCouncilSession(
   agentOutputs: AgentOutput[],
   totalTokens: number,
   duration: number,
-  userFeedback?: number
+  _userFeedback?: number
 ): Promise<EvaluationResult> {
   try {
     const coherence = await calculateCoherence(agentOutputs);
@@ -346,8 +346,8 @@ export async function getUserEvaluationMetrics(userId: number, days: number = 30
 
 export async function benchmarkCouncilPerformance(
   userId: number,
-  councilSize: number,
-  queryComplexity: 'simple' | 'moderate' | 'complex'
+  _councilSize: number,
+  _queryComplexity: 'simple' | 'moderate' | 'complex'
 ): Promise<{
   userScore: number;
   benchmarkScore: number;

@@ -26,7 +26,7 @@ async function safeEvalExpr(
     const result = await script.run(context, { timeout: 1000 });
     return result;
   } finally {
-    try { isolate.dispose(); } catch {}
+    try { isolate.dispose(); } catch { /* dispose may throw if already disposed */ }
   }
 }
 

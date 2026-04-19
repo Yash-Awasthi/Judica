@@ -4,7 +4,6 @@ import { ingestionQueue, researchQueue, repoQueue, compactionQueue } from "../qu
 import { db } from "../lib/drizzle.js";
 import { users } from "../db/schema/users.js";
 import { eq } from "drizzle-orm";
-import { AppError } from "../middleware/errorHandler.js";
 
 function fastifyRequireRole(...roles: string[]) {
   return async (request: FastifyRequest, reply: FastifyReply) => {

@@ -12,7 +12,6 @@
  */
 
 import crypto from "crypto";
-import type { ProviderResponse } from "../lib/providers.js";
 import { askProvider } from "../lib/providers.js";
 import logger from "../lib/logger.js";
 

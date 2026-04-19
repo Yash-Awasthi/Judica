@@ -1,7 +1,6 @@
 import crypto from "crypto";
 import { LRUCache } from "lru-cache";
 import { env } from "../config/env.js";
-import logger from "../lib/logger.js";
 
 const cache = new LRUCache<string, number[]>({ max: 1000, ttl: 1000 * 60 * 60 });
 

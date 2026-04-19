@@ -1,6 +1,16 @@
 import { useRef, useEffect, useCallback, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import type { Opinion, PeerReview, ScoredOpinion, ModelCost } from "../types/index.js";
+import type { Opinion, PeerReview, ScoredOpinion, ModelCost, CouncilMember } from "../types/index.js";
+
+export interface StreamRequestBody {
+  question: string;
+  summon?: string;
+  rounds?: number;
+  conversationId?: string;
+  upload_ids?: string[];
+  deliberation_mode?: string;
+  members: (CouncilMember & { systemPrompt?: string })[];
+}
 
 export type SSEEvent =
   | { type: "member_chunk"; name: string; chunk: string }
@@ -39,7 +49,7 @@ export function useCouncilStream({ onEvent, onError }: UseCouncilStreamProps) {
     };
   }, [stopStream]);
 
-  const startStream = useCallback(async (body: any) => {
+  const startStream = useCallback(async (body: StreamRequestBody) => {
     stopStream();
     setStreamError(null);
     const controller = new AbortController();
@@ -95,11 +105,12 @@ export function useCouncilStream({ onEvent, onError }: UseCouncilStreamProps) {
           }
         }
       }
-    } catch (err: any) {
-      if (err.name !== "AbortError") {
-        console.error("Stream error:", err);
-        setStreamError(err.message || "Unknown streaming error");
-        if (onError) onError(err.message || "Unknown streaming error");
+    } catch (err: unknown) {
+      const error = err as Error;
+      if (error.name !== "AbortError") {
+        console.error("Stream error:", error);
+        setStreamError(error.message || "Unknown streaming error");
+        if (onError) onError(error.message || "Unknown streaming error");
       }
     } finally {
       if (abortControllerRef.current === controller) {

@@ -1,7 +1,7 @@
 import { db } from "../lib/drizzle.js";
 import { sql } from "drizzle-orm";
-import { topicNodes, topicEdges } from "../db/schema/conversations.js";
-import { eq, and } from "drizzle-orm";
+import { topicNodes } from "../db/schema/conversations.js";
+import { eq } from "drizzle-orm";
 import { embed } from "./embeddings.service.js";
 import { safeVectorLiteral } from "./vectorStore.service.js";
 import { routeAndCollect } from "../router/index.js";

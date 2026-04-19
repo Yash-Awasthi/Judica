@@ -4,6 +4,28 @@ import { env } from "../config/env.js";
 import { redisBackend, postgresBackend } from "./cache/backends.js";
 import type { CacheEntry } from "./cache/CacheBackend.js";
 
+interface CachedOpinion {
+  name: string;
+  opinion: string;
+  [key: string]: unknown;
+}
+
+interface EmbeddingResponse {
+  data?: Array<{ embedding: number[] }>;
+}
+
+interface CacheMemberConfig {
+  model: string;
+  temperature?: number;
+  systemPrompt?: string;
+  tools?: string[];
+}
+
+interface CacheMessage {
+  role: string;
+  content: string | unknown[];
+}
+
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 const embeddingLocks = new Map<string, Promise<number[] | null>>();
@@ -26,7 +48,7 @@ export async function getEmbeddingWithLock(text: string): Promise<number[] | nul
   }
 }
 
-export function generateCacheKey(prompt: string, members: any[], master?: any, history: any[] = []): string {
+export function generateCacheKey(prompt: string, members: CacheMemberConfig[], master?: CacheMemberConfig, history: CacheMessage[] = []): string {
   const memberConfigs = members.map(m => ({
     model: m.model,
     temp: m.temperature,
@@ -59,7 +81,7 @@ async function getEmbedding(text: string): Promise<number[] | null> {
         model: "text-embedding-3-small",
       }),
     });
-    const data = await res.json() as any;
+    const data: EmbeddingResponse = await res.json() as EmbeddingResponse;
     if (data.data?.[0]?.embedding) {
       return data.data[0].embedding;
     }
@@ -69,7 +91,7 @@ async function getEmbedding(text: string): Promise<number[] | null> {
   return null;
 }
 
-export async function getCachedResponse(prompt: string, members: any[], master?: any, history: any[] = []) {
+export async function getCachedResponse(prompt: string, members: CacheMemberConfig[], master?: CacheMemberConfig, history: CacheMessage[] = []) {
   const keyHash = generateCacheKey(prompt, members, master, history);
 
   const redisHit = await redisBackend.get(keyHash);
@@ -112,11 +134,11 @@ export async function getCachedResponse(prompt: string, members: any[], master?:
 
 export async function setCachedResponse(
   prompt: string,
-  members: any[],
-  master: any | undefined,
-  history: any[],
+  members: CacheMemberConfig[],
+  master: CacheMemberConfig | undefined,
+  history: CacheMessage[],
   verdict: string,
-  opinions: any[]
+  opinions: CachedOpinion[]
 ) {
   const keyHash = generateCacheKey(prompt, members, master, history);
   const embedding = env.ENABLE_VECTOR_CACHE ? await getEmbeddingWithLock(prompt) : null;

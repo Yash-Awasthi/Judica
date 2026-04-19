@@ -56,7 +56,7 @@ export async function executeJS(code: string, timeout: number = 5000): Promise<S
     };
   } finally {
     if (isolate) {
-      try { isolate.dispose(); } catch {}
+      try { isolate.dispose(); } catch { /* dispose may throw if already disposed */ }
     }
   }
 }

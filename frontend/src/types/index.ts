@@ -125,3 +125,18 @@ export interface Node {
   x: number;
   y: number;
 }
+
+export interface SearchResult {
+  id: string;
+  question: string;
+  verdict: string;
+  conversationId: string;
+  conversationTitle: string;
+  createdAt: string;
+  relevanceScore: number;
+  highlights: {
+    question: string;
+    verdict: string;
+    hasOpinionMatch: boolean;
+  };
+}

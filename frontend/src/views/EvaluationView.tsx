@@ -270,18 +270,31 @@ function StatusBadge({ status }: { status: Evaluation["status"] }) {
     );
 }
 
-function DropdownField({ label, value, onChange, placeholder, options }: any) {
+interface DropdownOption {
+    value: string;
+    label: string;
+}
+
+interface DropdownFieldProps {
+    label: string;
+    value: string;
+    onChange: (value: string) => void;
+    placeholder: string;
+    options: (string | DropdownOption)[];
+}
+
+function DropdownField({ label, value, onChange, placeholder, options }: DropdownFieldProps) {
     return (
         <div className="space-y-3">
             <label className="block text-[9px] font-diag text-white/30 uppercase tracking-[0.4em] ml-1">{label}</label>
             <div className="relative group/select">
-                <select 
-                    value={value} 
+                <select
+                    value={value}
                     onChange={(e) => onChange(e.target.value)}
                     className="w-full bg-black/60 border border-white/10 rounded-2xl px-6 py-4 text-xs text-white focus:outline-none focus:border-white/30 transition-all font-bold appearance-none cursor-pointer"
                 >
                     <option value="" disabled>{placeholder}</option>
-                    {options.map((opt: any) => (
+                    {options.map((opt) => (
                         <option key={typeof opt === "string" ? opt : opt.value} value={typeof opt === "string" ? opt : opt.value}>
                             {typeof opt === "string" ? opt : opt.label}
                         </option>

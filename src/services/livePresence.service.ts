@@ -5,7 +5,6 @@
  * for users collaborating in shared sessions.
  */
 
-import crypto from "crypto";
 import logger from "../lib/logger.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -64,7 +63,7 @@ export function updatePresence(
 
 export function getPresence(sessionId: string): PresenceState[] {
   const result: PresenceState[] = [];
-  for (const [k, state] of presenceMap) {
+  for (const [, state] of presenceMap) {
     if (state.sessionId === sessionId) {
       result.push(state);
     }

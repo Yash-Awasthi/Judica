@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback } from "react";
-import { useCouncilStream, type SSEEvent } from "./useCouncilStream";
+import { useCouncilStream, type SSEEvent, type StreamRequestBody } from "./useCouncilStream";
 import type { ChatMessage, CouncilMember } from "../types/index";
 import { v4 as uuidv4 } from "uuid";
 
@@ -100,7 +100,7 @@ export function useDeliberation({
         { id: msgId, question: text, opinions: [], verdict: "" },
       ]);
 
-      const body = {
+      const body: StreamRequestBody = {
         question: text,
         summon: summon || undefined,
         rounds: rounds || undefined,

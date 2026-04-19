@@ -2,7 +2,7 @@ import { db } from "../lib/drizzle.js";
 import { sql } from "drizzle-orm";
 import { embed } from "./embeddings.service.js";
 import { safeVectorLiteral } from "./vectorStore.service.js";
-import { hybridSearch, type MemoryChunk } from "./vectorStore.service.js";
+import { hybridSearch } from "./vectorStore.service.js";
 import { pool } from "../lib/db.js";
 import logger from "../lib/logger.js";
 
@@ -114,7 +114,7 @@ async function searchFacts(
       LIMIT ${limit}
     `);
 
-    return (result.rows as any[]).map((row, idx) => ({
+    return (result.rows as any[]).map((row) => ({
       id: row.id,
       content: `[${row.type}] ${row.content} (confidence: ${row.confidence}, source: ${row.sourceAgent})`,
       source: "fact" as const,

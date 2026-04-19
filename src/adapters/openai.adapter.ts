@@ -106,7 +106,7 @@ export class OpenAIAdapter implements IProviderAdapter {
     return msgs;
   }
 
-  private async *parseSSEStream(res: Response, model: string): AsyncGenerator<AdapterChunk> {
+  private async *parseSSEStream(res: Response, _model: string): AsyncGenerator<AdapterChunk> {
     if (!res.body) return;
 
     const reader = res.body.getReader();

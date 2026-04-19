@@ -95,9 +95,7 @@ export class OpenAIProvider extends BaseProvider {
                 if (parsed.usage) {
                   streamUsage = parsed.usage;
                 }
-              } catch (e) {
-                // ignore unparseable chunk
-              }
+              } catch { /* ignore unparseable SSE chunk */ }
             }
           }
         }

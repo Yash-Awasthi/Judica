@@ -15,7 +15,6 @@
 
 import fs from "fs";
 import path from "path";
-import os from "os";
 import logger from "../lib/logger.js";
 
 // BPF instruction opcodes
@@ -28,7 +27,6 @@ const BPF_K = 0x00;
 const BPF_RET = 0x06;
 
 // Seccomp return values
-const SECCOMP_RET_KILL_PROCESS = 0x80000000;
 const SECCOMP_RET_ERRNO = 0x00050000; // EPERM = 1
 const SECCOMP_RET_ALLOW = 0x7fff0000;
 

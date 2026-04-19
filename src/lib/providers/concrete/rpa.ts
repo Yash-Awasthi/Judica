@@ -189,7 +189,7 @@ export class RPAProvider extends BaseProvider {
     }
   }
 
-  async call({ prompt, messages, signal, maxTokens, isFallback, onChunk }: {
+  async call({ prompt, messages, signal, maxTokens, isFallback: _isFallback, onChunk }: {
     messages: Message[];
     prompt?: string;
     signal?: AbortSignal;
