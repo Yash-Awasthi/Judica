@@ -283,3 +283,67 @@
     display: none !important;
   }
 }
+
+/* ============================================================
+   ACCESSIBILITY
+   ============================================================ */
+
+/* Focus-visible ring — consistent across all themes */
+:focus-visible {
+  outline: 2px solid var(--accent-mint);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Screen-reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+.sr-only.focus\:not-sr-only:focus,
+.focus\:not-sr-only:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: inherit;
+  margin: inherit;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+/* Reduced motion — disable all animations for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High contrast mode — respect system forced-colors */
+@media (forced-colors: active) {
+  .glass-panel,
+  .surface-card {
+    border: 1px solid ButtonText;
+    background: Canvas;
+  }
+  .btn-pill,
+  .btn-pill-primary {
+    border: 2px solid ButtonText;
+    forced-color-adjust: none;
+  }
+  :focus-visible {
+    outline: 3px solid Highlight;
+  }
+}
