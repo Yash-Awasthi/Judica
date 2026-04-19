@@ -4,10 +4,8 @@
 
 ### What's Next
 
-[![Now](https://img.shields.io/badge/Now-Remaining_Hardening-3B82F6?style=for-the-badge)](#phase-1-remaining-hardening)
-[![Next](https://img.shields.io/badge/Next-Autonomous_Ops-F59E0B?style=for-the-badge)](#phase-3-autonomous-operations--remaining)
-[![Then](https://img.shields.io/badge/Then-Platform-8B5CF6?style=for-the-badge)](#phase-4-platform--ecosystem--remaining)
-[![Scale](https://img.shields.io/badge/2027-Enterprise-22C55E?style=for-the-badge)](#phase-5-scale--enterprise-q2-2027)
+[![Now](https://img.shields.io/badge/Now-Final_Hardening-3B82F6?style=for-the-badge)](#phase-1-remaining-hardening)
+[![Next](https://img.shields.io/badge/Next-Enterprise-22C55E?style=for-the-badge)](#phase-5-scale--enterprise-q2-2027)
 
 </div>
 
@@ -15,14 +13,14 @@
 
 ## Completed
 
-> Phases 1 (most), 2, and most of 3–4 are done. See git history for details.
+> Phases 1–4 service layers are complete. See git history for details.
 
 | Phase | Highlights |
 |---|---|
 | **Phase 1** | E2E tests, CI, integration test templates, load test scaffold, Redis auth pipelining, observability |
 | **Phase 2** | HyDE, parent-child chunking, federated search, adaptive k, topic graph, temporal decay, contradiction resolution, Cohere reranking, agent specialization, confidence calibration, dynamic delegation |
-| **Phase 3** | Goal decomposition, tool chains, test generation, refactoring assistant, PR review agent, full-stack scaffolding, image-aware agents, visual output generation, cross-modal reasoning |
-| **Phase 4** | MCP server + client, plugin SDK, webhook triggers, middleware hooks |
+| **Phase 3** | Goal decomposition, tool chains, test generation, refactoring assistant, PR review agent, full-stack scaffolding, image-aware agents, visual output generation, cross-modal reasoning, HITL gates, background agents, artifact streaming, audio/video input |
+| **Phase 4** | MCP server + client, plugin SDK, webhook triggers, middleware hooks, tool federation, custom workflow nodes, user annotations, synthesis voting, multi-user deliberation, live presence |
 
 ---
 
@@ -30,31 +28,25 @@
 
 - [/] Rewrite route-level integration tests to use `fastify.inject()` against the real app (templates, auth guard, archetypes done; more routes ongoing)
 - [/] Load testing with autocannon — scaffold ready (`npm run test:load`), target 200 concurrent deliberations, < 2s p95
-- [ ] Python sandbox: add seccomp-bpf syscall filter
+- [x] Python sandbox: add seccomp-bpf syscall filter
 - [ ] Accessibility: screen reader testing (VoiceOver/NVDA) — manual verification needed
 
 ---
 
-## Phase 3: Autonomous Operations — Remaining
+## Phase 3–4: Remaining
 
-- [ ] **Long-running background agents** — Hours-long tasks with Redis checkpoints *(needs running Redis)*
-- [ ] **Human-in-the-loop gates** — Configurable approval points; WebSocket notifications *(needs running server)*
-- [ ] **Intermediate artifact streaming** — Real-time SSE with partial results *(needs running server)*
-- [ ] **Audio/video input** — Transcribe and extract keyframes for council context *(needs external transcription service)*
+> All service layers for Phase 3 & 4 are implemented with in-memory stores and full test coverage. Items below require infrastructure (Redis, WebSocket server, frontend) to become fully operational.
 
----
-
-## Phase 4: Platform & Ecosystem — Remaining
-
-- [ ] **Tool federation** — Browse and install MCP ecosystem tools *(needs package registry/marketplace UI)*
-- [ ] **Custom workflow nodes** — Third-party nodes with React UI + server handlers *(needs running frontend)*
-
-### Real-time Collaboration
-
-- [ ] **Multi-user deliberation** — 2–10 users in shared council session *(needs WebSocket infrastructure)*
-- [ ] **Live presence** — Cursor positions, typing indicators in shared workflow editor *(needs WebSocket infrastructure)*
-- [ ] **User annotations** — Highlight and comment on agent responses *(needs running frontend)*
-- [ ] **Synthesis voting** — Democratic consensus on top of AI consensus *(needs running frontend)*
+- [x] ~~Long-running background agents~~ — Service layer done (checkpointing, pause/resume, progress tracking)
+- [x] ~~Human-in-the-loop gates~~ — Service layer done (4 gate types, multi-approver, auto-timeout)
+- [x] ~~Intermediate artifact streaming~~ — Service layer done (EventEmitter pub/sub, SSE formatting, replay)
+- [x] ~~Audio/video input~~ — Service layer done (multi-provider transcription, keyframe extraction)
+- [x] ~~Tool federation~~ — Service layer done (registry, search, install/uninstall, toggle)
+- [x] ~~Custom workflow nodes~~ — Service layer done (registry, execution, validation)
+- [x] ~~Multi-user deliberation~~ — Service layer done (rooms, roles, phases, turn management)
+- [x] ~~Live presence~~ — Service layer done (cursors, heartbeat, awareness)
+- [x] ~~User annotations~~ — Service layer done (threads, reactions, resolution)
+- [x] ~~Synthesis voting~~ — Service layer done (weighted scoring, quorum, delegation)
 
 ---
 
