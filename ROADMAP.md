@@ -6,9 +6,8 @@
 
 [![Phase 10](https://img.shields.io/badge/Phase_10-Planned-3B82F6?style=flat-square)](#phase-10-multi-modal-input)
 [![Phase 11](https://img.shields.io/badge/Phase_11-Planned-3B82F6?style=flat-square)](#phase-11-agent-marketplace--sharing)
-[![Phase 12](https://img.shields.io/badge/Phase_12-Planned-3B82F6?style=flat-square)](#phase-12-enterprise--teams)
+[![Phase 12](https://img.shields.io/badge/Phase_12-Planned-3B82F6?style=flat-square)](#phase-12-workspace-roles--audit-logs)
 [![Phase 13](https://img.shields.io/badge/Phase_13-Planned-3B82F6?style=flat-square)](#phase-13-advanced-reasoning-modes)
-[![Phase 14](https://img.shields.io/badge/Phase_14-Planned-3B82F6?style=flat-square)](#phase-14-native-mobile)
 
 </div>
 
@@ -29,10 +28,10 @@
 
 | Feature | Status |
 |---------|--------|
-| **Image Upload & Vision Routing** — attach images to council prompts; route to vision-capable models | 🔵 |
-| **PDF / Document Ingestion** — drag-drop PDF → auto-chunk → inject as RAG context for the council | 🔵 |
-| **Audio Transcription** — record or upload audio; Whisper transcription feeds council as text | 🔵 |
-| **Multi-modal Conflict Detection** — claim extractor handles image captions + text claims together | 🔵 |
+| **File Attachment UI** — paperclip button in InputArea; preview chips with remove; drag-and-drop | 🔵 |
+| **Inline Image Rendering** — user messages display image thumbnails; council receives base64 vision blocks | 🔵 |
+| **Audio Transcription** — upload audio file → Whisper transcription → injected as text context | 🔵 |
+| **Multi-modal Conflict Detection** — vision model extracts claims from images; conflict detector runs on mixed content | 🔵 |
 
 ---
 
@@ -42,23 +41,23 @@
 
 | Feature | Status |
 |---------|--------|
-| **Archetype Builder UI** — no-code form to define a new archetype (system prompt, tools, icon, color) | 🔵 |
-| **Publish to Marketplace** — one-click publish; versioning + changelog per archetype | 🔵 |
-| **Council Template Sharing** — export/import SUMMONS configs as shareable JSON links | 🔵 |
-| **Ratings & Usage Stats** — star rating, fork count, and weekly usage per published archetype | 🔵 |
+| **Archetype Builder UI** — no-code form: system prompt, tools, icon, color, blind spot | 🔵 |
+| **Publish to Marketplace** — one-click publish with version + changelog per archetype | 🔵 |
+| **Council Template Export / Import** — share SUMMONS configs as portable JSON | 🔵 |
+| **Ratings & Usage Stats** — star rating, fork count, weekly usage per published archetype | 🔵 |
 
 ---
 
-## Phase 12: Enterprise & Teams
+## Phase 12: Workspace Roles & Audit Logs
 
-> Workspace-level access control, audit trails, and SSO for organisation deployments.
+> Structured access control and immutable audit trails for team deployments.
 
 | Feature | Status |
 |---------|--------|
 | **Workspace Roles** — Owner / Admin / Member / Viewer with per-resource permission matrix | 🔵 |
-| **SSO / SAML 2.0** — Okta, Azure AD, Google Workspace integration | 🔵 |
-| **Compliance Audit Log Export** — immutable JSONL export of every deliberation + approval event | 🔵 |
-| **Private Model Endpoints** — bring-your-own model: point to internal Ollama / Azure OpenAI endpoint | 🔵 |
+| **Role-Based Route Guards** — middleware enforces minimum role per API endpoint | 🔵 |
+| **Audit Log JSONL Export** — immutable export of every deliberation, approval, and config change event | 🔵 |
+| **Role Management UI** — admin panel to invite, promote, and remove workspace members | 🔵 |
 
 ---
 
@@ -68,23 +67,10 @@
 
 | Feature | Status |
 |---------|--------|
-| **Socratic Dialogue Mode** — agents ask clarifying questions before forming opinions | 🔵 |
+| **Socratic Dialogue Mode** — agents ask clarifying questions before forming opinions; second pass uses answers | 🔵 |
 | **Red Team / Blue Team** — fixed two-faction structure with a neutral judge archetype | 🔵 |
 | **Iterative Hypothesis Refinement** — agents propose, falsify, and revise hypotheses across rounds | 🔵 |
 | **Confidence Calibration** — agents declare uncertainty levels; synthesis weights by calibrated confidence | 🔵 |
-
----
-
-## Phase 14: Native Mobile
-
-> First-class iOS and Android experience for on-the-go deliberations.
-
-| Feature | Status |
-|---------|--------|
-| **React Native App** — shared business logic with the web frontend; push notifications for HITL gates | 🔵 |
-| **Offline-First Council** — local SQLite cache; sync deliberation state when back online | 🔵 |
-| **Voice-First Interface** — speak a prompt → transcribe → council deliberates → TTS response | 🔵 |
-| **Biometric Auth** — Face ID / fingerprint unlock replacing password on mobile | 🔵 |
 
 ---
 
