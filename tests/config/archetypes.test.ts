@@ -11,7 +11,7 @@ describe("archetypes config", () => {
   const expectedArchetypeKeys = [
     "architect", "contrarian", "empiricist", "ethicist", "futurist",
     "pragmatist", "historian", "empath", "outsider", "strategist",
-    "minimalist", "creator", "judge",
+    "minimalist", "creator", "judge", "devils_advocate",
   ];
 
   describe("ARCHETYPES", () => {
@@ -82,9 +82,9 @@ describe("archetypes config", () => {
       }
     });
 
-    it("all categories have exactly 12 members", () => {
+    it("all categories have exactly 13 members", () => {
       for (const [category, members] of Object.entries(SUMMONS)) {
-        expect(members.length, `SUMMONS.${category} should have 12 members`).toBe(12);
+        expect(members.length, `SUMMONS.${category} should have 13 members`).toBe(13);
       }
     });
   });
