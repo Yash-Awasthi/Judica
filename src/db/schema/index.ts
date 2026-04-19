@@ -11,3 +11,5 @@ export * from "./social.js";
 export * from "./marketplace.js";
 export * from "./traces.js";
 export * from "./repos.js";
+export * from "./projects.js";
+export * from "./admin.js";

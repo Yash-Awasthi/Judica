@@ -173,6 +173,50 @@ const redisWrapper = {
       return false;
     }
   },
+
+  /**
+   * Returns a pipeline-like object that batches multiple commands into a
+   * single Redis round-trip.  Uses the node-redis `multi()` under the hood
+   * (MULTI/EXEC), but the caller treats it like ioredis `.pipeline()`:
+   *
+   *   const p = redis.pipeline();
+   *   p.get("key1");
+   *   p.get("key2");
+   *   const results = await p.exec();
+   *   // results = [[null, value1], [null, value2]]
+   */
+  pipeline() {
+    let clientMulti: ReturnType<RedisClientType["multi"]> | null = null;
+    const initPromise = getRedis().then((c) => {
+      clientMulti = c.multi();
+    }).catch(() => { /* Redis unavailable — exec() will return empty */ });
+
+    return {
+      get(key: string) {
+        initPromise.then(() => clientMulti?.get(key));
+        return this;
+      },
+      set(key: string, value: string) {
+        initPromise.then(() => clientMulti?.set(key, value));
+        return this;
+      },
+      del(key: string) {
+        initPromise.then(() => clientMulti?.del(key));
+        return this;
+      },
+      async exec(): Promise<Array<[null, any]>> {
+        try {
+          await initPromise;
+          if (!clientMulti) return [];
+          const results = await clientMulti.exec();
+          // node-redis multi().exec() returns values directly; wrap in ioredis format [err, value]
+          return (results ?? []).map((val: unknown) => [null, val] as [null, unknown]);
+        } catch {
+          return [];
+        }
+      },
+    };
+  },
 };
 
 export default redisWrapper;

@@ -1,6 +1,6 @@
 import { db } from "../lib/drizzle.js";
 import { memories } from "../db/schema/memory.js";
-import { eq, and, lt, inArray } from "drizzle-orm";
+import { eq, and, lt, inArray, sql } from "drizzle-orm";
 import { embed } from "./embeddings.service.js";
 import { storeChunk } from "./vectorStore.service.js";
 import { routeAndCollect } from "../router/index.js";
@@ -10,7 +10,22 @@ export interface CompactionResult {
   originalCount: number;
   compactedCount: number;
   tokensSaved: number;
+  expiredCount: number;
 }
+
+/**
+ * Exponential decay score: returns 0..1 where 1 = just accessed, 0 = stale.
+ * halfLifeDays controls how fast memories decay.
+ */
+function decayScore(lastAccessedAt: Date | null, createdAt: Date, halfLifeDays: number = 14): number {
+  const referenceDate = lastAccessedAt || createdAt;
+  const ageMs = Date.now() - referenceDate.getTime();
+  const ageDays = ageMs / (24 * 60 * 60 * 1000);
+  return Math.pow(0.5, ageDays / halfLifeDays);
+}
+
+/** One-off facts with no access after 30 days are expired. */
+const ONE_OFF_TTL_DAYS = 30;
 
 function cosineSimilarity(a: number[], b: number[]): number {
   let dot = 0, magA = 0, magB = 0;
@@ -32,8 +47,23 @@ interface MemoryChunkWithEmbedding {
 
 export async function compact(userId: number): Promise<CompactionResult> {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const ttlCutoff = new Date(Date.now() - ONE_OFF_TTL_DAYS * 24 * 60 * 60 * 1000);
 
-  // Get old memories
+  // ── Step 1: Expire one-off memories (>30 days old, never accessed) ──
+  const expiredResult = await db.execute(sql`
+    DELETE FROM "Memory"
+    WHERE "userId" = ${userId}
+      AND "createdAt" < ${ttlCutoff}
+      AND ("lastAccessedAt" IS NULL)
+      AND ("accessCount" IS NULL OR "accessCount" = 0)
+    RETURNING "id"
+  `);
+  const expiredCount = expiredResult.rowCount ?? 0;
+  if (expiredCount > 0) {
+    logger.info({ userId, expiredCount }, "Expired stale one-off memories");
+  }
+
+  // ── Step 2: Get old memories for compaction ──
   const oldMemories = await db
     .select({
       id: memories.id,
@@ -50,7 +80,7 @@ export async function compact(userId: number): Promise<CompactionResult> {
     );
 
   if (oldMemories.length < 10) {
-    return { originalCount: 0, compactedCount: 0, tokensSaved: 0 };
+    return { originalCount: 0, compactedCount: 0, tokensSaved: 0, expiredCount };
   }
 
   // Embed all chunks
@@ -143,7 +173,7 @@ export async function compact(userId: number): Promise<CompactionResult> {
   const tokensSaved = Math.round(originalTokens - compactedTokens);
 
   logger.info(
-    { userId, originalCount: totalOriginal, compactedCount, tokensSaved },
+    { userId, originalCount: totalOriginal, compactedCount, tokensSaved, expiredCount },
     "Memory compaction complete"
   );
 
@@ -151,5 +181,6 @@ export async function compact(userId: number): Promise<CompactionResult> {
     originalCount: totalOriginal,
     compactedCount,
     tokensSaved: Math.max(0, tokensSaved),
+    expiredCount,
   };
 }

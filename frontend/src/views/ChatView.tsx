@@ -30,13 +30,19 @@ interface OutletContextType {
 }
 
 export function ChatView() {
-  const { conversationId } = useParams();
+  const { conversationId: rawConversationId } = useParams();
   const navigate = useNavigate();
   const { fetchWithAuth } = useAuth();
   const location = useLocation();
   const { setIsSidebarOpen, loadConversations, conversations } = useOutletContext<OutletContextType>();
 
+  // Sanitize conversationId: must be a valid UUID to prevent path traversal
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const conversationId = rawConversationId && UUID_RE.test(rawConversationId) ? rawConversationId : undefined;
+
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
+  const [summaryData, setSummaryData] = useState<any>(null);
+  const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
 
   const { members, setMembers } = useCouncilMembers();
 
@@ -120,8 +126,44 @@ export function ChatView() {
          setMessages([]);
       }
     };
+
+    const fetchSummary = async () => {
+      if (conversationId) {
+        try {
+          const res = await fetchWithAuth(`/api/history/${conversationId}/summary`);
+          if (res.ok) {
+            const data = await res.json();
+            setSummaryData(data);
+          }
+        } catch (err) {
+          console.error("Failed to fetch summary", err);
+        }
+      } else {
+        setSummaryData(null);
+      }
+    };
+
     fetchHistory();
+    fetchSummary();
   }, [conversationId, fetchWithAuth, setMessages, navigate, conversations]);
+
+  const handleGenerateSummary = async () => {
+    if (!conversationId) return;
+    setIsGeneratingSummary(true);
+    try {
+      const res = await fetchWithAuth(`/api/history/${conversationId}/summary`, {
+        method: "POST"
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setSummaryData(data);
+      }
+    } catch (err) {
+      console.error("Failed to generate summary", err);
+    } finally {
+      setIsGeneratingSummary(false);
+    }
+  };
 
   const handleExport = async (format: "markdown" | "json") => {
     if (!conversationId) return;
@@ -168,6 +210,9 @@ export function ChatView() {
       members={members}
       onUpdateMembers={setMembers}
       isLoading={isLoadingHistory}
+      summaryData={summaryData}
+      onGenerateSummary={handleGenerateSummary}
+      isGeneratingSummary={isGeneratingSummary}
     />
   );
 }

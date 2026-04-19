@@ -3,7 +3,10 @@ import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import {
   getConversationList,
   deleteConversation,
-  updateConversationTitle
+  updateConversationTitle,
+  generateConversationSummary,
+  findConversationById,
+  searchChats
 } from "../services/conversationService.js";
 import { db } from "../lib/drizzle.js";
 import { conversations, chats } from "../db/schema/conversations.js";
@@ -76,43 +79,20 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
 
   fastify.get("/search", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     try {
-      const { q, limit = "10" } = request.query as { q?: string; limit?: string };
+      const { q, limit = "10", projectId, after, before } = request.query as { q?: string; limit?: string; projectId?: string; after?: string; before?: string };
 
       if (!q || typeof q !== "string" || q.trim().length < 2) {
         return [];
       }
 
-      const searchTerm = q.trim();
       const limitNum = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 50);
+      const filters = {
+        projectId,
+        after: after ? new Date(after) : undefined,
+        before: before ? new Date(before) : undefined,
+      };
 
-      // Escape LIKE special characters to prevent wildcard injection
-      const escapedTerm = searchTerm
-        .replace(/\\/g, "\\\\")
-        .replace(/%/g, "\\%")
-        .replace(/_/g, "\\_");
-
-      const results = await db
-        .select({
-          id: chats.id,
-          conversationId: chats.conversationId,
-          question: chats.question,
-          verdict: chats.verdict,
-          createdAt: chats.createdAt,
-        })
-        .from(chats)
-        .where(
-          and(
-            eq(chats.userId, request.userId!),
-            or(
-              ilike(chats.question, `%${escapedTerm}%`),
-              ilike(chats.verdict, `%${escapedTerm}%`)
-            )
-          )
-        )
-        .orderBy(desc(chats.createdAt))
-        .limit(limitNum);
-
-      return results;
+      return await searchChats(request.userId!, q, limitNum, filters);
     } catch (err) {
       logger.error({ err, userId: request.userId }, "History search failed");
       return [];
@@ -179,16 +159,18 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
    */
   fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const { page, limit, skip } = parsePagination(request.query as { page?: string; limit?: string });
+    const { projectId, after, before } = request.query as { projectId?: string; after?: string; before?: string };
 
-    const [conversationList, totalResult] = await Promise.all([
-      getConversationList(request.userId!, limit, skip),
-      db.select({ value: count() }).from(conversations).where(eq(conversations.userId, request.userId!))
-    ]);
+    const filters = {
+      projectId,
+      after: after ? new Date(after) : undefined,
+      before: before ? new Date(before) : undefined,
+    };
 
-    const total = totalResult[0]?.value ?? 0;
+    const { data, total } = await getConversationList(request.userId!, limit, skip, filters);
 
     return {
-      data: conversationList,
+      data,
       pagination: paginationMeta(page, limit, total)
     };
   });
@@ -606,6 +588,37 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
 
     if (updated.length === 0) throw new AppError(404, "Conversation not found");
     return { success: true, isPublic };
+  });
+
+  fastify.get("/:id/summary", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const userId = request.userId!;
+
+    try {
+      const conv = await findConversationById(id, userId);
+      if (!conv) {
+        throw new AppError(404, "Conversation not found");
+      }
+      return (conv as any).summaryData || null;
+    } catch (err) {
+      if (err instanceof AppError) throw err;
+      logger.error({ err, id }, "Failed to fetch summary");
+      throw new AppError(500, "Internal server error");
+    }
+  });
+
+  fastify.post("/:id/summary", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const userId = request.userId!;
+
+    try {
+      const summary = await generateConversationSummary(id, userId);
+      return summary;
+    } catch (err) {
+      if (err instanceof AppError) throw err;
+      logger.error({ err, id }, "Failed to generate summary");
+      throw new AppError(500, "Internal server error");
+    }
   });
 };
 

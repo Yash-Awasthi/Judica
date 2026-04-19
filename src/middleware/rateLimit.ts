@@ -11,9 +11,16 @@ try {
     enableOfflineQueue: false,
     lazyConnect: true,
   });
-  rateLimitRedisClient.connect().catch(() => {});
+  rateLimitRedisClient.connect().catch(() => {
+    logger.warn("Rate limit Redis connection failed — falling back to in-memory store");
+  });
 } catch {
   logger.warn("Redis store for rate limiter unavailable");
+}
+
+/** The ioredis client for @fastify/rate-limit Redis store. May be undefined if Redis is unavailable. */
+export function getRateLimitRedis(): any {
+  return rateLimitRedisClient;
 }
 
 export async function cleanupRateLimitRedis(): Promise<void> {

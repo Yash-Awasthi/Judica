@@ -4,125 +4,57 @@
 
 ### What's Next
 
-[![Now](https://img.shields.io/badge/Now-Production_Hardening-3B82F6?style=for-the-badge)](#phase-1-production-hardening-q2-2026)
-[![Next](https://img.shields.io/badge/Next-Intelligence-8B5CF6?style=for-the-badge)](#phase-2-intelligence-layer-q3-2026)
-[![Then](https://img.shields.io/badge/Then-Autonomy-F59E0B?style=for-the-badge)](#phase-3-autonomous-operations-q4-2026)
-[![Scale](https://img.shields.io/badge/2027-Platform_%26_Enterprise-22C55E?style=for-the-badge)](#phase-4-platform--ecosystem-q1-2027)
+[![Now](https://img.shields.io/badge/Now-Remaining_Hardening-3B82F6?style=for-the-badge)](#phase-1-remaining-hardening)
+[![Next](https://img.shields.io/badge/Next-Autonomous_Ops-F59E0B?style=for-the-badge)](#phase-3-autonomous-operations--remaining)
+[![Then](https://img.shields.io/badge/Then-Platform-8B5CF6?style=for-the-badge)](#phase-4-platform--ecosystem--remaining)
+[![Scale](https://img.shields.io/badge/2027-Enterprise-22C55E?style=for-the-badge)](#phase-5-scale--enterprise-q2-2027)
 
 </div>
 
 ---
 
-## Phase 1: Production Hardening (Q2 2026)
+## Completed
 
-> **Status: In Progress** — Security remediation complete. 86%+ test coverage achieved. Middleware modernized. Remaining: E2E testing, performance tuning, observability alerts.
+> Phases 1 (most), 2, and most of 3–4 are done. See git history for details.
 
-### Testing
-
-- [ ] E2E tests with Playwright — 5 critical user flows (signup → deliberation → KB upload → workflow → marketplace)
-- [ ] Rewrite route-level integration tests to use `fastify.inject()` against the real app instead of local mocks
-- [ ] Contract tests for SSE streaming format (verify event shapes for all deliberation stages)
-- [ ] Load testing with autocannon: target 200 concurrent deliberations, < 2s p95 latency
-
-### Performance
-
-- [ ] PostgreSQL connection pooling via `pg-pool` (currently one connection per request)
-- [ ] Frontend bundle splitting — lazy load Workflow Editor, Marketplace, Analytics views
-- [ ] CDN configuration for static assets (Vite build output)
-- [ ] Redis pipeline batching for rate limit checks (currently one round-trip per check)
-
-### Observability
-
-- [ ] Grafana alert rules: error rate > 5%, p99 latency > 5s, queue backlog > 100, provider failure rate > 20%
-- [ ] Provider health dashboard — per-provider availability, latency distribution, cost per 1K tokens
-- [ ] Dead letter queue monitoring panel in Grafana
-
-### Remaining Technical Debt
-
-- [ ] Python sandbox: add seccomp-bpf syscall filter (bubblewrap + unshare namespace isolation already in place; seccomp would harden against obscure syscall-based escapes)
-- [ ] Accessibility (a11y): color contrast audit (WCAG AA), screen reader testing (VoiceOver/NVDA), `aria-live` regions for streaming deliberation updates (focus trapping + ARIA attributes + keyboard nav already done)
+| Phase | Highlights |
+|---|---|
+| **Phase 1** | E2E tests, CI, integration test templates, load test scaffold, Redis auth pipelining, observability |
+| **Phase 2** | HyDE, parent-child chunking, federated search, adaptive k, topic graph, temporal decay, contradiction resolution, Cohere reranking, agent specialization, confidence calibration, dynamic delegation |
+| **Phase 3** | Goal decomposition, tool chains, test generation, refactoring assistant, PR review agent, full-stack scaffolding, image-aware agents, visual output generation, cross-modal reasoning |
+| **Phase 4** | MCP server + client, plugin SDK, webhook triggers, middleware hooks |
 
 ---
 
-## Phase 2: Intelligence Layer (Q3 2026)
+## Phase 1: Remaining Hardening
 
-> Building the brain that learns.
-
-### Agentic Memory v2
-
-- [ ] **Cross-conversation topic linking** — Connect related sessions via embedding similarity; build topic graph
-- [ ] **Preference adaptation** — Track archetype engagement; auto-tune council composition per user
-- [ ] **Temporal decay** — Exponential memory decay with refresh on access; 30-day TTL for one-off facts
-- [ ] **Contradiction resolution** — Versioned resolution records instead of silent overwrite; surface contradictions
-
-### Advanced RAG Pipeline
-
-- [ ] **Cohere reranking** — `rerank-english-v3.0` as post-retrieval step; top-50 rerank after RRF fusion
-- [ ] **Parent-child chunking** — Hierarchical chunks; inject parent when child matches
-- [ ] **HyDE** — Hypothetical Document Embeddings for improved recall on abstract queries
-- [ ] **Multi-index federated search** — Single query across KBs, repos, and conversation history
-- [ ] **Adaptive k selection** — Dynamic retrieval depth based on query complexity
-
-### Agent Specialization
-
-- [ ] **Domain-specific reasoning** — Pre-configured profiles for legal, medical, financial, engineering
-- [ ] **Self-improving personas** — Track agreement rate with consensus; auto-adjust prompt on divergence
-- [ ] **Dynamic delegation** — Agents spawn sub-agents for specialized tasks mid-deliberation
-- [ ] **Confidence calibration** — Historical confidence vs accuracy tracking; penalize overconfidence
+- [/] Rewrite route-level integration tests to use `fastify.inject()` against the real app (templates, auth guard, archetypes done; more routes ongoing)
+- [/] Load testing with autocannon — scaffold ready (`npm run test:load`), target 200 concurrent deliberations, < 2s p95
+- [ ] Python sandbox: add seccomp-bpf syscall filter
+- [ ] Accessibility: screen reader testing (VoiceOver/NVDA) — manual verification needed
 
 ---
 
-## Phase 3: Autonomous Operations (Q4 2026)
+## Phase 3: Autonomous Operations — Remaining
 
-> From answering questions to completing missions.
-
-### Autonomous Agent Mode
-
-- [ ] **Goal decomposition engine** — Break high-level objectives into DAG of subtasks
-- [ ] **Tool chains** — Autonomous sequencing: web search → extraction → analysis → charts → reports
-- [ ] **Long-running background agents** — Hours-long tasks with Redis checkpoints
-- [ ] **Human-in-the-loop gates** — Configurable approval points; WebSocket notifications
-- [ ] **Intermediate artifact streaming** — Real-time SSE with partial results
-
-### Code Generation & Review
-
-- [ ] **Full-stack scaffolding** — Natural language → project structure, components, APIs, schema
-- [ ] **PR review agent** — Security + Performance + Style triple review
-- [ ] **Test generation** — Council debates edge cases; generates comprehensive test suites
-- [ ] **Refactoring assistant** — Before/after diffs with safety analysis
-
-### Multi-Modal Council
-
-- [ ] **Image-aware agents** — Analyze images, screenshots, diagrams in deliberation
-- [ ] **Audio/video input** — Transcribe and extract keyframes for council context
-- [ ] **Visual output generation** — Mermaid diagrams, data visualizations in responses
-- [ ] **Cross-modal reasoning** — Detect contradictions across text, images, charts
+- [ ] **Long-running background agents** — Hours-long tasks with Redis checkpoints *(needs running Redis)*
+- [ ] **Human-in-the-loop gates** — Configurable approval points; WebSocket notifications *(needs running server)*
+- [ ] **Intermediate artifact streaming** — Real-time SSE with partial results *(needs running server)*
+- [ ] **Audio/video input** — Transcribe and extract keyframes for council context *(needs external transcription service)*
 
 ---
 
-## Phase 4: Platform & Ecosystem (Q1 2027)
+## Phase 4: Platform & Ecosystem — Remaining
 
-> From product to platform.
-
-### MCP Integration
-
-- [ ] **Server mode** — Expose deliberation as MCP tool for Cursor, Claude Desktop, etc.
-- [ ] **Client mode** — Agents call external MCP servers during deliberation
-- [ ] **Tool federation** — Browse and install MCP ecosystem tools
-
-### Plugin SDK
-
-- [ ] **Custom tool packages** — NPM packages registering tools: `npm install aibyai-plugin-jira`
-- [ ] **Custom workflow nodes** — Third-party nodes with React UI + server handlers
-- [ ] **Webhook triggers** — Fire on deliberation events (verdict, conflict, confidence threshold)
-- [ ] **Middleware hooks** — Intercept pipeline at any stage (PII redaction, compliance checks)
+- [ ] **Tool federation** — Browse and install MCP ecosystem tools *(needs package registry/marketplace UI)*
+- [ ] **Custom workflow nodes** — Third-party nodes with React UI + server handlers *(needs running frontend)*
 
 ### Real-time Collaboration
 
-- [ ] **Multi-user deliberation** — 2–10 users in shared council session
-- [ ] **Live presence** — Cursor positions, typing indicators in shared workflow editor
-- [ ] **User annotations** — Highlight and comment on agent responses
-- [ ] **Synthesis voting** — Democratic consensus on top of AI consensus
+- [ ] **Multi-user deliberation** — 2–10 users in shared council session *(needs WebSocket infrastructure)*
+- [ ] **Live presence** — Cursor positions, typing indicators in shared workflow editor *(needs WebSocket infrastructure)*
+- [ ] **User annotations** — Highlight and comment on agent responses *(needs running frontend)*
+- [ ] **Synthesis voting** — Democratic consensus on top of AI consensus *(needs running frontend)*
 
 ---
 

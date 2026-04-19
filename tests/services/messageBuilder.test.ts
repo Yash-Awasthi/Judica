@@ -31,8 +31,21 @@ vi.mock("../../src/db/schema/uploads.js", () => ({
 
 // Mock vectorStore
 const mockHybridSearch = vi.fn();
+const mockEnhancedHybridSearch = vi.fn();
+const mockEnrichWithParentContext = vi.fn((chunks: unknown[]) => chunks);
 vi.mock("../../src/services/vectorStore.service.js", () => ({
   hybridSearch: (...args: unknown[]) => mockHybridSearch(...args),
+  enhancedHybridSearch: (...args: unknown[]) => mockEnhancedHybridSearch(...args),
+  enrichWithParentContext: (...args: unknown[]) => mockEnrichWithParentContext(...args),
+}));
+
+// Mock adaptiveK
+vi.mock("../../src/services/adaptiveK.service.js", () => ({
+  getAdaptiveK: (_query: string, overrideK?: number) => ({
+    k: overrideK || 5,
+    useHyde: false,
+    complexity: { level: "moderate", k: overrideK || 5, useHyde: false, reason: "test" },
+  }),
 }));
 
 // Mock fs/promises (used by the updated code)

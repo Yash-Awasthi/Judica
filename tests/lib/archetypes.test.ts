@@ -12,7 +12,7 @@ vi.mock("../../src/lib/drizzle.js", () => ({
 
 // Mock schema
 vi.mock("../../src/db/schema/users.js", () => ({ userArchetypes: { userId: "userId", isActive: "isActive", createdAt: "createdAt", archetypeId: "archetypeId", id: "id" } }));
-vi.mock("../../src/db/schema/conversations.js", () => ({ chats: { userId: "userId", opinions: "opinions" } }));
+vi.mock("../../src/db/schema/conversations.js", () => ({ chats: { userId: "userId", opinions: "opinions", createdAt: "createdAt" } }));
 
 // Mock config
 vi.mock("../../src/config/archetypes.js", () => ({
@@ -105,8 +105,8 @@ describe("Archetypes Utility", () => {
     (db.select as any).mockReturnValue({
       from: vi.fn().mockReturnThis(),
       where: vi.fn().mockResolvedValue([
-        { opinions: [{ name: "A1" }, { name: "A2" }] },
-        { opinions: [{ name: "A1" }] }
+        { opinions: [{ name: "A1" }, { name: "A2" }], createdAt: new Date() },
+        { opinions: [{ name: "A1" }], createdAt: new Date() }
       ])
     });
 

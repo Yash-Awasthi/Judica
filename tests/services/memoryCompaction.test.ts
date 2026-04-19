@@ -7,11 +7,13 @@ const mockFrom = vi.fn();
 const mockWhere = vi.fn();
 const mockDeleteWhere = vi.fn();
 const mockDelete = vi.fn();
+const mockExecute = vi.fn();
 
 vi.mock("../../src/lib/drizzle.js", () => ({
   db: {
     select: (...args: any[]) => mockSelect(...args),
     delete: (...args: any[]) => mockDelete(...args),
+    execute: (...args: any[]) => mockExecute(...args),
   },
 }));
 
@@ -31,6 +33,10 @@ vi.mock("drizzle-orm", () => ({
   and: vi.fn((...args: any[]) => ({ _op: "and", args })),
   lt: vi.fn((...args: any[]) => ({ _op: "lt", args })),
   inArray: vi.fn((...args: any[]) => ({ _op: "inArray", args })),
+  sql: Object.assign(
+    (strings: TemplateStringsArray, ...values: any[]) => ({ strings, values }),
+    { raw: (s: string) => s }
+  ),
 }));
 
 const mockEmbed = vi.fn();
@@ -96,6 +102,9 @@ function makeMemory(
 beforeEach(() => {
   vi.clearAllMocks();
 
+  // Default: db.execute() for TTL expiry step
+  mockExecute.mockResolvedValue({ rowCount: 0 });
+
   // Default: db.select().from().where() chain
   mockWhere.mockResolvedValue([]);
   mockFrom.mockReturnValue({ where: mockWhere });
@@ -121,7 +130,7 @@ describe("compact()", () => {
 
       const result = await compact(1);
 
-      expect(result).toEqual({ originalCount: 0, compactedCount: 0, tokensSaved: 0 });
+      expect(result).toEqual({ originalCount: 0, compactedCount: 0, tokensSaved: 0, expiredCount: 0 });
       expect(mockRouteAndCollect).not.toHaveBeenCalled();
       expect(mockStoreChunk).not.toHaveBeenCalled();
     });
@@ -134,7 +143,7 @@ describe("compact()", () => {
 
       const result = await compact(42);
 
-      expect(result).toEqual({ originalCount: 0, compactedCount: 0, tokensSaved: 0 });
+      expect(result).toEqual({ originalCount: 0, compactedCount: 0, tokensSaved: 0, expiredCount: 0 });
       expect(mockEmbed).not.toHaveBeenCalled();
       expect(mockRouteAndCollect).not.toHaveBeenCalled();
     });

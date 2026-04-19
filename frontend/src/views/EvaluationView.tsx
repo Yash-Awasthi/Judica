@@ -189,7 +189,7 @@ export function EvaluationView() {
                                             <p className="text-[10px] text-white/30 font-diag uppercase tracking-widest">{ev.model} // {ev.dataset}</p>
                                         </div>
                                     </div>
-                                    <button className="text-white/10 hover:text-white transition-colors"><Share2 size={16} /></button>
+                                    <button aria-label="Share evaluation" className="text-white/10 hover:text-white transition-colors"><Share2 size={16} /></button>
                                 </div>
 
                                 <div className="space-y-6 relative z-10">

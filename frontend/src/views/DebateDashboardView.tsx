@@ -337,9 +337,11 @@ export function DebateDashboardView() {
                         </div>
 
                         {/* Inference Terminal */}
-                        <div 
+                        <div
                             ref={(el) => { if (el) columnRefs.current.set(mItem.id, el); }}
                             className="flex-1 p-8 overflow-y-auto scrollbar-custom text-sm font-diag font-medium text-white/60 leading-relaxed space-y-6"
+                            aria-live="polite"
+                            aria-atomic="false"
                         >
                             {mItem.text ? (
                                 <div className="whitespace-pre-wrap selection:bg-[var(--accent-mint)]/20">
@@ -381,11 +383,13 @@ export function DebateDashboardView() {
       {/* ━━━ Synthesis Footprints ━━━ */}
       <AnimatePresence>
         {synthesis && (
-            <motion.div 
-                initial={{ y: 200 }} 
-                animate={{ y: 0 }} 
+            <motion.div
+                initial={{ y: 200 }}
+                animate={{ y: 0 }}
                 exit={{ y: 200 }}
                 className="shrink-0 bg-black/80 backdrop-blur-3xl border-t border-[var(--accent-mint)]/20 p-10 relative z-30"
+                aria-live="assertive"
+                aria-label="Council synthesis verdict"
             >
                 <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-[var(--accent-mint)] to-transparent" />
                 <div className="max-w-7xl mx-auto flex gap-12">

@@ -8,17 +8,16 @@ const maxConnections = connectionLimitStr ? parseInt(connectionLimitStr, 10) : 2
 
 export const pool = new pg.Pool({
   connectionString: env.DATABASE_URL,
-  max: maxConnections
-});
-
-pool.on("error", (err) => {
-  logger.error({ err }, "Unexpected error on idle database client");
-});
-
-pool.on("acquire", () => {
-  logger.debug({ total: pool.totalCount, idle: pool.idleCount }, "DB connection acquired");
+  max: maxConnections,
+  idleTimeoutMillis: 30_000,
+  connectionTimeoutMillis: 5_000,
+  statement_timeout: 30_000,
 });
 
 pool.on("error", (err) => {
   logger.error({ err, total: pool.totalCount, idle: pool.idleCount }, "Database pool error");
+});
+
+pool.on("acquire", () => {
+  logger.debug({ total: pool.totalCount, idle: pool.idleCount }, "DB connection acquired");
 });

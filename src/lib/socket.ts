@@ -1,17 +1,86 @@
-import { Server as HttpServer } from "http";
+import { Server as HttpServer, IncomingMessage } from "http";
 import { WebSocketServer, WebSocket } from "ws";
+import jwt from "jsonwebtoken";
+import { z } from "zod";
 import logger from "./logger.js";
 import { env } from "../config/env.js";
+import redis from "./redis.js";
+import { findConversationById } from "../services/conversationService.js";
 
 let wss: WebSocketServer | null = null;
+
+const jwtPayloadSchema = z.object({
+  userId: z.number(),
+  username: z.string(),
+  role: z.string().default("member"),
+});
 
 interface ClientSocket extends WebSocket {
   isAlive?: boolean;
   rooms?: Set<string>;
+  userId?: number;
+  username?: string;
+}
+
+function extractToken(req: IncomingMessage): string | null {
+  const url = new URL(req.url || "/", `http://${req.headers.host}`);
+  const tokenFromQuery = url.searchParams.get("token");
+  if (tokenFromQuery) return tokenFromQuery;
+
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith("Bearer ")) return authHeader.slice(7);
+
+  // Check cookies
+  const cookies = req.headers.cookie;
+  if (cookies) {
+    const match = cookies.match(/(?:^|;\s*)access_token=([^;]*)/);
+    if (match) return match[1];
+  }
+
+  return null;
 }
 
 export function initSocket(server: HttpServer): WebSocketServer {
-  wss = new WebSocketServer({ server, path: "/ws" });
+  wss = new WebSocketServer({ noServer: true });
+
+  // Handle upgrade with JWT verification
+  server.on("upgrade", async (req, socket, head) => {
+    const url = new URL(req.url || "/", `http://${req.headers.host}`);
+    if (url.pathname !== "/ws") {
+      socket.destroy();
+      return;
+    }
+
+    const token = extractToken(req);
+    if (!token) {
+      socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+      socket.destroy();
+      return;
+    }
+
+    try {
+      const decoded = jwt.verify(token, env.JWT_SECRET);
+      const payload = jwtPayloadSchema.parse(decoded);
+
+      // Check if user is suspended
+      const userStatus = await redis.get(`user:status:${payload.userId}`);
+      if (userStatus === "suspended") {
+        socket.write("HTTP/1.1 403 Forbidden\r\n\r\n");
+        socket.destroy();
+        return;
+      }
+
+      wss!.handleUpgrade(req, socket, head, (ws: ClientSocket) => {
+        ws.userId = payload.userId;
+        ws.username = payload.username;
+        wss!.emit("connection", ws, req);
+      });
+    } catch (err) {
+      logger.debug({ err: (err as Error).message }, "WebSocket auth failed");
+      socket.write("HTTP/1.1 401 Unauthorized\r\n\r\n");
+      socket.destroy();
+    }
+  });
 
   // Heartbeat interval
   const interval = setInterval(() => {
@@ -32,21 +101,31 @@ export function initSocket(server: HttpServer): WebSocketServer {
     ws.isAlive = true;
     ws.rooms = new Set();
 
-    logger.info("WebSocket client connected");
+    logger.info({ userId: ws.userId }, "WebSocket client connected");
 
     ws.on("pong", () => {
       ws.isAlive = true;
     });
 
-    ws.on("message", (raw) => {
+    ws.on("message", async (raw) => {
       try {
         const msg = JSON.parse(raw.toString());
         if (msg.type === "join:conversation" && msg.conversationId) {
+          // Verify the user owns this conversation (or it's public)
+          const conversation = await findConversationById(msg.conversationId, ws.userId);
+          if (!conversation) {
+            // Check if it's a public conversation
+            const publicConv = await findConversationById(msg.conversationId);
+            if (!publicConv || !publicConv.isPublic) {
+              ws.send(JSON.stringify({ event: "error", data: { message: "Conversation not found or access denied" } }));
+              return;
+            }
+          }
           ws.rooms!.add(`conversation:${msg.conversationId}`);
-          logger.debug({ conversationId: msg.conversationId }, "Joined conversation room");
+          logger.debug({ conversationId: msg.conversationId, userId: ws.userId }, "Joined conversation room");
         } else if (msg.type === "leave:conversation" && msg.conversationId) {
           ws.rooms!.delete(`conversation:${msg.conversationId}`);
-          logger.debug({ conversationId: msg.conversationId }, "Left conversation room");
+          logger.debug({ conversationId: msg.conversationId, userId: ws.userId }, "Left conversation room");
         }
       } catch {
         // Ignore non-JSON messages
@@ -54,15 +133,15 @@ export function initSocket(server: HttpServer): WebSocketServer {
     });
 
     ws.on("close", () => {
-      logger.info("WebSocket client disconnected");
+      logger.info({ userId: ws.userId }, "WebSocket client disconnected");
     });
 
     ws.on("error", (err) => {
-      logger.error({ err: err.message }, "WebSocket error");
+      logger.error({ err: err.message, userId: ws.userId }, "WebSocket error");
     });
   });
 
-  logger.info("WebSocket server initialized");
+  logger.info("WebSocket server initialized (authenticated)");
   return wss;
 }
 

@@ -1,11 +1,14 @@
 import { db } from "../lib/drizzle.js";
 import { conversations, chats } from "../db/schema/conversations.js";
-import { eq, and, desc, asc, sql } from "drizzle-orm";
-import { Message } from "../lib/providers.js";
+import { eq, and, desc, asc, sql, or, ilike } from "drizzle-orm";
+import { Message, askProvider } from "../lib/providers.js";
+import { selectProvider, FREE_TIER_CHAIN } from "../router/providerChain.js";
+import { getAdapter } from "../adapters/registry.js";
 import logger from "../lib/logger.js";
 import { getEmbeddingWithLock } from "../lib/cache.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { safeVectorLiteral } from "./vectorStore.service.js";
+import { env } from "../config/env.js";
 
 export interface Conversation {
   id: string;
@@ -153,18 +156,68 @@ export async function getRecentHistory(conversationId: string): Promise<Message[
   }
 }
 
-export async function getConversationList(userId: number, limit: number = 50, offset: number = 0): Promise<Conversation[]> {
+export async function getConversationList(userId: number, limit: number = 50, offset: number = 0, filters?: { projectId?: string; after?: Date; before?: Date }): Promise<{ data: Conversation[]; total: number }> {
   try {
-    const result = await db
-      .select()
-      .from(conversations)
-      .where(eq(conversations.userId, userId))
-      .orderBy(desc(conversations.updatedAt))
-      .offset(offset)
-      .limit(limit);
-    return result as Conversation[];
+    const whereConditions = [eq(conversations.userId, userId)];
+    if (filters?.projectId) whereConditions.push(eq(conversations.projectId, filters.projectId));
+    if (filters?.after) whereConditions.push(sql`${conversations.updatedAt} >= ${filters.after}`);
+    if (filters?.before) whereConditions.push(sql`${conversations.updatedAt} <= ${filters.before}`);
+
+    const [data, totalResult] = await Promise.all([
+      db.select()
+        .from(conversations)
+        .where(and(...whereConditions))
+        .orderBy(desc(conversations.updatedAt))
+        .offset(offset)
+        .limit(limit),
+      db.select({ count: sql<number>`count(*)` })
+        .from(conversations)
+        .where(and(...whereConditions))
+    ]);
+
+    const total = Number(totalResult[0]?.count ?? 0);
+    return { data: data as Conversation[], total };
   } catch (err) {
     logger.error({ err, userId }, "Failed to get conversation list");
+    throw err;
+  }
+}
+
+export async function searchChats(userId: number, q: string, limit: number = 10, filters?: { projectId?: string; after?: Date; before?: Date }): Promise<Chat[]> {
+  try {
+    const searchTerm = q.trim();
+    const escapedTerm = searchTerm
+      .replace(/\\/g, "\\\\")
+      .replace(/%/g, "\\%")
+      .replace(/_/g, "\\_");
+
+    const whereConditions = [
+      eq(chats.userId, userId),
+      or(
+        ilike(chats.question, `%${escapedTerm}%`),
+        ilike(chats.verdict, `%${escapedTerm}%`)
+      )
+    ];
+
+    if (filters?.after) whereConditions.push(sql`${chats.createdAt} >= ${filters.after}`);
+    if (filters?.before) whereConditions.push(sql`${chats.createdAt} <= ${filters.before}`);
+
+    const results = await db
+      .select({
+        id: chats.id,
+        conversationId: chats.conversationId,
+        question: chats.question,
+        verdict: chats.verdict,
+        createdAt: chats.createdAt,
+      })
+      .from(chats)
+      .where(and(...whereConditions as any))
+      .orderBy(desc(chats.createdAt))
+      .limit(limit);
+
+    return results as any as Chat[];
+  } catch (err) {
+    logger.error({ err, userId, q }, "Failed to search chats");
     throw err;
   }
 }
@@ -341,4 +394,66 @@ export function formatContextForInjection(context: RelevantContext[]): string {
   }
 
   return `Relevant past context:\n${formatted}\n\n---\n\n`;
+}
+
+export async function generateConversationSummary(conversationId: string, userId: number) {
+  try {
+    const history = await getRecentHistory(conversationId);
+    if (history.length === 0) {
+      throw new AppError(400, "No history found to summarize");
+    }
+
+    const prompt = `You are a professional executive assistant. Summarize the following AI council deliberation into a structured JSON format.
+Focus on:
+1. Key Decisions: Major conclusions or consensus points reached.
+2. Action Items: Specific tasks or steps identified.
+3. Follow-Ups: Questions that remain or areas needing further research.
+
+Conversation History:
+${history.map(m => `${m.role.toUpperCase()}: ${m.content}`).join("\n")}
+
+Respond ONLY with a JSON object in this format:
+{
+  "keyDecisions": ["string"],
+  "actionItems": ["string"],
+  "followUps": ["string"]
+}`;
+
+    // Use the smart router to select the best available provider
+    const selected = selectProvider(2000, FREE_TIER_CHAIN);
+    if (!selected) {
+      throw new AppError(503, "No AI provider available for summary generation");
+    }
+
+    const adapter = getAdapter(selected.provider);
+    const providerConfig = {
+      type: selected.provider,
+      model: selected.model,
+      apiKey: "", // Adapter handles credentials
+      name: "Internal Summarizer",
+    };
+
+    const response = await askProvider(providerConfig as any, prompt);
+    const content = response.text;
+
+    // Extract JSON from response (handle potential markdown blocks)
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error("Failed to extract JSON from AI response");
+    }
+
+    const summaryData = JSON.parse(jsonMatch[0]);
+    summaryData.lastUpdated = new Date().toISOString();
+
+    const [updated] = await db
+      .update(conversations)
+      .set({ summaryData })
+      .where(and(eq(conversations.id, conversationId), eq(conversations.userId, userId)))
+      .returning();
+
+    return updated.summaryData;
+  } catch (err) {
+    logger.error({ err, conversationId }, "Failed to generate conversation summary");
+    throw err;
+  }
 }

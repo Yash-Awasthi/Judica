@@ -25,8 +25,11 @@ export const memories = pgTable(
     chunkIndex: integer("chunkIndex").default(0).notNull(),
     sourceName: text("sourceName"),
     sourceUrl: text("sourceUrl"),
+    parentChunkId: text("parentChunkId"),
     embedding: vector("embedding", { dimensions: 1536 }).notNull(),
     createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+    lastAccessedAt: timestamp("lastAccessedAt", { mode: "date" }),
+    accessCount: integer("accessCount").default(0).notNull(),
   },
   (table) => [
     index("Memory_userId_kbId_idx").on(table.userId, table.kbId),

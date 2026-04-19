@@ -154,10 +154,10 @@ export function PersonaBuilder({ onSelect }: PersonaBuilderProps) {
                   <div className="text-xs text-gray-500">{p.domain || "general"} &middot; T:{p.temperature}</div>
                 </div>
                 <div className="flex gap-1 opacity-0 group-hover:opacity-100">
-                  <button onClick={(e) => { e.stopPropagation(); editPersona(p); }} className="p-1 text-gray-400 hover:text-blue-600">
+                  <button onClick={(e) => { e.stopPropagation(); editPersona(p); }} aria-label="Edit persona" className="p-1 text-gray-400 hover:text-blue-600">
                     <Save size={12} />
                   </button>
-                  <button onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }} className="p-1 text-gray-400 hover:text-red-600">
+                  <button onClick={(e) => { e.stopPropagation(); handleDelete(p.id); }} aria-label="Delete persona" className="p-1 text-gray-400 hover:text-red-600">
                     <Trash2 size={12} />
                   </button>
                 </div>
@@ -173,7 +173,7 @@ export function PersonaBuilder({ onSelect }: PersonaBuilderProps) {
           <div className="bg-white rounded-xl shadow-xl p-6 max-w-lg w-full max-h-[80vh] overflow-y-auto">
             <div className="flex items-center justify-between mb-4">
               <h3 className="font-semibold text-lg">{editing ? "Edit Persona" : "New Persona"}</h3>
-              <button onClick={resetForm} className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
+              <button onClick={resetForm} aria-label="Close" className="text-gray-400 hover:text-gray-600"><X size={18} /></button>
             </div>
 
             <div className="space-y-4">

@@ -18,8 +18,8 @@ const ACCESS_TOKEN_EXPIRY = "15m";
 const REFRESH_TOKEN_TTL_DAYS = 7;
 const REFRESH_TOKEN_TTL_SECS = REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60;
 
-function generateAccessToken(userId: number, username: string): string {
-  return jwt.sign({ userId, username }, env.JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY });
+function generateAccessToken(userId: number, username: string, role: string): string {
+  return jwt.sign({ userId, username, role }, env.JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY });
 }
 
 function generateRefreshToken(): string {
@@ -40,8 +40,8 @@ async function createRefreshToken(userId: number): Promise<string> {
   return rawToken;
 }
 
-async function issueTokenPair(userId: number, username: string, reply: FastifyReply): Promise<{ token: string; username: string }> {
-  const accessToken = generateAccessToken(userId, username);
+async function issueTokenPair(userId: number, username: string, role: string, reply: FastifyReply): Promise<{ token: string; username: string; role: string }> {
+  const accessToken = generateAccessToken(userId, username, role);
   const refreshToken = await createRefreshToken(userId);
 
   // Set access token as httpOnly cookie
@@ -63,7 +63,7 @@ async function issueTokenPair(userId: number, username: string, reply: FastifyRe
   });
 
   // Still return token in body for backward compatibility during migration
-  return { token: accessToken, username };
+  return { token: accessToken, username, role };
 }
 
 function fastifyValidate(schema: any) {
@@ -142,7 +142,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
 
       logger.info({ username }, "New user registered");
       reply.code(201);
-      return issueTokenPair(user.id, username, reply);
+      return issueTokenPair(user.id, username, user.role, reply);
     } catch (e: any) {
       if (e.code === "23505") {
         throw new AppError(409, "Username already taken");
@@ -215,7 +215,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     logger.info({ username }, "User logged in");
-    return issueTokenPair(user.id, username, reply);
+    return issueTokenPair(user.id, username, user.role, reply);
   });
 
   /**
@@ -335,14 +335,14 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(401, "Invalid or expired refresh token");
     }
 
-    // Delete the used refresh token (single-use rotation)
+    // Look up the user separately
+    const [user] = await db.select({ id: users.id, username: users.username, role: users.role }).from(users).where(eq(users.id, storedToken.userId)).limit(1);
+
+    // Invalidate the old token to prevent reuse (token rotation)
     await db.delete(refreshTokens).where(eq(refreshTokens.id, storedToken.id));
 
-    // Look up the user separately
-    const [user] = await db.select({ id: users.id, username: users.username }).from(users).where(eq(users.id, storedToken.userId)).limit(1);
-
     logger.info({ username: user.username }, "Token refreshed via rotation");
-    return issueTokenPair(user.id, user.username, reply);
+    return issueTokenPair(user.id, user.username, user.role, reply);
   });
 
   /**

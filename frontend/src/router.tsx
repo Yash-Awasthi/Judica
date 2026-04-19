@@ -2,8 +2,10 @@ import { lazy, Suspense } from "react";
 import { createBrowserRouter } from "react-router-dom";
 import { RootLayout } from "./layouts/RootLayout";
 import { ViewSkeleton } from "./components/ViewSkeleton";
+import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
 import { Settings } from "./components/Settings";
 import { Link } from "react-router-dom";
+import { ProtectedRoute } from "./components/ProtectedRoute";
 
 // Lazy-loaded views
 const ChatView = lazy(() => import("./views/ChatView").then(m => ({ default: m.ChatView })));
@@ -21,6 +23,7 @@ const SkillsView = lazy(() => import("./views/SkillsView").then(m => ({ default:
 const ReposView = lazy(() => import("./views/ReposView").then(m => ({ default: m.ReposView })));
 const EvaluationView = lazy(() => import("./views/EvaluationView").then(m => ({ default: m.EvaluationView })));
 const TrainingLabView = lazy(() => import("./views/TrainingLabView").then(m => ({ default: m.TrainingLabView })));
+const ProjectsView = lazy(() => import("./views/ProjectsView"));
 
 function NotFoundView() {
   return (
@@ -45,137 +48,185 @@ export const router = createBrowserRouter([
       { 
         index: true, 
         element: (
-          <Suspense fallback={<ViewSkeleton />}>
-            <DashboardView />
-          </Suspense>
+          <RouteErrorBoundary>
+            <Suspense fallback={<ViewSkeleton />}>
+              <DashboardView />
+            </Suspense>
+          </RouteErrorBoundary>
         ) 
       },
       { 
         path: "chat", 
         element: (
-          <Suspense fallback={<ViewSkeleton />}>
-            <ChatView />
-          </Suspense>
-        ) 
+          <RouteErrorBoundary>
+            <Suspense fallback={<ViewSkeleton />}>
+              <ChatView />
+            </Suspense>
+          </RouteErrorBoundary>
+        )
       },
-      { 
-        path: "debate", 
+      {
+        path: "projects",
         element: (
-          <Suspense fallback={<ViewSkeleton />}>
-            <DebateDashboardView />
-          </Suspense>
-        ) 
+          <RouteErrorBoundary>
+            <Suspense fallback={<ViewSkeleton />}>
+              <ProjectsView />
+            </Suspense>
+          </RouteErrorBoundary>
+        )
       },
-      { 
-        path: "chat/:conversationId", 
+      {
+        path: "debate",
         element: (
-          <Suspense fallback={<ViewSkeleton />}>
-            <ChatView />
-          </Suspense>
-        ) 
+          <RouteErrorBoundary>
+            <Suspense fallback={<ViewSkeleton />}>
+              <DebateDashboardView />
+            </Suspense>
+          </RouteErrorBoundary>
+        )
       },
-      { 
-        path: "metrics", 
+      {
+        path: "chat/:conversationId",
         element: (
-          <Suspense fallback={<ViewSkeleton />}>
-            <MetricsView />
-          </Suspense>
-        ) 
+          <RouteErrorBoundary>
+            <Suspense fallback={<ViewSkeleton />}>
+              <ChatView />
+            </Suspense>
+          </RouteErrorBoundary>
+        )
       },
-      { 
-        path: "workflows", 
+      {
+        path: "metrics",
         element: (
-          <Suspense fallback={<ViewSkeleton />}>
-            <WorkflowsView />
-          </Suspense>
-        ) 
+          <RouteErrorBoundary>
+            <Suspense fallback={<ViewSkeleton />}>
+              <MetricsView />
+            </Suspense>
+          </RouteErrorBoundary>
+        )
       },
-      { 
-        path: "workflows/new", 
+      {
+        path: "workflows",
         element: (
-          <Suspense fallback={<ViewSkeleton />}>
-            <WorkflowEditorView />
-          </Suspense>
-        ) 
+          <RouteErrorBoundary>
+            <Suspense fallback={<ViewSkeleton />}>
+              <WorkflowsView />
+            </Suspense>
+          </RouteErrorBoundary>
+        )
       },
-      { 
-        path: "workflows/:id", 
+      {
+        path: "workflows/new",
         element: (
-          <Suspense fallback={<ViewSkeleton />}>
-            <WorkflowEditorView />
-          </Suspense>
-        ) 
+          <RouteErrorBoundary>
+            <Suspense fallback={<ViewSkeleton />}>
+              <WorkflowEditorView />
+            </Suspense>
+          </RouteErrorBoundary>
+        )
       },
-      { 
-        path: "prompts", 
+      {
+        path: "workflows/:id",
         element: (
-          <Suspense fallback={<ViewSkeleton />}>
-            <PromptIDEView />
-          </Suspense>
-        ) 
+          <RouteErrorBoundary>
+            <Suspense fallback={<ViewSkeleton />}>
+              <WorkflowEditorView />
+            </Suspense>
+          </RouteErrorBoundary>
+        )
       },
-      { 
-        path: "memory", 
+      {
+        path: "prompts",
         element: (
-          <Suspense fallback={<ViewSkeleton />}>
-            <MemorySettingsView />
-          </Suspense>
-        ) 
+          <RouteErrorBoundary>
+            <Suspense fallback={<ViewSkeleton />}>
+              <PromptIDEView />
+            </Suspense>
+          </RouteErrorBoundary>
+        )
       },
-      { 
-        path: "admin", 
+      {
+        path: "memory",
         element: (
-          <Suspense fallback={<ViewSkeleton />}>
-            <AdminView />
-          </Suspense>
-        ) 
+          <RouteErrorBoundary>
+            <Suspense fallback={<ViewSkeleton />}>
+              <MemorySettingsView />
+            </Suspense>
+          </RouteErrorBoundary>
+        )
       },
-      { 
-        path: "analytics", 
+      {
+        path: "admin",
         element: (
-          <Suspense fallback={<ViewSkeleton />}>
-            <AnalyticsView />
-          </Suspense>
-        ) 
+          <RouteErrorBoundary>
+            <Suspense fallback={<ViewSkeleton />}>
+              <ProtectedRoute requireAdmin>
+                <AdminView />
+              </ProtectedRoute>
+            </Suspense>
+          </RouteErrorBoundary>
+        )
       },
-      { 
-        path: "marketplace", 
+      {
+        path: "analytics",
         element: (
-          <Suspense fallback={<ViewSkeleton />}>
-            <MarketplaceView />
-          </Suspense>
-        ) 
+          <RouteErrorBoundary>
+            <Suspense fallback={<ViewSkeleton />}>
+              <ProtectedRoute requireAdmin>
+                <AnalyticsView />
+              </ProtectedRoute>
+            </Suspense>
+          </RouteErrorBoundary>
+        )
       },
-      { 
-        path: "skills", 
+      {
+        path: "marketplace",
         element: (
-          <Suspense fallback={<ViewSkeleton />}>
-            <SkillsView />
-          </Suspense>
-        ) 
+          <RouteErrorBoundary>
+            <Suspense fallback={<ViewSkeleton />}>
+              <MarketplaceView />
+            </Suspense>
+          </RouteErrorBoundary>
+        )
       },
-      { 
-        path: "repos", 
+      {
+        path: "skills",
         element: (
-          <Suspense fallback={<ViewSkeleton />}>
-            <ReposView />
-          </Suspense>
-        ) 
+          <RouteErrorBoundary>
+            <Suspense fallback={<ViewSkeleton />}>
+              <SkillsView />
+            </Suspense>
+          </RouteErrorBoundary>
+        )
       },
-      { 
-        path: "benchmarks", 
+      {
+        path: "repos",
         element: (
-          <Suspense fallback={<ViewSkeleton />}>
-            <EvaluationView />
-          </Suspense>
-        ) 
+          <RouteErrorBoundary>
+            <Suspense fallback={<ViewSkeleton />}>
+              <ReposView />
+            </Suspense>
+          </RouteErrorBoundary>
+        )
       },
-      { 
-        path: "training", 
+      {
+        path: "benchmarks",
         element: (
-          <Suspense fallback={<ViewSkeleton />}>
-            <TrainingLabView />
-          </Suspense>
+          <RouteErrorBoundary>
+            <Suspense fallback={<ViewSkeleton />}>
+              <EvaluationView />
+            </Suspense>
+          </RouteErrorBoundary>
+        )
+      },
+      {
+        path: "training",
+        element: (
+          <RouteErrorBoundary>
+            <Suspense fallback={<ViewSkeleton />}>
+              <TrainingLabView />
+            </Suspense>
+          </RouteErrorBoundary>
         ) 
       },
       { path: "settings", element: <Settings /> },

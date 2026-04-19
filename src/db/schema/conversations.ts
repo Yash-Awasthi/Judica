@@ -7,8 +7,10 @@ import {
   integer,
   jsonb,
   index,
+  uuid,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
+import { projects } from "./projects.js";
 import { vector } from "./types.js";
 
 // ─── Conversation ────────────────────────────────────────────────────────────
@@ -22,6 +24,9 @@ export const conversations = pgTable(
     updatedAt: timestamp("updatedAt", { mode: "date" }).notNull(),
     isPublic: boolean("isPublic").default(false).notNull(),
     sessionSummary: text("sessionSummary"),
+    projectId: text("projectId").references(() => projects.id, { onDelete: "set null" }),
+    activeTab: text("activeTab").default("discussion").notNull(),
+    summaryData: jsonb("summaryData"),
   },
   (table) => [
     index("Conversation_userId_idx").on(table.userId),
@@ -121,5 +126,51 @@ export const semanticCache = pgTable(
   (table) => [
     index("SemanticCache_embedding_hnsw_idx")
       .using("hnsw", table.embedding.op("vector_cosine_ops")),
+  ],
+);
+
+// ─── TopicNode ──────────────────────────────────────────────────────────────
+// Represents a topic extracted from conversations. Topics are linked to
+// conversations and to each other via embedding similarity, forming a graph.
+export const topicNodes = pgTable(
+  "TopicNode",
+  {
+    id: text("id").primaryKey(),
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    label: text("label").notNull(),
+    summary: text("summary"),
+    embedding: vector("embedding", { dimensions: 1536 }),
+    conversationIds: jsonb("conversationIds").$type<string[]>().default([]).notNull(),
+    strength: integer("strength").default(1).notNull(),
+    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("TopicNode_userId_idx").on(table.userId),
+    index("TopicNode_embedding_hnsw_idx")
+      .using("hnsw", table.embedding.op("vector_cosine_ops")),
+  ],
+);
+
+// ─── TopicEdge ──────────────────────────────────────────────────────────────
+// Weighted edges between topic nodes, representing relatedness.
+export const topicEdges = pgTable(
+  "TopicEdge",
+  {
+    id: text("id").primaryKey(),
+    sourceTopicId: text("sourceTopicId")
+      .notNull()
+      .references(() => topicNodes.id, { onDelete: "cascade" }),
+    targetTopicId: text("targetTopicId")
+      .notNull()
+      .references(() => topicNodes.id, { onDelete: "cascade" }),
+    weight: integer("weight").default(1).notNull(),
+    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("TopicEdge_source_idx").on(table.sourceTopicId),
+    index("TopicEdge_target_idx").on(table.targetTopicId),
   ],
 );

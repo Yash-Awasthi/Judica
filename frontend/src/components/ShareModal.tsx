@@ -67,7 +67,7 @@ export function ShareModal({ resourceType, resourceId, onClose }: ShareModalProp
           <h3 className="font-semibold text-lg flex items-center gap-2 text-[var(--text-primary)]">
             <Link2 size={18} /> Share
           </h3>
-          <button onClick={onClose} className="text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><X size={18} /></button>
+          <button onClick={onClose} aria-label="Close" className="text-[var(--text-muted)] hover:text-[var(--text-secondary)]"><X size={18} /></button>
         </div>
 
         {!shareToken ? (

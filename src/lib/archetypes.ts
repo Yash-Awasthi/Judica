@@ -2,8 +2,7 @@ import { db } from "./drizzle.js";
 import { userArchetypes } from "../db/schema/users.js";
 import { chats } from "../db/schema/conversations.js";
 import { eq, and, asc } from "drizzle-orm";
-import { ARCHETYPES } from "../config/archetypes.js";
-import { Archetype } from "../config/archetypes.js";
+import { ARCHETYPES, Archetype } from "../config/archetypes.js";
 
 export interface UserArchetypeInput {
   archetypeId?: string;
@@ -149,21 +148,49 @@ export function validateArchetype(data: UserArchetypeInput): { valid: boolean; e
 }
 
 export async function getArchetypeUsage(userId: number): Promise<Record<string, number>> {
-  const rows = await db.select({ opinions: chats.opinions })
+  const rows = await db.select({ opinions: chats.opinions, createdAt: chats.createdAt })
     .from(chats)
     .where(eq(chats.userId, userId));
 
   const usage: Record<string, number> = {};
 
+  const now = Date.now();
+  const halfLifeMs = 14 * 24 * 60 * 60 * 1000; // 14-day half-life
+
   for (const chat of rows) {
     const opinions = chat.opinions as { name: string }[] || [];
+    // Recency weight: recent chats count more than old ones
+    const ageMs = now - new Date(chat.createdAt).getTime();
+    const weight = Math.pow(0.5, ageMs / halfLifeMs);
+
     for (const opinion of opinions) {
       const name = opinion.name;
-      usage[name] = (usage[name] || 0) + 1;
+      usage[name] = (usage[name] || 0) + weight;
     }
   }
 
+  // Round to 2 decimal places for readability
+  for (const key of Object.keys(usage)) {
+    usage[key] = Math.round(usage[key] * 100) / 100;
+  }
+
   return usage;
+}
+
+/**
+ * Recommend archetypes for a user based on their engagement patterns.
+ * Returns archetype IDs sorted by weighted usage (most engaged first).
+ */
+export function rankArchetypesByEngagement(
+  usage: Record<string, number>,
+): { id: string; name: string; score: number }[] {
+  return Object.entries(ARCHETYPES)
+    .map(([id, arch]) => ({
+      id,
+      name: arch.name,
+      score: usage[arch.name] || 0,
+    }))
+    .sort((a, b) => b.score - a.score);
 }
 
 export function cloneDefaultArchetype(archetypeId: string): UserArchetypeInput {
