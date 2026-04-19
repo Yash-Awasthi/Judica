@@ -62,8 +62,16 @@ export function useDeliberation({
           case "verdict_chunk":
             updated.verdict = cleanContent((updated.verdict || "") + event.chunk);
             break;
+          case "mode_start":
+            updated.deliberationMode = event.mode;
+            updated.modePhases = [];
+            break;
+          case "mode_phase":
+            updated.modePhases = [...(updated.modePhases || []), event as any];
+            break;
           case "done":
             if (event.verdict) updated.verdict = cleanContent(event.verdict);
+            if (event.opinions && !updated.opinions.length) updated.opinions = event.opinions;
             if (event.conversationId) onConversationCreated?.(event.conversationId);
             break;
         }

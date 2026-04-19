@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { Easing } from "framer-motion";
 import { Volume2, Pause, Eye, EyeOff, Gavel, Timer, DollarSign } from "lucide-react";
 import type { ChatMessage } from "../types/index.js";
+import { ModePhasePanel } from "./ModePhasePanel";
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -128,6 +129,15 @@ export function MessageList({
               )}
             </div>
           </div>
+
+          {/* Mode Phase Panel — shown for advanced reasoning modes */}
+          {msg.deliberationMode && msg.deliberationMode !== "standard" && (
+            <ModePhasePanel
+              mode={msg.deliberationMode}
+              phases={msg.modePhases ?? []}
+              isStreaming={!msg.verdict && (msg.opinions?.length ?? 0) === 0}
+            />
+          )}
 
           {/* Opinions */}
           {(msg.opinions?.length ?? 0) > 0 && (
