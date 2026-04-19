@@ -139,7 +139,10 @@ Three-layer memory with intelligence: active conversation context, auto-generate
 Domain-specific reasoning profiles (legal, medical, financial, engineering) with weighted archetype selection. **Self-improving personas** adjust agent prompts based on performance metrics. **Confidence calibration** flags over/underconfident agents by comparing stated confidence to actual agreement rates. **Dynamic delegation** routes subtasks to the best archetype via keyword matching.
 
 ### Autonomous Operations
-**Goal decomposition engine** breaks complex objectives into a DAG of subtasks with cycle detection, topological sort, and cascading failure handling. **Tool chains** execute 6 tool types sequentially with output piping between steps. Three pre-built templates: research reports, competitive analysis, data pipelines.
+**Goal decomposition engine** breaks complex objectives into a DAG of subtasks with cycle detection, topological sort, and cascading failure handling. **Tool chains** execute 6 tool types sequentially with output piping between steps. Three pre-built templates: research reports, competitive analysis, data pipelines. **Long-running background agents** handle hours-long tasks with checkpointing, pause/resume, and progress tracking. **Human-in-the-loop gates** provide configurable approval points with 4 gate types (approval, review, confirmation, escalation), multi-approver support, and auto-timeout. **Artifact streaming** delivers real-time intermediate results via EventEmitter pub/sub with SSE formatting and late-join replay.
+
+### Audio/Video Input
+**Multi-provider transcription** supports OpenAI Whisper and Google Speech-to-Text with graceful fallback. **Video keyframe extraction** captures frames at configurable intervals with LLM-generated scene descriptions. Transcripts and visual elements are formatted as structured council context for multi-modal deliberation.
 
 ### Code Generation & Review
 **Full-stack scaffolding** turns natural language into PostgreSQL schemas + Drizzle ORM + API routes + React components. **PR review agent** runs security, performance, and style analysis in parallel with weighted scoring. **Test generation** uses 4 council perspectives (boundary, error, security, usability) for edge case discovery. **Refactoring assistant** detects 10 refactoring types and generates safe diffs with behavior-preservation analysis.
@@ -148,10 +151,13 @@ Domain-specific reasoning profiles (legal, medical, financial, engineering) with
 **Server mode** exposes AIBYAI as an MCP-compatible tool server (JSON-RPC 2.0) with deliberation, knowledge search, and test generation tools. **Client mode** connects to external MCP servers with tool discovery, caching, and auth header forwarding.
 
 ### Plugin SDK & Webhooks
-**Custom tool packages** with manifest-driven lifecycle (onLoad/onUnload) and config validation. **Webhook triggers** for 8 event types with retry logic and HMAC-SHA256 signing. **Middleware hooks** at 8 pipeline stages with priority ordering — includes built-in PII redaction, audit logging, and content length guards.
+**Custom tool packages** with manifest-driven lifecycle (onLoad/onUnload) and config validation. **Webhook triggers** for 8 event types with retry logic and HMAC-SHA256 signing. **Middleware hooks** at 8 pipeline stages with priority ordering — includes built-in PII redaction, audit logging, and content length guards. **Tool federation** lets users browse, install, and manage MCP ecosystem tools from a registry with search, ratings, and per-user enable/toggle. **Custom workflow nodes** support third-party node types with input/output schema validation and pluggable execution handlers.
 
 ### Multi-Modal Council
 **Image-aware agents** analyze images and extract elements for council deliberation. **Visual output generation** produces Mermaid diagrams (8 types), chart specs, deliberation mindmaps, and confidence tables. **Cross-modal reasoning** detects contradictions between text and image inputs.
+
+### Real-time Collaboration
+**Multi-user deliberation** supports 2–10 users in shared council sessions with role-based participation (moderator, contributor, observer), phase management (open, deliberating, voting, closed), and turn-based speaking. **Live presence** tracks cursor positions, typing indicators, and user activity with heartbeat-based cleanup. **User annotations** let participants highlight and comment on agent responses with threaded replies, reactions, and resolution tracking. **Synthesis voting** adds democratic consensus on top of AI consensus with weighted scoring, quorum thresholds, delegation, and automatic result tallying.
 
 ### Smart Provider Routing
 Queries are classified by complexity and routed through provider chains. Free tier: Gemini → Groq → OpenRouter → Cerebras → Ollama. Paid tier: OpenAI → Anthropic → Gemini → Mistral. If a provider fails, the circuit breaker (Opossum) trips and traffic shifts to the next in chain — no user-visible downtime.
@@ -163,7 +169,7 @@ A drag-and-drop canvas (React Flow) with 12 node types: LLM, Tool, Condition, Lo
 Autonomous multi-step research: an LLM breaks your query into 3–5 sub-questions, searches the web (Tavily → SerpAPI fallback), scrapes up to 2000 chars per source, synthesizes cited answers per sub-question, then compiles a final Markdown report with executive summary and references.
 
 ### Code Sandbox
-JavaScript runs in a V8 isolate (isolated-vm, 128MB cap). Python runs in a subprocess with ulimit constraints (256MB memory, 10s CPU, 32 processes) and socket-level network blocking. A safe math evaluator uses a recursive descent parser (no `eval()` or `Function()`).
+JavaScript runs in a V8 isolate (isolated-vm, 128MB cap). Python runs in a subprocess with ulimit constraints (256MB memory, 10s CPU, 32 processes), socket-level network blocking, and **seccomp-bpf syscall filtering** that blocks 30+ dangerous syscalls (ptrace, mount, bpf, unshare, kexec, etc.). A safe math evaluator uses a recursive descent parser (no `eval()` or `Function()`).
 
 ### Community Marketplace
 Publish and install prompts, workflows, personas, and custom tools. Star ratings, reviews, download tracking, one-click import into your workspace.
@@ -267,9 +273,12 @@ aibyai/
 │   ├── queue/              # BullMQ workers + dead-letter queue
 │   ├── router/             # Smart routing, token estimation, quota tracking
 │   ├── routes/             # 35 Fastify route plugins
-│   ├── sandbox/            # V8 isolate (JS) + subprocess (Python)
+│   ├── sandbox/            # V8 isolate (JS) + subprocess (Python) + seccomp-bpf
 │   ├── services/           # Council, RAG, memory, reliability, specialization,
-│   │                       # goal decomposition, tool chains, code gen, MCP, plugins
+│   │                       # goal decomposition, tool chains, code gen, MCP, plugins,
+│   │                       # HITL gates, background agents, artifact streaming,
+│   │                       # audio/video, tool federation, workflow nodes,
+│   │                       # annotations, voting, multi-user, live presence
 │   ├── types/              # TypeScript declarations
 │   └── workflow/           # Executor + 9 node type handlers
 ├── frontend/src/
@@ -302,7 +311,7 @@ aibyai/
 | **Rate Limiting** | Redis-backed: 10/min auth, 60/min API, 10/min sandbox, 20/min voice |
 | **Input Validation** | Zod on all payloads; safe math parser (no eval); LIKE wildcard escaping |
 | **SSRF Protection** | Validated on all outbound HTTP — adapters, tools, workflow nodes |
-| **Code Sandbox** | JS: V8 isolate (128MB). Python: ulimit + socket blocking. |
+| **Code Sandbox** | JS: V8 isolate (128MB). Python: ulimit + socket blocking + seccomp-bpf syscall filter. |
 | **Encryption** | AES-256-GCM, per-record IV-derived key via scrypt; API keys encrypted server-side |
 | **Resilience** | Circuit breaker on provider calls, exponential backoff, dead-letter queue |
 | **Headers** | CSP with nonce, request ID correlation, structured error responses |
