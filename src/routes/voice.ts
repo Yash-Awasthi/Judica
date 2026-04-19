@@ -8,44 +8,7 @@ import logger from "../lib/logger.js";
 const voicePlugin: FastifyPluginAsync = async (fastify) => {
   await fastify.register(multipart, { limits: { fileSize: 25 * 1024 * 1024 } });
 
-  /**
-   * @openapi
-   * /api/voice/transcribe:
-   *   post:
-   *     tags:
-   *       - Council
-   *     summary: Transcribe audio to text using Whisper STT
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         multipart/form-data:
-   *           schema:
-   *             type: object
-   *             required:
-   *               - audio
-   *             properties:
-   *               audio:
-   *                 type: string
-   *                 format: binary
-   *                 description: Audio file to transcribe
-   *     responses:
-   *       200:
-   *         description: Transcription result
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 text:
-   *                   type: string
-   *       400:
-   *         description: Audio file required
-   *       502:
-   *         description: Transcription failed
-   *       503:
-   *         description: STT not configured
-   */
-  // POST /api/voice/transcribe — Whisper STT
+    // POST /api/voice/transcribe — Whisper STT
   fastify.post("/transcribe", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const file = await request.file();
     if (!file) throw new AppError(400, "Audio file required", "NO_AUDIO");
@@ -75,45 +38,7 @@ const voicePlugin: FastifyPluginAsync = async (fastify) => {
     return { text: data.text };
   });
 
-  /**
-   * @openapi
-   * /api/voice/synthesize:
-   *   post:
-   *     tags:
-   *       - Council
-   *     summary: Synthesize text to speech audio
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             required:
-   *               - text
-   *             properties:
-   *               text:
-   *                 type: string
-   *                 maxLength: 4096
-   *                 description: Text to synthesize
-   *               voice:
-   *                 type: string
-   *                 description: Voice identifier
-   *     responses:
-   *       200:
-   *         description: Audio file
-   *         content:
-   *           audio/mpeg:
-   *             schema:
-   *               type: string
-   *               format: binary
-   *       400:
-   *         description: Text is required or too long
-   *       502:
-   *         description: All TTS providers failed
-   *       503:
-   *         description: TTS not configured
-   */
-  // POST /api/voice/synthesize — TTS
+    // POST /api/voice/synthesize — TTS
   fastify.post("/synthesize", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const { text, voice } = request.body as { text?: string; voice?: string };
     if (!text || typeof text !== "string" || text.trim().length === 0) {

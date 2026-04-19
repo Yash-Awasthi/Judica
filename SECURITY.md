@@ -54,5 +54,5 @@ This project implements:
 - Input validation on all route handlers
 - Parameterized queries via Drizzle ORM (no raw SQL)
 - File upload MIME type allowlist with path traversal protection
-- Python sandbox with resource limits (ulimit)
+- Python sandbox with resource limits (ulimit) and seccomp-bpf syscall filtering
 - Automated dependency scanning via Dependabot and CodeQL

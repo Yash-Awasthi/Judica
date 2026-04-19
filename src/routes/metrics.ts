@@ -31,65 +31,7 @@ async function fastifyRequireAdmin(request: FastifyRequest, reply: FastifyReply)
 // ─── Plugin ─────────────────────────────────────────────────────────────────
 
 const metricsPlugin: FastifyPluginAsync = async (fastify) => {
-  /**
-   * @openapi
-   * /api/metrics/usage:
-   *   get:
-   *     tags:
-   *       - Analytics
-   *     summary: Get usage metrics for the authenticated user
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: query
-   *         name: days
-   *         schema:
-   *           type: integer
-   *           default: 30
-   *         description: Number of days to look back
-   *     responses:
-   *       200:
-   *         description: Usage metrics
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 period:
-   *                   type: object
-   *                   properties:
-   *                     days:
-   *                       type: integer
-   *                     from:
-   *                       type: string
-   *                       format: date-time
-   *                     to:
-   *                       type: string
-   *                       format: date-time
-   *                 summary:
-   *                   type: object
-   *                   properties:
-   *                     totalChats:
-   *                       type: integer
-   *                     totalTokens:
-   *                       type: integer
-   *                     avgDurationMs:
-   *                       type: integer
-   *                 daily:
-   *                   type: array
-   *                   items:
-   *                     type: object
-   *                     properties:
-   *                       date:
-   *                         type: string
-   *                       requests:
-   *                         type: integer
-   *                       tokens:
-   *                         type: integer
-   *       401:
-   *         description: Unauthorized
-   */
-  fastify.get("/usage", { preHandler: fastifyRequireAuth }, async (request: any, reply) => {
+    fastify.get("/usage", { preHandler: fastifyRequireAuth }, async (request: any, reply) => {
     try {
       const userId = request.userId!;
       const { days = "30" } = request.query as { days?: string };
@@ -148,40 +90,7 @@ const metricsPlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  /**
-   * @openapi
-   * /api/metrics/system:
-   *   get:
-   *     tags:
-   *       - Analytics
-   *     summary: Get system-wide metrics
-   *     security:
-   *       - bearerAuth: []
-   *     responses:
-   *       200:
-   *         description: System metrics
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 totalUsers:
-   *                   type: integer
-   *                 totalConversations:
-   *                   type: integer
-   *                 totalChats:
-   *                   type: integer
-   *                 totalTokens:
-   *                   type: integer
-   *                 recentActivity:
-   *                   type: object
-   *                   properties:
-   *                     chatsLast24h:
-   *                       type: integer
-   *       401:
-   *         description: Unauthorized
-   */
-  fastify.get("/system", { preHandler: fastifyRequireAdmin }, async (request: any, reply) => {
+    fastify.get("/system", { preHandler: fastifyRequireAdmin }, async (request: any, reply) => {
     try {
       const [totalUsersRow] = await db.select({ value: count() }).from(users);
 
@@ -214,52 +123,7 @@ const metricsPlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  /**
-   * @openapi
-   * /api/metrics/conversation/{id}:
-   *   get:
-   *     tags:
-   *       - Analytics
-   *     summary: Get metrics for a specific conversation
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: Conversation ID
-   *     responses:
-   *       200:
-   *         description: Conversation metrics
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 conversationId:
-   *                   type: string
-   *                 title:
-   *                   type: string
-   *                 totalChats:
-   *                   type: integer
-   *                 totalTokens:
-   *                   type: integer
-   *                 avgDurationMs:
-   *                   type: integer
-   *                 createdAt:
-   *                   type: string
-   *                   format: date-time
-   *                 updatedAt:
-   *                   type: string
-   *                   format: date-time
-   *       401:
-   *         description: Unauthorized
-   *       404:
-   *         description: Conversation not found
-   */
-  fastify.get("/conversation/:id", { preHandler: fastifyRequireAuth }, async (request: any, reply) => {
+    fastify.get("/conversation/:id", { preHandler: fastifyRequireAuth }, async (request: any, reply) => {
     try {
       const userId = request.userId!;
       const { id } = request.params as { id: string };

@@ -24,21 +24,6 @@ const testProviderBody = z.object({
   baseUrl: z.string().url().optional(),
 });
 
-/**
- * @openapi
- * /api/providers:
- *   get:
- *     tags:
- *       - Providers
- *     summary: List configured providers (API keys masked)
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: List of providers with masked API keys
- *       401:
- *         description: Unauthorized
- */
 const providersPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     try {
@@ -66,17 +51,7 @@ const providersPlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  /**
-   * @openapi
-   * /api/providers:
-   *   post:
-   *     tags:
-   *       - Providers
-   *     summary: Add a new provider
-   *     security:
-   *       - bearerAuth: []
-   */
-  fastify.post("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.post("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const parsed = addProviderBody.safeParse(request.body);
     if (!parsed.success) {
       reply.code(400);
@@ -136,15 +111,7 @@ const providersPlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  /**
-   * @openapi
-   * /api/providers/test:
-   *   post:
-   *     tags:
-   *       - Providers
-   *     summary: Test a provider connection
-   */
-  fastify.post("/test", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.post("/test", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const parsed = testProviderBody.safeParse(request.body);
     if (!parsed.success) {
       reply.code(400);
@@ -186,17 +153,7 @@ const providersPlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  /**
-   * @openapi
-   * /api/providers/{id}:
-   *   delete:
-   *     tags:
-   *       - Providers
-   *     summary: Delete a provider
-   *     security:
-   *       - bearerAuth: []
-   */
-  fastify.delete<{ Params: { id: string } }>("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.delete<{ Params: { id: string } }>("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     try {
       const userId = request.userId!;
       const { id } = request.params;

@@ -29,7 +29,7 @@ import { fastifyPrometheusOnRequest, fastifyPrometheusOnResponse } from "./middl
 import { fastifyErrorHandler } from "./middleware/errorHandler.js";
 import { getRateLimitRedis } from "./middleware/rateLimit.js";
 
-import { swaggerSpec } from "./lib/swagger.js";
+import { registerSwagger } from "./lib/swagger.js";
 
 // Routes
 import askPlugin from "./routes/ask.js";
@@ -108,6 +108,9 @@ export async function buildApp() {
     ...(rateLimitRedis ? { redis: rateLimitRedis } : {}),
   });
 
+  // Swagger — must be registered before routes
+  await registerSwagger(fastify);
+
   const publicPath = fs.existsSync(path.join(process.cwd(), "frontend/dist"))
     ? path.join(process.cwd(), "frontend/dist")
     : path.join(process.cwd(), "dist/public");
@@ -135,7 +138,9 @@ export async function buildApp() {
   fastify.setErrorHandler(fastifyErrorHandler);
 
   // Health and Metrics
-  fastify.get("/metrics", async (request, reply) => {
+  fastify.get("/metrics", {
+    config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
+  }, async (request, reply) => {
     const authHeader = request.headers.authorization;
     const metricsToken = process.env.METRICS_TOKEN;
     if (metricsToken && authHeader === `Bearer ${metricsToken}`) {
@@ -227,28 +232,6 @@ export async function buildApp() {
   await fastify.register(projectsPlugin,        { prefix: "/api/v1/projects" });
   await fastify.register(askPlugin,             { prefix: "/api/ask" });
   await fastify.register(uploadsPlugin,         { prefix: "/api/uploads" });
-
-  fastify.get("/api/docs/swagger.json", async (_request, reply) => {
-    reply.type("application/json").send(swaggerSpec);
-  });
-
-  fastify.get("/api/docs", async (_request, reply) => {
-    const html = `<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <title>AIBYAI API Documentation</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui.css">
-  <style>.swagger-ui .topbar { display: none }</style>
-</head>
-<body>
-  <div id="swagger-ui"></div>
-  <script src="https://cdn.jsdelivr.net/npm/swagger-ui-dist@5/swagger-ui-bundle.js"></script>
-  <script>SwaggerUIBundle({ url: "/api/docs/swagger.json", dom_id: "#swagger-ui" });</script>
-</body>
-</html>`;
-    reply.type("text/html").send(html);
-  });
 
   fastify.get("/", {
     config: { rateLimit: { max: 60, timeWindow: "1 minute" } },

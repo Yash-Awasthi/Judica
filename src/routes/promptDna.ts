@@ -7,47 +7,7 @@ import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { AppError } from "../middleware/errorHandler.js";
 
 const promptDnaPlugin: FastifyPluginAsync = async (fastify) => {
-  /**
-   * @openapi
-   * /api/prompt-dna:
-   *   get:
-   *     tags:
-   *       - Personas
-   *     summary: List user's PromptDNA profiles
-   *     security:
-   *       - bearerAuth: []
-   *     responses:
-   *       200:
-   *         description: List of PromptDNA profiles
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 dnas:
-   *                   type: array
-   *                   items:
-   *                     type: object
-   *                     properties:
-   *                       id:
-   *                         type: string
-   *                       name:
-   *                         type: string
-   *                       systemPrompt:
-   *                         type: string
-   *                       steeringRules:
-   *                         type: string
-   *                       consensusBias:
-   *                         type: string
-   *                       critiqueStyle:
-   *                         type: string
-   *                       createdAt:
-   *                         type: string
-   *                         format: date-time
-   *       401:
-   *         description: Unauthorized
-   */
-  // GET / — list user's PromptDNA profiles
+    // GET / — list user's PromptDNA profiles
   fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const dnas = await db
       .select()
@@ -58,50 +18,7 @@ const promptDnaPlugin: FastifyPluginAsync = async (fastify) => {
     return { dnas };
   });
 
-  /**
-   * @openapi
-   * /api/prompt-dna:
-   *   post:
-   *     tags:
-   *       - Personas
-   *     summary: Create a PromptDNA profile
-   *     security:
-   *       - bearerAuth: []
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             required:
-   *               - name
-   *               - systemPrompt
-   *             properties:
-   *               name:
-   *                 type: string
-   *               systemPrompt:
-   *                 type: string
-   *               steeringRules:
-   *                 type: string
-   *               consensusBias:
-   *                 type: string
-   *                 default: neutral
-   *               critiqueStyle:
-   *                 type: string
-   *                 default: evidence_based
-   *     responses:
-   *       201:
-   *         description: Created PromptDNA
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *       400:
-   *         description: Missing required fields
-   *       401:
-   *         description: Unauthorized
-   */
-  // POST / — create PromptDNA
+    // POST / — create PromptDNA
   fastify.post("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const { name, systemPrompt, steeringRules, consensusBias, critiqueStyle } =
       request.body as Record<string, any>;
@@ -130,52 +47,7 @@ const promptDnaPlugin: FastifyPluginAsync = async (fastify) => {
     return dna;
   });
 
-  /**
-   * @openapi
-   * /api/prompt-dna/{id}:
-   *   put:
-   *     tags:
-   *       - Personas
-   *     summary: Update a PromptDNA profile
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: PromptDNA ID
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             properties:
-   *               name:
-   *                 type: string
-   *               systemPrompt:
-   *                 type: string
-   *               steeringRules:
-   *                 type: string
-   *               consensusBias:
-   *                 type: string
-   *               critiqueStyle:
-   *                 type: string
-   *     responses:
-   *       200:
-   *         description: Updated PromptDNA
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *       401:
-   *         description: Unauthorized
-   *       404:
-   *         description: PromptDNA not found
-   */
-  // PUT /:id — update PromptDNA
+    // PUT /:id — update PromptDNA
   fastify.put("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const { id } = request.params as { id: string };
 
@@ -206,38 +78,7 @@ const promptDnaPlugin: FastifyPluginAsync = async (fastify) => {
     return updated;
   });
 
-  /**
-   * @openapi
-   * /api/prompt-dna/{id}:
-   *   delete:
-   *     tags:
-   *       - Personas
-   *     summary: Delete a PromptDNA profile
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: PromptDNA ID
-   *     responses:
-   *       200:
-   *         description: PromptDNA deleted
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 success:
-   *                   type: boolean
-   *       401:
-   *         description: Unauthorized
-   *       404:
-   *         description: PromptDNA not found
-   */
-  // DELETE /:id — delete PromptDNA
+    // DELETE /:id — delete PromptDNA
   fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const { id } = request.params as { id: string };
 

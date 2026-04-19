@@ -10,47 +10,6 @@ import { deleteKBChunks, deleteDocChunks } from "../services/vectorStore.service
 import { randomUUID } from "crypto";
 import logger from "../lib/logger.js";
 
-/**
- * @openapi
- * /api/kb:
- *   get:
- *     tags:
- *       - Knowledge Bases
- *     summary: List knowledge bases
- *     description: Returns all knowledge bases owned by the authenticated user.
- *     responses:
- *       200:
- *         description: A list of knowledge bases
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 knowledge_bases:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       id:
- *                         type: string
- *                       name:
- *                         type: string
- *                       description:
- *                         type: string
- *                         nullable: true
- *                       document_count:
- *                         type: integer
- *                       chunk_count:
- *                         type: integer
- *                       createdAt:
- *                         type: string
- *                         format: date-time
- *                       updatedAt:
- *                         type: string
- *                         format: date-time
- *       401:
- *         description: Unauthorized
- */
 const kbPlugin: FastifyPluginAsync = async (fastify) => {
   // GET /api/kb — list knowledge bases
   fastify.get("/", { preHandler: fastifyRequireAuth }, async (request) => {
@@ -86,58 +45,7 @@ const kbPlugin: FastifyPluginAsync = async (fastify) => {
     return { knowledge_bases: result };
   });
 
-  /**
-   * @openapi
-   * /api/kb:
-   *   post:
-   *     tags:
-   *       - Knowledge Bases
-   *     summary: Create a knowledge base
-   *     description: Creates a new knowledge base for the authenticated user.
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             required:
-   *               - name
-   *             properties:
-   *               name:
-   *                 type: string
-   *                 description: Name of the knowledge base
-   *               description:
-   *                 type: string
-   *                 description: Optional description of the knowledge base
-   *     responses:
-   *       201:
-   *         description: Knowledge base created successfully
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 id:
-   *                   type: string
-   *                 name:
-   *                   type: string
-   *                 description:
-   *                   type: string
-   *                   nullable: true
-   *                 userId:
-   *                   type: string
-   *                 createdAt:
-   *                   type: string
-   *                   format: date-time
-   *                 updatedAt:
-   *                   type: string
-   *                   format: date-time
-   *       400:
-   *         description: Name is required
-   *       401:
-   *         description: Unauthorized
-   */
-  fastify.post("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.post("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const { name, description } = request.body as { name?: string; description?: string };
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       throw new AppError(400, "Name is required", "KB_NAME_REQUIRED");
@@ -159,64 +67,7 @@ const kbPlugin: FastifyPluginAsync = async (fastify) => {
     return kb;
   });
 
-  /**
-   * @openapi
-   * /api/kb/{id}:
-   *   get:
-   *     tags:
-   *       - Knowledge Bases
-   *     summary: Get knowledge base detail
-   *     description: Returns a single knowledge base with its documents.
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: Knowledge base ID
-   *     responses:
-   *       200:
-   *         description: Knowledge base details
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 id:
-   *                   type: string
-   *                 name:
-   *                   type: string
-   *                 description:
-   *                   type: string
-   *                   nullable: true
-   *                 chunk_count:
-   *                   type: integer
-   *                 documents:
-   *                   type: array
-   *                   items:
-   *                     type: object
-   *                     properties:
-   *                       id:
-   *                         type: string
-   *                       filename:
-   *                         type: string
-   *                       chunkCount:
-   *                         type: integer
-   *                       indexed:
-   *                         type: boolean
-   *                       indexedAt:
-   *                         type: string
-   *                         format: date-time
-   *                         nullable: true
-   *                       createdAt:
-   *                         type: string
-   *                         format: date-time
-   *       401:
-   *         description: Unauthorized
-   *       404:
-   *         description: Knowledge base not found
-   */
-  fastify.get("/:id", { preHandler: fastifyRequireAuth }, async (request) => {
+    fastify.get("/:id", { preHandler: fastifyRequireAuth }, async (request) => {
     const { id } = request.params as { id: string };
 
     const [kb] = await db
@@ -252,38 +103,7 @@ const kbPlugin: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  /**
-   * @openapi
-   * /api/kb/{id}:
-   *   delete:
-   *     tags:
-   *       - Knowledge Bases
-   *     summary: Delete a knowledge base
-   *     description: Deletes a knowledge base and all associated vector chunks.
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: Knowledge base ID
-   *     responses:
-   *       200:
-   *         description: Knowledge base deleted successfully
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 success:
-   *                   type: boolean
-   *                   example: true
-   *       401:
-   *         description: Unauthorized
-   *       404:
-   *         description: Knowledge base not found
-   */
-  fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request) => {
+    fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request) => {
     const { id } = request.params as { id: string };
 
     const [kb] = await db
@@ -300,66 +120,7 @@ const kbPlugin: FastifyPluginAsync = async (fastify) => {
     return { success: true };
   });
 
-  /**
-   * @openapi
-   * /api/kb/{id}/documents:
-   *   post:
-   *     tags:
-   *       - Knowledge Bases
-   *     summary: Add a document to a knowledge base
-   *     description: Adds a previously uploaded and processed document to a knowledge base. Indexing runs in the background.
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: Knowledge base ID
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             required:
-   *               - upload_id
-   *             properties:
-   *               upload_id:
-   *                 type: string
-   *                 description: ID of a previously processed upload
-   *     responses:
-   *       201:
-   *         description: Document added and indexing started
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 document:
-   *                   type: object
-   *                   properties:
-   *                     id:
-   *                       type: string
-   *                     kbId:
-   *                       type: string
-   *                     uploadId:
-   *                       type: string
-   *                     filename:
-   *                       type: string
-   *                     createdAt:
-   *                       type: string
-   *                       format: date-time
-   *                 message:
-   *                   type: string
-   *                   example: Indexing started in background
-   *       400:
-   *         description: upload_id is required or upload not yet processed
-   *       401:
-   *         description: Unauthorized
-   *       404:
-   *         description: Knowledge base or upload not found
-   */
-  fastify.post("/:id/documents", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.post("/:id/documents", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { upload_id } = request.body as { upload_id?: string };
     if (!upload_id) throw new AppError(400, "upload_id is required", "UPLOAD_ID_REQUIRED");
@@ -403,59 +164,7 @@ const kbPlugin: FastifyPluginAsync = async (fastify) => {
     return { document: doc, message: "Indexing started in background" };
   });
 
-  /**
-   * @openapi
-   * /api/kb/{id}/documents:
-   *   get:
-   *     tags:
-   *       - Knowledge Bases
-   *     summary: List documents in a knowledge base
-   *     description: Returns all documents belonging to the specified knowledge base.
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: Knowledge base ID
-   *     responses:
-   *       200:
-   *         description: A list of documents
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 documents:
-   *                   type: array
-   *                   items:
-   *                     type: object
-   *                     properties:
-   *                       id:
-   *                         type: string
-   *                       kbId:
-   *                         type: string
-   *                       uploadId:
-   *                         type: string
-   *                       filename:
-   *                         type: string
-   *                       chunkCount:
-   *                         type: integer
-   *                       indexed:
-   *                         type: boolean
-   *                       indexedAt:
-   *                         type: string
-   *                         format: date-time
-   *                         nullable: true
-   *                       createdAt:
-   *                         type: string
-   *                         format: date-time
-   *       401:
-   *         description: Unauthorized
-   *       404:
-   *         description: Knowledge base not found
-   */
-  fastify.get("/:id/documents", { preHandler: fastifyRequireAuth }, async (request) => {
+    fastify.get("/:id/documents", { preHandler: fastifyRequireAuth }, async (request) => {
     const { id } = request.params as { id: string };
 
     const [kb] = await db
@@ -475,44 +184,7 @@ const kbPlugin: FastifyPluginAsync = async (fastify) => {
     return { documents: docs };
   });
 
-  /**
-   * @openapi
-   * /api/kb/{kbId}/documents/{docId}:
-   *   delete:
-   *     tags:
-   *       - Knowledge Bases
-   *     summary: Remove a document from a knowledge base
-   *     description: Deletes a document and its associated vector chunks from the knowledge base.
-   *     parameters:
-   *       - in: path
-   *         name: kbId
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: Knowledge base ID
-   *       - in: path
-   *         name: docId
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: Document ID
-   *     responses:
-   *       200:
-   *         description: Document removed successfully
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 success:
-   *                   type: boolean
-   *                   example: true
-   *       401:
-   *         description: Unauthorized
-   *       404:
-   *         description: Knowledge base or document not found
-   */
-  fastify.delete("/:kbId/documents/:docId", { preHandler: fastifyRequireAuth }, async (request) => {
+    fastify.delete("/:kbId/documents/:docId", { preHandler: fastifyRequireAuth }, async (request) => {
     const { kbId, docId } = request.params as { kbId: string; docId: string };
 
     const [kb] = await db

@@ -1,8 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.js";
 
 /* ============================================================
    DESIGN TOKENS - Dual Theme CSS Custom Properties
@@ -121,7 +120,12 @@
   }
 
   .glass-panel-hover {
-    @apply glass-panel;
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--card-shadow);
+    border-radius: 16px;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .glass-panel-hover:hover {
@@ -167,7 +171,10 @@
     font-size: 0.875rem;
   }
   .btn-pill-primary {
-    @apply btn-pill;
+    @apply inline-flex items-center justify-center gap-2 font-semibold transition-all duration-200;
+    border-radius: 9999px;
+    padding: 0.625rem 1.5rem;
+    font-size: 0.875rem;
     background: var(--accent-mint);
     color: #000000;
   }
@@ -254,7 +261,11 @@
     z-index: -1;
   }
   .bg-orb-mint {
-    @apply bg-orb;
+    position: fixed;
+    border-radius: 50%;
+    pointer-events: none;
+    filter: blur(120px);
+    z-index: -1;
     background: var(--accent-mint);
     opacity: 0.04;
   }

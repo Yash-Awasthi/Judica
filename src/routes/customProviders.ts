@@ -11,53 +11,7 @@ import logger from "../lib/logger.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
 
 const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
-  /**
-   * @openapi
-   * /api/custom-providers:
-   *   get:
-   *     tags:
-   *       - Providers
-   *     summary: List all providers (built-in and custom)
-   *     security:
-   *       - bearerAuth: []
-   *     responses:
-   *       200:
-   *         description: Combined list of built-in and custom providers
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 providers:
-   *                   type: array
-   *                   items:
-   *                     type: object
-   *                     properties:
-   *                       id:
-   *                         type: string
-   *                       name:
-   *                         type: string
-   *                       type:
-   *                         type: string
-   *                         enum:
-   *                           - builtin
-   *                           - custom
-   *                       baseUrl:
-   *                         type: string
-   *                       authType:
-   *                         type: string
-   *                       capabilities:
-   *                         type: object
-   *                       models:
-   *                         type: array
-   *                         items:
-   *                           type: string
-   *                       available:
-   *                         type: boolean
-   *       401:
-   *         description: Unauthorized
-   */
-  fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const userId = request.userId!;
 
     // Built-in providers
@@ -101,79 +55,7 @@ const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
     return { providers: [...builtIn, ...customMapped] };
   });
 
-  /**
-   * @openapi
-   * /api/custom-providers/custom:
-   *   post:
-   *     tags:
-   *       - Providers
-   *     summary: Create a custom provider
-   *     security:
-   *       - bearerAuth: []
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             required:
-   *               - name
-   *               - base_url
-   *               - auth_type
-   *               - models
-   *             properties:
-   *               name:
-   *                 type: string
-   *               base_url:
-   *                 type: string
-   *                 format: uri
-   *               auth_type:
-   *                 type: string
-   *               auth_key:
-   *                 type: string
-   *               auth_header_name:
-   *                 type: string
-   *               capabilities:
-   *                 type: object
-   *                 properties:
-   *                   streaming:
-   *                     type: boolean
-   *                   tools:
-   *                     type: boolean
-   *                   vision:
-   *                     type: boolean
-   *               models:
-   *                 type: array
-   *                 items:
-   *                   type: string
-   *     responses:
-   *       201:
-   *         description: Custom provider created
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 id:
-   *                   type: string
-   *                 name:
-   *                   type: string
-   *                 baseUrl:
-   *                   type: string
-   *                 authType:
-   *                   type: string
-   *                 capabilities:
-   *                   type: object
-   *                 models:
-   *                   type: array
-   *                   items:
-   *                     type: string
-   *       400:
-   *         description: Validation error
-   *       401:
-   *         description: Unauthorized
-   */
-  fastify.post("/custom", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.post("/custom", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const userId = request.userId!;
     const { name, base_url, auth_type, auth_key, auth_header_name, capabilities, models } = request.body as any;
 
@@ -237,59 +119,7 @@ const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  /**
-   * @openapi
-   * /api/custom-providers/custom/{id}:
-   *   put:
-   *     tags:
-   *       - Providers
-   *     summary: Update a custom provider
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: integer
-   *         description: Custom provider ID
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             properties:
-   *               name:
-   *                 type: string
-   *               base_url:
-   *                 type: string
-   *                 format: uri
-   *               auth_type:
-   *                 type: string
-   *               auth_key:
-   *                 type: string
-   *               auth_header_name:
-   *                 type: string
-   *               capabilities:
-   *                 type: object
-   *               models:
-   *                 type: array
-   *                 items:
-   *                   type: string
-   *     responses:
-   *       200:
-   *         description: Updated custom provider
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *       401:
-   *         description: Unauthorized
-   *       404:
-   *         description: Custom provider not found
-   */
-  fastify.put("/custom/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.put("/custom/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const userId = request.userId!;
     const providerId = parseInt((request.params as any).id, 10);
 
@@ -346,38 +176,7 @@ const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  /**
-   * @openapi
-   * /api/custom-providers/custom/{id}:
-   *   delete:
-   *     tags:
-   *       - Providers
-   *     summary: Delete a custom provider
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: integer
-   *         description: Custom provider ID
-   *     responses:
-   *       200:
-   *         description: Custom provider deleted
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 deleted:
-   *                   type: boolean
-   *       401:
-   *         description: Unauthorized
-   *       404:
-   *         description: Custom provider not found
-   */
-  fastify.delete("/custom/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.delete("/custom/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const userId = request.userId!;
     const providerId = parseInt((request.params as any).id, 10);
 
@@ -398,44 +197,7 @@ const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
     return { deleted: true };
   });
 
-  /**
-   * @openapi
-   * /api/custom-providers/custom/{id}/test:
-   *   post:
-   *     tags:
-   *       - Providers
-   *     summary: Test a custom provider connection
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: integer
-   *         description: Custom provider ID
-   *     responses:
-   *       200:
-   *         description: Test result
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 success:
-   *                   type: boolean
-   *                 response:
-   *                   type: string
-   *                 usage:
-   *                   type: object
-   *                 error:
-   *                   type: string
-   *       401:
-   *         description: Unauthorized
-   *       404:
-   *         description: Custom provider not found
-   */
-  fastify.post("/custom/:id/test", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.post("/custom/:id/test", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const userId = request.userId!;
     const providerId = parseInt((request.params as any).id, 10);
 
@@ -475,42 +237,7 @@ const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  /**
-   * @openapi
-   * /api/custom-providers/{providerId}/models:
-   *   get:
-   *     tags:
-   *       - Providers
-   *     summary: List models for a provider
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: path
-   *         name: providerId
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: Provider identifier
-   *     responses:
-   *       200:
-   *         description: List of models
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 provider:
-   *                   type: string
-   *                 models:
-   *                   type: array
-   *                   items:
-   *                     type: object
-   *       401:
-   *         description: Unauthorized
-   *       404:
-   *         description: Provider not found
-   */
-  fastify.get("/:providerId/models", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.get("/:providerId/models", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const { providerId } = request.params as any;
 
     const adapter = getAdapterOrNull(providerId as string);
