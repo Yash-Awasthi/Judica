@@ -4,8 +4,6 @@
 
 ### Status
 
-[![Phases 1–4](https://img.shields.io/badge/Phases_1--4-Complete-22C55E?style=for-the-badge)](#phase-5-bloom-gate-anti-convergence--ml-scoring)
-
 *Execution must strictly follow the sequential order of phases, as each phase unlocks the next.*
 
 </div>
@@ -13,26 +11,6 @@
 ---
 
 ## The 13-Tier Roadmap
-
-### Phase 1: Core Setup & Base Stack (Complete)
-- [x] Monorepo initialization (Node.js/TypeScript backend, React/Vite frontend)
-- [x] Database schema creation with Prisma ORM / Drizzle ORM & PostgreSQL
-- [x] Security mechanisms (JWT, PII safeguards, AES-256-GCM encryption)
-
-### Phase 2: LibreChat-Style Unified Adapters (Complete)
-- [x] Provider routing and adapter patterns (LibreChat-style unified adapters)
-- [x] OpenAI, Anthropic, Gemini, Groq, Ollama integration
-- [x] Server-Sent Events (SSE) streaming infrastructure
-
-### Phase 3: Auto-Routing & Parallel Agent Generation (Complete)
-- [x] Query classification and smart routing
-- [x] Multi-agent orchestration for parallel response generation
-- [x] Agent archetype profiles (Empiricist, Strategist, etc.)
-
-### Phase 4: Peer Review & Debate Engine (Complete)
-- [x] Cross-agent conflict detection
-- [x] Structured debate rounds (Critique & Rebuttal)
-- [x] Concession tracking and reliability scoring
 
 ### Phase 5: Bloom Gate Anti-Convergence & ML Scoring
 - [ ] Implement Bloom Gate mechanism to prevent premature convergence during debate
