@@ -12,7 +12,8 @@
  */
 
 import crypto from "crypto";
-import { routeAndCollect } from "../lib/providers.js";
+import type { ProviderResponse } from "../lib/providers.js";
+import { askProvider } from "../lib/providers.js";
 import logger from "../lib/logger.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -115,7 +116,7 @@ async function transcribeWithWhisper(
   options: TranscriptionOptions,
 ): Promise<{ transcript: string; segments: TranscriptionSegment[] }> {
   const formData = new FormData();
-  formData.append("file", new Blob([audioBuffer]), "audio.wav");
+  formData.append("file", new Blob([new Uint8Array(audioBuffer)]), "audio.wav");
   formData.append("model", "whisper-1");
   formData.append("response_format", "verbose_json");
   if (options.language) formData.append("language", options.language);
@@ -246,11 +247,10 @@ Transcript: ${transcript.slice(0, 4000)}
 
 Provide a concise context summary (2-3 paragraphs).`;
 
-    const [response] = await routeAndCollect(prompt, {
-      archetype: "empiricist",
-      maxTokens: 500,
-      temperature: 0.3,
-    });
+    const response = await askProvider(
+      { name: "summarizer", type: "api", provider: "openai", model: "gpt-4o-mini", apiKey: process.env.OPENAI_API_KEY || "" },
+      prompt,
+    );
 
     return response?.text || "Summary unavailable.";
   } catch {

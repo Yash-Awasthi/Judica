@@ -7,7 +7,7 @@ vi.mock("../../src/lib/logger.js", () => ({
 }));
 
 vi.mock("../../src/lib/providers.js", () => ({
-  routeAndCollect: vi.fn().mockResolvedValue([{ text: "Council summary of media content." }]),
+  askProvider: vi.fn().mockResolvedValue({ text: "Council summary of media content." }),
 }));
 
 import {
