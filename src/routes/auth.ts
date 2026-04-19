@@ -67,7 +67,7 @@ async function issueTokenPair(userId: number, username: string, role: string, re
 }
 
 function fastifyValidate(schema: any) {
-  return async (request: any, reply: any) => {
+  return async (request: any, _reply: any) => {
     const result = schema.safeParse(request.body);
     if (!result.success) {
       throw new AppError(400, result.error.issues.map((i: any) => i.message).join(", "));
@@ -139,7 +139,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     // Support both legacy bcrypt ($2a$/$2b$) and new argon2id hashes
-    let passwordValid = false;
+    let passwordValid: boolean;
     const isBcryptHash = user.passwordHash.startsWith("$2a$") || user.passwordHash.startsWith("$2b$");
 
     if (isBcryptHash) {
@@ -203,7 +203,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     return { success: true };
   });
 
-    fastify.get("/me", { preHandler: [fastifyRequireAuth] }, async (request, reply) => {
+    fastify.get("/me", { preHandler: [fastifyRequireAuth] }, async (request, _reply) => {
     const [user] = await db.select({
       id: users.id,
       username: users.username,
@@ -245,7 +245,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     return issueTokenPair(user.id, user.username, user.role, reply);
   });
 
-    fastify.patch("/me", { preHandler: [fastifyRequireAuth] }, async (request, reply) => {
+    fastify.patch("/me", { preHandler: [fastifyRequireAuth] }, async (request, _reply) => {
     const { custom_instructions } = request.body as any;
     if (typeof custom_instructions !== "string") {
       throw new AppError(400, "custom_instructions must be a string");
@@ -256,7 +256,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     return { success: true };
   });
 
-    fastify.post("/config", { preHandler: [fastifyRequireAuth, fastifyValidate(configSchema)] }, async (request, reply) => {
+    fastify.post("/config", { preHandler: [fastifyRequireAuth, fastifyValidate(configSchema)] }, async (request, _reply) => {
     const encrypted = encrypt(JSON.stringify((request.body as any).config));
 
     await db.insert(councilConfigs).values({
@@ -271,7 +271,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     return { success: true };
   });
 
-    fastify.get("/config", { preHandler: [fastifyRequireAuth] }, async (request, reply) => {
+    fastify.get("/config", { preHandler: [fastifyRequireAuth] }, async (request, _reply) => {
     const [row] = await db.select().from(councilConfigs).where(eq(councilConfigs.userId, request.userId!)).limit(1);
 
     if (!row) return null;
@@ -279,7 +279,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     return decrypted;
   });
 
-    fastify.post("/config/rotate", { preHandler: [fastifyRequireAuth] }, async (request, reply) => {
+    fastify.post("/config/rotate", { preHandler: [fastifyRequireAuth] }, async (request, _reply) => {
     const [row] = await db.select().from(councilConfigs).where(eq(councilConfigs.userId, request.userId!)).limit(1);
 
     if (!row) {
@@ -296,13 +296,13 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // GET /api/auth/settings - retrieve user settings
-  fastify.get("/settings", { preHandler: [fastifyRequireAuth] }, async (request, reply) => {
+  fastify.get("/settings", { preHandler: [fastifyRequireAuth] }, async (request, _reply) => {
     const [row] = await db.select().from(userSettings).where(eq(userSettings.userId, request.userId!)).limit(1);
     return row?.settings ?? {};
   });
 
   // PUT /api/auth/settings - save user settings
-  fastify.put("/settings", { preHandler: [fastifyRequireAuth] }, async (request, reply) => {
+  fastify.put("/settings", { preHandler: [fastifyRequireAuth] }, async (request, _reply) => {
     const settings = request.body;
     if (typeof settings !== "object" || settings === null || Array.isArray(settings)) {
       throw new AppError(400, "Settings must be a JSON object");

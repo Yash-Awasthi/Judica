@@ -1,7 +1,7 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { httpRequestDuration, httpRequestTotal } from "../lib/prometheusMetrics.js";
 
-export async function fastifyPrometheusOnRequest(request: FastifyRequest, reply: FastifyReply) {
+export async function fastifyPrometheusOnRequest(request: FastifyRequest, _reply: FastifyReply) {
   (request as any).metricsTimer = httpRequestDuration.startTimer();
 }
 

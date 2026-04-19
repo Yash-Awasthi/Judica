@@ -1,5 +1,3 @@
-import logger from "../lib/logger.js";
-
 /**
  * LIMITATION (PRV-10): Quota tracking is in-memory only.
  *

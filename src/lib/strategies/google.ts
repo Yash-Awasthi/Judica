@@ -107,7 +107,7 @@ export async function streamGoogle(
               totalTokens: json.usageMetadata.totalTokenCount
             };
           }
-        } catch {  }
+        } catch { /* no-op */ }
       }
     }
   }

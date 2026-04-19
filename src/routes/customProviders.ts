@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { AppError } from "../middleware/errorHandler.js";
-import { encrypt, decrypt, mask } from "../lib/crypto.js";
+import { encrypt } from "../lib/crypto.js";
 import { registerAdapter, deregisterAdapter, listAvailableProviders, getAdapterOrNull } from "../adapters/registry.js";
 import { CustomAdapter, type CustomProviderConfig } from "../adapters/custom.adapter.js";
 import { db } from "../lib/drizzle.js";
@@ -11,7 +11,7 @@ import logger from "../lib/logger.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
 
 const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
-    fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const userId = request.userId!;
 
     // Built-in providers
@@ -119,7 +119,7 @@ const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-    fastify.put("/custom/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.put("/custom/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const userId = request.userId!;
     const providerId = parseInt((request.params as any).id, 10);
 
@@ -176,7 +176,7 @@ const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-    fastify.delete("/custom/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.delete("/custom/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const userId = request.userId!;
     const providerId = parseInt((request.params as any).id, 10);
 
@@ -197,7 +197,7 @@ const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
     return { deleted: true };
   });
 
-    fastify.post("/custom/:id/test", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.post("/custom/:id/test", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const userId = request.userId!;
     const providerId = parseInt((request.params as any).id, 10);
 
@@ -237,7 +237,7 @@ const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-    fastify.get("/:providerId/models", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.get("/:providerId/models", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { providerId } = request.params as any;
 
     const adapter = getAdapterOrNull(providerId as string);

@@ -193,15 +193,15 @@ const redisWrapper = {
 
     return {
       get(key: string) {
-        initPromise.then(() => clientMulti?.get(key));
+        void initPromise.then(() => clientMulti?.get(key));
         return this;
       },
       set(key: string, value: string) {
-        initPromise.then(() => clientMulti?.set(key, value));
+        void initPromise.then(() => clientMulti?.set(key, value));
         return this;
       },
       del(key: string) {
-        initPromise.then(() => clientMulti?.del(key));
+        void initPromise.then(() => clientMulti?.del(key));
         return this;
       },
       async exec(): Promise<Array<[null, any]>> {

@@ -119,6 +119,7 @@ export class PostgresBackend implements CacheBackend {
       `);
       logger.debug({ deleted: (result as any).rowCount }, "Cleaned up expired cache entries");
     } catch {
+      // no-op
     }
   }
 }

@@ -1,6 +1,5 @@
 import { Message, Provider, askProvider, askProviderStream } from "./providers.js";
 import logger from "./logger.js";
-import { mapProviderError } from "./errorMapper.js";
 import { parseAgentOutput, AgentOutput, PeerReview, PeerReviewFlaw, ValidatorResult, ScoredOpinion } from "./schemas.js";
 import { adversarialModule } from "./adversarial.js";
 import { groundingModule } from "./grounding.js";

@@ -3,14 +3,10 @@ import type {
   AdapterRequest,
   AdapterChunk,
   AdapterStreamResult,
-  AdapterMessage,
-  AdapterToolCall,
 } from "./types.js";
 import { createStreamResult } from "./types.js";
-import { calculateCost } from "../lib/cost.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
 import { getBreaker } from "../lib/breaker.js";
-import logger from "../lib/logger.js";
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 
@@ -116,7 +112,7 @@ export class OpenAIAdapter implements IProviderAdapter {
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
-    let pendingToolCalls = new Map<number, { id: string; name: string; args: string }>();
+    const pendingToolCalls = new Map<number, { id: string; name: string; args: string }>();
 
     try {
       while (true) {

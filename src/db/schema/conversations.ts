@@ -7,7 +7,6 @@ import {
   integer,
   jsonb,
   index,
-  uuid,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
 import { projects } from "./projects.js";

@@ -51,7 +51,7 @@ export async function processAudio(filePath: string, mimeType: string): Promise<
     });
   } catch (err) {
     logger.error({ err, filePath }, "Whisper API request failed");
-    throw new Error("Audio transcription request failed");
+    throw new Error("Audio transcription request failed", { cause: err });
   }
 
   if (!response.ok) {

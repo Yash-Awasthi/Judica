@@ -4,7 +4,7 @@ import { db } from "../lib/drizzle.js";
 import { users } from "../db/schema/users.js";
 import { customProviders } from "../db/schema/council.js";
 import { auditLogs } from "../db/schema/conversations.js";
-import { eq, desc, ilike, or, sql, gte, lte } from "drizzle-orm";
+import { desc, sql, gte, lte } from "drizzle-orm";
 import { fastifyRequireAdmin } from "../middleware/fastifyAuth.js";
 import { AdminService } from "../services/adminService.js";
 import { AppError } from "../middleware/errorHandler.js";
@@ -18,7 +18,7 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   // ─── USER MANAGEMENT ───────────────────────────────────────────────────────
 
   // GET /users — search and list users
-  fastify.get("/users", async (request, reply) => {
+  fastify.get("/users", async (request, _reply) => {
     const { 
       search, 
       limit = 20, 
@@ -37,7 +37,7 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // GET /users/:id — user detail for modal
-  fastify.get("/users/:id", async (request, reply) => {
+  fastify.get("/users/:id", async (request, _reply) => {
     const { id } = request.params as any;
     const userId = parseInt(id);
     const detail = await AdminService.getUserDetail(userId);
@@ -54,7 +54,7 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // PUT /users/:id/role — change user role
-  fastify.put("/users/:id/role", async (request, reply) => {
+  fastify.put("/users/:id/role", async (request, _reply) => {
     const { role } = request.body as any;
     const { id } = request.params as any;
     
@@ -68,7 +68,7 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // POST /users/:id/suspend — suspend user and revoke sessions
-  fastify.post("/users/:id/suspend", async (request, reply) => {
+  fastify.post("/users/:id/suspend", async (request, _reply) => {
     const { id } = request.params as any;
     const userId = parseInt(id);
 
@@ -81,7 +81,7 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // POST /users/:id/activate — reactivate user
-  fastify.post("/users/:id/activate", async (request, reply) => {
+  fastify.post("/users/:id/activate", async (request, _reply) => {
     const { id } = request.params as any;
     const userId = parseInt(id);
 
@@ -92,7 +92,7 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // DELETE /users/:id — hard delete user
-  fastify.delete("/users/:id", async (request, reply) => {
+  fastify.delete("/users/:id", async (request, _reply) => {
     const { id } = request.params as any;
     await AdminService.deleteUser(parseInt(id), request.userId!);
     return { success: true };
@@ -101,7 +101,7 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   // ─── GROUP MANAGEMENT ───────────────────────────────────────────────────────
 
   // GET /groups — list all groups with member counts
-  fastify.get("/groups", async (request, reply) => {
+  fastify.get("/groups", async (_request, _reply) => {
     const groups = await AdminService.getGroups();
     return { groups };
   });
@@ -117,7 +117,7 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // POST /groups/:id/members — add member to group
-  fastify.post("/groups/:id/members", async (request, reply) => {
+  fastify.post("/groups/:id/members", async (request, _reply) => {
     const { id } = request.params as any;
     const { userId } = request.body as any;
     
@@ -128,7 +128,7 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // DELETE /groups/:id/members/:userId — remove member from group
-  fastify.delete("/groups/:id/members/:userId", async (request, reply) => {
+  fastify.delete("/groups/:id/members/:userId", async (request, _reply) => {
     const { id, userId } = request.params as any;
     
     await AdminService.removeMemberFromGroup(parseInt(id), parseInt(userId), request.userId!);
@@ -138,12 +138,12 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   // ─── SYSTEM CONFIGURATION ──────────────────────────────────────────────────
 
   // GET /config — get all system settings
-  fastify.get("/config", async (request, reply) => {
+  fastify.get("/config", async (_request, _reply) => {
     return AdminService.getConfig();
   });
 
   // PATCH /config — update system settings
-  fastify.patch("/config", async (request, reply) => {
+  fastify.patch("/config", async (request, _reply) => {
     const body = request.body as Record<string, any>;
     for (const [key, value] of Object.entries(body)) {
       await AdminService.updateConfig(key, value, request.userId!);
@@ -154,7 +154,7 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   // ─── PROVIDERS ─────────────────────────────────────────────────────────────
 
   // GET /providers — list API provider statuses
-  fastify.get("/providers", async (request, reply) => {
+  fastify.get("/providers", async (_request, _reply) => {
     const providers = await db.select().from(customProviders);
     const config = await AdminService.getConfig();
     const defaultId = config.default_provider_id;
@@ -172,7 +172,7 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // POST /providers/:id/default — set global default
-  fastify.post("/providers/:id/default", async (request, reply) => {
+  fastify.post("/providers/:id/default", async (request, _reply) => {
     const { id } = request.params as any;
     await AdminService.setProviderDefault(parseInt(id), request.userId!);
     return { success: true };
@@ -181,19 +181,19 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   // ─── ANALYTICS ─────────────────────────────────────────────────────────────
   
   // GET /analytics/metrics — system-wide totals
-  fastify.get("/analytics/metrics", async (request, reply) => {
+  fastify.get("/analytics/metrics", async (_request, _reply) => {
     return AdminService.getSystemStats();
   });
 
   // GET /analytics/daily-volume — time-series usage data
-  fastify.get("/analytics/daily-volume", async (request, reply) => {
+  fastify.get("/analytics/daily-volume", async (request, _reply) => {
     const { days = 30 } = request.query as any;
     const data = await AdminService.getUsageAnalytics(parseInt(days));
     return { data };
   });
 
   // GET /analytics/provider-breakdown — tokens per provider
-  fastify.get("/analytics/provider-breakdown", async (request, reply) => {
+  fastify.get("/analytics/provider-breakdown", async (_request, _reply) => {
     const providers = await AdminService.getProviderBreakdown();
     return { providers };
   });
@@ -201,7 +201,7 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   // ─── SECURITY & AUDIT ──────────────────────────────────────────────────────
 
   // GET /audit-log — view administrative actions
-  fastify.get("/audit-log", async (request, reply) => {
+  fastify.get("/audit-log", async (request, _reply) => {
     const { actionType, limit, offset, startDate, endDate } = request.query as any;
     const logs = await AdminService.getAuditLogs({
       actionType,
@@ -214,7 +214,7 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // GET /security/key-rotation — encryption status
-  fastify.get("/security/key-rotation", async (request, reply) => {
+  fastify.get("/security/key-rotation", async (_request, _reply) => {
     const configs = await AdminService.getConfig();
     return {
       currentRotation: new Date(), // Mock for UI
@@ -225,7 +225,7 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // POST /security/key-rotation — trigger manual rotation
-  fastify.post("/security/key-rotation", async (request, reply) => {
+  fastify.post("/security/key-rotation", async (request, _reply) => {
     const { old_key, new_key } = request.body as any;
 
     if (!old_key || !new_key) {
@@ -273,7 +273,7 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // GET /api/admin/workspace/members — list all workspace members with roles
-  fastify.get("/workspace/members", async (request, reply) => {
+  fastify.get("/workspace/members", async (_request, _reply) => {
     const rows = await db
       .select({
         id: users.id,
@@ -290,7 +290,7 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // PUT /api/admin/workspace/members/:id/role — update member role
-  fastify.put("/workspace/members/:id/role", async (request, reply) => {
+  fastify.put("/workspace/members/:id/role", async (request, _reply) => {
     const { id } = request.params as { id: string };
     const { role } = request.body as { role: string };
 

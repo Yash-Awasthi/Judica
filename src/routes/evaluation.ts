@@ -11,7 +11,7 @@ import { AppError } from "../middleware/errorHandler.js";
 // ─── Plugin ─────────────────────────────────────────────────────────────────
 
 const evaluationPlugin: FastifyPluginAsync = async (fastify) => {
-  fastify.post("/session", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.post("/session", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const {
       sessionId,
       conversationId,
@@ -48,7 +48,7 @@ const evaluationPlugin: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  fastify.get("/metrics", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/metrics", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { days = 30 } = request.query as { days?: string };
     const metrics = await getUserEvaluationMetrics(request.userId!, parseInt(days as string));
 
@@ -58,7 +58,7 @@ const evaluationPlugin: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  fastify.get("/benchmark", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/benchmark", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { councilSize = 3, queryComplexity = 'moderate' } = request.query as {
       councilSize?: string;
       queryComplexity?: string;
@@ -77,7 +77,7 @@ const evaluationPlugin: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  fastify.get("/dashboard", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/dashboard", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { days = 30 } = request.query as { days?: string };
     const daysNum = parseInt(days as string);
 

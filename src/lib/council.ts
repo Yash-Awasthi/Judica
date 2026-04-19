@@ -5,12 +5,10 @@ import { eq } from "drizzle-orm";
 import { mapProviderError } from "./errorMapper.js";
 import { Message, Provider } from "./providers.js";
 import logger from "./logger.js";
-import { formatAgentOutput, ScoredOpinion } from "./schemas.js";
-import { filterAndRank } from "./scoring.js";
+import { ScoredOpinion } from "./schemas.js";
 import { gatherOpinions, conductPeerReview, evaluateConsensus, synthesizeVerdict, conductDebateRound, OpinionResult } from "./deliberationPhases.js";
 import { PeerReview, ValidatorResult } from "./schemas.js";
 import { createController } from "./controller.js";
-import { calculateCost } from "./cost.js";
 import { updateReliability, getReliabilityScores } from "../services/reliability.service.js";
 
 export type { PeerReview, ValidatorResult };
@@ -157,7 +155,7 @@ export async function* deliberate(
     
     yield { type: "status", round: r, message: `${roundLabel}: Gathering agent responses...` };
 
-    let { opinions, totalTokens: opinionTokens } = await gatherOpinions({
+    const { opinions: _gatherOpinions, totalTokens: opinionTokens } = await gatherOpinions({
       members,
       currentMessages,
       round: r,
@@ -165,6 +163,7 @@ export async function* deliberate(
       maxTokens,
       onMemberChunk
     });
+    let opinions = _gatherOpinions;
     totalTokens += opinionTokens;
 
     const minRequired = Math.max(2, Math.ceil(members.length * 0.5));
@@ -199,7 +198,6 @@ export async function* deliberate(
           structured: original?.structured || null
         } as OpinionResult;
       });
-      finalOpinions = opinions;
 
       for (const op of refinedOpinions) {
         yield { type: "opinion", name: op.name + " (Refined)", text: op.opinion, round: 1.5 };
@@ -266,8 +264,6 @@ export async function* deliberate(
 
     finalOpinions = opinions;
 
-    const roundContext = opinions.map(o => `${o.name}: ${o.opinion}`).join("\n\n");
-
     if (r < rounds) {
       const {
         criticEval,
@@ -320,7 +316,6 @@ export async function* deliberate(
   yield { type: "status", round: rounds, message: "Master synthesis started" };
 
   // ── Reliability-weighted synthesis: inject model reliability scores ──
-  let reliabilityContext = "";
   try {
     const modelNames = (members as any[]).map((m) => m.model).filter(Boolean);
     const scores = await getReliabilityScores(modelNames);
@@ -332,7 +327,7 @@ export async function* deliberate(
           : null;
       }).filter(Boolean);
       if (memberScores.length > 0) {
-        reliabilityContext = `\n\n[MODEL RELIABILITY SCORES - weight responses accordingly]\n${memberScores.join("\n")}\n[/MODEL RELIABILITY SCORES]`;
+        const reliabilityContext = `\n\n[MODEL RELIABILITY SCORES - weight responses accordingly]\n${memberScores.join("\n")}\n[/MODEL RELIABILITY SCORES]`;
         // Inject into the last message for synthesis context
         if (currentMessages.length > 0) {
           const lastMsg = currentMessages[currentMessages.length - 1];

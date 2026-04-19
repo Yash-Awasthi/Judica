@@ -30,7 +30,7 @@ async function isTokenRevoked(token: string): Promise<boolean> {
   return !!revokedInDB;
 }
 
-export async function fastifyOptionalAuth(request: FastifyRequest, reply: FastifyReply) {
+export async function fastifyOptionalAuth(request: FastifyRequest, _reply: FastifyReply) {
   const authHeader = request.headers.authorization;
   const tokenFromHeader = authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
   const tokenFromCookie = (request as any).cookies?.access_token;

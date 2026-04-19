@@ -21,7 +21,7 @@ export const executeCodeTool: ToolInstance = {
     const isolate = new ivm.Isolate({ memoryLimit: 128 });
     try {
       const context = await isolate.createContext();
-      const jail = context.global;
+      const _jail = context.global;
 
       const script = await isolate.compileScript(code);
       const result = await script.run(context, { timeout: 1000 });

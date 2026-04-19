@@ -8,7 +8,6 @@ import { createStreamResult } from "./types.js";
 import { decrypt } from "../lib/crypto.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
 import { getBreaker } from "../lib/breaker.js";
-import logger from "../lib/logger.js";
 
 export interface CustomProviderConfig {
   id: string;

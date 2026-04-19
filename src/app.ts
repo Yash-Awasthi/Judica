@@ -144,6 +144,7 @@ export async function buildApp() {
     const authHeader = request.headers.authorization;
     const metricsToken = process.env.METRICS_TOKEN;
     if (metricsToken && authHeader === `Bearer ${metricsToken}`) {
+      // no-op: authorized, proceed to metrics
     } else if (!metricsToken) {
       const ip = request.ip;
       if (ip !== "127.0.0.1" && ip !== "::1" && ip !== "::ffff:127.0.0.1") {

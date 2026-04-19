@@ -24,7 +24,7 @@ export const FALLBACK_MAP: Record<string, Partial<Provider>> = {
 };
 
 export function getFallbackProvider(original: Provider): Provider | null {
-  let fallbackData = FALLBACK_MAP[original.type];
+  const fallbackData = FALLBACK_MAP[original.type];
 
   if (!fallbackData || !fallbackData.apiKey) {
     return null;

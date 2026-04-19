@@ -39,7 +39,7 @@ const LANG_EXTENSIONS: Record<string, string> = {
 
 const artifactsPlugin: FastifyPluginAsync = async (fastify) => {
   // GET /api/artifacts — list user's artifacts
-  fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { conversation_id, type } = request.query as {
       conversation_id?: string;
       type?: string;
@@ -68,7 +68,7 @@ const artifactsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // GET /api/artifacts/:id — get artifact
-  fastify.get("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const artifact = await db
@@ -84,7 +84,7 @@ const artifactsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // PUT /api/artifacts/:id — update artifact
-  fastify.put("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.put("/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
     const body = request.body as { name?: string; content?: string };
 
@@ -111,7 +111,7 @@ const artifactsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // DELETE /api/artifacts/:id — delete
-  fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const existing = await db

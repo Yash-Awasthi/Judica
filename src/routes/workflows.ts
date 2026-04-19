@@ -2,7 +2,7 @@ import { FastifyPluginAsync } from "fastify";
 import { randomUUID } from "crypto";
 import { db } from "../lib/drizzle.js";
 import { workflows, workflowRuns } from "../db/schema/workflows.js";
-import { eq, and, desc, count, sql } from "drizzle-orm";
+import { eq, and, desc, count } from "drizzle-orm";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { AppError } from "../middleware/errorHandler.js";
 import logger from "../lib/logger.js";
@@ -100,7 +100,7 @@ if (_sweepInterval.unref) _sweepInterval.unref();
 
 const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
     // GET / — list user's workflows
-  fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const limit = Math.min(Math.max(Number((request.query as any).limit) || 20, 1), 100);
     const offset = Math.max(Number((request.query as any).offset) || 0, 0);
 
@@ -159,7 +159,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // GET /:id — get workflow by ID
-  fastify.get("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [workflow] = await db
@@ -174,7 +174,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // PUT /:id — update workflow
-  fastify.put("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.put("/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [workflow] = await db
@@ -213,7 +213,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // DELETE /:id — delete workflow
-  fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [workflow] = await db
@@ -229,7 +229,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // POST /:id/publish — publish workflow
-  fastify.post("/:id/publish", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.post("/:id/publish", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [workflow] = await db
@@ -290,7 +290,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
     activeRuns.set(run.id, { executor, events: [], createdAt: Date.now() });
 
     // Run execution in background (do NOT await)
-    (async () => {
+    void (async () => {
       try {
         for await (const event of executor.run(inputs || {})) {
           const entry = activeRuns.get(run.id);
@@ -326,7 +326,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // GET /:id/runs — list runs for workflow
-  fastify.get("/:id/runs", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/:id/runs", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [workflow] = await db
@@ -347,7 +347,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // GET /runs/:runId — get run status
-  fastify.get("/runs/:runId", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/runs/:runId", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { runId } = request.params as { runId: string };
 
     const [run] = await db
@@ -428,7 +428,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // POST /runs/:runId/gate — resume human gate
-  fastify.post("/runs/:runId/gate", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.post("/runs/:runId/gate", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { runId } = request.params as { runId: string };
 
     const [run] = await db

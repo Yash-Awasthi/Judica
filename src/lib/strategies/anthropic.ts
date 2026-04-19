@@ -108,7 +108,7 @@ export async function streamAnthropic(
           }
           const chunk = json.delta?.text ?? "";
           if (chunk) { fullText += chunk; onChunk(chunk); }
-        } catch {  }
+        } catch { /* no-op */ }
       }
     }
   }

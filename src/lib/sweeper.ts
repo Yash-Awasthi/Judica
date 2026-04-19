@@ -4,10 +4,8 @@ import { semanticCache, auditLogs, contextSummaries } from "../db/schema/convers
 import { revokedTokens } from "../db/schema/auth.js";
 import redis from "./redis.js";
 import logger from "./logger.js";
-import { env } from "../config/env.js";
 
 const SWEEP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
-const CACHE_TTL_HOURS = 24; // 24 hours
 const TOKEN_TTL_DAYS = 90; // 90 days
 
 let sweepTimer: NodeJS.Timeout | null = null;

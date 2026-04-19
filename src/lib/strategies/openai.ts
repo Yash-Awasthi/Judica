@@ -109,7 +109,7 @@ export async function streamOpenAI(
   let fullText = "";
   let usage: any;
   let inThink = false;
-  let toolCalls: any[] = [];
+  const toolCalls: any[] = [];
 
   while (true) {
     const { done, value } = await reader.read();
@@ -156,7 +156,7 @@ export async function streamOpenAI(
             }
             if (toSend) onChunk(toSend);
           }
-        } catch {  }
+        } catch { /* no-op */ }
       }
     }
   }

@@ -6,7 +6,7 @@ import { traces } from "../db/schema/traces.js";
 import { eq, count, sum, avg, sql } from "drizzle-orm";
 
 const analyticsPlugin: FastifyPluginAsync = async (fastify) => {
-    fastify.get("/overview", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.get("/overview", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const userId = request.userId!;
 
     // Total conversations

@@ -18,7 +18,7 @@ import logger from "../lib/logger.js";
 
 const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
     // GET / — list marketplace items
-  fastify.get("/", async (request, reply) => {
+  fastify.get("/", async (request, _reply) => {
     const {
       type,
       tags,
@@ -83,7 +83,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // GET /:id — item detail with reviews
-  fastify.get("/:id", async (request, reply) => {
+  fastify.get("/:id", async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [item] = await db
@@ -168,7 +168,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // PUT /:id — update item (author only)
-  fastify.put("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.put("/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [item] = await db
