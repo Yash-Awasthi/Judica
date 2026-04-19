@@ -27,6 +27,13 @@ import {
 } from "../services/councilService.js";
 import { loadFileContext, loadRAGContext, buildEnrichedQuestion } from "../services/messageBuilder.service.js";
 import { detectArtifact, saveArtifact } from "../services/artifacts.service.js";
+import {
+  runSocraticPrelude,
+  runRedBlueDebate,
+  runHypothesisRefinement,
+  runConfidenceCalibration,
+  type ReasoningMode,
+} from "../lib/reasoningModes.js";
 import { startTrace, addStep, endTrace } from "../observability/tracer.js";
 import { searchRepo } from "../services/repoSearch.service.js";
 import { db } from "../lib/drizzle.js";
@@ -113,234 +120,6 @@ function validateAskBody(request: FastifyRequest, reply: FastifyReply) {
   (request as any).body = result.data;
 }
 
-/**
- * @openapi
- * /api/ask:
- *   get:
- *     tags:
- *       - Council
- *     summary: Health check for the Council endpoint
- *     description: Returns a simple message confirming the Council endpoint is listening.
- *     responses:
- *       200:
- *         description: Council endpoint is available
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 message:
- *                   type: string
- *                   example: "Council is listening. Use POST to ask."
- */
-
-/**
- * @openapi
- * /api/ask:
- *   post:
- *     tags:
- *       - Council
- *     summary: Ask the AI council a question
- *     description: >
- *       Submits a question to the AI council for deliberation. Members discuss the
- *       question over one or more rounds, then a master synthesiser produces a final verdict.
- *       Supports auto-routing, manual member selection, and direct (baseline) mode.
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - question
- *             properties:
- *               question:
- *                 type: string
- *                 description: The question to ask the council.
- *               mode:
- *                 type: string
- *                 enum: [auto, manual, direct]
- *                 description: >
- *                   Routing mode. "auto" lets the router pick archetypes,
- *                   "manual" uses the provided members, "direct" skips deliberation.
- *               rounds:
- *                 type: number
- *                 minimum: 1
- *                 maximum: 5
- *                 default: 1
- *                 description: Number of deliberation rounds (1-5).
- *               conversationId:
- *                 type: string
- *                 format: uuid
- *                 description: Optional existing conversation ID for multi-turn context.
- *               members:
- *                 type: array
- *                 description: Optional array of council member configurations.
- *                 items:
- *                   type: object
- *               upload_ids:
- *                 type: array
- *                 items:
- *                   type: string
- *                 description: Optional file upload IDs to include as context.
- *               kb_id:
- *                 type: string
- *                 description: Optional knowledge-base ID for RAG context retrieval.
- *               maxTokens:
- *                 type: number
- *                 description: Optional maximum tokens for each LLM response.
- *               userConfig:
- *                 type: object
- *                 description: >
- *                   Optional user-level council configuration overriding default members
- *                   and master.
- *     responses:
- *       200:
- *         description: Council verdict with opinions and metadata
- *         content:
- *           application/json:
- *             schema:
- *               type: object
- *               properties:
- *                 success:
- *                   type: boolean
- *                 conversationId:
- *                   type: string
- *                   format: uuid
- *                 verdict:
- *                   type: string
- *                   description: The synthesised final answer.
- *                 opinions:
- *                   type: array
- *                   items:
- *                     type: object
- *                   description: Individual member opinions.
- *                 latency:
- *                   type: number
- *                   description: Total request duration in milliseconds.
- *                 cacheHit:
- *                   type: boolean
- *                 router:
- *                   type: object
- *                   description: Router metadata (present when mode is auto).
- *                 citations:
- *                   type: array
- *                   items:
- *                     type: object
- *                     properties:
- *                       source:
- *                         type: string
- *                       score:
- *                         type: number
- *                 artifact_id:
- *                   type: string
- *                   description: ID of a detected artifact, if any.
- *                 metrics:
- *                   type: object
- *                   properties:
- *                     totalTokens:
- *                       type: number
- *                     totalCost:
- *                       type: number
- *                     hallucinationCount:
- *                       type: number
- *       400:
- *         description: Invalid request or council configuration error
- *       404:
- *         description: Conversation not found
- *       429:
- *         description: Quota exceeded
- */
-
-/**
- * @openapi
- * /api/ask/stream:
- *   post:
- *     tags:
- *       - Council
- *     summary: Stream a council deliberation via Server-Sent Events
- *     description: >
- *       Submits a question to the AI council and returns the response as an SSE stream.
- *       Events are emitted for each stage of deliberation: status updates, member token
- *       chunks, completed opinions, peer reviews, scoring, validator results, metrics,
- *       and a final done event containing the synthesised verdict.
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - question
- *             properties:
- *               question:
- *                 type: string
- *                 description: The question to ask the council.
- *               mode:
- *                 type: string
- *                 enum: [auto, manual, direct]
- *                 description: >
- *                   Routing mode. "auto" lets the router pick archetypes,
- *                   "manual" uses the provided members, "direct" skips deliberation.
- *               rounds:
- *                 type: number
- *                 minimum: 1
- *                 maximum: 5
- *                 default: 1
- *                 description: Number of deliberation rounds (1-5).
- *               conversationId:
- *                 type: string
- *                 format: uuid
- *                 description: Optional existing conversation ID for multi-turn context.
- *               members:
- *                 type: array
- *                 description: Optional array of council member configurations.
- *                 items:
- *                   type: object
- *               upload_ids:
- *                 type: array
- *                 items:
- *                   type: string
- *                 description: Optional file upload IDs to include as context.
- *               kb_id:
- *                 type: string
- *                 description: Optional knowledge-base ID for RAG context retrieval.
- *               maxTokens:
- *                 type: number
- *                 description: Optional maximum tokens for each LLM response.
- *               userConfig:
- *                 type: object
- *                 description: >
- *                   Optional user-level council configuration overriding default members
- *                   and master.
- *     responses:
- *       200:
- *         description: SSE event stream of council deliberation
- *         content:
- *           text/event-stream:
- *             schema:
- *               type: string
- *               description: >
- *                 Newline-delimited SSE events. Each event has a JSON `data` field with
- *                 a `type` property. Event types: status, member_chunk, opinion,
- *                 peer_review, scored, validator_result, metrics, done, error.
- *               example: |
- *                 data: {"type":"status","message":"Deliberating..."}
- *                 data: {"type":"member_chunk","name":"analyst","chunk":"The key issue..."}
- *                 data: {"type":"opinion","name":"analyst","opinion":"..."}
- *                 data: {"type":"done","verdict":"...","opinions":[...],"conversationId":"..."}
- *       400:
- *         description: Invalid request or council configuration error
- *       404:
- *         description: Conversation not found (sent as SSE error event after headers)
- *       429:
- *         description: Quota exceeded
- */
-
 const askPlugin: FastifyPluginAsync = async (fastify) => {
 
   // GET / - Health check
@@ -355,6 +134,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     const { question, conversationId, summon, maxTokens, rounds = 1, context, mode, userConfig } = request.body as any;
     const upload_ids: string[] | undefined = (request.body as any).upload_ids;
     const kb_id: string | undefined = (request.body as any).kb_id;
+    const deliberation_mode: ReasoningMode = (request.body as any).deliberation_mode ?? "standard";
 
     let effectiveSummon: QueryType | "default" = summon || "default";
     let effectiveMembers = (request.body as any).members;
@@ -485,13 +265,49 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       logger.info({ question: question.slice(0, 50) }, "Serving from semantic cache");
       if (traceCtx) addStep(traceCtx, { name: "cache_hit", type: "retrieval", input: question.slice(0, 500), output: "served from cache", latencyMs: 0 });
     } else {
-      logger.info({ question: question.slice(0, 80), memberCount: councilMembers.length, summon: effectiveSummon, rounds: effectiveRounds }, "Council ask started");
+      logger.info({ question: question.slice(0, 80), memberCount: councilMembers.length, summon: effectiveSummon, rounds: effectiveRounds, deliberation_mode }, "Council ask started");
 
       const councilStart = Date.now();
-      const councilResponse = await askCouncil(councilMembers, master, currentMessages, maxTokens, effectiveRounds);
-      verdict = councilResponse.verdict;
-      finalOpinions = councilResponse.opinions;
-      tokensUsed = councilResponse.metrics?.totalTokens ?? 0;
+
+      if (deliberation_mode === "socratic") {
+        const { augmentedContext, qa } = await runSocraticPrelude(question, councilMembers);
+        const augmentedMessages = [
+          ...messages,
+          { role: "user" as const, content: augmentedContext + (typeof enrichedQuestion === "string" ? enrichedQuestion : question) },
+        ];
+        const councilResponse = await askCouncil(councilMembers, master, augmentedMessages, maxTokens, effectiveRounds);
+        verdict = councilResponse.verdict;
+        finalOpinions = [{ name: "Socratic Q&A", opinion: qa.map(({ q, a }) => `Q: ${q}\nA: ${a}`).join("\n\n") }, ...councilResponse.opinions];
+        tokensUsed = councilResponse.metrics?.totalTokens ?? 0;
+      } else if (deliberation_mode === "red_blue") {
+        const result = await runRedBlueDebate(question, councilMembers);
+        verdict = result.judgeVerdict;
+        finalOpinions = [
+          { name: "Red Team (FOR)", opinion: result.redArguments },
+          { name: "Blue Team (AGAINST)", opinion: result.blueArguments },
+          { name: "Judge", opinion: result.judgeVerdict },
+        ];
+      } else if (deliberation_mode === "hypothesis") {
+        const result = await runHypothesisRefinement(question, councilMembers);
+        verdict = result.finalSynthesis;
+        finalOpinions = result.rounds.flatMap((r) =>
+          r.hypotheses.map((h) => ({ name: `${h.agent} [${r.phase} R${r.round}]`, opinion: h.text }))
+        );
+      } else if (deliberation_mode === "confidence") {
+        const result = await runConfidenceCalibration(question, councilMembers);
+        verdict = result.weightedSynthesis;
+        finalOpinions = result.opinions.map((o) => ({
+          name: o.agent,
+          opinion: o.opinion,
+          confidence: o.confidence,
+          reasoning: o.reasoning,
+        }));
+      } else {
+        const councilResponse = await askCouncil(councilMembers, master, currentMessages, maxTokens, effectiveRounds);
+        verdict = councilResponse.verdict;
+        finalOpinions = councilResponse.opinions;
+        tokensUsed = councilResponse.metrics?.totalTokens ?? 0;
+      }
 
       if (traceCtx) {
         for (const op of finalOpinions) {
@@ -569,6 +385,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       const { question, conversationId, summon, maxTokens, rounds = 1, context, mode } = request.body as any;
       const upload_ids: string[] | undefined = (request.body as any).upload_ids;
       const kb_id: string | undefined = (request.body as any).kb_id;
+      const deliberation_mode: ReasoningMode = (request.body as any).deliberation_mode ?? "standard";
 
       let effectiveSummon: QueryType | "default" = summon || "default";
       let effectiveMembers = (request.body as any).members;
@@ -680,7 +497,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         })}\n\n`);
         reply.raw.end();
       } else {
-        logger.info({ question: question.slice(0, 80), memberCount: councilMembers.length, summon: effectiveSummon, rounds: effectiveRounds }, "Council SSE stream started");
+        logger.info({ question: question.slice(0, 80), memberCount: councilMembers.length, summon: effectiveSummon, rounds: effectiveRounds, deliberation_mode }, "Council SSE stream started");
 
         const emitEvent = (type: string, data: any) => {
           if (!controller.signal.aborted) {
@@ -691,21 +508,75 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
           }
         };
 
-        finalVerdict = await streamCouncil(
-          councilMembers,
-          master,
-          currentMessages,
-          (event, data) => {
-            if (event === "opinion") finalOpinions.push(data);
-            if (event === "done") tokensUsed = data.tokensUsed || 0;
-            emitEvent(event, data);
-          },
-          maxTokens,
-          effectiveRounds,
-          controller.signal
-        );
+        if (deliberation_mode !== "standard") {
+          // Emit a phase event so the frontend can show a spinner
+          emitEvent("mode_start", { mode: deliberation_mode });
 
-        reply.raw.end();
+          if (deliberation_mode === "socratic") {
+            const { augmentedContext, qa } = await runSocraticPrelude(question, councilMembers);
+            emitEvent("mode_phase", { phase: "socratic_prelude", qa });
+            const augmentedMessages = [
+              ...messages,
+              { role: "user" as const, content: augmentedContext + questionWithContext },
+            ];
+            finalVerdict = await streamCouncil(
+              councilMembers, master, augmentedMessages,
+              (event, data) => {
+                if (event === "opinion") finalOpinions.push(data);
+                if (event === "done") tokensUsed = data.tokensUsed || 0;
+                emitEvent(event, data);
+              },
+              maxTokens, effectiveRounds, controller.signal
+            );
+          } else if (deliberation_mode === "red_blue") {
+            const result = await runRedBlueDebate(question, councilMembers);
+            emitEvent("mode_phase", { phase: "red_blue_complete", redArguments: result.redArguments, blueArguments: result.blueArguments });
+            finalVerdict = result.judgeVerdict;
+            finalOpinions = [
+              { name: "Red Team (FOR)", opinion: result.redArguments },
+              { name: "Blue Team (AGAINST)", opinion: result.blueArguments },
+              { name: "Judge", opinion: result.judgeVerdict },
+            ];
+            emitEvent("done", { verdict: finalVerdict, opinions: finalOpinions, router: routerDecision ? formatRouterMetadata(routerDecision) : undefined });
+          } else if (deliberation_mode === "hypothesis") {
+            const result = await runHypothesisRefinement(question, councilMembers);
+            for (const round of result.rounds) {
+              emitEvent("mode_phase", { phase: "hypothesis_round", round });
+            }
+            finalVerdict = result.finalSynthesis;
+            finalOpinions = result.rounds.flatMap((r) =>
+              r.hypotheses.map((h) => ({ name: `${h.agent} [${r.phase} R${r.round}]`, opinion: h.text }))
+            );
+            emitEvent("done", { verdict: finalVerdict, opinions: finalOpinions, router: routerDecision ? formatRouterMetadata(routerDecision) : undefined });
+          } else if (deliberation_mode === "confidence") {
+            const result = await runConfidenceCalibration(question, councilMembers);
+            emitEvent("mode_phase", { phase: "calibrated_opinions", opinions: result.opinions });
+            finalVerdict = result.weightedSynthesis;
+            finalOpinions = result.opinions.map((o) => ({
+              name: o.agent, opinion: o.opinion, confidence: o.confidence, reasoning: o.reasoning,
+            }));
+            emitEvent("done", { verdict: finalVerdict, opinions: finalOpinions, router: routerDecision ? formatRouterMetadata(routerDecision) : undefined });
+          }
+
+          reply.raw.end();
+        } else {
+          finalVerdict = await streamCouncil(
+            councilMembers,
+            master,
+            currentMessages,
+            (event, data) => {
+              if (event === "opinion") finalOpinions.push(data);
+              if (event === "done") tokensUsed = data.tokensUsed || 0;
+              emitEvent(event, data);
+            },
+            maxTokens,
+            effectiveRounds,
+            controller.signal
+          );
+
+          reply.raw.end();
+        }
+
         await setCachedResponse(question, councilMembers, master, messages, finalVerdict, finalOpinions);
 
         if (effectiveConversationId && userId && finalVerdict) {

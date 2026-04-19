@@ -1,7 +1,7 @@
 import { motion } from "framer-motion";
 
 export const Skeleton = ({ className }: { className?: string }) => (
-  <div className={`relative overflow-hidden ${className}`}>
+  <div className={`relative overflow-hidden ${className}`} aria-hidden="true">
     <motion.div
       animate={{
         opacity: [0.03, 0.08, 0.03],
@@ -21,7 +21,7 @@ export const Skeleton = ({ className }: { className?: string }) => (
 const SkeletonPulse = Skeleton;
 
 export const CardSkeleton = () => (
-  <div className="p-6 rounded-[2rem] bg-white/[0.01] border border-white/5 space-y-4">
+  <div className="p-6 rounded-[2rem] bg-white/[0.01] border border-white/5 space-y-4" aria-hidden="true">
     <SkeletonPulse className="h-6 w-32 rounded-lg" />
     <div className="space-y-2">
       <SkeletonPulse className="h-4 w-full rounded-md" />
@@ -35,7 +35,7 @@ export const CardSkeleton = () => (
 );
 
 export const MarketplaceGridSkeleton = () => (
-  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+  <div role="status" aria-label="Loading marketplace items" className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
     {Array.from({ length: 8 }).map((_, i) => (
       <CardSkeleton key={i} />
     ))}
@@ -43,7 +43,7 @@ export const MarketplaceGridSkeleton = () => (
 );
 
 export const TerminalSkeleton = () => (
-  <div className="p-6 rounded-[2.5rem] bg-[#0A0A0A] border border-white/5 font-mono">
+  <div role="status" aria-label="Loading" className="p-6 rounded-[2.5rem] bg-[#0A0A0A] border border-white/5 font-mono" aria-hidden="true">
     <div className="flex items-center gap-2 mb-6 border-b border-white/5 pb-4">
       <div className="w-2 h-2 rounded-full bg-red-500/20" />
       <div className="w-2 h-2 rounded-full bg-yellow-500/20" />
@@ -62,7 +62,7 @@ export const TerminalSkeleton = () => (
 );
 
 export const HUDSkeleton = () => (
-  <div className="p-10 rounded-[2.5rem] bg-white/[0.01] border border-white/5 space-y-8">
+  <div role="status" aria-label="Loading dashboard" className="p-10 rounded-[2.5rem] bg-white/[0.01] border border-white/5 space-y-8" aria-hidden="true">
     <div className="flex justify-between items-end">
       <div className="space-y-2">
         <SkeletonPulse className="h-4 w-20 rounded opacity-50" />

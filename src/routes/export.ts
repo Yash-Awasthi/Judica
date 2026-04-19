@@ -31,43 +31,7 @@ function mapChat(chat: {
 // ─── Plugin ─────────────────────────────────────────────────────────────────
 
 const exportPlugin: FastifyPluginAsync = async (fastify) => {
-  /**
-   * @openapi
-   * /api/export/conversation/{id}:
-   *   get:
-   *     tags:
-   *       - Export
-   *     summary: Export a conversation as JSON
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: Conversation ID
-   *     responses:
-   *       200:
-   *         description: Conversation JSON file download
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 exportedAt:
-   *                   type: string
-   *                   format: date-time
-   *                 conversation:
-   *                   type: object
-   *       401:
-   *         description: Unauthorized
-   *       404:
-   *         description: Conversation not found
-   *       500:
-   *         description: Export failed
-   */
-  fastify.get<{ Params: { id: string } }>(
+    fastify.get<{ Params: { id: string } }>(
     "/conversation/:id",
     { preHandler: fastifyRequireAuth },
     async (request, reply) => {
@@ -124,40 +88,7 @@ const exportPlugin: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  /**
-   * @openapi
-   * /api/export/all:
-   *   get:
-   *     tags:
-   *       - Export
-   *     summary: Export all conversations as JSON
-   *     security:
-   *       - bearerAuth: []
-   *     responses:
-   *       200:
-   *         description: All conversations JSON file download
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 exportedAt:
-   *                   type: string
-   *                   format: date-time
-   *                 totalConversations:
-   *                   type: integer
-   *                 totalChats:
-   *                   type: integer
-   *                 conversations:
-   *                   type: array
-   *                   items:
-   *                     type: object
-   *       401:
-   *         description: Unauthorized
-   *       500:
-   *         description: Export failed
-   */
-  fastify.get(
+    fastify.get(
     "/all",
     { preHandler: fastifyRequireAuth },
     async (request, reply) => {
@@ -227,37 +158,7 @@ const exportPlugin: FastifyPluginAsync = async (fastify) => {
     },
   );
 
-  /**
-   * @openapi
-   * /api/export/conversation/{id}/markdown:
-   *   get:
-   *     tags:
-   *       - Export
-   *     summary: Export a conversation as Markdown
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: Conversation ID
-   *     responses:
-   *       200:
-   *         description: Markdown file download
-   *         content:
-   *           text/markdown:
-   *             schema:
-   *               type: string
-   *       401:
-   *         description: Unauthorized
-   *       404:
-   *         description: Conversation not found
-   *       500:
-   *         description: Export failed
-   */
-  fastify.get<{ Params: { id: string } }>(
+    fastify.get<{ Params: { id: string } }>(
     "/conversation/:id/markdown",
     { preHandler: fastifyRequireAuth },
     async (request, reply) => {

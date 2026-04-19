@@ -100,8 +100,33 @@ export async function fastifyRequireAdmin(request: FastifyRequest, reply: Fastif
   await fastifyRequireAuth(request, reply);
   if (reply.sent) return;
 
-  if (request.role !== "admin") {
+  if (request.role !== "admin" && request.role !== "owner") {
     reply.code(403).send({ error: "Admin access required" });
     return;
   }
+}
+
+/**
+ * Role hierarchy: owner > admin > member > viewer
+ * Usage: preHandler: fastifyRequireRole("admin")
+ */
+const ROLE_RANK: Record<string, number> = {
+  viewer: 1,
+  member: 2,
+  admin: 3,
+  owner: 4,
+};
+
+export function fastifyRequireRole(minRole: "viewer" | "member" | "admin" | "owner") {
+  return async function (request: FastifyRequest, reply: FastifyReply) {
+    await fastifyRequireAuth(request, reply);
+    if (reply.sent) return;
+
+    const userRank = ROLE_RANK[request.role ?? "member"] ?? 0;
+    const requiredRank = ROLE_RANK[minRole];
+
+    if (userRank < requiredRank) {
+      reply.code(403).send({ error: `Role '${minRole}' or higher required` });
+    }
+  };
 }

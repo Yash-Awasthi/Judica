@@ -112,28 +112,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     }
   };
 
-  /**
-   * @openapi
-   * /api/auth/register:
-   *   post:
-   *     tags: [Auth]
-   *     summary: Register a new user account
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             required: [username, password]
-   *             properties:
-   *               username: { type: string }
-   *               password: { type: string, minLength: 8 }
-   *     responses:
-   *       201: { description: Account created, content: { application/json: { schema: { type: object, properties: { token: { type: string }, username: { type: string } } } } } }
-   *       409: { description: Username already taken }
-   *       400: { description: Validation error }
-   */
-  fastify.post("/register", { preHandler: [authRateLimit, fastifyValidate(authSchema)] }, async (request, reply) => {
+    fastify.post("/register", { preHandler: [authRateLimit, fastifyValidate(authSchema)] }, async (request, reply) => {
     try {
       const { username, password } = request.body as any;
       const hash = await argon2.hash(password, { type: argon2.argon2id, memoryCost: 65536, timeCost: 3 });
@@ -151,28 +130,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  /**
-   * @openapi
-   * /api/auth/login:
-   *   post:
-   *     tags: [Auth]
-   *     summary: Log in with username and password
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             required: [username, password]
-   *             properties:
-   *               username: { type: string }
-   *               password: { type: string }
-   *     responses:
-   *       200: { description: Login successful, content: { application/json: { schema: { type: object, properties: { token: { type: string }, username: { type: string } } } } } }
-   *       401: { description: Invalid username or password }
-   *       400: { description: Validation error }
-   */
-  fastify.post("/login", { preHandler: [authRateLimit, fastifyValidate(authSchema)] }, async (request, reply) => {
+    fastify.post("/login", { preHandler: [authRateLimit, fastifyValidate(authSchema)] }, async (request, reply) => {
     const { username, password } = request.body as any;
     const [user] = await db.select().from(users).where(eq(users.username, username)).limit(1);
 
@@ -218,25 +176,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     return issueTokenPair(user.id, username, user.role, reply);
   });
 
-  /**
-   * @openapi
-   * /api/auth/logout:
-   *   post:
-   *     tags: [Auth]
-   *     summary: Log out and revoke the current JWT token
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: header
-   *         name: Authorization
-   *         required: true
-   *         schema: { type: string }
-   *         description: Bearer token
-   *     responses:
-   *       200: { description: Logout successful, content: { application/json: { schema: { type: object, properties: { success: { type: boolean } } } } } }
-   *       401: { description: Unauthorized }
-   */
-  fastify.post("/logout", { preHandler: [fastifyRequireAuth] }, async (request, reply) => {
+    fastify.post("/logout", { preHandler: [fastifyRequireAuth] }, async (request, reply) => {
     // Revoke access token
     const authHeader = request.headers.authorization;
     if (authHeader?.startsWith("Bearer ")) {
@@ -263,36 +203,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     return { success: true };
   });
 
-  /**
-   * @openapi
-   * /api/auth/me:
-   *   get:
-   *     tags: [Auth]
-   *     summary: Get the authenticated user's profile
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: header
-   *         name: Authorization
-   *         required: true
-   *         schema: { type: string }
-   *         description: Bearer token
-   *     responses:
-   *       200:
-   *         description: User profile
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 id: { type: string }
-   *                 username: { type: string }
-   *                 customInstructions: { type: string, nullable: true }
-   *                 createdAt: { type: string, format: date-time }
-   *       401: { description: Unauthorized }
-   *       404: { description: User not found }
-   */
-  fastify.get("/me", { preHandler: [fastifyRequireAuth] }, async (request, reply) => {
+    fastify.get("/me", { preHandler: [fastifyRequireAuth] }, async (request, reply) => {
     const [user] = await db.select({
       id: users.id,
       username: users.username,
@@ -304,18 +215,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     return user;
   });
 
-  /**
-   * @openapi
-   * /api/auth/refresh:
-   *   post:
-   *     tags: [Auth]
-   *     summary: Rotate refresh token and get a new access token
-   *     description: Uses httpOnly refresh_token cookie. The old refresh token is invalidated and a new pair is issued (token rotation).
-   *     responses:
-   *       200: { description: Token refreshed, content: { application/json: { schema: { type: object, properties: { token: { type: string }, username: { type: string } } } } } }
-   *       401: { description: Invalid or expired refresh token }
-   */
-  fastify.post("/refresh", { preHandler: [authRateLimit] }, async (request, reply) => {
+    fastify.post("/refresh", { preHandler: [authRateLimit] }, async (request, reply) => {
     const refreshToken = (request as any).cookies?.refresh_token;
     if (!refreshToken) {
       throw new AppError(401, "No refresh token provided");
@@ -345,35 +245,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     return issueTokenPair(user.id, user.username, user.role, reply);
   });
 
-  /**
-   * @openapi
-   * /api/auth/me:
-   *   patch:
-   *     tags: [Auth]
-   *     summary: Update the authenticated user's custom instructions
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: header
-   *         name: Authorization
-   *         required: true
-   *         schema: { type: string }
-   *         description: Bearer token
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             required: [custom_instructions]
-   *             properties:
-   *               custom_instructions: { type: string, maxLength: 2000 }
-   *     responses:
-   *       200: { description: Update successful, content: { application/json: { schema: { type: object, properties: { success: { type: boolean } } } } } }
-   *       400: { description: custom_instructions must be a string }
-   *       401: { description: Unauthorized }
-   */
-  fastify.patch("/me", { preHandler: [fastifyRequireAuth] }, async (request, reply) => {
+    fastify.patch("/me", { preHandler: [fastifyRequireAuth] }, async (request, reply) => {
     const { custom_instructions } = request.body as any;
     if (typeof custom_instructions !== "string") {
       throw new AppError(400, "custom_instructions must be a string");
@@ -384,35 +256,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     return { success: true };
   });
 
-  /**
-   * @openapi
-   * /api/auth/config:
-   *   post:
-   *     tags: [Auth]
-   *     summary: Save or update the user's council configuration
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: header
-   *         name: Authorization
-   *         required: true
-   *         schema: { type: string }
-   *         description: Bearer token
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             required: [config]
-   *             properties:
-   *               config: { type: object, description: Council configuration object }
-   *     responses:
-   *       200: { description: Configuration saved, content: { application/json: { schema: { type: object, properties: { success: { type: boolean } } } } } }
-   *       400: { description: Validation error }
-   *       401: { description: Unauthorized }
-   */
-  fastify.post("/config", { preHandler: [fastifyRequireAuth, fastifyValidate(configSchema)] }, async (request, reply) => {
+    fastify.post("/config", { preHandler: [fastifyRequireAuth, fastifyValidate(configSchema)] }, async (request, reply) => {
     const encrypted = encrypt(JSON.stringify((request.body as any).config));
 
     await db.insert(councilConfigs).values({
@@ -427,25 +271,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     return { success: true };
   });
 
-  /**
-   * @openapi
-   * /api/auth/config:
-   *   get:
-   *     tags: [Auth]
-   *     summary: Retrieve the user's council configuration
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: header
-   *         name: Authorization
-   *         required: true
-   *         schema: { type: string }
-   *         description: Bearer token
-   *     responses:
-   *       200: { description: Configuration object or null if not set, content: { application/json: { schema: { type: object, nullable: true } } } }
-   *       401: { description: Unauthorized }
-   */
-  fastify.get("/config", { preHandler: [fastifyRequireAuth] }, async (request, reply) => {
+    fastify.get("/config", { preHandler: [fastifyRequireAuth] }, async (request, reply) => {
     const [row] = await db.select().from(councilConfigs).where(eq(councilConfigs.userId, request.userId!)).limit(1);
 
     if (!row) return null;
@@ -453,26 +279,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     return decrypted;
   });
 
-  /**
-   * @openapi
-   * /api/auth/config/rotate:
-   *   post:
-   *     tags: [Auth]
-   *     summary: Rotate encryption on the user's stored API keys
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: header
-   *         name: Authorization
-   *         required: true
-   *         schema: { type: string }
-   *         description: Bearer token
-   *     responses:
-   *       200: { description: Keys rotated successfully, content: { application/json: { schema: { type: object, properties: { success: { type: boolean }, message: { type: string } } } } } }
-   *       401: { description: Unauthorized }
-   *       404: { description: No configuration found to rotate }
-   */
-  fastify.post("/config/rotate", { preHandler: [fastifyRequireAuth] }, async (request, reply) => {
+    fastify.post("/config/rotate", { preHandler: [fastifyRequireAuth] }, async (request, reply) => {
     const [row] = await db.select().from(councilConfigs).where(eq(councilConfigs.userId, request.userId!)).limit(1);
 
     if (!row) {

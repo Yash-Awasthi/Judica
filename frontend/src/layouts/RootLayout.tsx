@@ -9,6 +9,7 @@ import { PageTransition } from "../components/PageTransition";
 import { CommandPalette } from "../components/CommandPalette";
 import { ToastProvider } from "../components/ToastProvider";
 import { GlobalHUD } from "../components/GlobalHUD";
+import { KeyboardShortcutsPanel } from "../components/KeyboardShortcutsPanel";
 import type { Conversation, Project } from "../types/index";
 
 export function RootLayout() {
@@ -29,6 +30,20 @@ export function RootLayout() {
   const [error, setError] = useState<string | null>(null);
   const [searchResults, setSearchResults] = useState<any[] | null>(null);
   const [isSearching, setIsSearching] = useState(false);
+  const [kbdShortcutsOpen, setKbdShortcutsOpen] = useState(false);
+
+  // Global `?` key: open keyboard shortcuts panel (ignore when typing in inputs)
+  useEffect(() => {
+    const handleGlobalKey = (e: KeyboardEvent) => {
+      if (e.key !== "?") return;
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === "INPUT" || tag === "TEXTAREA" || (e.target as HTMLElement)?.isContentEditable) return;
+      e.preventDefault();
+      setKbdShortcutsOpen((prev) => !prev);
+    };
+    document.addEventListener("keydown", handleGlobalKey);
+    return () => document.removeEventListener("keydown", handleGlobalKey);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem("sidebar_open", JSON.stringify(sidebarOpen));
@@ -148,6 +163,7 @@ export function RootLayout() {
       <div className="flex h-screen overflow-hidden bg-[var(--bg)] relative">
         <GlobalHUD />
         <CommandPalette />
+        <KeyboardShortcutsPanel open={kbdShortcutsOpen} onClose={() => setKbdShortcutsOpen(false)} />
       <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:bg-card focus:text-text focus:p-2 focus:rounded">Skip to main content</a>
       {/* Ambient background orbs — only render in dark mode */}
       <div className="bg-orb-mint w-[500px] h-[500px] top-[-10%] left-[20%] animate-drift hidden dark:block" />

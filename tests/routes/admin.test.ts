@@ -112,6 +112,7 @@ function createFastifyInstance(): any {
     });
 
   return {
+    register: vi.fn().mockResolvedValue(undefined),
     addHook: vi.fn().mockReturnThis(),
     get: register("GET"),
     post: register("POST"),

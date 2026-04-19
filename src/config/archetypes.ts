@@ -167,19 +167,46 @@ export const ARCHETYPES: Record<string, Archetype> = {
     icon: "gavel",
     colorBg: "#ef4444",
     systemPrompt: "You are The Judge. Your role is risk mitigation and content sanitization. Evaluate the provided synthesis for PII, harmful bias, or unsafe instructions. Only approve content that adheres strictly to ethical AI guidelines."
+  },
+  devils_advocate: {
+    id: "devils_advocate",
+    name: "Devil's Advocate",
+    thinkingStyle: "Adversarial stress-testing, edge-case hunting",
+    asks: "What could go catastrophically wrong?",
+    blindSpot: "May manufacture risks that don't exist in practice",
+    icon: "crisis_alert",
+    colorBg: "#dc2626",
+    systemPrompt: `You are the Devil's Advocate. You are the dedicated adversarial agent in this council.
+Your SOLE purpose during Peer Review is to aggressively stress-test every claim made by the other agents.
+
+Your mandate:
+1. EDGE CASES — Identify scenarios where the proposed solution breaks, fails, or produces incorrect results.
+2. LOGICAL FALLACIES — Detect circular reasoning, false dichotomies, hasty generalizations, or unsupported leaps.
+3. SECURITY RISKS — Flag any advice that could introduce vulnerabilities, data exposure, or exploitable behaviour.
+4. HIDDEN ASSUMPTIONS — Surface unstated premises that the other agents have silently accepted as true.
+5. OVERCONFIDENCE — Challenge any claim stated with certainty that lacks sufficient evidentiary support.
+
+Format your critique as:
+- [EDGE CASE] <description>
+- [FALLACY] <description>
+- [SECURITY] <description>
+- [ASSUMPTION] <description>
+- [OVERCONFIDENCE] <description>
+
+Be precise, clinical, and merciless. Do not soften criticism. The council is stronger for your honesty.`
   }
 };
 
 export const SUMMONS: Record<string, string[]> = {
-  debate: ["contrarian", "strategist", "ethicist", "historian", "outsider", "architect", "pragmatist", "empiricist", "creator", "minimalist", "futurist", "empath"],
-  research: ["empiricist", "historian", "outsider", "ethicist", "architect", "strategist", "pragmatist", "minimalist", "futurist", "contrarian", "creator", "empath"],
-  business: ["strategist", "pragmatist", "ethicist", "futurist", "contrarian", "architect", "minimalist", "empiricist", "creator", "historian", "empath", "outsider"],
-  technical: ["architect", "minimalist", "empiricist", "outsider", "strategist", "pragmatist", "contrarian", "creator", "futurist", "ethicist", "historian", "empath"],
-  personal: ["empath", "contrarian", "futurist", "pragmatist", "ethicist", "minimalist", "outsider", "creator", "historian", "architect", "strategist", "empiricist"],
-  creative: ["creator", "outsider", "historian", "minimalist", "architect", "futurist", "contrarian", "empath", "ethicist", "pragmatist", "strategist", "empiricist"],
-  ethical: ["ethicist", "contrarian", "empiricist", "empath", "historian", "futurist", "outsider", "creator", "minimalist", "architect", "strategist", "pragmatist"],
-  strategy: ["strategist", "historian", "futurist", "contrarian", "pragmatist", "architect", "ethicist", "empiricist", "outsider", "creator", "minimalist", "empath"],
-  default: ["pragmatist", "strategist", "architect", "contrarian", "minimalist", "empiricist", "futurist", "ethicist", "historian", "empath", "outsider", "creator"]
+  debate:    ["contrarian", "strategist", "ethicist", "historian", "outsider", "architect", "pragmatist", "empiricist", "creator", "minimalist", "futurist", "empath", "devils_advocate"],
+  research:  ["empiricist", "historian", "outsider", "ethicist", "architect", "strategist", "pragmatist", "minimalist", "futurist", "contrarian", "creator", "empath", "devils_advocate"],
+  business:  ["strategist", "pragmatist", "ethicist", "futurist", "contrarian", "architect", "minimalist", "empiricist", "creator", "historian", "empath", "outsider", "devils_advocate"],
+  technical: ["architect", "minimalist", "empiricist", "outsider", "strategist", "pragmatist", "contrarian", "creator", "futurist", "ethicist", "historian", "empath", "devils_advocate"],
+  personal:  ["empath", "contrarian", "futurist", "pragmatist", "ethicist", "minimalist", "outsider", "creator", "historian", "architect", "strategist", "empiricist", "devils_advocate"],
+  creative:  ["creator", "outsider", "historian", "minimalist", "architect", "futurist", "contrarian", "empath", "ethicist", "pragmatist", "strategist", "empiricist", "devils_advocate"],
+  ethical:   ["ethicist", "contrarian", "empiricist", "empath", "historian", "futurist", "outsider", "creator", "minimalist", "architect", "strategist", "pragmatist", "devils_advocate"],
+  strategy:  ["strategist", "historian", "futurist", "contrarian", "pragmatist", "architect", "ethicist", "empiricist", "outsider", "creator", "minimalist", "empath", "devils_advocate"],
+  default:   ["pragmatist", "strategist", "architect", "contrarian", "minimalist", "empiricist", "futurist", "ethicist", "historian", "empath", "outsider", "creator", "devils_advocate"]
 };
 
 export interface CouncilTemplate {

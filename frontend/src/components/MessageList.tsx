@@ -113,6 +113,19 @@ export function MessageList({
           <div className="flex justify-end">
             <div className="bg-[var(--accent-mint)] text-black px-5 py-3.5 rounded-[20px] rounded-br-[4px] max-w-[85%] md:max-w-[70%] text-[15px] leading-[1.6] shadow-glow-sm font-medium">
               {msg.question}
+              {msg.attachmentPreviews && msg.attachmentPreviews.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2" role="list" aria-label="Attached images">
+                  {msg.attachmentPreviews.map((p, i) => (
+                    <div key={i} role="listitem">
+                      <img
+                        src={p.url}
+                        alt={p.name}
+                        className="max-h-32 max-w-[180px] rounded-lg object-cover border border-black/20"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 

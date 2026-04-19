@@ -16,6 +16,8 @@ interface CouncilConfigPanelProps {
   onAddMember: () => void;
   onRemoveMember: (id: string) => void;
   onUpdateMember: (id: string, field: keyof CouncilMember, value: any) => void;
+  deliberationMode: string;
+  onDeliberationModeChange: (value: string) => void;
 }
 
 const ROLES = ["Default", "Analyst", "Devil's Advocate", "Optimist", "Pessimist", "Expert", "Critic", "Creative", "Pragmatist"];
@@ -88,7 +90,9 @@ export function CouncilConfigPanel({
   members,
   onAddMember,
   onRemoveMember,
-  onUpdateMember
+  onUpdateMember,
+  deliberationMode,
+  onDeliberationModeChange,
 }: CouncilConfigPanelProps) {
   const trapRef = useFocusTrap(onClose);
   return (
@@ -201,6 +205,30 @@ export function CouncilConfigPanel({
                 <div className="flex justify-between text-[9px] text-[var(--text-muted)] mt-1">
                   <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
                 </div>
+              </div>
+
+              {/* Deliberation Mode */}
+              <div>
+                <label className="text-[10px] font-bold text-[var(--text-muted)] uppercase tracking-[0.15em] block mb-2">Reasoning Mode</label>
+                <select
+                  value={deliberationMode}
+                  onChange={(e) => onDeliberationModeChange(e.target.value)}
+                  className="input-base text-xs"
+                  aria-label="Deliberation mode"
+                >
+                  <option value="standard">Standard — Council deliberation</option>
+                  <option value="socratic">Socratic — Q&amp;A augmented context</option>
+                  <option value="red_blue">Red / Blue — Adversarial debate</option>
+                  <option value="hypothesis">Hypothesis — Propose, falsify, revise</option>
+                  <option value="confidence">Confidence — Weighted by certainty</option>
+                </select>
+                <p className="mt-1.5 text-[10px] text-[var(--text-muted)] leading-relaxed">
+                  {deliberationMode === "socratic" && "Agents generate clarifying questions before the main debate begins."}
+                  {deliberationMode === "red_blue" && "Agents split into FOR and AGAINST factions; a neutral judge synthesizes."}
+                  {deliberationMode === "hypothesis" && "Agents propose hypotheses, attack each other's, then revise in 3 rounds."}
+                  {deliberationMode === "confidence" && "Each agent declares a confidence score; synthesis weights higher confidence more."}
+                  {deliberationMode === "standard" && "All agents deliberate in parallel rounds and the master synthesizes a verdict."}
+                </p>
               </div>
 
               {/* Members */}

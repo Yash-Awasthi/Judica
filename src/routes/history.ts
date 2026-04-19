@@ -27,54 +27,6 @@ function paginationMeta(page: number, limit: number, total: number) {
   return { page, limit, total, totalPages: Math.ceil(total / limit) };
 }
 
-/**
- * @openapi
- * /api/history/search:
- *   get:
- *     tags:
- *       - History
- *     summary: Search conversations
- *     description: Search through the authenticated user's conversation history by question or verdict text.
- *     parameters:
- *       - in: query
- *         name: q
- *         required: true
- *         schema:
- *           type: string
- *           minLength: 2
- *         description: Search query string (minimum 2 characters)
- *       - in: query
- *         name: limit
- *         schema:
- *           type: integer
- *           default: 10
- *           minimum: 1
- *           maximum: 50
- *         description: Maximum number of results to return
- *     responses:
- *       200:
- *         description: Array of matching chat messages
- *         content:
- *           application/json:
- *             schema:
- *               type: array
- *               items:
- *                 type: object
- *                 properties:
- *                   id:
- *                     type: integer
- *                   conversationId:
- *                     type: string
- *                   question:
- *                     type: string
- *                   verdict:
- *                     type: string
- *                   createdAt:
- *                     type: string
- *                     format: date-time
- *       401:
- *         description: Unauthorized
- */
 const historyPlugin: FastifyPluginAsync = async (fastify) => {
 
   fastify.get("/search", { preHandler: fastifyRequireAuth }, async (request, reply) => {
@@ -99,65 +51,7 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  /**
-   * @openapi
-   * /api/history:
-   *   get:
-   *     tags:
-   *       - History
-   *     summary: List conversations
-   *     description: Retrieve a paginated list of the authenticated user's conversations.
-   *     parameters:
-   *       - in: query
-   *         name: page
-   *         schema:
-   *           type: integer
-   *           default: 1
-   *           minimum: 1
-   *         description: Page number
-   *       - in: query
-   *         name: limit
-   *         schema:
-   *           type: integer
-   *           default: 20
-   *           minimum: 1
-   *           maximum: 100
-   *         description: Number of conversations per page
-   *     responses:
-   *       200:
-   *         description: Paginated list of conversations
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 data:
-   *                   type: array
-   *                   items:
-   *                     type: object
-   *                     properties:
-   *                       id:
-   *                         type: string
-   *                       title:
-   *                         type: string
-   *                       createdAt:
-   *                         type: string
-   *                         format: date-time
-   *                 pagination:
-   *                   type: object
-   *                   properties:
-   *                     page:
-   *                       type: integer
-   *                     limit:
-   *                       type: integer
-   *                     total:
-   *                       type: integer
-   *                     totalPages:
-   *                       type: integer
-   *       401:
-   *         description: Unauthorized
-   */
-  fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const { page, limit, skip } = parsePagination(request.query as { page?: string; limit?: string });
     const { projectId, after, before } = request.query as { projectId?: string; after?: string; before?: string };
 
@@ -175,69 +69,7 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  /**
-   * @openapi
-   * /api/history/{id}:
-   *   get:
-   *     tags:
-   *       - History
-   *     summary: Get conversation messages
-   *     description: Retrieve a single conversation with its paginated chat messages.
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: Conversation ID
-   *       - in: query
-   *         name: page
-   *         schema:
-   *           type: integer
-   *           default: 1
-   *           minimum: 1
-   *         description: Page number
-   *       - in: query
-   *         name: limit
-   *         schema:
-   *           type: integer
-   *           default: 50
-   *           minimum: 1
-   *           maximum: 100
-   *         description: Number of messages per page
-   *     responses:
-   *       200:
-   *         description: Conversation with paginated chat messages
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 id:
-   *                   type: string
-   *                 title:
-   *                   type: string
-   *                 chats:
-   *                   type: array
-   *                   items:
-   *                     type: object
-   *                 pagination:
-   *                   type: object
-   *                   properties:
-   *                     page:
-   *                       type: integer
-   *                     limit:
-   *                       type: integer
-   *                     total:
-   *                       type: integer
-   *                     totalPages:
-   *                       type: integer
-   *       401:
-   *         description: Unauthorized
-   *       404:
-   *         description: Conversation not found
-   */
-  fastify.get("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.get("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { page, limit, skip } = parsePagination(request.query as { page?: string; limit?: string }, 50);
 
@@ -276,50 +108,7 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  /**
-   * @openapi
-   * /api/history/{id}:
-   *   patch:
-   *     tags:
-   *       - History
-   *     summary: Rename a conversation
-   *     description: Update the title of an existing conversation owned by the authenticated user.
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: Conversation ID
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             required:
-   *               - title
-   *             properties:
-   *               title:
-   *                 type: string
-   *     responses:
-   *       200:
-   *         description: Conversation renamed successfully
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 success:
-   *                   type: boolean
-   *                 title:
-   *                   type: string
-   *       401:
-   *         description: Unauthorized
-   *       404:
-   *         description: Conversation not found
-   */
-  fastify.patch("/:id", { preHandler: [fastifyRequireAuth, fastifyValidate(renameConversationSchema)] }, async (request, reply) => {
+    fastify.patch("/:id", { preHandler: [fastifyRequireAuth, fastifyValidate(renameConversationSchema)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { title } = request.body as { title: string };
 
@@ -328,92 +117,14 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
     return { success: true, title };
   });
 
-  /**
-   * @openapi
-   * /api/history/{id}:
-   *   delete:
-   *     tags:
-   *       - History
-   *     summary: Delete a conversation
-   *     description: Permanently delete a conversation and its messages.
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: Conversation ID
-   *     responses:
-   *       200:
-   *         description: Conversation deleted successfully
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 success:
-   *                   type: boolean
-   *       401:
-   *         description: Unauthorized
-   *       404:
-   *         description: Conversation not found
-   */
-  fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const deleted = await deleteConversation(id, request.userId!);
     if (!deleted) throw new AppError(404, "Conversation not found");
     return { success: true };
   });
 
-  /**
-   * @openapi
-   * /api/history/{id}/fork:
-   *   post:
-   *     tags:
-   *       - History
-   *     summary: Fork a conversation
-   *     description: Create a new conversation by copying messages up to a specified chat ID from an existing conversation.
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: Source conversation ID
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             required:
-   *               - toChatId
-   *             properties:
-   *               toChatId:
-   *                 type: integer
-   *                 description: ID of the last chat message to include in the fork
-   *     responses:
-   *       200:
-   *         description: Conversation forked successfully
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 success:
-   *                   type: boolean
-   *                 forkId:
-   *                   type: string
-   *                 count:
-   *                   type: integer
-   *       400:
-   *         description: No messages to fork
-   *       401:
-   *         description: Unauthorized
-   *       404:
-   *         description: Source conversation not found
-   */
-  fastify.post("/:id/fork", { preHandler: [fastifyRequireAuth, fastifyValidate(forkSchema)] }, async (request, reply) => {
+    fastify.post("/:id/fork", { preHandler: [fastifyRequireAuth, fastifyValidate(forkSchema)] }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { toChatId } = request.body as { toChatId: number };
 
@@ -464,43 +175,7 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
     return { success: true, forkId: fork.id, count: chatsToFork.length };
   });
 
-  /**
-   * @openapi
-   * /api/history/shared/{id}:
-   *   get:
-   *     tags:
-   *       - History
-   *     summary: Get a shared conversation
-   *     description: Retrieve a publicly shared conversation by its ID. No authentication required.
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: Conversation ID
-   *     responses:
-   *       200:
-   *         description: Public conversation with all chat messages
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 id:
-   *                   type: string
-   *                 title:
-   *                   type: string
-   *                 isPublic:
-   *                   type: boolean
-   *                 chats:
-   *                   type: array
-   *                   items:
-   *                     type: object
-   *       404:
-   *         description: Public conversation not found
-   */
-  fastify.get("/shared/:id", async (request, reply) => {
+    fastify.get("/shared/:id", async (request, reply) => {
     const { id } = request.params as { id: string };
 
     const conversationRows = await db
@@ -527,52 +202,7 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  /**
-   * @openapi
-   * /api/history/{id}/share:
-   *   patch:
-   *     tags:
-   *       - History
-   *     summary: Toggle conversation sharing
-   *     description: Set a conversation's public sharing status.
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: Conversation ID
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             required:
-   *               - isPublic
-   *             properties:
-   *               isPublic:
-   *                 type: boolean
-   *     responses:
-   *       200:
-   *         description: Sharing status updated
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 success:
-   *                   type: boolean
-   *                 isPublic:
-   *                   type: boolean
-   *       400:
-   *         description: isPublic must be a boolean
-   *       401:
-   *         description: Unauthorized
-   *       404:
-   *         description: Conversation not found
-   */
-  fastify.patch("/:id/share", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.patch("/:id/share", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const { isPublic } = request.body as { isPublic: boolean };
 

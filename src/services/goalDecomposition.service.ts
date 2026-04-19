@@ -1,4 +1,5 @@
 import { routeAndCollect } from "../router/index.js";
+import { mlWorker } from "../lib/ml/ml_worker.js";
 import logger from "../lib/logger.js";
 
 /**
@@ -203,4 +204,136 @@ export function getExecutionOrder(dag: TaskDAG): SubTask[][] {
   }
 
   return levels;
+}
+
+// ─── Monte Carlo Thought Trees (MCTS) ────────────────────────────────────────
+
+export interface MCTSBranch {
+  id: string;
+  reasoning: string;
+  score: number;
+  pruned: boolean;
+}
+
+export interface MCTSResult {
+  bestBranch: MCTSBranch;
+  branches: MCTSBranch[];
+  exploredCount: number;
+  prunedCount: number;
+}
+
+const MCTS_PRUNE_THRESHOLD = 0.4; // prune branches with ML score below this
+
+/**
+ * Monte Carlo Thought Trees: generate N parallel reasoning branches for a
+ * problem, score each branch via ML cosine similarity against an ideal
+ * reference embedding, prune low-quality branches, then return the best.
+ *
+ * @param problem   The question or goal to reason about
+ * @param branches  Number of parallel branches to simulate (default 5)
+ * @param context   Optional prior context fed to each branch
+ */
+export async function runMCTS(
+  problem: string,
+  branches = 5,
+  context?: string
+): Promise<MCTSResult> {
+  const contextBlock = context ? `\nContext: ${context.substring(0, 1500)}` : "";
+
+  // ── Step 1: Generate an ideal reference answer (anchor for scoring) ────
+  let referenceText: string;
+  try {
+    const ref = await routeAndCollect({
+      model: "auto",
+      messages: [
+        {
+          role: "user",
+          content: `Give the single most accurate and complete answer to the following in 2–3 sentences:\n\n${problem}${contextBlock}`,
+        },
+      ],
+      temperature: 0,
+    });
+    referenceText = ref.text;
+  } catch (err) {
+    logger.error({ err, problem }, "MCTS: reference answer generation failed");
+    throw err;
+  }
+
+  // ── Step 2: Generate N diverse reasoning branches in parallel ──────────
+  const branchPromises = Array.from({ length: branches }, (_, i) =>
+    routeAndCollect({
+      model: "auto",
+      messages: [
+        {
+          role: "system",
+          content: `You are reasoning branch #${i + 1}. Approach the problem from a distinct angle: ${
+            ["logical", "empirical", "creative", "critical", "intuitive"][i % 5]
+          } reasoning.`,
+        },
+        {
+          role: "user",
+          content: `Reason through the following problem step-by-step and give your best answer:\n\n${problem}${contextBlock}`,
+        },
+      ],
+      temperature: 0.7 + i * 0.05, // slight temperature spread for diversity
+    }).catch((err) => {
+      logger.warn({ err, branch: i }, "MCTS: branch generation failed");
+      return null;
+    })
+  );
+
+  const branchResponses = await Promise.all(branchPromises);
+
+  // ── Step 3: Score each branch via ML cosine similarity vs. reference ───
+  const scoredBranches: MCTSBranch[] = [];
+  const scorePromises = branchResponses.map(async (resp, i) => {
+    if (!resp) return;
+    let score = 0;
+    try {
+      score = await mlWorker.computeSimilarity(resp.text, referenceText);
+    } catch {
+      // Fallback: Jaccard on token overlap
+      const tokenize = (s: string) =>
+        new Set(s.toLowerCase().replace(/[^a-z0-9]/g, " ").split(/\s+/).filter((w) => w.length > 2));
+      const a = tokenize(resp.text);
+      const b = tokenize(referenceText);
+      let overlap = 0;
+      for (const w of a) { if (b.has(w)) overlap++; }
+      const union = new Set([...a, ...b]).size;
+      score = union > 0 ? overlap / union : 0;
+    }
+    scoredBranches.push({
+      id: `branch_${i + 1}`,
+      reasoning: resp.text,
+      score,
+      pruned: score < MCTS_PRUNE_THRESHOLD,
+    });
+  });
+
+  await Promise.all(scorePromises);
+
+  // Sort descending by score
+  scoredBranches.sort((a, b) => b.score - a.score);
+
+  const surviving = scoredBranches.filter((b) => !b.pruned);
+  const prunedCount = scoredBranches.length - surviving.length;
+
+  const bestBranch = surviving.length > 0 ? surviving[0] : scoredBranches[0];
+
+  logger.info(
+    {
+      problem: problem.substring(0, 80),
+      explored: scoredBranches.length,
+      pruned: prunedCount,
+      bestScore: bestBranch?.score.toFixed(3),
+    },
+    "MCTS complete"
+  );
+
+  return {
+    bestBranch,
+    branches: scoredBranches,
+    exploredCount: scoredBranches.length,
+    prunedCount,
+  };
 }

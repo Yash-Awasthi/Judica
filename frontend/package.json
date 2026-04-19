@@ -22,7 +22,7 @@
     "echarts-for-react": "^3.0.2",
     "framer-motion": "^12.38.0",
     "idb": "^8.0.3",
-    "lucide-react": "0.469.0",
+    "lucide-react": "1.8.0",
     "react": "19.2.5",
     "react-dom": "19.2.5",
     "react-is": "^19.0.0",
@@ -30,31 +30,33 @@
     "react-router-dom": "7.14.1",
     "remark-gfm": "4.0.1",
     "three": "^0.183.2",
-    "uuid": "10.0.0",
+    "uuid": "13.0.0",
     "vite-plugin-pwa": "^1.2.0",
     "workbox-window": "^7.4.0"
   },
   "overrides": {
     "serialize-javascript": ">=6.0.3",
     "rollup": ">=3.0.0",
-    "@rollup/pluginutils": ">=5.0.0"
+    "@rollup/pluginutils": ">=5.0.0",
+    "dompurify": ">=3.4.0"
   },
   "devDependencies": {
-    "@eslint/js": "9.17.0",
+    "@eslint/js": "9.39.0",
+    "@tailwindcss/postcss": "4.2.2",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "@types/three": "^0.183.1",
-    "@types/uuid": "10.0.0",
-    "@vitejs/plugin-react": "4.3.4",
+    "@types/uuid": "11.0.0",
+    "@vitejs/plugin-react": "5.1.4",
     "autoprefixer": "10.5.0",
-    "eslint": "9.17.0",
-    "eslint-plugin-react-hooks": "5.0.0",
+    "eslint": "9.39.0",
+    "eslint-plugin-react-hooks": "7.1.1",
     "eslint-plugin-react-refresh": "0.5.2",
     "globals": "17.5.0",
-    "postcss": "8.5.9",
-    "tailwindcss": "3.4.17",
-    "typescript": "6.0.2",
+    "postcss": "8.5.10",
+    "tailwindcss": "4.2.2",
+    "typescript": "6.0.3",
     "typescript-eslint": "^8.58.2",
-    "vite": "6.0.5"
+    "vite": "7.3.2"
   }
 }

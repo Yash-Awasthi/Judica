@@ -1,8 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@config "../tailwind.config.js";
 
 /* ============================================================
    DESIGN TOKENS - Dual Theme CSS Custom Properties
@@ -121,7 +120,12 @@
   }
 
   .glass-panel-hover {
-    @apply glass-panel;
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--card-shadow);
+    border-radius: 16px;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   }
   .glass-panel-hover:hover {
@@ -167,7 +171,10 @@
     font-size: 0.875rem;
   }
   .btn-pill-primary {
-    @apply btn-pill;
+    @apply inline-flex items-center justify-center gap-2 font-semibold transition-all duration-200;
+    border-radius: 9999px;
+    padding: 0.625rem 1.5rem;
+    font-size: 0.875rem;
     background: var(--accent-mint);
     color: #000000;
   }
@@ -254,7 +261,11 @@
     z-index: -1;
   }
   .bg-orb-mint {
-    @apply bg-orb;
+    position: fixed;
+    border-radius: 50%;
+    pointer-events: none;
+    filter: blur(120px);
+    z-index: -1;
     background: var(--accent-mint);
     opacity: 0.04;
   }
@@ -270,5 +281,69 @@
   }
   .no-print {
     display: none !important;
+  }
+}
+
+/* ============================================================
+   ACCESSIBILITY
+   ============================================================ */
+
+/* Focus-visible ring — consistent across all themes */
+:focus-visible {
+  outline: 2px solid var(--accent-mint);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Screen-reader only utility */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+.sr-only.focus\:not-sr-only:focus,
+.focus\:not-sr-only:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  padding: inherit;
+  margin: inherit;
+  overflow: visible;
+  clip: auto;
+  white-space: normal;
+}
+
+/* Reduced motion — disable all animations for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* High contrast mode — respect system forced-colors */
+@media (forced-colors: active) {
+  .glass-panel,
+  .surface-card {
+    border: 1px solid ButtonText;
+    background: Canvas;
+  }
+  .btn-pill,
+  .btn-pill-primary {
+    border: 2px solid ButtonText;
+    forced-color-adjust: none;
+  }
+  :focus-visible {
+    outline: 3px solid Highlight;
   }
 }

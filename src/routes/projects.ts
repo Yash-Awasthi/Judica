@@ -1,4 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
+import fastifyRateLimit from "@fastify/rate-limit";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import {
   createProject,
@@ -10,15 +11,8 @@ import {
 import { AppError } from "../middleware/errorHandler.js";
 
 const projectsPlugin: FastifyPluginAsync = async (fastify) => {
+  await fastify.register(fastifyRateLimit, { max: 60, timeWindow: "1 minute" });
   fastify.addHook("preHandler", fastifyRequireAuth);
-
-  // Explicit rate limit for project endpoints
-  fastify.addHook("onRoute", (routeOptions) => {
-    routeOptions.config = {
-      ...routeOptions.config,
-      rateLimit: { max: 60, timeWindow: "1 minute" },
-    };
-  });
 
   // List projects
   fastify.get("/", async (request, reply) => {

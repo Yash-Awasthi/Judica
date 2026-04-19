@@ -4,6 +4,7 @@ import { processXLSX } from "./xlsx.processor.js";
 import { processCSV } from "./csv.processor.js";
 import { processTXT } from "./txt.processor.js";
 import { processImage } from "./image.processor.js";
+import { processAudio } from "./audio.processor.js";
 import type { ProcessedFile } from "./types.js";
 
 interface UploadRecord {
@@ -39,6 +40,9 @@ export async function processFile(upload: UploadRecord): Promise<ProcessedFile> 
   }
   if (mimeType.startsWith("image/")) {
     return processImage(storagePath, mimeType);
+  }
+  if (mimeType.startsWith("audio/")) {
+    return processAudio(storagePath, mimeType);
   }
 
   // Fallback: try as text

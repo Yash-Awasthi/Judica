@@ -41,47 +41,7 @@ async function getQueueStats(queue: typeof ingestionQueue) {
 }
 
 const queuePlugin: FastifyPluginAsync = async (fastify) => {
-  /**
-   * @openapi
-   * /api/queue/stats:
-   *   get:
-   *     tags:
-   *       - Queue
-   *     summary: Get stats for all background job queues
-   *     security:
-   *       - bearerAuth: []
-   *     responses:
-   *       200:
-   *         description: Queue statistics
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 data:
-   *                   type: object
-   *                   properties:
-   *                     ingestion:
-   *                       type: object
-   *                       properties:
-   *                         active:
-   *                           type: integer
-   *                         waiting:
-   *                           type: integer
-   *                         completed:
-   *                           type: integer
-   *                         failed:
-   *                           type: integer
-   *                     research:
-   *                       type: object
-   *                     repo-ingestion:
-   *                       type: object
-   *                     compaction:
-   *                       type: object
-   *       401:
-   *         description: Unauthorized
-   */
-  // GET /stats — queue stats (admin only)
+    // GET /stats — queue stats (admin only)
   fastify.get("/stats", { onRequest: fastifyRequireRole("admin") }, async (request, reply) => {
     const [ingestion, research, repo, compaction] = await Promise.all([
       getQueueStats(ingestionQueue),
@@ -95,70 +55,7 @@ const queuePlugin: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  /**
-   * @openapi
-   * /api/queue/jobs/{queueName}/{jobId}:
-   *   get:
-   *     tags:
-   *       - Queue
-   *     summary: Get job status (admin only)
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: path
-   *         name: queueName
-   *         required: true
-   *         schema:
-   *           type: string
-   *           enum:
-   *             - ingestion
-   *             - research
-   *             - repo-ingestion
-   *             - compaction
-   *         description: Queue name
-   *       - in: path
-   *         name: jobId
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: Job ID
-   *     responses:
-   *       200:
-   *         description: Job details
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 data:
-   *                   type: object
-   *                   properties:
-   *                     id:
-   *                       type: string
-   *                     name:
-   *                       type: string
-   *                     state:
-   *                       type: string
-   *                     data:
-   *                       type: object
-   *                     progress:
-   *                       type: number
-   *                     attemptsMade:
-   *                       type: integer
-   *                     timestamp:
-   *                       type: number
-   *                     finishedOn:
-   *                       type: number
-   *                       nullable: true
-   *                     failedReason:
-   *                       type: string
-   *                       nullable: true
-   *       401:
-   *         description: Unauthorized
-   *       404:
-   *         description: Queue or job not found
-   */
-  // GET /jobs/:queueName/:jobId — job status (admin only)
+    // GET /jobs/:queueName/:jobId — job status (admin only)
   fastify.get(
     "/jobs/:queueName/:jobId",
     { preHandler: fastifyRequireRole("admin") },
@@ -198,55 +95,7 @@ const queuePlugin: FastifyPluginAsync = async (fastify) => {
     }
   );
 
-  /**
-   * @openapi
-   * /api/queue/jobs/{queueName}/{jobId}:
-   *   delete:
-   *     tags:
-   *       - Queue
-   *     summary: Cancel a job (admin only)
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: path
-   *         name: queueName
-   *         required: true
-   *         schema:
-   *           type: string
-   *           enum:
-   *             - ingestion
-   *             - research
-   *             - repo-ingestion
-   *             - compaction
-   *         description: Queue name
-   *       - in: path
-   *         name: jobId
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: Job ID
-   *     responses:
-   *       200:
-   *         description: Job cancelled
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 message:
-   *                   type: string
-   *                 jobId:
-   *                   type: string
-   *                 previousState:
-   *                   type: string
-   *       400:
-   *         description: Cannot cancel job in current state
-   *       401:
-   *         description: Unauthorized
-   *       404:
-   *         description: Queue or job not found
-   */
-  // DELETE /jobs/:queueName/:jobId — cancel job (admin only)
+    // DELETE /jobs/:queueName/:jobId — cancel job (admin only)
   fastify.delete(
     "/jobs/:queueName/:jobId",
     { preHandler: fastifyRequireRole("admin") },

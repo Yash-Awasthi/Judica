@@ -19,61 +19,7 @@ interface PiiCheckResponse {
 }
 
 const piiPlugin: FastifyPluginAsync = async (fastify) => {
-  /**
-   * @openapi
-   * /api/pii/check:
-   *   post:
-   *     tags:
-   *       - Admin
-   *     summary: Check text for personally identifiable information (PII)
-   *     security:
-   *       - bearerAuth: []
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             required:
-   *               - text
-   *             properties:
-   *               text:
-   *                 type: string
-   *                 description: Text to scan for PII
-   *               enforce:
-   *                 type: boolean
-   *                 default: false
-   *                 description: If true, reject when PII is found
-   *     responses:
-   *       200:
-   *         description: PII detection result
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 found:
-   *                   type: boolean
-   *                 types:
-   *                   type: array
-   *                   items:
-   *                     type: string
-   *                 riskScore:
-   *                   type: number
-   *                 anonymized:
-   *                   type: string
-   *                 allowed:
-   *                   type: boolean
-   *                 message:
-   *                   type: string
-   *       400:
-   *         description: Text is required
-   *       401:
-   *         description: Unauthorized
-   *       500:
-   *         description: PII check failed
-   */
-  fastify.post("/check", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.post("/check", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     try {
       const { text, enforce = false } = request.body as PiiCheckRequest;
 

@@ -6,7 +6,7 @@ import {
   Brain, Store, BarChart3, Activity, Terminal,
   Shield, Settings, ChevronLeft, ChevronRight, LogOut, Trash2,
   MessageCircle, ChevronDown, ChevronUp, Search, Loader2, Zap,
-  Cpu, Database, Network, Folder, FolderPlus
+  Cpu, Database, Network, Folder, FolderPlus, Users
 } from "lucide-react";
 import { ThemeToggle } from "./ThemeToggle";
 import type { Conversation, Project } from "../types/index";
@@ -267,6 +267,7 @@ export function Sidebar({
         <NavItem to="/workflows" icon={<Workflow size={18} />} label="Flow_Control" sector="PROT-04" active={currentPath.startsWith("/workflow")} collapsed={collapsed} />
         <NavItem to="/prompts" icon={<Terminal size={18} />} label="Prompt_IDE" sector="CODE-09" active={currentPath === "/prompts"} collapsed={collapsed} />
         <NavItem to="/skills" icon={<Zap size={18} />} label="Unit_Skills" sector="UNIT-11" active={currentPath === "/skills"} collapsed={collapsed} />
+        <NavItem to="/archetypes" icon={<Users size={18} />} label="Archetypes" sector="ARCH-03" active={currentPath === "/archetypes"} collapsed={collapsed} />
 
         <SectionHeader label="Knowledge" collapsed={collapsed} />
         <NavItem to="/repos" icon={<Database size={18} />} label="Data_Vaults" sector="INTEL-12" active={currentPath === "/repos"} collapsed={collapsed} />
@@ -283,6 +284,7 @@ export function Sidebar({
         {role === "admin" && (
           <>
             <NavItem to="/analytics" icon={<BarChart3 size={18} />} label="Global_Telemetry" sector="TELE-08" active={currentPath === "/analytics"} collapsed={collapsed} />
+            <NavItem to="/workspace" icon={<Users size={18} />} label="Workspace_Roles" sector="ACL-13" active={currentPath === "/workspace"} collapsed={collapsed} />
             <NavItem to="/admin" icon={<Shield size={18} />} label="Root_Admin" sector="SYS-AD" active={currentPath === "/admin"} collapsed={collapsed} />
           </>
         )}

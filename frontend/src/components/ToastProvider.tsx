@@ -70,10 +70,17 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={{ toast, success, error }}>
       {children}
-      <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3 pointer-events-none w-full max-w-sm">
+      <div
+        role="region"
+        aria-label="Notifications"
+        aria-live="polite"
+        aria-atomic="false"
+        className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-3 pointer-events-none w-full max-w-sm"
+      >
         <AnimatePresence mode="popLayout">
           {toasts.map((t) => {
             const Icon = TOAST_ICONS[t.type];
+            const isError = t.type === "error";
             return (
               <motion.div
                 key={t.id}
@@ -83,16 +90,21 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                 exit={{ opacity: 0, scale: 0.9, transition: { duration: 0.2 } }}
                 className="pointer-events-auto"
               >
-                <div className="glass-panel p-4 flex items-start gap-3 relative overflow-hidden group">
+                <div
+                  role={isError ? "alert" : "status"}
+                  className="glass-panel p-4 flex items-start gap-3 relative overflow-hidden group"
+                >
                   {/* Accent bar */}
-                  <div 
-                    className="absolute left-0 top-0 bottom-0 w-1" 
-                    style={{ backgroundColor: TOAST_COLORS[t.type] }} 
+                  <div
+                    className="absolute left-0 top-0 bottom-0 w-1"
+                    style={{ backgroundColor: TOAST_COLORS[t.type] }}
+                    aria-hidden="true"
                   />
-                  
-                  <div 
+
+                  <div
                     className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
                     style={{ backgroundColor: `color-mix(in srgb, ${TOAST_COLORS[t.type]} 10%, transparent)`, color: TOAST_COLORS[t.type] }}
+                    aria-hidden="true"
                   >
                     <Icon size={18} />
                   </div>
@@ -110,8 +122,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
                   <button
                     onClick={() => removeToast(t.id)}
-                    aria-label="Dismiss notification"
-                    className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--glass-bg)] transition-all opacity-0 group-hover:opacity-100"
+                    aria-label={`Dismiss: ${t.message}`}
+                    className="p-1 rounded-md text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--glass-bg)] transition-all focus-visible:opacity-100 opacity-0 group-hover:opacity-100"
                   >
                     <X size={14} />
                   </button>
