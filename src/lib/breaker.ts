@@ -20,7 +20,7 @@ const BREAKER_OPTIONS = {
   resetTimeout: 30000, // wait 30s before trying again
 };
 
-export function getBreaker<T extends (...args: any[]) => Promise<any>>(
+export function getBreaker<T extends (...args: unknown[]) => Promise<unknown>>(
   provider: Provider,
   action: T
 ): CircuitBreaker<Parameters<T>, ReturnType<T>> {

@@ -1,12 +1,9 @@
 import { randomUUID } from "crypto";
 import { AgentMessageBus, type Message } from "./messageBus.js";
-import { detectConflicts, type AgentResponse, type Conflict } from "./conflictDetector.js";
+import { detectConflicts, type AgentResponse } from "./conflictDetector.js";
 import {
-  addFact,
   getFactContext,
   extractAndStoreFacts,
-  confirmFact,
-  disputeFact,
 } from "./sharedMemory.js";
 import { routeAndCollect } from "../router/index.js";
 import { hybridSearch } from "../services/vectorStore.service.js";
@@ -123,7 +120,7 @@ export class DeliberationOrchestrator {
       try {
         const chunks = await hybridSearch(userId ?? 0, query, kbId, 5);
         ragContext = chunks
-          .map((c: any) => c.content)
+          .map((c: { content?: string }) => c.content)
           .join("\n\n");
       } catch (err) {
         logger.warn({ err }, "RAG retrieval failed during orchestration");
@@ -206,14 +203,13 @@ export class DeliberationOrchestrator {
 
     // ── 3. EXTRACT FACTS ──────────────────────────────────────────────────────
 
-    let totalFacts = 0;
     const factPromises = memberResponses.map(async (resp) => {
       const facts = await extractAndStoreFacts(conversationId, resp.memberId, resp.text);
       return facts.length;
     });
 
     const factCounts = await Promise.all(factPromises);
-    totalFacts = factCounts.reduce((a, b) => a + b, 0);
+    const totalFacts = factCounts.reduce((a, b) => a + b, 0);
 
     yield { type: "facts_extracted", data: { count: totalFacts } };
 

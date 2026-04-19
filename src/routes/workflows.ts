@@ -2,18 +2,18 @@ import { FastifyPluginAsync } from "fastify";
 import { randomUUID } from "crypto";
 import { db } from "../lib/drizzle.js";
 import { workflows, workflowRuns } from "../db/schema/workflows.js";
-import { eq, and, desc, count, sql } from "drizzle-orm";
+import { eq, and, desc, count } from "drizzle-orm";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { AppError } from "../middleware/errorHandler.js";
 import logger from "../lib/logger.js";
-import type { ExecutionEvent } from "../workflow/types.js";
+import type { ExecutionEvent, WorkflowDefinition } from "../workflow/types.js";
 import type { WorkflowExecutor } from "../workflow/executor.js";
 
 /**
  * Validate that a workflow definition has well-formed node and edge structures.
  * Throws AppError on malformed definitions to prevent runtime crashes.
  */
-function validateWorkflowDefinition(definition: any): void {
+function validateWorkflowDefinition(definition: Record<string, unknown>): void {
   const { nodes, edges } = definition;
 
   if (!Array.isArray(nodes) || !Array.isArray(edges)) {
@@ -100,9 +100,9 @@ if (_sweepInterval.unref) _sweepInterval.unref();
 
 const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
     // GET / — list user's workflows
-  fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
-    const limit = Math.min(Math.max(Number((request.query as any).limit) || 20, 1), 100);
-    const offset = Math.max(Number((request.query as any).offset) || 0, 0);
+  fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
+    const limit = Math.min(Math.max(Number((request.query as { limit?: string }).limit) || 20, 1), 100);
+    const offset = Math.max(Number((request.query as { offset?: string }).offset) || 0, 0);
 
     const whereClause = eq(workflows.userId, request.userId!);
 
@@ -125,7 +125,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
 
     // POST / — create workflow
   fastify.post("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
-    const { name, description, definition } = request.body as any;
+    const { name, description, definition } = request.body as { name?: string; description?: string; definition?: Record<string, unknown> };
 
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       throw new AppError(400, "Name is required", "WORKFLOW_NAME_REQUIRED");
@@ -159,7 +159,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // GET /:id — get workflow by ID
-  fastify.get("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [workflow] = await db
@@ -174,7 +174,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // PUT /:id — update workflow
-  fastify.put("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.put("/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [workflow] = await db
@@ -185,7 +185,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
 
     if (!workflow) throw new AppError(404, "Workflow not found", "WORKFLOW_NOT_FOUND");
 
-    const { name, description, definition } = request.body as any;
+    const { name, description, definition } = request.body as { name?: string; description?: string; definition?: Record<string, unknown> };
 
     const data: Record<string, unknown> = { updatedAt: new Date() };
     if (name !== undefined) data.name = name.trim();
@@ -213,7 +213,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // DELETE /:id — delete workflow
-  fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [workflow] = await db
@@ -229,7 +229,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // POST /:id/publish — publish workflow
-  fastify.post("/:id/publish", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.post("/:id/publish", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [workflow] = await db
@@ -261,7 +261,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
 
     if (!workflow) throw new AppError(404, "Workflow not found", "WORKFLOW_NOT_FOUND");
 
-    const { inputs } = request.body as any;
+    const { inputs } = request.body as { inputs?: Record<string, unknown> };
 
     const [run] = await db
       .insert(workflowRuns)
@@ -276,7 +276,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
 
     // Import executor dynamically and start execution in background
     const { WorkflowExecutor: ExecutorClass } = await import("../workflow/executor.js");
-    const executor = new ExecutorClass(workflow.definition as any, run.id, request.userId!);
+    const executor = new ExecutorClass(workflow.definition as WorkflowDefinition, run.id, request.userId!);
 
     // Enforce bounded map size — evict oldest entry if at capacity
     if (activeRuns.size >= MAX_ACTIVE_RUNS) {
@@ -290,7 +290,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
     activeRuns.set(run.id, { executor, events: [], createdAt: Date.now() });
 
     // Run execution in background (do NOT await)
-    (async () => {
+    void (async () => {
       try {
         for await (const event of executor.run(inputs || {})) {
           const entry = activeRuns.get(run.id);
@@ -299,7 +299,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
           if (event.type === "workflow_complete") {
             await db
               .update(workflowRuns)
-              .set({ status: "done", outputs: (event.outputs as any) ?? {}, endedAt: new Date() })
+              .set({ status: "done", outputs: (event.outputs as Record<string, unknown>) ?? {}, endedAt: new Date() })
               .where(eq(workflowRuns.id, run.id));
           } else if (event.type === "workflow_error") {
             await db
@@ -326,7 +326,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // GET /:id/runs — list runs for workflow
-  fastify.get("/:id/runs", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/:id/runs", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [workflow] = await db
@@ -347,7 +347,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // GET /runs/:runId — get run status
-  fastify.get("/runs/:runId", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/runs/:runId", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { runId } = request.params as { runId: string };
 
     const [run] = await db
@@ -428,7 +428,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // POST /runs/:runId/gate — resume human gate
-  fastify.post("/runs/:runId/gate", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.post("/runs/:runId/gate", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { runId } = request.params as { runId: string };
 
     const [run] = await db
@@ -439,7 +439,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
 
     if (!run) throw new AppError(404, "Workflow run not found", "WORKFLOW_RUN_NOT_FOUND");
 
-    const { choice, nodeId } = request.body as any;
+    const { choice, nodeId } = request.body as { choice?: string; nodeId?: string };
     if (!choice) throw new AppError(400, "Choice is required", "GATE_CHOICE_REQUIRED");
 
     const active = activeRuns.get(run.id);
@@ -447,7 +447,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(400, "No active executor for this run", "GATE_NO_ACTIVE_RUN");
     }
 
-    active.executor.resumeGate(nodeId, choice);
+    active.executor.resumeGate(nodeId!, choice);
     return { success: true };
   });
 };

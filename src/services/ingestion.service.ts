@@ -1,4 +1,4 @@
-import { chunkText, chunkHierarchical } from "./chunker.service.js";
+import { chunkHierarchical } from "./chunker.service.js";
 import { storeChunk } from "./vectorStore.service.js";
 import { db } from "../lib/drizzle.js";
 import { kbDocuments } from "../db/schema/uploads.js";
@@ -21,8 +21,6 @@ export async function ingestDocument(
 ): Promise<number> {
   const hierarchicalChunks = chunkHierarchical(extractedText);
   logger.info({ docId, filename, chunkCount: hierarchicalChunks.length }, "Starting document ingestion (hierarchical)");
-
-  let stored = 0;
 
   for (let i = 0; i < hierarchicalChunks.length; i += BATCH_SIZE) {
     const batch = hierarchicalChunks.slice(i, i + BATCH_SIZE);
@@ -63,8 +61,6 @@ export async function ingestDocument(
         await storeChunk(userId, kbId, chunk.content, i + idx, filename);
       }
     }
-
-    stored += batch.length;
 
     if (i + BATCH_SIZE < hierarchicalChunks.length) {
       await delay(BATCH_DELAY_MS);

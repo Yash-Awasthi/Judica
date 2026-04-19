@@ -8,13 +8,14 @@ import {
   cloneDefaultArchetype,
   exportUserArchetypes,
   importArchetypes,
-  getArchetypeUsage
+  getArchetypeUsage,
+  type UserArchetypeInput
 } from "../lib/archetypes.js";
 import { fastifyOptionalAuth } from "../middleware/fastifyAuth.js";
 import { AppError } from "../middleware/errorHandler.js";
 
 const archetypesPlugin: FastifyPluginAsync = async (fastify) => {
-  fastify.get("/", { preHandler: fastifyOptionalAuth }, async (request, reply) => {
+  fastify.get("/", { preHandler: fastifyOptionalAuth }, async (request, _reply) => {
     const userId = request.userId;
 
     if (!userId) {
@@ -32,20 +33,20 @@ const archetypesPlugin: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  fastify.post("/", { preHandler: fastifyOptionalAuth }, async (request, reply) => {
+  fastify.post("/", { preHandler: fastifyOptionalAuth }, async (request, _reply) => {
     const userId = request.userId;
     if (!userId) {
       throw new AppError(401, "Authentication required for custom archetypes");
     }
 
-    const { archetypeId, ...archetypeData } = request.body as any;
+    const { archetypeId, ...archetypeData } = request.body as Record<string, unknown>;
 
-    const validation = validateArchetype(archetypeData);
+    const validation = validateArchetype(archetypeData as unknown as UserArchetypeInput);
     if (!validation.valid) {
       throw new AppError(400, `Validation failed: ${validation.errors.join(", ")}`);
     }
 
-    const archetype = await upsertUserArchetype(userId, archetypeData, archetypeId);
+    const archetype = await upsertUserArchetype(userId, archetypeData as unknown as UserArchetypeInput, archetypeId as string | undefined);
 
     return {
       message: archetypeId ? "Archetype updated successfully" : "Archetype created successfully",
@@ -53,25 +54,25 @@ const archetypesPlugin: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  fastify.delete("/:id", { preHandler: fastifyOptionalAuth }, async (request, reply) => {
+  fastify.delete("/:id", { preHandler: fastifyOptionalAuth }, async (request, _reply) => {
     const userId = request.userId;
     if (!userId) {
       throw new AppError(401, "Authentication required");
     }
 
-    const { id } = request.params as any;
+    const { id } = request.params as { id: string };
     await deleteUserArchetype(userId, id as string);
 
     return { message: "Archetype deleted successfully" };
   });
 
-  fastify.patch("/:id/toggle", { preHandler: fastifyOptionalAuth }, async (request, reply) => {
+  fastify.patch("/:id/toggle", { preHandler: fastifyOptionalAuth }, async (request, _reply) => {
     const userId = request.userId;
     if (!userId) {
       throw new AppError(401, "Authentication required");
     }
 
-    const { id } = request.params as any;
+    const { id } = request.params as { id: string };
     const isActive = await toggleArchetypeStatus(userId, id as string);
 
     return {
@@ -80,16 +81,16 @@ const archetypesPlugin: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-  fastify.post("/:id/clone", { preHandler: fastifyOptionalAuth }, async (request, reply) => {
+  fastify.post("/:id/clone", { preHandler: fastifyOptionalAuth }, async (request, _reply) => {
     const userId = request.userId;
     if (!userId) {
       throw new AppError(401, "Authentication required");
     }
 
-    const { id } = request.params as any;
+    const { id } = request.params as { id: string };
     const clonedData = cloneDefaultArchetype(id as string);
 
-    const customizations = request.body as any;
+    const customizations = request.body as Record<string, unknown>;
     const finalData = { ...clonedData, ...customizations };
 
     const validation = validateArchetype(finalData);
@@ -124,7 +125,7 @@ const archetypesPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(401, "Authentication required");
     }
 
-    const { jsonData } = request.body as any;
+    const { jsonData } = request.body as { jsonData?: string };
     if (!jsonData) {
       throw new AppError(400, "JSON data is required");
     }
@@ -146,7 +147,7 @@ const archetypesPlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  fastify.get("/usage", { preHandler: fastifyOptionalAuth }, async (request, reply) => {
+  fastify.get("/usage", { preHandler: fastifyOptionalAuth }, async (request, _reply) => {
     const userId = request.userId;
     if (!userId) {
       throw new AppError(401, "Authentication required");

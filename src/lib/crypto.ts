@@ -4,7 +4,6 @@ import { env } from "../config/env.js";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
-const TAG_LENGTH = 16;
 
 function getMasterKey(customKey?: string): Buffer {
   const keyStr = customKey || env.MASTER_ENCRYPTION_KEY;

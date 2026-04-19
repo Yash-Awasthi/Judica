@@ -3,7 +3,6 @@ import { projects } from "../db/schema/projects.js";
 import { conversations } from "../db/schema/conversations.js";
 import { eq, and, desc, sql, count } from "drizzle-orm";
 import logger from "../lib/logger.js";
-import { AppError } from "../middleware/errorHandler.js";
 
 export interface Project {
   id: string;
@@ -12,7 +11,7 @@ export interface Project {
   description?: string | null;
   color?: string | null;
   icon?: string | null;
-  defaultCouncilComposition?: any;
+  defaultCouncilComposition?: Record<string, unknown>;
   defaultSystemPrompt?: string | null;
   createdAt: Date;
   updatedAt: Date;
@@ -25,7 +24,7 @@ export interface CreateProjectInput {
   description?: string;
   color?: string;
   icon?: string;
-  defaultCouncilComposition?: any;
+  defaultCouncilComposition?: Record<string, unknown>;
   defaultSystemPrompt?: string;
 }
 
@@ -47,7 +46,7 @@ export async function createProject(input: CreateProjectInput): Promise<Project>
         updatedAt: now,
       })
       .returning();
-    return project as any as Project;
+    return project as unknown as Project;
   } catch (err) {
     logger.error({ err, input }, "Failed to create project");
     throw err;
@@ -74,7 +73,7 @@ export async function getProjects(userId: number): Promise<Project[]> {
       .groupBy(projects.id)
       .orderBy(desc(projects.updatedAt));
     
-    return result as any as Project[];
+    return result as unknown as Project[];
   } catch (err) {
     logger.error({ err, userId }, "Failed to get projects");
     throw err;
@@ -89,7 +88,7 @@ export async function getProjectById(id: string, userId: number): Promise<Projec
       .where(and(eq(projects.id, id), eq(projects.userId, userId), sql`${projects.deletedAt} IS NULL`))
       .limit(1);
     
-    return project as any as Project || null;
+    return project as unknown as Project || null;
   } catch (err) {
     logger.error({ err, id, userId }, "Failed to get project by id");
     throw err;
@@ -107,7 +106,7 @@ export async function updateProject(id: string, userId: number, input: Partial<C
       .where(and(eq(projects.id, id), eq(projects.userId, userId)))
       .returning();
     
-    return project as any as Project || null;
+    return project as unknown as Project || null;
   } catch (err) {
     logger.error({ err, id, userId, input }, "Failed to update project");
     throw err;

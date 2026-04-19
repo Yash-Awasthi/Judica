@@ -15,7 +15,7 @@ interface CouncilConfigPanelProps {
   members: CouncilMember[];
   onAddMember: () => void;
   onRemoveMember: (id: string) => void;
-  onUpdateMember: (id: string, field: keyof CouncilMember, value: any) => void;
+  onUpdateMember: (id: string, field: keyof CouncilMember, value: CouncilMember[keyof CouncilMember]) => void;
   deliberationMode: string;
   onDeliberationModeChange: (value: string) => void;
 }

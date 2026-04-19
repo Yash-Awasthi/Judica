@@ -9,7 +9,7 @@ const voicePlugin: FastifyPluginAsync = async (fastify) => {
   await fastify.register(multipart, { limits: { fileSize: 25 * 1024 * 1024 } });
 
     // POST /api/voice/transcribe — Whisper STT
-  fastify.post("/transcribe", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.post("/transcribe", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const file = await request.file();
     if (!file) throw new AppError(400, "Audio file required", "NO_AUDIO");
 
@@ -34,7 +34,7 @@ const voicePlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(502, "Transcription failed", "STT_FAILED");
     }
 
-    const data = await response.json() as any;
+    const data = await response.json() as { text: string };
     return { text: data.text };
   });
 

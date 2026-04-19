@@ -1,19 +1,18 @@
 import { Message, Provider, askProvider, askProviderStream } from "./providers.js";
 import logger from "./logger.js";
-import { mapProviderError } from "./errorMapper.js";
-import { parseAgentOutput, AgentOutput, PeerReview, PeerReviewFlaw, ValidatorResult, ScoredOpinion } from "./schemas.js";
+import { parseAgentOutput, AgentOutput, PeerReview, PeerReviewFlaw, ValidatorResult, ScoredOpinion, AdversarialResult, GroundingResult } from "./schemas.js";
 import { adversarialModule } from "./adversarial.js";
 import { groundingModule } from "./grounding.js";
 import { computeConsensus } from "./metrics.js";
 import { getFallbackProvider } from "../config/fallbacks.js";
 
-let scoreOpinions: any = null;
-async function lazyScoreOpinions(...args: any[]) {
+let scoreOpinions: typeof import('./scoring.js').scoreOpinions | null = null;
+async function lazyScoreOpinions(...args: Parameters<typeof import('./scoring.js').scoreOpinions>) {
   if (!scoreOpinions) {
     const mod = await import("./scoring.js");
     scoreOpinions = mod.scoreOpinions;
   }
-  return scoreOpinions(...args);
+  return scoreOpinions!(...args);
 }
 
 export interface OpinionResult {
@@ -134,10 +133,9 @@ interface ConductPeerReviewOptions {
 export async function conductPeerReview(
   options: ConductPeerReviewOptions
 ): Promise<{ reviews: PeerReview[]; scored: ScoredOpinion[]; totalTokens: number; cost: number }> {
-  const { members, opinions, currentMessages, round, validatorProvider, skipAdversarial, skipGrounding, abortSignal, maxTokens } = options;
+  const { members, opinions, currentMessages, validatorProvider, skipAdversarial, skipGrounding, abortSignal, maxTokens } = options;
   
   let totalTokens = 0;
-  const cost = 0;
 
   const labels = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
   const anonymized = opinions.map((o, i) => ({
@@ -203,7 +201,7 @@ Do not include any text outside the JSON object.`;
       
       if (res.usage) totalTokens += res.usage.totalTokens;
 
-      const parsed = parseAgentOutput(res.text);
+      parseAgentOutput(res.text);
       let reviewData: { ranking: string[]; critique: string; identified_flaws: PeerReviewFlaw[] } | null = null;
       try {
         const jsonMatch = res.text.match(/\{[\s\S]*\}/);
@@ -272,8 +270,8 @@ Do not include any text outside the JSON object.`;
       opinion: o.opinion, 
       structured: o.structured!,
       isFallback: o.isFallback,
-      adversarial: (o as any).adversarial,
-      grounding: (o as any).grounding
+      adversarial: (o as unknown as { adversarial?: AdversarialResult }).adversarial,
+      grounding: (o as unknown as { grounding?: GroundingResult }).grounding
     })),
     reviews,
     anonymizedLabels
@@ -301,7 +299,7 @@ export async function evaluateConsensus(
   haltReason?: string;
   totalTokens: number;
 }> {
-  const { master, opinions, currentMessages, round, abortSignal, maxTokens } = options;
+  const { master, opinions, currentMessages, round, abortSignal } = options;
   
   let totalTokens = 0;
 

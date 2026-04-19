@@ -12,7 +12,6 @@
  */
 
 import crypto from "crypto";
-import type { ProviderResponse } from "../lib/providers.js";
 import { askProvider } from "../lib/providers.js";
 import logger from "../lib/logger.js";
 
@@ -131,9 +130,9 @@ async function transcribeWithWhisper(
     throw new Error(`Whisper API error: ${response.status} ${response.statusText}`);
   }
 
-  const data = await response.json() as any;
+  const data = await response.json() as { results: Array<{ text: string }>; text?: string; segments?: Array<{ text: string; start: number; end: number; avg_logprob?: number }> };
 
-  const segments: TranscriptionSegment[] = (data.segments || []).map((s: any) => ({
+  const segments: TranscriptionSegment[] = (data.segments || []).map((s) => ({
     start: s.start,
     end: s.end,
     text: s.text.trim(),
@@ -141,7 +140,7 @@ async function transcribeWithWhisper(
   }));
 
   return {
-    transcript: data.text,
+    transcript: data.text || "",
     segments,
   };
 }
@@ -178,14 +177,14 @@ async function transcribeWithGoogleSTT(
     throw new Error(`Google STT error: ${response.status}`);
   }
 
-  const data = await response.json() as any;
+  const data = await response.json() as { results?: Array<{ text?: string; alternatives?: Array<{ transcript?: string }> }>; text?: string };
   const results = data.results || [];
 
-  const segments: TranscriptionSegment[] = results.map((r: any, i: number) => ({
+  const segments: TranscriptionSegment[] = results.map((r, i: number) => ({
     start: i * 30,
     end: (i + 1) * 30,
-    text: r.alternatives?.[0]?.transcript || "",
-    confidence: r.alternatives?.[0]?.confidence || 0,
+    text: r.alternatives?.[0]?.transcript || r.text || "",
+    confidence: 0,
   }));
 
   const transcript = segments.map((s) => s.text).join(" ");
@@ -320,12 +319,12 @@ export async function processMedia(
       "Media processing completed",
     );
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     result.status = "failed";
-    result.error = err.message;
+    result.error = err instanceof Error ? err.message : String(err);
     result.processingMs = Date.now() - start;
 
-    logger.error({ mediaId: id, err: err.message }, "Media processing failed");
+    logger.error({ mediaId: id, err: err instanceof Error ? err.message : String(err) }, "Media processing failed");
   }
 
   return result;

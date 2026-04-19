@@ -9,7 +9,7 @@ const tracesPlugin: FastifyPluginAsync = async (fastify) => {
     "/",
     { preHandler: fastifyRequireAuth },
     async (request) => {
-      const userId = (request as any).userId!;
+      const userId = request.userId!;
       const {
         type,
         date_from,
@@ -70,7 +70,7 @@ const tracesPlugin: FastifyPluginAsync = async (fastify) => {
     "/:id",
     { preHandler: fastifyRequireAuth },
     async (request, reply) => {
-      const userId = (request as any).userId!;
+      const userId = request.userId!;
       const { id } = request.params as { id: string };
 
       const [trace] = await db

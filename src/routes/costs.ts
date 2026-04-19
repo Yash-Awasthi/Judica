@@ -89,15 +89,15 @@ const costsPlugin: FastifyPluginAsync = async (fastify) => {
       currentPeriod: {
         totalCost: breakdown.totalCost,
         totalTokens: breakdown.totalTokens,
-        avgCostPerRequest: breakdown.totalCost / Object.values(breakdown.byTimeframe).reduce((sum: number, day: any) => sum + day.requests, 0) || 0
+        avgCostPerRequest: breakdown.totalCost / Object.values(breakdown.byTimeframe).reduce((sum: number, day: { requests: number }) => sum + day.requests, 0) || 0
       },
       efficiency,
       limits,
       trends: breakdown.byTimeframe,
       topProviders: Object.entries(breakdown.byProvider)
-        .sort(([, a]: any, [, b]: any) => b.cost - a.cost)
+        .sort((a, b) => (b[1] as { cost: number }).cost - (a[1] as { cost: number }).cost)
         .slice(0, 5)
-        .map(([provider, data]: any) => ({ provider, ...data })),
+        .map(([provider, data]) => ({ provider, ...(data as Record<string, unknown>) })),
       currency: "USD"
     });
   });

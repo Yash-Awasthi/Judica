@@ -25,7 +25,7 @@ export class OllamaProvider extends BaseProvider {
     await validateSafeUrl(url);
   }
 
-  async call({ prompt, messages, signal, isFallback, onChunk }: {
+  async call({ prompt, messages, signal, isFallback: _isFallback, onChunk }: {
     messages: Message[];
     prompt?: string;
     signal?: AbortSignal;
@@ -95,9 +95,7 @@ export class OllamaProvider extends BaseProvider {
                 streamPromptTokens = parsed.prompt_eval_count || 0;
                 streamCompletionTokens = parsed.eval_count || 0;
               }
-            } catch (e) {
-              // ignore unparseable chunk
-            }
+            } catch { /* ignore unparseable chunk */ }
           }
         }
 

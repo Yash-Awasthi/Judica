@@ -1,6 +1,6 @@
 import { db } from "../lib/drizzle.js";
 import { contradictionRecords, type ContradictionVersion } from "../db/schema/council.js";
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { routeAndCollect } from "../router/index.js";
 import logger from "../lib/logger.js";
 

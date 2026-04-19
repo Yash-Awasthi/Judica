@@ -2,8 +2,22 @@ import { motion, AnimatePresence } from "framer-motion";
 import { X, Activity, User, Star } from "lucide-react";
 import { NeuralBlueprint } from "../NeuralBlueprint";
 
+interface MarketplaceItem {
+  id: string;
+  type: string;
+  name: string;
+  description: string;
+  content: unknown;
+  authorName: string;
+  tags: string[];
+  stars: number;
+  downloads: number;
+  version: string;
+  starred?: boolean;
+}
+
 interface AssetDetailModalProps {
-  item: any;
+  item: MarketplaceItem | null;
   onClose: () => void;
   onStar: (id: string) => void;
   onInstall: (id: string) => void;

@@ -36,13 +36,8 @@ export async function runLoginHelper(targetName: "chatgpt" | "claude" | "deepsee
   const page = await context.newPage();
   await page.goto(url);
 
-  console.log("\n---------------------------------------------------------");
-  console.log(`PLEASE LOG IN MANUALLY TO ${targetName.toUpperCase()}`);
-  console.log("---------------------------------------------------------");
-  console.log("1. Perform the sign-in / verification process in the browser window.");
-  console.log("2. Once you are fully logged in and see the chat interface,");
-  console.log("3. Return to this terminal and press ENTER to save the session.");
-  console.log("---------------------------------------------------------\n");
+  // eslint-disable-next-line no-console
+  console.log(`\n---------------------------------------------------------\nPLEASE LOG IN MANUALLY TO ${targetName.toUpperCase()}\n---------------------------------------------------------\n1. Perform the sign-in / verification process in the browser window.\n2. Once you are fully logged in and see the chat interface,\n3. Return to this terminal and press ENTER to save the session.\n---------------------------------------------------------\n`);
 
   await new Promise((resolve) => process.stdin.once("data", resolve));
 
@@ -55,10 +50,14 @@ export async function runLoginHelper(targetName: "chatgpt" | "claude" | "deepsee
 }
 
 if (process.argv[1]?.includes("login_helper.ts")) {
-  const target = process.argv.slice(2).find(arg => !arg.startsWith("--")) as any;
+  const target = process.argv.slice(2).find(arg => !arg.startsWith("--")) as "chatgpt" | "claude" | "deepseek" | "gemini" | undefined;
   if (target) {
-    runLoginHelper(target).catch(console.error);
+    runLoginHelper(target).catch((err: unknown) => {
+      logger.error({ err }, "Login helper failed");
+      process.exit(1);
+    });
   } else {
+    // eslint-disable-next-line no-console
     console.log("Usage: tsx src/lib/tools/login_helper.ts <chatgpt|claude|deepseek|gemini>");
     process.exit(1);
   }

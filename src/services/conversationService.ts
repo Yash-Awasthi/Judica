@@ -1,14 +1,12 @@
 import { db } from "../lib/drizzle.js";
 import { conversations, chats } from "../db/schema/conversations.js";
 import { eq, and, desc, asc, sql, or, ilike } from "drizzle-orm";
-import { Message, askProvider } from "../lib/providers.js";
+import { Message, askProvider, type Provider } from "../lib/providers.js";
 import { selectProvider, FREE_TIER_CHAIN } from "../router/providerChain.js";
-import { getAdapter } from "../adapters/registry.js";
 import logger from "../lib/logger.js";
 import { getEmbeddingWithLock } from "../lib/cache.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { safeVectorLiteral } from "./vectorStore.service.js";
-import { env } from "../config/env.js";
 
 export interface Conversation {
   id: string;
@@ -25,7 +23,7 @@ export interface Chat {
   conversationId?: string | null;
   question: string;
   verdict: string;
-  opinions: any;
+  opinions: Record<string, unknown>;
   durationMs?: number | null;
   tokensUsed?: number | null;
   cacheHit: boolean;
@@ -43,7 +41,7 @@ export interface CreateChatInput {
   conversationId?: string;
   question: string;
   verdict: string;
-  opinions: any;
+  opinions: Record<string, unknown>;
   durationMs?: number;
   tokensUsed?: number;
   cacheHit?: boolean;
@@ -112,7 +110,7 @@ export async function createChat(input: CreateChatInput, generateEmbedding: bool
         RETURNING *
       `);
 
-      return (result as any).rows[0] as Chat;
+      return (result as unknown as { rows: Chat[] }).rows[0] as Chat;
     }
 
     const [chat] = await db
@@ -211,11 +209,11 @@ export async function searchChats(userId: number, q: string, limit: number = 10,
         createdAt: chats.createdAt,
       })
       .from(chats)
-      .where(and(...whereConditions as any))
+      .where(and(...whereConditions))
       .orderBy(desc(chats.createdAt))
       .limit(limit);
 
-    return results as any as Chat[];
+    return results as unknown as Chat[];
   } catch (err) {
     logger.error({ err, userId, q }, "Failed to search chats");
     throw err;
@@ -252,24 +250,6 @@ export async function updateConversationTitle(id: string, userId: number, title:
     logger.error({ err, id, userId, title }, "Failed to update conversation title");
     throw err;
   }
-}
-
-function cosineSimilarity(a: number[], b: number[]): number {
-  if (a.length !== b.length) return 0;
-
-  let dotProduct = 0;
-  let normA = 0;
-  let normB = 0;
-
-  for (let i = 0; i < a.length; i++) {
-    dotProduct += a[i] * b[i];
-    normA += a[i] * a[i];
-    normB += b[i] * b[i];
-  }
-
-  if (normA === 0 || normB === 0) return 0;
-
-  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
 }
 
 function extractKeywords(text: string): Set<string> {
@@ -317,9 +297,9 @@ export async function retrieveRelevantContext(
           LIMIT ${maxResults}
         `);
 
-        const rows = (result as any).rows;
+        const rows = (result as unknown as { rows: Array<{ question: string; verdict: string; distance?: number }> }).rows;
         if (rows && rows.length > 0) {
-          const contexts: RelevantContext[] = rows.map((row: any) => ({
+          const contexts: RelevantContext[] = rows.map((row) => ({
             question: row.question,
             verdict: row.verdict,
             relevance: Math.max(0, 1 - (row.distance || 0)) // Convert distance to similarity
@@ -425,7 +405,6 @@ Respond ONLY with a JSON object in this format:
       throw new AppError(503, "No AI provider available for summary generation");
     }
 
-    const adapter = getAdapter(selected.provider);
     const providerConfig = {
       type: selected.provider,
       model: selected.model,
@@ -433,7 +412,7 @@ Respond ONLY with a JSON object in this format:
       name: "Internal Summarizer",
     };
 
-    const response = await askProvider(providerConfig as any, prompt);
+    const response = await askProvider(providerConfig as Provider, prompt);
     const content = response.text;
 
     // Extract JSON from response (handle potential markdown blocks)

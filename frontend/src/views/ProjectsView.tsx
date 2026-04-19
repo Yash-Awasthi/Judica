@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useOutletContext, useNavigate } from "react-router-dom";
 import { 
-  FolderPlus, Folder, Plus, Search, MoreVertical, 
-  Trash2, Edit2, LayoutGrid, List as ListIcon,
-  ChevronRight, Calendar, MessageCircle, Clock
+  FolderPlus, Folder, Plus, Search, MoreVertical,
+  LayoutGrid, List as ListIcon,
+  ChevronRight, MessageCircle, Clock
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "../context/AuthContext";
@@ -16,7 +16,7 @@ interface OutletContextType {
 
 export default function ProjectsView() {
   const { fetchWithAuth } = useAuth();
-  const { conversations } = useOutletContext<OutletContextType>();
+  const { conversations: _conversations } = useOutletContext<OutletContextType>();
   const navigate = useNavigate();
   const [projects, setProjects] = useState<Project[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,7 +28,7 @@ export default function ProjectsView() {
   const [newProjectName, setNewProjectName] = useState("");
   const [newProjectDesc, setNewProjectDesc] = useState("");
 
-  const loadProjects = async () => {
+  const loadProjects = useCallback(async () => {
     setIsLoading(true);
     try {
       const res = await fetchWithAuth("/api/v1/projects");
@@ -41,11 +41,12 @@ export default function ProjectsView() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [fetchWithAuth]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadProjects();
-  }, [fetchWithAuth]);
+  }, [loadProjects]);
 
   const handleCreateProject = async (e: React.FormEvent) => {
     e.preventDefault();

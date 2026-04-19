@@ -104,7 +104,7 @@ export async function buildApp() {
   await fastify.register(fastifyRateLimit, {
     max: 120,
     timeWindow: "1 minute",
-    keyGenerator: (request) => (request as any).userId?.toString() || request.ip,
+    keyGenerator: (request) => (request as unknown as { userId?: number }).userId?.toString() || request.ip,
     ...(rateLimitRedis ? { redis: rateLimitRedis } : {}),
   });
 
@@ -144,6 +144,7 @@ export async function buildApp() {
     const authHeader = request.headers.authorization;
     const metricsToken = process.env.METRICS_TOKEN;
     if (metricsToken && authHeader === `Bearer ${metricsToken}`) {
+      // no-op: authorized, proceed to metrics
     } else if (!metricsToken) {
       const ip = request.ip;
       if (ip !== "127.0.0.1" && ip !== "::1" && ip !== "::ffff:127.0.0.1") {
@@ -239,7 +240,7 @@ export async function buildApp() {
     const indexPath = path.join(publicPath, "index.html");
     try {
       let html = fs.readFileSync(indexPath, "utf8");
-      const nonce = (request as any).cspNonce as string || "";
+      const nonce = (request as unknown as { cspNonce?: string }).cspNonce || "";
       html = html.split("<script").join(`<script nonce="${nonce}"`);
       html = html.split(`nonce="${nonce}" nonce="`).join(`nonce="`);
       reply.type("text/html").send(html);

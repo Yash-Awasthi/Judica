@@ -1,9 +1,7 @@
 import { db } from "../lib/drizzle.js";
 import { modelReliability } from "../db/schema/traces.js";
-import { customPersonas } from "../db/schema/council.js";
-import { eq, sql } from "drizzle-orm";
-import { ARCHETYPES, SUMMONS } from "../config/archetypes.js";
-import type { Archetype } from "../config/archetypes.js";
+import { sql } from "drizzle-orm";
+import { ARCHETYPES } from "../config/archetypes.js";
 import logger from "../lib/logger.js";
 
 // ─── Domain Profiles ─────────────────────────────────────────────────────────

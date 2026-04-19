@@ -135,7 +135,7 @@ const uploadsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // GET /api/uploads/:id/status
-  fastify.get("/:id/status", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/:id/status", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [record] = await db
@@ -164,7 +164,7 @@ const uploadsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // POST /api/uploads/:id/process — trigger processing
-  fastify.post("/:id/process", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.post("/:id/process", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [record] = await db
@@ -187,14 +187,14 @@ const uploadsPlugin: FastifyPluginAsync = async (fastify) => {
         .set({
           processed: true,
           extractedText: result.text || null,
-          metadata: (result.metadata || undefined) as any,
+          metadata: (result.metadata || undefined) as Record<string, unknown> | undefined,
         })
         .where(eq(uploads.id, record.id));
 
       return { success: true, extracted_text_length: result.text?.length || 0, type: result.type };
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error({ err, uploadId: record.id }, "File processing failed");
-      throw new AppError(500, `Processing failed: ${err.message}`, "PROCESSING_FAILED");
+      throw new AppError(500, `Processing failed: ${(err as Error).message}`, "PROCESSING_FAILED");
     }
   });
 
@@ -228,7 +228,7 @@ const uploadsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // GET /api/uploads — list user's uploads
-  fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const rows = await db
       .select({
         id: uploads.id,

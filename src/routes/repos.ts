@@ -5,7 +5,6 @@ import { eq, and, desc } from "drizzle-orm";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { searchRepo } from "../services/repoSearch.service.js";
 import { repoQueue } from "../queue/queues.js";
-import logger from "../lib/logger.js";
 
 const reposPlugin: FastifyPluginAsync = async (fastify) => {
   // GET / — list user's repos

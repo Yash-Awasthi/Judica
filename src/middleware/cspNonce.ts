@@ -3,7 +3,7 @@ import type { FastifyRequest, FastifyReply } from "fastify";
 
 export async function fastifyCspNonce(request: FastifyRequest, reply: FastifyReply) {
   const nonce = randomBytes(16).toString("base64");
-  (request as any).cspNonce = nonce;
+  (request as unknown as { cspNonce: string }).cspNonce = nonce;
   reply.header(
     "Content-Security-Policy",
     [

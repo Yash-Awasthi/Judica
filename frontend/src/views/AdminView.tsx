@@ -1,11 +1,11 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Users, Shield, Plus, Trash2, MessageSquare, Terminal, 
+import {
+  Users, Shield, Trash2, MessageSquare, Terminal,
   Cpu, Search, Settings, Activity, Globe, History,
-  Lock, AlertTriangle, CheckCircle2, XCircle, RotateCcw,
+  Lock, CheckCircle2, XCircle, RotateCcw,
   LayoutGrid, ChevronRight, Zap, ChevronUp, ChevronDown,
-  ChevronLeft, User, Mail, Calendar, CreditCard, X
+  ChevronLeft, User, Mail, Calendar, X
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { AnimatedCounter } from "../components/AnimatedCounter";
@@ -31,7 +31,7 @@ interface AuditLogRow {
   actionType: string;
   resourceType: string;
   resourceId: string;
-  details: any;
+  details: Record<string, unknown>;
   status: string;
   createdAt: string;
 }
@@ -50,6 +50,74 @@ interface Stats {
   totalTokens: number;
 }
 
+interface ApiKeyInfo {
+  name: string;
+  baseUrl: string;
+  createdAt: string;
+}
+
+interface UserDetail extends UserRow {
+  stats?: { tokens: number; conversations: number };
+  apiKeys?: ApiKeyInfo[];
+}
+
+interface AdminProvider {
+  id: number;
+  name: string;
+  baseUrl: string;
+  isDefault: boolean;
+}
+
+interface AdminGroup {
+  id: number;
+  name: string;
+  description?: string;
+  memberCount?: number;
+  createdAt: string;
+}
+
+interface ProviderBreakdownEntry {
+  provider: string;
+  name: string;
+  tokens: number;
+  trend: "up" | "down" | "stable";
+  percentage: number;
+}
+
+interface FeatureToggleProps {
+  label: string;
+  active: boolean;
+  onToggle: (value: boolean) => void;
+}
+
+interface NavButtonProps {
+  active: boolean;
+  icon: React.ReactNode;
+  title: string;
+  desc: string;
+  onClick: () => void;
+}
+
+interface MetricCardProps {
+  title: string;
+  value: string | number;
+  label: string;
+  icon: React.ReactNode;
+  color: string;
+}
+
+interface ConfigInputProps {
+  title: string;
+  desc: string;
+  value: string;
+  onSave: (val: string) => void;
+}
+
+interface TelemetryRowProps {
+  label: string;
+  value: string | number;
+}
+
 type AdminSection = "users" | "groups" | "config" | "providers" | "analytics" | "security";
 
 // ─── UTILS ──────────────────────────────────────────────────────────────────
@@ -61,7 +129,7 @@ const stagger = {
 
 // ─── MAIN COMPONENT ─────────────────────────────────────────────────────────
 
-function UserDetailModal({ user, onClose }: { user: any, onClose: () => void }) {
+function UserDetailModal({ user, onClose }: { user: UserDetail, onClose: () => void }) {
   return (
     <AnimatePresence>
       <motion.div 
@@ -149,8 +217,8 @@ function UserDetailModal({ user, onClose }: { user: any, onClose: () => void }) 
                 </div>
 
                 <div className="space-y-4 max-h-[300px] overflow-y-auto custom-scrollbar pr-4">
-                  {user.apiKeys?.length > 0 ? (
-                    user.apiKeys.map((key: any, idx: number) => (
+                  {(user.apiKeys?.length ?? 0) > 0 ? (
+                    user.apiKeys!.map((key: ApiKeyInfo, idx: number) => (
                       <div key={idx} className="p-5 bg-black/40 border border-white/5 rounded-2xl flex items-center justify-between group">
                         <div className="flex items-center gap-4">
                           <div className="w-10 h-10 rounded-xl bg-white/5 flex items-center justify-center text-white/20 group-hover:text-[#a78bfa] transition-colors">
@@ -190,14 +258,14 @@ export function AdminView() {
   // Data State
   const [users, setUsers] = useState<UserRow[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
-  const [config, setConfig] = useState<Record<string, any>>({});
-  const [providers, setProviders] = useState<any[]>([]);
+  const [config, setConfig] = useState<Record<string, string>>({});
+  const [providers, setProviders] = useState<AdminProvider[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLogRow[]>([]);
-  const [groups, setGroups] = useState<any[]>([]);
+  const [groups, setGroups] = useState<AdminGroup[]>([]);
   const [usageData, setUsageData] = useState<UsagePoint[]>([]);
-  const [providerBreakdown, setProviderBreakdown] = useState<any[]>([]);
+  const [providerBreakdown, setProviderBreakdown] = useState<ProviderBreakdownEntry[]>([]);
   
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
   const [sortBy, setSortBy] = useState<"email" | "username" | "createdAt">("createdAt");
@@ -210,7 +278,7 @@ export function AdminView() {
   const [auditActionFilter, setAuditActionFilter] = useState("");
   const [auditDateStart, setAuditDateStart] = useState("");
   const [auditDateEnd, setAuditDateEnd] = useState("");
-  const [activeUserDetail, setActiveUserDetail] = useState<any>(null);
+  const [activeUserDetail, setActiveUserDetail] = useState<UserDetail | null>(null);
   
   const USERS_PER_PAGE = 20;
   const AUDIT_PER_PAGE = 50;
@@ -274,9 +342,9 @@ export function AdminView() {
     } finally {
       setLoading(false);
     }
-  }, [fetchWithAuth, userPage, auditPage]);
+  }, [fetchWithAuth, userPage, auditPage, debouncedSearch, sortBy, sortOrder, auditActionFilter, auditDateStart, auditDateEnd]);
 
-  useEffect(() => { loadAllData(); }, [loadAllData, userPage, auditPage, debouncedSearch, sortBy, sortOrder, auditActionFilter, auditDateStart, auditDateEnd]);
+  useEffect(() => { loadAllData(); }, [loadAllData]);
 
   // Actions
   const toggleUserStatus = async (user: UserRow) => {
@@ -309,7 +377,7 @@ export function AdminView() {
     } catch (err) { console.error("Role change failure", err); }
   };
 
-  const updateConfigValue = async (key: string, value: any) => {
+  const updateConfigValue = async (key: string, value: string) => {
     try {
       await fetchWithAuth("/api/admin/config", {
         method: "PATCH",
@@ -388,7 +456,7 @@ export function AdminView() {
           itemStyle: { color: "rgba(16, 185, 129, 0.6)" }
         }
       ]
-    }), [usageData]);
+    }), []);
 
     return (
       <motion.div variants={stagger.container} initial="initial" animate="animate" className="space-y-8">
@@ -721,7 +789,7 @@ export function AdminView() {
     </motion.div>
   );
 
-  function FeatureToggle({ label, active, onToggle }: any) {
+  function FeatureToggle({ label, active, onToggle }: FeatureToggleProps) {
     return (
       <div className="flex items-center justify-between p-4 bg-white/5 rounded-2xl border border-white/5 hover:border-white/10 transition-all">
         <span className="text-[10px] font-black uppercase tracking-widest text-white/60">{label}</span>
@@ -754,7 +822,7 @@ export function AdminView() {
       <div className="p-8">
         {groups.length > 0 ? (
           <div className="space-y-4">
-            {groups.map((g: any) => (
+            {groups.map((g: AdminGroup) => (
               <div key={g.id} className="p-6 bg-black/40 border border-white/5 rounded-2xl flex items-center justify-between hover:bg-white/[0.02] transition-all">
                 <div className="flex items-center gap-4">
                   <div className="w-10 h-10 rounded-2xl bg-[#a78bfa]/10 text-[#a78bfa] flex items-center justify-center">
@@ -969,7 +1037,7 @@ export function AdminView() {
 
 // ─── HELPER COMPONENTS ──────────────────────────────────────────────────────
 
-function NavButton({ active, icon, title, desc, onClick }: any) {
+function NavButton({ active, icon, title, desc, onClick }: NavButtonProps) {
   return (
     <button 
       onClick={onClick}
@@ -996,7 +1064,7 @@ function NavButton({ active, icon, title, desc, onClick }: any) {
   );
 }
 
-function MetricCard({ title, value, label, icon, color }: any) {
+function MetricCard({ title, value, label, icon, color }: MetricCardProps) {
   return (
     <div className="surface-card p-6 border-l-2 bg-white/[0.01] relative transition-all hover:bg-white/[0.02]" style={{ borderColor: color }}>
         <div className="flex items-center gap-3 mb-4 overflow-hidden" style={{ color }}>
@@ -1012,8 +1080,9 @@ function MetricCard({ title, value, label, icon, color }: any) {
   );
 }
 
-function ConfigInput({ title, desc, value, onSave }: any) {
+function ConfigInput({ title, desc, value, onSave }: ConfigInputProps) {
   const [val, setVal] = useState(value);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setVal(value), [value]);
 
   return (
@@ -1037,7 +1106,7 @@ function ConfigInput({ title, desc, value, onSave }: any) {
   );
 }
 
-function TelemetryRow({ label, value }: any) {
+function TelemetryRow({ label, value }: TelemetryRowProps) {
   return (
     <div className="flex items-center justify-between py-3 border-b border-white/[0.02] last:border-0">
       <span className="text-[9px] font-diag text-white/20 uppercase tracking-widest">{label}</span>
@@ -1046,10 +1115,10 @@ function TelemetryRow({ label, value }: any) {
   );
 }
 
-function ProvidersSection({ providers, onSetDefault }: { providers: any[], onSetDefault: (id: number) => void }) {
+function ProvidersSection({ providers, onSetDefault }: { providers: AdminProvider[], onSetDefault: (id: number) => void }) {
   return (
     <motion.div variants={stagger.item} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {providers.map((p: any) => (
+      {providers.map((p: AdminProvider) => (
         <div key={p.id} className="surface-card p-6 border border-white/5 bg-white/[0.01] hover:bg-white/[0.02] transition-all group relative overflow-hidden">
             <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center gap-4">

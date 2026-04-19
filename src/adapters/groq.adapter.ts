@@ -6,6 +6,7 @@ import type {
 } from "./types.js";
 import { createStreamResult } from "./types.js";
 import { getBreaker } from "../lib/breaker.js";
+import type { Provider } from "../lib/providers.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
 
 const DEFAULT_TIMEOUT_MS = 60_000;
@@ -53,12 +54,13 @@ export class GroqAdapter implements IProviderAdapter {
         signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
       });
 
-    const breaker = getBreaker({ name: this.providerId } as any, fetchChat);
+    const breaker = getBreaker({ name: this.providerId } as Provider, fetchChat);
     const res: Response = await breaker.fire();
 
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error((err as any)?.error?.message ?? `Groq API error: ${res.status}`);
+      const err = await res.json().catch(() => ({})) as Record<string, unknown>;
+      const errObj = err as { error?: { message?: string } };
+      throw new Error(errObj?.error?.message ?? `Groq API error: ${res.status}`);
     }
 
     return createStreamResult(this.parseSSE(res));
@@ -167,8 +169,8 @@ export class GroqAdapter implements IProviderAdapter {
         signal: AbortSignal.timeout(10000),
       });
       if (!res.ok) return [];
-      const data: any = await res.json();
-      return (data.data || []).map((m: any) => m.id).sort();
+      const data = await res.json() as { data?: Array<{ id: string }> };
+      return (data.data || []).map((m) => m.id).sort();
     } catch {
       return [];
     }

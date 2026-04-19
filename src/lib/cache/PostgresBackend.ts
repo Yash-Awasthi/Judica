@@ -4,6 +4,20 @@ import { eq, sql } from "drizzle-orm";
 import logger from "../logger.js";
 import type { CacheBackend, CacheEntry, SemanticSearchResult } from "./CacheBackend.js";
 
+interface CacheOpinion {
+  name: string;
+  opinion: string;
+  [key: string]: unknown;
+}
+
+interface SemanticCacheRow {
+  id: number;
+  keyHash: string;
+  verdict: string;
+  opinions: CacheOpinion[] | string;
+  distance: number;
+}
+
 export class PostgresBackend implements CacheBackend {
 
   async get(key: string): Promise<CacheEntry | null> {
@@ -19,7 +33,7 @@ export class PostgresBackend implements CacheBackend {
 
     return {
       verdict: hit.verdict,
-      opinions: hit.opinions as any[],
+      opinions: hit.opinions as CacheOpinion[],
       metadata: {
         prompt: hit.prompt,
         createdAt: hit.createdAt
@@ -68,7 +82,7 @@ export class PostgresBackend implements CacheBackend {
         LIMIT 1
       `);
 
-      const rows = result.rows as any[];
+      const rows = result.rows as unknown as SemanticCacheRow[];
       if (rows.length > 0 && rows[0].distance < threshold) {
         return {
           keyHash: rows[0].keyHash,
@@ -117,8 +131,9 @@ export class PostgresBackend implements CacheBackend {
       const result = await db.execute(sql`
         DELETE FROM "SemanticCache" WHERE "expiresAt" < NOW()
       `);
-      logger.debug({ deleted: (result as any).rowCount }, "Cleaned up expired cache entries");
+      logger.debug({ deleted: (result as { rowCount?: number }).rowCount }, "Cleaned up expired cache entries");
     } catch {
+      // no-op
     }
   }
 }

@@ -1,5 +1,5 @@
 import { useRef, useState, useCallback } from "react";
-import { useCouncilStream, type SSEEvent } from "./useCouncilStream";
+import { useCouncilStream, type SSEEvent, type StreamRequestBody } from "./useCouncilStream";
 import type { ChatMessage, CouncilMember } from "../types/index";
 import { v4 as uuidv4 } from "uuid";
 
@@ -62,8 +62,16 @@ export function useDeliberation({
           case "verdict_chunk":
             updated.verdict = cleanContent((updated.verdict || "") + event.chunk);
             break;
+          case "mode_start":
+            updated.deliberationMode = event.mode;
+            updated.modePhases = [];
+            break;
+          case "mode_phase":
+            updated.modePhases = [...(updated.modePhases || []), event];
+            break;
           case "done":
             if (event.verdict) updated.verdict = cleanContent(event.verdict);
+            if (event.opinions && !updated.opinions.length) updated.opinions = event.opinions;
             if (event.conversationId) onConversationCreated?.(event.conversationId);
             break;
         }
@@ -92,7 +100,7 @@ export function useDeliberation({
         { id: msgId, question: text, opinions: [], verdict: "" },
       ]);
 
-      const body = {
+      const body: StreamRequestBody = {
         question: text,
         summon: summon || undefined,
         rounds: rounds || undefined,

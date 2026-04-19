@@ -6,17 +6,23 @@ interface ConsensusVisualizerProps {
   nodes: Node[];
   links?: Link[];
   consensusScore?: number;
-  data?: any;
   streaming?: boolean;
   annotations?: { id: string; nodeId: string; title: string; content: string; type: 'conflict' | 'info' | 'warning' }[];
 }
 
-export function ConsensusVisualizer({ 
-  nodes, 
+export function ConsensusVisualizer({
+  nodes,
   links: customLinks,
-  consensusScore = 85 
+  consensusScore = 85
 }: ConsensusVisualizerProps) {
   const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+
+  const [infNodeHex] = useState(() => Math.random().toString(16).substring(2, 6).toUpperCase());
+  const [linkAnimations] = useState(() =>
+    Array.from({ length: 50 }, () => ({
+      duration: 1.5 + Math.random() * 1.5,
+      delay: Math.random() * 2,
+    })));
 
   const links = useMemo(() => {
     if (customLinks) return customLinks;
@@ -52,7 +58,7 @@ export function ConsensusVisualizer({
 
       <div className="absolute top-6 right-8 z-10 text-right pointer-events-none">
         <div className="text-[7px] font-mono text-[var(--text-muted)] opacity-30 leading-relaxed uppercase tracking-[0.1em]">
-          INF_NODE: 0x{Math.random().toString(16).substring(2, 6).toUpperCase()}<br/>
+          INF_NODE: 0x{infNodeHex}<br/>
           SYNC: CRYPTO_SAFE
         </div>
       </div>
@@ -128,10 +134,10 @@ export function ConsensusVisualizer({
                   scale: [1, 1.5, 1]
                 }}
                 transition={{ 
-                  duration: 1.5 + Math.random() * 1.5, 
-                  repeat: Infinity, 
+                  duration: linkAnimations[i].duration,
+                  repeat: Infinity,
                   ease: "easeInOut",
-                  delay: Math.random() * 2
+                  delay: linkAnimations[i].delay
                 }}
               />
             </g>

@@ -8,7 +8,6 @@ import {
 import {
   UserCouncilConfig,
   CouncilComposition,
-  ConfigValidationResult
 } from "../types/userConfig.js";
 import logger from "../lib/logger.js";
 
@@ -215,7 +214,7 @@ export function resolveMembersApiKeys(members: ApiKeyResolutionInput[]): Council
 export function composeCouncilFromUserConfig(
   userConfig?: Partial<UserCouncilConfig>
 ): CouncilComposition {
-  const validation = validateUserConfig((userConfig as any) ?? null);
+  const validation = validateUserConfig((userConfig ?? null) as UserCouncilConfig | null);
   if (!validation.valid) {
     throw new CouncilServiceError(
       "INVALID_CONFIG",

@@ -28,7 +28,7 @@ const realtimePlugin: FastifyPluginAsync = async (fastify) => {
             return;
           }
           try {
-            const payload = jwt.verify(msg.token, env.JWT_SECRET, { algorithms: ['HS256'] }) as any;
+            const payload = jwt.verify(msg.token, env.JWT_SECRET, { algorithms: ['HS256'] }) as { userId?: number; username?: string; id?: number; sub?: number };
             const userId = payload.userId || payload.id || payload.sub;
             if (!userId) {
               ws.send(JSON.stringify({ event: 'error', data: { message: 'Invalid token: no userId' } }));
@@ -48,7 +48,7 @@ const realtimePlugin: FastifyPluginAsync = async (fastify) => {
             });
 
             logger.info({ userId }, "User authenticated for real-time updates");
-          } catch (err) {
+          } catch {
             ws.send(JSON.stringify({ event: 'error', data: { message: 'Invalid or expired token' } }));
           }
         } else if (msg.type === 'request-cost-data' && ws.userId) {
@@ -132,7 +132,7 @@ const realtimePlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-    fastify.get("/statistics", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.get("/statistics", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     try {
       const { hours = 24 } = request.query as { hours?: string };
 

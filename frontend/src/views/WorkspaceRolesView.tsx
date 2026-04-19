@@ -59,7 +59,7 @@ function RoleSelect({
 }
 
 export function WorkspaceRolesView() {
-  const { fetchWithAuth, user } = useAuth();
+  const { fetchWithAuth, user: _user } = useAuth();
   const [members, setMembers] = useState<Member[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<number | null>(null);
@@ -85,6 +85,7 @@ export function WorkspaceRolesView() {
     }
   }, [fetchWithAuth]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
   const handleRoleChange = async (id: number, role: string) => {
@@ -115,7 +116,7 @@ export function WorkspaceRolesView() {
     URL.revokeObjectURL(url);
   };
 
-  const grouped = ROLE_ORDER.reduce<Record<string, Member[]>>((acc, r) => {
+  const _grouped = ROLE_ORDER.reduce<Record<string, Member[]>>((acc, r) => {
     acc[r] = members.filter((m) => m.role === r);
     return acc;
   }, {});

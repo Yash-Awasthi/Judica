@@ -1,12 +1,11 @@
 import { useState, useCallback, FormEvent, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Eye, EyeOff, Mail, Lock, User, ArrowRight, ShieldCheck, Activity, Database, Cpu } from "lucide-react";
+import { Eye, EyeOff, Lock, User, ArrowRight, ShieldCheck, Activity, Database, Cpu } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
 export function AuthScreen() {
   const { login, register, loginWithGoogle } = useAuth();
   const [mode, setMode] = useState<"login" | "register">("login");
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [username, setUsername] = useState("");
   const [showPw, setShowPw] = useState(false);
@@ -24,10 +23,12 @@ export function AuthScreen() {
   useEffect(() => {
     if (loading) {
       const interval = setInterval(() => {
+         
         setInitStep((prev) => (prev + 1) % initSteps.length);
       }, 800);
       return () => clearInterval(interval);
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setInitStep(0);
     }
   }, [loading, initSteps.length]);
@@ -42,8 +43,8 @@ export function AuthScreen() {
       } else {
         await register(username, password);
       }
-    } catch (err: any) {
-      setError(err?.message || "Authentication failed");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Authentication failed");
       setLoading(false);
     }
   }, [mode, username, password, login, register]);
@@ -201,8 +202,8 @@ export function AuthScreen() {
                     setLoading(true);
                     try {
                       await loginWithGoogle();
-                    } catch (err: any) {
-                      setError(err.message || "Google Authentication failed");
+                    } catch (err: unknown) {
+                      setError(err instanceof Error ? err.message : "Google Authentication failed");
                       setLoading(false);
                     }
                   }}

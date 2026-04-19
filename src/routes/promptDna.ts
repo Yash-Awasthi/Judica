@@ -8,7 +8,7 @@ import { AppError } from "../middleware/errorHandler.js";
 
 const promptDnaPlugin: FastifyPluginAsync = async (fastify) => {
     // GET / — list user's PromptDNA profiles
-  fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const dnas = await db
       .select()
       .from(promptDnas)
@@ -21,7 +21,7 @@ const promptDnaPlugin: FastifyPluginAsync = async (fastify) => {
     // POST / — create PromptDNA
   fastify.post("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const { name, systemPrompt, steeringRules, consensusBias, critiqueStyle } =
-      request.body as Record<string, any>;
+      request.body as { name?: string; systemPrompt?: string; steeringRules?: string; consensusBias?: string; critiqueStyle?: string };
 
     if (!name || typeof name !== "string") {
       throw new AppError(400, "Name is required", "DNA_NAME_REQUIRED");
@@ -48,7 +48,7 @@ const promptDnaPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // PUT /:id — update PromptDNA
-  fastify.put("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.put("/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [existing] = await db
@@ -60,7 +60,7 @@ const promptDnaPlugin: FastifyPluginAsync = async (fastify) => {
     if (!existing) throw new AppError(404, "PromptDNA not found", "DNA_NOT_FOUND");
 
     const { name, systemPrompt, steeringRules, consensusBias, critiqueStyle } =
-      request.body as Record<string, any>;
+      request.body as { name?: string; systemPrompt?: string; steeringRules?: string; consensusBias?: string; critiqueStyle?: string };
 
     const data: Record<string, unknown> = {};
     if (name !== undefined) data.name = name.trim();
@@ -79,7 +79,7 @@ const promptDnaPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // DELETE /:id — delete PromptDNA
-  fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [existing] = await db

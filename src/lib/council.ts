@@ -1,16 +1,14 @@
-import { ARCHETYPES, SUMMONS, UNIVERSAL_PROMPT } from "../config/archetypes.js";
+import { ARCHETYPES, SUMMONS, UNIVERSAL_PROMPT, Archetype } from "../config/archetypes.js";
 import { db } from "./drizzle.js";
 import { councilConfigs } from "../db/schema/auth.js";
 import { eq } from "drizzle-orm";
 import { mapProviderError } from "./errorMapper.js";
 import { Message, Provider } from "./providers.js";
 import logger from "./logger.js";
-import { formatAgentOutput, ScoredOpinion } from "./schemas.js";
-import { filterAndRank } from "./scoring.js";
+import { ScoredOpinion } from "./schemas.js";
 import { gatherOpinions, conductPeerReview, evaluateConsensus, synthesizeVerdict, conductDebateRound, OpinionResult } from "./deliberationPhases.js";
 import { PeerReview, ValidatorResult } from "./schemas.js";
 import { createController } from "./controller.js";
-import { calculateCost } from "./cost.js";
 import { updateReliability, getReliabilityScores } from "../services/reliability.service.js";
 
 export type { PeerReview, ValidatorResult };
@@ -68,12 +66,13 @@ export async function prepareCouncilMembers(members: CouncilMemberInput[], summo
   const summonKey = (summon && SUMMONS[summon]) ? summon : "default";
   const archetypeOrder = SUMMONS[summonKey];
 
-  const userArchetypes: Record<string, any> = Object.create(null);
+  const userArchetypes: Record<string, Archetype> = Object.create(null);
   if (userId) {
     const [config] = await db.select().from(councilConfigs).where(eq(councilConfigs.userId, userId)).limit(1);
     if (config) {
-      const customs = (config.config as any).customArchetypes || [];
-      customs.forEach((a: any) => {
+      const configData = config.config as { customArchetypes?: Archetype[] };
+      const customs = configData.customArchetypes || [];
+      customs.forEach((a) => {
         // Prevent prototype pollution
         if (typeof a?.id === 'string' && !['__proto__', 'constructor', 'prototype'].includes(a.id)) {
           userArchetypes[a.id] = a;
@@ -157,7 +156,7 @@ export async function* deliberate(
     
     yield { type: "status", round: r, message: `${roundLabel}: Gathering agent responses...` };
 
-    let { opinions, totalTokens: opinionTokens } = await gatherOpinions({
+    const { opinions: _gatherOpinions, totalTokens: opinionTokens } = await gatherOpinions({
       members,
       currentMessages,
       round: r,
@@ -165,6 +164,7 @@ export async function* deliberate(
       maxTokens,
       onMemberChunk
     });
+    let opinions = _gatherOpinions;
     totalTokens += opinionTokens;
 
     const minRequired = Math.max(2, Math.ceil(members.length * 0.5));
@@ -199,7 +199,6 @@ export async function* deliberate(
           structured: original?.structured || null
         } as OpinionResult;
       });
-      finalOpinions = opinions;
 
       for (const op of refinedOpinions) {
         yield { type: "opinion", name: op.name + " (Refined)", text: op.opinion, round: 1.5 };
@@ -211,7 +210,7 @@ export async function* deliberate(
     if (opinions.length >= 2) {
       yield { type: "status", round: r, message: `Peer review phase for Round ${r}...` };
 
-      const lastConsensus = r > 1 ? (controller as any)['previousMaxScore'] : 0; 
+      const lastConsensus = r > 1 ? (controller as unknown as { previousMaxScore: number })['previousMaxScore'] : 0;
       const skipAdversarial = lastConsensus > 0.92;
       const skipGrounding = lastConsensus > 0.95;
 
@@ -244,7 +243,7 @@ export async function* deliberate(
 
         // ── Reliability tracking: update model scores based on peer review ──
         const memberModels = new Map<string, string>();
-        for (const m of members as any[]) {
+        for (const m of members) {
           if (m.name && m.model) memberModels.set(m.name, m.model);
         }
         const conflicts: Array<{ agentA: string; agentB: string }> = [];
@@ -266,8 +265,6 @@ export async function* deliberate(
 
     finalOpinions = opinions;
 
-    const roundContext = opinions.map(o => `${o.name}: ${o.opinion}`).join("\n\n");
-
     if (r < rounds) {
       const {
         criticEval,
@@ -276,7 +273,7 @@ export async function* deliberate(
         totalTokens: consensusTokens
       } = await evaluateConsensus({
         master,
-        opinions: opinions.map((o: any) => o as OpinionResult),
+        opinions,
         currentMessages,
         round: r,
         abortSignal,
@@ -320,19 +317,18 @@ export async function* deliberate(
   yield { type: "status", round: rounds, message: "Master synthesis started" };
 
   // ── Reliability-weighted synthesis: inject model reliability scores ──
-  let reliabilityContext = "";
   try {
-    const modelNames = (members as any[]).map((m) => m.model).filter(Boolean);
+    const modelNames = members.map((m) => m.model).filter(Boolean);
     const scores = await getReliabilityScores(modelNames);
     if (scores.size > 0) {
-      const memberScores = (members as any[]).map((m) => {
+      const memberScores = members.map((m) => {
         const score = scores.get(m.model);
         return score
           ? `${m.name} (${m.model}): reliability ${(score.avgConfidence * 100).toFixed(1)}% (${score.totalResponses} responses)`
           : null;
       }).filter(Boolean);
       if (memberScores.length > 0) {
-        reliabilityContext = `\n\n[MODEL RELIABILITY SCORES - weight responses accordingly]\n${memberScores.join("\n")}\n[/MODEL RELIABILITY SCORES]`;
+        const reliabilityContext = `\n\n[MODEL RELIABILITY SCORES - weight responses accordingly]\n${memberScores.join("\n")}\n[/MODEL RELIABILITY SCORES]`;
         // Inject into the last message for synthesis context
         if (currentMessages.length > 0) {
           const lastMsg = currentMessages[currentMessages.length - 1];
@@ -366,7 +362,7 @@ export async function* deliberate(
       totalCost: 0, // Actual cost is calculated by providers layer or service layer
       hallucinationCount: 0 // Aggregate from validator result if needed
     } 
-  } as any;
+  } as DeliberationEvent;
 }
 
 export async function askCouncil(
@@ -397,14 +393,14 @@ export async function streamCouncil(
   members: Provider[],
   master: Provider,
   messages: Message[],
-  onEvent: (event: string, data: any) => void,
+  onEvent: (event: string, data: Record<string, unknown>) => void,
   maxTokens: number = 4096,
   rounds: number = 1,
   abortSignal?: AbortSignal
 ) {
   let verdict = "";
   const archetypeMap: Record<string, string> = {};
-  for (const m of (members as any[])) {
+  for (const m of (members as (Provider & { archetype?: string })[]) ) {
     if (m.name && m.archetype) archetypeMap[m.name] = m.archetype;
   }
 

@@ -10,7 +10,7 @@ export function fastifyValidate(schema: ZodSchema) {
     if (!result.success) {
       reply.code(400).send({
         error: "Validation failed",
-        details: result.error.issues.map((e: any) => ({
+        details: result.error.issues.map((e) => ({
           field: e.path.join("."),
           message: e.message,
         })),

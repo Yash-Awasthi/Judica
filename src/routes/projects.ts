@@ -15,14 +15,14 @@ const projectsPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", fastifyRequireAuth);
 
   // List projects
-  fastify.get("/", async (request, reply) => {
+  fastify.get("/", async (request, _reply) => {
     const userId = request.userId!;
     const projects = await getProjects(userId);
     return projects;
   });
 
   // Get project by ID
-  fastify.get("/:projectId", async (request, reply) => {
+  fastify.get("/:projectId", async (request, _reply) => {
     const userId = request.userId!;
     const { projectId } = request.params as { projectId: string };
     const project = await getProjectById(projectId, userId);
@@ -35,7 +35,7 @@ const projectsPlugin: FastifyPluginAsync = async (fastify) => {
   // Create project
   fastify.post("/", async (request, reply) => {
     const userId = request.userId!;
-    const body = request.body as any;
+    const body = request.body as { name: string; description?: string; defaultCouncilComposition?: Record<string, unknown>; color?: string; icon?: string; defaultSystemPrompt?: string };
     const project = await createProject({
       userId,
       name: body.name,
@@ -49,10 +49,10 @@ const projectsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // Update project
-  fastify.put("/:projectId", async (request, reply) => {
+  fastify.put("/:projectId", async (request, _reply) => {
     const userId = request.userId!;
     const { projectId } = request.params as { projectId: string };
-    const body = request.body as any;
+    const body = request.body as { name: string; description?: string; defaultCouncilComposition?: Record<string, unknown>; color?: string; icon?: string; defaultSystemPrompt?: string };
     const project = await updateProject(projectId, userId, body);
     if (!project) {
       throw new AppError(404, "Project not found");
@@ -61,7 +61,7 @@ const projectsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // Delete project (soft delete)
-  fastify.delete("/:projectId", async (request, reply) => {
+  fastify.delete("/:projectId", async (request, _reply) => {
     const userId = request.userId!;
     const { projectId } = request.params as { projectId: string };
     const success = await deleteProject(projectId, userId);

@@ -1,12 +1,21 @@
 import type { Message, Provider } from "../providers.js";
 import { getToolDefinitions, callTool } from "../tools/index.js";
 
+interface ProviderResult {
+  text: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+}
+
 export async function askAnthropic(
   provider: Provider,
   normMessages: Message[],
   maxTokens: number,
   signal: AbortSignal
-): Promise<any> {
+): Promise<ProviderResult> {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     signal,
@@ -27,16 +36,16 @@ export async function askAnthropic(
       }))
     }),
   });
-  const data = (await res.json()) as any;
+  const data = (await res.json()) as { error?: { message?: string }; content?: Array<{ type: string; text?: string; id?: string; name?: string; input?: Record<string, unknown> }>; usage?: { input_tokens: number; output_tokens: number } };
   if (!res.ok) throw new Error(data.error?.message ?? `Anthropic error ${res.status}`);
 
   const content = data.content || [];
-  const toolCalls = content.filter((c: any) => c.type === "tool_use");
+  const toolCalls = content.filter(c => c.type === "tool_use");
 
   if (toolCalls.length > 0) {
     const nextMessages: Message[] = [...normMessages, { role: "assistant" as const, content }];
     for (const tc of toolCalls) {
-      const result = await callTool({ id: tc.id, name: tc.name, arguments: tc.input });
+      const result = await callTool({ id: tc.id!, name: tc.name!, arguments: tc.input ?? {} });
       const safeResult = `[UNTRUSTED TOOL OUTPUT]\n${result}\n[/UNTRUSTED TOOL OUTPUT]`;
       nextMessages.push({
         role: "user" as const,
@@ -52,12 +61,13 @@ export async function askAnthropic(
     return askAnthropic(provider, nextMessages, maxTokens, signal);
   }
 
+  const usageData = data.usage;
   return {
-    text: content.find((c: any) => c.type === "text")?.text ?? JSON.stringify(data),
-    usage: data.usage ? {
-      promptTokens: data.usage.input_tokens,
-      completionTokens: data.usage.output_tokens,
-      totalTokens: data.usage.input_tokens + data.usage.output_tokens
+    text: content.find(c => c.type === "text")?.text ?? JSON.stringify(data),
+    usage: usageData ? {
+      promptTokens: usageData.input_tokens,
+      completionTokens: usageData.output_tokens,
+      totalTokens: usageData.input_tokens + usageData.output_tokens
     } : undefined
   };
 }
@@ -68,7 +78,7 @@ export async function streamAnthropic(
   maxTokens: number,
   signal: AbortSignal,
   onChunk: (chunk: string) => void
-): Promise<any> {
+): Promise<ProviderResult> {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     signal,
@@ -86,7 +96,7 @@ export async function streamAnthropic(
     }),
   });
 
-  if (!res.ok) throw new Error(((await res.json()) as any).error?.message ?? `Anthropic error ${res.status}`);
+  if (!res.ok) throw new Error(((await res.json()) as { error?: { message?: string } }).error?.message ?? `Anthropic error ${res.status}`);
 
   const reader = res.body!.getReader();
   const decoder = new TextDecoder();
@@ -108,7 +118,7 @@ export async function streamAnthropic(
           }
           const chunk = json.delta?.text ?? "";
           if (chunk) { fullText += chunk; onChunk(chunk); }
-        } catch {  }
+        } catch { /* no-op */ }
       }
     }
   }

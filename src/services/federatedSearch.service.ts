@@ -2,7 +2,7 @@ import { db } from "../lib/drizzle.js";
 import { sql } from "drizzle-orm";
 import { embed } from "./embeddings.service.js";
 import { safeVectorLiteral } from "./vectorStore.service.js";
-import { hybridSearch, type MemoryChunk } from "./vectorStore.service.js";
+import { hybridSearch } from "./vectorStore.service.js";
 import { pool } from "../lib/db.js";
 import logger from "../lib/logger.js";
 
@@ -38,12 +38,12 @@ async function searchConversations(
       LIMIT ${limit}
     `);
 
-    return (result.rows as any[]).map((row) => ({
-      id: row.id,
+    return (result.rows as Array<{ [key: string]: unknown }>).map((row) => ({
+      id: row.id as string,
       content: `Q: ${row.question}\nA: ${row.verdict}`,
       source: "conversation" as const,
       sourceName: "conversation history",
-      score: row.score,
+      score: row.score as number,
     }));
   } catch (err) {
     logger.warn({ err }, "Federated search: conversation search failed");
@@ -114,12 +114,12 @@ async function searchFacts(
       LIMIT ${limit}
     `);
 
-    return (result.rows as any[]).map((row, idx) => ({
-      id: row.id,
+    return (result.rows as Array<{ [key: string]: unknown }>).map((row) => ({
+      id: row.id as string,
       content: `[${row.type}] ${row.content} (confidence: ${row.confidence}, source: ${row.sourceAgent})`,
       source: "fact" as const,
-      sourceName: row.sourceAgent,
-      score: row.confidence || 0.5,
+      sourceName: row.sourceAgent as string | null,
+      score: (row.confidence as number) || 0.5,
     }));
   } catch (err) {
     logger.warn({ err }, "Federated search: fact search failed");

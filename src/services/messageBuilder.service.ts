@@ -1,7 +1,7 @@
 import { db } from "../lib/drizzle.js";
 import { uploads } from "../db/schema/uploads.js";
 import { eq, inArray, and } from "drizzle-orm";
-import { hybridSearch, enhancedHybridSearch, enrichWithParentContext, type MemoryChunk } from "./vectorStore.service.js";
+import { hybridSearch, enhancedHybridSearch, enrichWithParentContext } from "./vectorStore.service.js";
 import { getAdaptiveK } from "./adaptiveK.service.js";
 import { readFile } from "fs/promises";
 import path from "path";

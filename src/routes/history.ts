@@ -10,7 +10,7 @@ import {
 } from "../services/conversationService.js";
 import { db } from "../lib/drizzle.js";
 import { conversations, chats } from "../db/schema/conversations.js";
-import { eq, and, or, ilike, asc, desc, count, lte, sql } from "drizzle-orm";
+import { eq, and, asc, count, lte, sql } from "drizzle-orm";
 import logger from "../lib/logger.js";
 
 import { AppError } from "../middleware/errorHandler.js";
@@ -29,7 +29,7 @@ function paginationMeta(page: number, limit: number, total: number) {
 
 const historyPlugin: FastifyPluginAsync = async (fastify) => {
 
-  fastify.get("/search", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/search", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     try {
       const { q, limit = "10", projectId, after, before } = request.query as { q?: string; limit?: string; projectId?: string; after?: string; before?: string };
 
@@ -51,7 +51,7 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-    fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { page, limit, skip } = parsePagination(request.query as { page?: string; limit?: string });
     const { projectId, after, before } = request.query as { projectId?: string; after?: string; before?: string };
 
@@ -69,7 +69,7 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-    fastify.get("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.get("/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
     const { page, limit, skip } = parsePagination(request.query as { page?: string; limit?: string }, 50);
 
@@ -108,7 +108,7 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-    fastify.patch("/:id", { preHandler: [fastifyRequireAuth, fastifyValidate(renameConversationSchema)] }, async (request, reply) => {
+    fastify.patch("/:id", { preHandler: [fastifyRequireAuth, fastifyValidate(renameConversationSchema)] }, async (request, _reply) => {
     const { id } = request.params as { id: string };
     const { title } = request.body as { title: string };
 
@@ -117,14 +117,14 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
     return { success: true, title };
   });
 
-    fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
     const deleted = await deleteConversation(id, request.userId!);
     if (!deleted) throw new AppError(404, "Conversation not found");
     return { success: true };
   });
 
-    fastify.post("/:id/fork", { preHandler: [fastifyRequireAuth, fastifyValidate(forkSchema)] }, async (request, reply) => {
+    fastify.post("/:id/fork", { preHandler: [fastifyRequireAuth, fastifyValidate(forkSchema)] }, async (request, _reply) => {
     const { id } = request.params as { id: string };
     const { toChatId } = request.body as { toChatId: number };
 
@@ -175,7 +175,7 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
     return { success: true, forkId: fork.id, count: chatsToFork.length };
   });
 
-    fastify.get("/shared/:id", async (request, reply) => {
+    fastify.get("/shared/:id", async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const conversationRows = await db
@@ -202,7 +202,7 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-    fastify.patch("/:id/share", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.patch("/:id/share", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
     const { isPublic } = request.body as { isPublic: boolean };
 
@@ -220,7 +220,7 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
     return { success: true, isPublic };
   });
 
-  fastify.get("/:id/summary", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/:id/summary", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
     const userId = request.userId!;
 
@@ -229,7 +229,7 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
       if (!conv) {
         throw new AppError(404, "Conversation not found");
       }
-      return (conv as any).summaryData || null;
+      return (conv as unknown as { summaryData?: unknown }).summaryData || null;
     } catch (err) {
       if (err instanceof AppError) throw err;
       logger.error({ err, id }, "Failed to fetch summary");
@@ -237,7 +237,7 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  fastify.post("/:id/summary", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.post("/:id/summary", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
     const userId = request.userId!;
 

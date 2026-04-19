@@ -96,7 +96,7 @@ export function startWorkers() {
         { jobId: job?.id, queue: worker.name, err, attempt: job?.attemptsMade },
         "Worker job failed",
       );
-      moveToDeadLetterQueue(job, err, worker.name);
+      void moveToDeadLetterQueue(job, err, worker.name);
     });
     worker.on("completed", (job) => {
       logger.info({ jobId: job?.id, queue: worker.name }, "Worker job completed");

@@ -135,7 +135,7 @@ const researchPlugin: FastifyPluginAsync = async (fastify) => {
           return;
         }
 
-        const steps = (current.steps as any[]) || [];
+        const steps = (current.steps as Array<Record<string, unknown>>) || [];
         // Send new completed steps
         for (let i = lastStepCount; i < steps.length; i++) {
           if (steps[i].status === "done") {

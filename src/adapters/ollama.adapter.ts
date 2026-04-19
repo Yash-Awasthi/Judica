@@ -6,6 +6,7 @@ import type {
 } from "./types.js";
 import { createStreamResult } from "./types.js";
 import { getBreaker } from "../lib/breaker.js";
+import type { Provider } from "../lib/providers.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
 
 interface OllamaChunk {
@@ -80,7 +81,7 @@ export class OllamaAdapter implements IProviderAdapter {
           signal: controller.signal,
         });
 
-      const breaker = getBreaker({ name: this.providerId } as any, fetchChat);
+      const breaker = getBreaker({ name: this.providerId } as Provider, fetchChat);
       const res: Response = await breaker.fire();
 
       clearTimeout(timeout);
@@ -151,8 +152,8 @@ export class OllamaAdapter implements IProviderAdapter {
         signal: AbortSignal.timeout(5000),
       });
       if (!res.ok) return [];
-      const data: any = await res.json();
-      return (data.models || []).map((m: any) => m.name).sort();
+      const data = await res.json() as { models?: Array<{ name: string }> };
+      return (data.models || []).map((m) => m.name).sort();
     } catch {
       return [];
     }

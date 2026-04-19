@@ -44,7 +44,7 @@ export function DebateDashboardView() {
   const [exchanges, setExchanges] = useState<DebateExchange[]>([]);
   const [synthesis, setSynthesis] = useState<string | null>(null);
   const [consensusScore, setConsensusScore] = useState<number | null>(null);
-  const [, setConsensusBreakdown] = useState<Record<string, any> | null>(null);
+  const [, setConsensusBreakdown] = useState<Record<string, unknown> | null>(null);
   const [running, setRunning] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
   const [factsCount, setFactsCount] = useState(0);
@@ -56,7 +56,26 @@ export function DebateDashboardView() {
     if (el) el.scrollTop = el.scrollHeight;
   };
 
-  const handleEvent = useCallback((data: Record<string, any>) => {
+  const voiceModeRef = useRef(voiceMode);
+  useEffect(() => { voiceModeRef.current = voiceMode; }, [voiceMode]);
+
+  const playTTS = async (text: string) => {
+    if (!voiceModeRef.current) return;
+    try {
+      const res = await fetchWithAuth("/api/voice/synthesize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: text.substring(0, 2000), voice: "alloy" }),
+      });
+      if (res.ok) {
+        const blob = await res.blob();
+        const audio = new Audio(URL.createObjectURL(blob));
+        audio.play();
+      }
+    } catch (_err) { /* ignore tts errors */ }
+  };
+
+  const handleEvent = useCallback((data: Record<string, unknown>) => {
     const type = data.type as string;
 
     switch (type) {
@@ -141,7 +160,7 @@ export function DebateDashboardView() {
         break;
       case "confidence_score":
         setConsensusScore(data.score as number);
-        setConsensusBreakdown(data.breakdown as Record<string, any>);
+        setConsensusBreakdown(data.breakdown as Record<string, unknown>);
         break;
       case "orchestration_error":
         setRunning(false);
@@ -194,25 +213,6 @@ export function DebateDashboardView() {
         }).catch(() => setRunning(false));
     } catch (_err) { setRunning(false); }
   }, [query, running, fetchWithAuth, handleEvent]);
-
-  const voiceModeRef = useRef(voiceMode);
-  useEffect(() => { voiceModeRef.current = voiceMode; }, [voiceMode]);
-
-  const playTTS = async (text: string) => {
-    if (!voiceModeRef.current) return;
-    try {
-      const res = await fetchWithAuth("/api/voice/synthesize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: text.substring(0, 2000), voice: "alloy" }),
-      });
-      if (res.ok) {
-        const blob = await res.blob();
-        const audio = new Audio(URL.createObjectURL(blob));
-        audio.play();
-      }
-    } catch (_err) { /* ignore tts errors */ }
-  };
 
   const meterPercent = consensusScore !== null ? Math.round(consensusScore * 100) : 0;
   const meterColor = consensusScore === null ? "bg-white/10" : consensusScore < 0.4 ? "bg-[var(--accent-coral)]" : consensusScore < 0.7 ? "bg-[var(--accent-gold)]" : "bg-[var(--accent-mint)]";

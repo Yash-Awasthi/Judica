@@ -57,6 +57,7 @@ export const ProviderManager: React.FC = () => {
   }, [fetchWithAuth]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (token) loadProviders();
   }, [token, loadProviders]);
 
@@ -207,7 +208,7 @@ export const ProviderManager: React.FC = () => {
                 <label className="text-xs font-medium text-zinc-500 uppercase tracking-wider">Auth Type</label>
                 <select 
                   value={form.auth_type}
-                  onChange={e => setForm({...form, auth_type: e.target.value as any})}
+                  onChange={e => setForm({...form, auth_type: e.target.value as ProviderForm['auth_type']})}
                   className="w-full bg-zinc-950 border border-zinc-800 rounded-lg px-4 py-2 text-white focus:border-blue-500 outline-none transition-all"
                 >
                   <option value="none">None (Local/Public)</option>

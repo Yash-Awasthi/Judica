@@ -43,6 +43,27 @@ export interface ChatMessage {
   cacheHit?: boolean;
   /** Preview URLs for images attached to this message (client-side only) */
   attachmentPreviews?: { url: string; name: string }[];
+  /** Active reasoning mode (socratic, red_blue, hypothesis, confidence) */
+  deliberationMode?: string;
+  /** Structured phase data streamed from advanced reasoning modes */
+  modePhases?: ModePhase[];
+}
+
+export interface ModePhase {
+  phase: string;
+  // Socratic
+  qa?: { q: string; a: string }[];
+  // Red/Blue
+  redArguments?: string;
+  blueArguments?: string;
+  // Hypothesis
+  round?: {
+    round: number;
+    phase: "propose" | "falsify" | "revise";
+    hypotheses: { agent: string; text: string }[];
+  };
+  // Confidence
+  opinions?: { agent: string; opinion: string; confidence: number; reasoning: string }[];
 }
 
 export interface CouncilMember {
@@ -103,4 +124,19 @@ export interface Node {
   type: "proposer" | "critic" | "moderator";
   x: number;
   y: number;
+}
+
+export interface SearchResult {
+  id: string;
+  question: string;
+  verdict: string;
+  conversationId: string;
+  conversationTitle: string;
+  createdAt: string;
+  relevanceScore: number;
+  highlights: {
+    question: string;
+    verdict: string;
+    hasOpinionMatch: boolean;
+  };
 }

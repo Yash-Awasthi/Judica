@@ -64,9 +64,10 @@ export class GoogleProvider extends BaseProvider {
       );
 
       if (!res.ok) {
-        let errorData: any = {};
-        try { errorData = await res.json(); } catch { /* ignore */ }
-        throw new Error(errorData?.error?.message ?? `Google API error: ${res.status}`);
+        let errorData: Record<string, unknown> = {};
+        try { errorData = await res.json() as Record<string, unknown>; } catch { /* ignore */ }
+        const errObj = errorData as { error?: { message?: string } };
+        throw new Error(errObj?.error?.message ?? `Google API error: ${res.status}`);
       }
 
       if (onChunk && res.body) {
@@ -102,9 +103,7 @@ export class GoogleProvider extends BaseProvider {
                 if (parsed.usageMetadata) {
                   streamUsage = parsed.usageMetadata;
                 }
-              } catch (e) {
-                // ignore unparseable chunk
-              }
+              } catch { /* ignore unparseable SSE chunk */ }
             }
           }
         }
@@ -145,7 +144,7 @@ export class GoogleProvider extends BaseProvider {
         const nextMessages: Message[] = [
           ...messages, 
           { role: "assistant", content: JSON.stringify(part) },
-          { role: "tool", name, content: safeResult } as any
+          { role: "tool", name, content: safeResult } as Message
         ];
 
         return this.call({ messages: nextMessages, signal, maxTokens, isFallback, onChunk, _depth: _depth + 1 });

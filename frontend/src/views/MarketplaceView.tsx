@@ -19,7 +19,7 @@ interface MarketplaceItem {
   type: string;
   name: string;
   description: string;
-  content: any;
+  content: unknown;
   authorId: string;
   authorName: string;
   tags: string[];
@@ -28,7 +28,7 @@ interface MarketplaceItem {
   version: string;
   published: boolean;
   createdAt: string;
-  reviews?: any[];
+  reviews?: unknown[];
   starred?: boolean;
 }
 
@@ -92,7 +92,9 @@ export function MarketplaceView() {
     }
   }, [fetchWithAuth, typeFilter, sort, page, search]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadItems(); }, [loadItems]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setPage(1); }, [typeFilter, sort, search]);
 
   const handleInstall = useCallback(async (id: string) => {
@@ -130,7 +132,7 @@ export function MarketplaceView() {
     if (!pubName.trim() || !pubDesc.trim() || !pubContent.trim()) return;
     setPublishing(true);
     try {
-      let content: any;
+      let content: unknown;
       try { content = JSON.parse(pubContent); }
       catch { content = { text: pubContent }; }
 
@@ -193,8 +195,8 @@ export function MarketplaceView() {
           <div className="space-y-8">
             <AnimatePresence>
               {showPublish && (
-                <AssetPublishForm 
-                  pubType={pubType} setPubType={setPubType}
+                <AssetPublishForm
+                  pubType={pubType} setPubType={(t: string) => setPubType(t as ItemType)}
                   pubName={pubName} setPubName={setPubName}
                   pubDesc={pubDesc} setPubDesc={setPubDesc}
                   pubTags={pubTags} setPubTags={setPubTags}

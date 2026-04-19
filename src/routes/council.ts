@@ -1,4 +1,4 @@
-import { FastifyPluginAsync } from "fastify";
+import { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
 import { z } from "zod";
 import { ARCHETYPES, SUMMONS, COUNCIL_TEMPLATES } from "../config/archetypes.js";
 import { db } from "../lib/drizzle.js";
@@ -25,12 +25,12 @@ const updateConfigSchema = z.object({
 });
 
 function fastifyValidate(schema: z.ZodSchema) {
-  return async (request: any, reply: any) => {
+  return async (request: FastifyRequest, reply: FastifyReply) => {
     const result = schema.safeParse(request.body);
     if (!result.success) {
       reply.code(400).send({
         error: "Validation failed",
-        details: result.error.issues.map((e: any) => ({
+        details: result.error.issues.map((e) => ({
           field: e.path.join("."),
           message: e.message,
         })),
@@ -42,8 +42,8 @@ function fastifyValidate(schema: z.ZodSchema) {
 }
 
 const councilPlugin: FastifyPluginAsync = async (fastify) => {
-    fastify.get("/archetypes", async (request, reply) => {
-    const archetypes = Object.values(ARCHETYPES).map((a: any) => ({
+    fastify.get("/archetypes", async (_request, _reply) => {
+    const archetypes = Object.values(ARCHETYPES).map((a) => ({
       id: a.id,
       name: a.name,
       thinkingStyle: a.thinkingStyle,
@@ -55,15 +55,15 @@ const councilPlugin: FastifyPluginAsync = async (fastify) => {
     return { archetypes };
   });
 
-    fastify.get("/summons", async (request, reply) => {
+    fastify.get("/summons", async (_request, _reply) => {
     return { summons: SUMMONS };
   });
 
-    fastify.get("/templates", async (request, reply) => {
+    fastify.get("/templates", async (_request, _reply) => {
     return { templates: COUNCIL_TEMPLATES };
   });
 
-    fastify.get("/config", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.get("/config", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     try {
       const userId = request.userId!;
       const [config] = await db
@@ -78,7 +78,7 @@ const councilPlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-    fastify.put("/config", { preHandler: [fastifyRequireAuth, fastifyValidate(updateConfigSchema)] }, async (request, reply) => {
+    fastify.put("/config", { preHandler: [fastifyRequireAuth, fastifyValidate(updateConfigSchema)] }, async (request, _reply) => {
     try {
       const userId = request.userId!;
       const config = request.body;
@@ -100,7 +100,7 @@ const councilPlugin: FastifyPluginAsync = async (fastify) => {
       } else {
         [updated] = await db
           .insert(councilConfigs)
-          .values({ userId, config, updatedAt: new Date() } as any)
+          .values({ userId, config, updatedAt: new Date() } as typeof councilConfigs.$inferInsert)
           .returning();
       }
 
@@ -111,7 +111,7 @@ const councilPlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-    fastify.delete("/config", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.delete("/config", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     try {
       const userId = request.userId!;
       await db.delete(councilConfigs).where(eq(councilConfigs.userId, userId));
@@ -123,7 +123,7 @@ const councilPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     fastify.get("/archetypes/:id", async (request, reply) => {
-    const { id } = request.params as any;
+    const { id } = request.params as { id: string };
     const archetype = ARCHETYPES[String(id)];
 
     if (!archetype) {

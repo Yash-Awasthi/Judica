@@ -1,22 +1,33 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Search, ChevronDown, Activity, Plus } from "lucide-react";
 
-interface MarketplaceFilterBarProps {
+interface FilterOption<T extends string = string> {
+  value: T;
+  label: string;
+  icon: React.ReactNode;
+}
+
+interface SortOption<T extends string = string> {
+  value: T;
+  label: string;
+}
+
+interface MarketplaceFilterBarProps<F extends string = string, S extends string = string> {
   search: string;
   setSearch: (s: string) => void;
-  typeFilter: string;
-  setTypeFilter: (s: any) => void;
-  sort: string;
-  setSort: (s: any) => void;
+  typeFilter: F;
+  setTypeFilter: (s: F) => void;
+  sort: S;
+  setSort: (s: S) => void;
   showPublish: boolean;
   setShowPublish: (s: boolean) => void;
   showSortDropdown: boolean;
   setShowSortDropdown: (s: boolean) => void;
-  typeFilters: any[];
-  sortOptions: any[];
+  typeFilters: FilterOption<F>[];
+  sortOptions: SortOption<S>[];
 }
 
-export function MarketplaceFilterBar({
+export function MarketplaceFilterBar<F extends string, S extends string>({
   search, setSearch,
   typeFilter, setTypeFilter,
   sort, setSort,
@@ -24,7 +35,7 @@ export function MarketplaceFilterBar({
   showSortDropdown, setShowSortDropdown,
   typeFilters,
   sortOptions
-}: MarketplaceFilterBarProps) {
+}: MarketplaceFilterBarProps<F, S>) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}

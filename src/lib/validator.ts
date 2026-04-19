@@ -1,5 +1,5 @@
 import { askProvider, Provider, Message } from "./providers.js";
-import { AgentOutput, parseAgentOutput } from "./schemas.js";
+import { AgentOutput } from "./schemas.js";
 import logger from "./logger.js";
 
 export interface ValidationResult {
@@ -50,7 +50,7 @@ export class ColdValidator {
     question: string,
     verdict: string,
     agentOutputs: AgentOutput[],
-    conversationContext?: Message[]
+    _conversationContext?: Message[]
   ): Promise<ValidationResult> {
     const startTime = Date.now();
     
@@ -181,9 +181,9 @@ export class ColdValidator {
   }
 
   private async validateContent(
-    question: string, 
-    verdict: string, 
-    agentOutputs: AgentOutput[]
+    question: string,
+    verdict: string,
+    _agentOutputs: AgentOutput[]
   ): Promise<ValidationIssue[]> {
     const issues: ValidationIssue[] = [];
 
@@ -274,9 +274,9 @@ Respond with ONLY a JSON object:
   }
 
   private async performFactCheck(
-    question: string, 
-    verdict: string, 
-    agentOutputs: AgentOutput[]
+    question: string,
+    verdict: string,
+    _agentOutputs: AgentOutput[]
   ): Promise<ValidationIssue[]> {
     const issues: ValidationIssue[] = [];
 
@@ -332,7 +332,7 @@ Respond with ONLY a JSON object:
     return issues;
   }
 
-  private async detectBias(verdict: string, agentOutputs: AgentOutput[]): Promise<ValidationIssue[]> {
+  private async detectBias(verdict: string, _agentOutputs: AgentOutput[]): Promise<ValidationIssue[]> {
     const issues: ValidationIssue[] = [];
 
     try {
@@ -384,7 +384,7 @@ Respond with ONLY a JSON object:
     return issues;
   }
 
-  private async checkSafety(verdict: string, agentOutputs: AgentOutput[]): Promise<ValidationIssue[]> {
+  private async checkSafety(verdict: string, _agentOutputs: AgentOutput[]): Promise<ValidationIssue[]> {
     const issues: ValidationIssue[] = [];
 
     const safetyKeywords = [

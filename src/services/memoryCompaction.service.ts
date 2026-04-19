@@ -13,17 +13,6 @@ export interface CompactionResult {
   expiredCount: number;
 }
 
-/**
- * Exponential decay score: returns 0..1 where 1 = just accessed, 0 = stale.
- * halfLifeDays controls how fast memories decay.
- */
-function decayScore(lastAccessedAt: Date | null, createdAt: Date, halfLifeDays: number = 14): number {
-  const referenceDate = lastAccessedAt || createdAt;
-  const ageMs = Date.now() - referenceDate.getTime();
-  const ageDays = ageMs / (24 * 60 * 60 * 1000);
-  return Math.pow(0.5, ageDays / halfLifeDays);
-}
-
 /** One-off facts with no access after 30 days are expired. */
 const ONE_OFF_TTL_DAYS = 30;
 
@@ -86,7 +75,7 @@ export async function compact(userId: number): Promise<CompactionResult> {
   // Embed all chunks
   const chunksWithEmbeddings: MemoryChunkWithEmbedding[] = [];
   for (const mem of oldMemories) {
-    const embeddingRaw = (mem as any).embedding as unknown;
+    const embeddingRaw = (mem as Record<string, unknown>).embedding as unknown;
     let embedding: number[];
     if (Array.isArray(embeddingRaw)) {
       embedding = embeddingRaw as number[];

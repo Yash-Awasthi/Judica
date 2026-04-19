@@ -41,7 +41,7 @@ export function ChatView() {
   const conversationId = rawConversationId && UUID_RE.test(rawConversationId) ? rawConversationId : undefined;
 
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-  const [summaryData, setSummaryData] = useState<any>(null);
+  const [summaryData, setSummaryData] = useState<Conversation["summaryData"] | null>(null);
   const [isGeneratingSummary, setIsGeneratingSummary] = useState(false);
 
   const { members, setMembers } = useCouncilMembers();

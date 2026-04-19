@@ -1,7 +1,7 @@
 import { FastifyPluginAsync } from "fastify";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { AppError } from "../middleware/errorHandler.js";
-import { encrypt, decrypt, mask } from "../lib/crypto.js";
+import { encrypt } from "../lib/crypto.js";
 import { registerAdapter, deregisterAdapter, listAvailableProviders, getAdapterOrNull } from "../adapters/registry.js";
 import { CustomAdapter, type CustomProviderConfig } from "../adapters/custom.adapter.js";
 import { db } from "../lib/drizzle.js";
@@ -11,7 +11,7 @@ import logger from "../lib/logger.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
 
 const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
-    fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const userId = request.userId!;
 
     // Built-in providers
@@ -57,7 +57,7 @@ const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
 
     fastify.post("/custom", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const userId = request.userId!;
-    const { name, base_url, auth_type, auth_key, auth_header_name, capabilities, models } = request.body as any;
+    const { name, base_url, auth_type, auth_key, auth_header_name, capabilities, models } = request.body as { name?: string; base_url?: string; auth_type?: string; auth_key?: string; auth_header_name?: string; capabilities?: Record<string, boolean>; models?: string[] };
 
     if (!name || !base_url || !auth_type) {
       throw new AppError(400, "name, base_url, and auth_type are required", "VALIDATION_ERROR");
@@ -119,9 +119,9 @@ const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-    fastify.put("/custom/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.put("/custom/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const userId = request.userId!;
-    const providerId = parseInt((request.params as any).id, 10);
+    const providerId = parseInt((request.params as { id: string }).id, 10);
 
     const [existing] = await db
       .select()
@@ -133,7 +133,7 @@ const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(404, "Custom provider not found", "NOT_FOUND");
     }
 
-    const { name, base_url, auth_type, auth_key, auth_header_name, capabilities, models } = request.body as any;
+    const { name, base_url, auth_type, auth_key, auth_header_name, capabilities, models } = request.body as { name?: string; base_url?: string; auth_type?: string; auth_key?: string; auth_header_name?: string; capabilities?: Record<string, boolean>; models?: string[] };
 
     const updateData: Record<string, unknown> = {};
     if (name) updateData.name = name;
@@ -176,9 +176,9 @@ const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
     };
   });
 
-    fastify.delete("/custom/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.delete("/custom/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const userId = request.userId!;
-    const providerId = parseInt((request.params as any).id, 10);
+    const providerId = parseInt((request.params as { id: string }).id, 10);
 
     const [existing] = await db
       .select()
@@ -197,9 +197,9 @@ const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
     return { deleted: true };
   });
 
-    fastify.post("/custom/:id/test", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.post("/custom/:id/test", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const userId = request.userId!;
-    const providerId = parseInt((request.params as any).id, 10);
+    const providerId = parseInt((request.params as { id: string }).id, 10);
 
     const [existing] = await db
       .select()
@@ -237,8 +237,8 @@ const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-    fastify.get("/:providerId/models", { preHandler: fastifyRequireAuth }, async (request, reply) => {
-    const { providerId } = request.params as any;
+    fastify.get("/:providerId/models", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
+    const { providerId } = request.params as { providerId: string };
 
     const adapter = getAdapterOrNull(providerId as string);
     if (!adapter) {

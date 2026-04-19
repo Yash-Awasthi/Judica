@@ -18,7 +18,7 @@ import logger from "../lib/logger.js";
 
 const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
     // GET / — list marketplace items
-  fastify.get("/", async (request, reply) => {
+  fastify.get("/", async (request, _reply) => {
     const {
       type,
       tags,
@@ -32,7 +32,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
     const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
     const skip = (pageNum - 1) * limitNum;
 
-    const conditions: any[] = [eq(marketplaceItems.published, true)];
+    const conditions = [eq(marketplaceItems.published, true)];
 
     if (type) {
       conditions.push(eq(marketplaceItems.type, type));
@@ -55,7 +55,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
         or(
           ilike(marketplaceItems.name, `%${escapedSearch}%`),
           ilike(marketplaceItems.description, `%${escapedSearch}%`)
-        )
+        )!
       );
     }
 
@@ -83,7 +83,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // GET /:id — item detail with reviews
-  fastify.get("/:id", async (request, reply) => {
+  fastify.get("/:id", async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [item] = await db
@@ -124,7 +124,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
 
     // POST / — publish item
   fastify.post("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
-    const { type, name, description, content, tags } = request.body as any;
+    const { type, name, description, content, tags } = request.body as { type?: string; name?: string; description?: string; content?: string; tags?: string[] };
 
     if (!type || !name || !description || !content) {
       throw new AppError(400, "type, name, description, and content are required", "MISSING_FIELDS");
@@ -168,7 +168,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // PUT /:id — update item (author only)
-  fastify.put("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.put("/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [item] = await db
@@ -184,7 +184,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(403, "Not authorized to update this item", "FORBIDDEN");
     }
 
-    const { name, description, content, tags, version, published } = request.body as any;
+    const { name, description, content, tags, version, published } = request.body as { name?: string; description?: string; content?: string; tags?: string[]; version?: string; published?: boolean };
 
     const data: Record<string, unknown> = { updatedAt: new Date() };
     if (name !== undefined) data.name = name;
@@ -204,7 +204,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // DELETE /:id — delete item (author or admin)
-  fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [item] = await db
@@ -232,7 +232,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // POST /:id/install — increment downloads, import into user account, return content
-  fastify.post("/:id/install", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.post("/:id/install", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
     const userId = request.userId!;
 
@@ -246,7 +246,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(404, "Item not found", "ITEM_NOT_FOUND");
     }
 
-    const content = item.content as Record<string, any>;
+    const content = item.content as Record<string, unknown>;
 
     // Import item into user's account based on type
     try {
@@ -256,16 +256,16 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
           await db.insert(prompts).values({
             id: promptId,
             userId,
-            name: content.name || item.name,
-            description: content.description || item.description,
+            name: (content.name as string) || item.name,
+            description: (content.description as string) || item.description,
           });
           await db.insert(promptVersions).values({
             id: randomUUID(),
             promptId,
             versionNum: 1,
-            content: content.text || content.content || JSON.stringify(content),
-            model: content.model || null,
-            temperature: content.temperature ?? null,
+            content: (content.text as string) || (content.content as string) || JSON.stringify(content),
+            model: (content.model as string) || null,
+            temperature: (content.temperature as number) ?? null,
             notes: `Installed from marketplace: ${item.name}`,
           });
           break;
@@ -275,9 +275,9 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
           await db.insert(workflows).values({
             id: randomUUID(),
             userId,
-            name: content.name || item.name,
-            description: content.description || item.description,
-            definition: content.definition || content,
+            name: (content.name as string) || item.name,
+            description: (content.description as string) || item.description,
+            definition: (content.definition || content) as Record<string, unknown>,
             createdAt: now,
             updatedAt: now,
           });
@@ -287,12 +287,12 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
           await db.insert(customPersonas).values({
             id: randomUUID(),
             userId,
-            name: content.name || item.name,
-            systemPrompt: content.systemPrompt || content.system_prompt || "",
-            temperature: content.temperature ?? 0.7,
-            critiqueStyle: content.critiqueStyle || null,
-            domain: content.domain || null,
-            aggressiveness: content.aggressiveness ?? 5,
+            name: (content.name as string) || item.name,
+            systemPrompt: (content.systemPrompt as string) || (content.system_prompt as string) || "",
+            temperature: (content.temperature as number) ?? 0.7,
+            critiqueStyle: (content.critiqueStyle as string) || null,
+            domain: (content.domain as string) || null,
+            aggressiveness: (content.aggressiveness as number) ?? 5,
           });
           break;
         }
@@ -302,10 +302,10 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
             await db.insert(userSkills).values({
               id: randomUUID(),
               userId: userId,
-              name: content.name || item.name,
-              description: content.description || item.description,
-              code: content.code,
-              parameters: content.parameters || {},
+              name: (content.name as string) || item.name,
+              description: (content.description as string) || item.description,
+              code: content.code as string,
+              parameters: (content.parameters || {}) as Record<string, unknown>,
               active: true,
             });
           }
@@ -321,7 +321,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // POST /:id/star — toggle star (atomic using ON CONFLICT and transaction)
-  fastify.post("/:id/star", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.post("/:id/star", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
     const userId = request.userId!;
 
@@ -364,7 +364,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
     // POST /:id/reviews — add review
   fastify.post("/:id/reviews", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const { id: itemId } = request.params as { id: string };
-    const { rating, comment } = request.body as any;
+    const { rating, comment } = request.body as { rating?: number; comment?: string };
 
     if (!rating || rating < 1 || rating > 5) {
       throw new AppError(400, "Rating must be between 1 and 5", "INVALID_RATING");
@@ -395,7 +395,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // GET /:id/reviews — list reviews
-  fastify.get("/:id/reviews", async (request, reply) => {
+  fastify.get("/:id/reviews", async (request, _reply) => {
     const { id: itemId } = request.params as { id: string };
 
     const reviews = await db

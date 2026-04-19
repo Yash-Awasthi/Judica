@@ -6,7 +6,7 @@ import { traces } from "../db/schema/traces.js";
 import { eq, count, sum, avg, sql } from "drizzle-orm";
 
 const analyticsPlugin: FastifyPluginAsync = async (fastify) => {
-    fastify.get("/overview", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.get("/overview", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const userId = request.userId!;
 
     // Total conversations
@@ -51,7 +51,7 @@ const analyticsPlugin: FastifyPluginAsync = async (fastify) => {
       ORDER BY date ASC
     `);
 
-    const dailyUsage = (dailyRaw.rows as any[]).map((d: any) => ({
+    const dailyUsage = (dailyRaw.rows as Array<{ date: string; tokens: string; cost: string }>).map((d) => ({
       date: new Date(d.date).toISOString().split("T")[0],
       tokens: Number(d.tokens),
       cost: Number(d.cost),
@@ -68,7 +68,7 @@ const analyticsPlugin: FastifyPluginAsync = async (fastify) => {
         ORDER BY count DESC
         LIMIT 20
       `);
-      modelDistribution = (modelRaw.rows as any[]).map((m: any) => ({
+      modelDistribution = (modelRaw.rows as Array<{ model: string; count: string }>).map((m) => ({
         model: m.model,
         count: Number(m.count),
       }));
@@ -87,7 +87,7 @@ const analyticsPlugin: FastifyPluginAsync = async (fastify) => {
         ORDER BY count DESC
         LIMIT 20
       `);
-      topTools = (toolRaw.rows as any[]).map((t: any) => ({
+      topTools = (toolRaw.rows as Array<{ tool: string; count: string }>).map((t) => ({
         tool: t.tool,
         count: Number(t.count),
       }));

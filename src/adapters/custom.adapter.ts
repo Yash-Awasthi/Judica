@@ -8,7 +8,7 @@ import { createStreamResult } from "./types.js";
 import { decrypt } from "../lib/crypto.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
 import { getBreaker } from "../lib/breaker.js";
-import logger from "../lib/logger.js";
+import type { Provider } from "../lib/providers.js";
 
 export interface CustomProviderConfig {
   id: string;
@@ -100,13 +100,14 @@ export class CustomAdapter implements IProviderAdapter {
         signal: AbortSignal.timeout(60000),
       });
 
-    const breaker = getBreaker({ name: this.providerId } as any, fetchCustom);
+    const breaker = getBreaker({ name: this.providerId } as Provider, fetchCustom);
     const res: Response = await breaker.fire();
 
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
+      const err = await res.json().catch(() => ({})) as Record<string, unknown>;
+      const errObj = err as { error?: { message?: string } };
       throw new Error(
-        (err as any)?.error?.message ?? `${this.config.name} API error: ${res.status}`
+        errObj?.error?.message ?? `${this.config.name} API error: ${res.status}`
       );
     }
 
@@ -115,7 +116,7 @@ export class CustomAdapter implements IProviderAdapter {
     }
 
     // Non-streaming: parse response and yield as single chunks
-    const data: any = await res.json();
+    const data = await res.json() as Record<string, unknown>;
     const self = this;
     return createStreamResult(self.yieldNonStream(data));
   }
@@ -187,16 +188,18 @@ export class CustomAdapter implements IProviderAdapter {
     yield { type: "done" };
   }
 
-  private async *yieldNonStream(data: any): AsyncGenerator<AdapterChunk> {
-    const text = data.choices?.[0]?.message?.content || "";
+  private async *yieldNonStream(data: Record<string, unknown>): AsyncGenerator<AdapterChunk> {
+    const choices = data.choices as Array<{ message?: { content?: string } }> | undefined;
+    const text = choices?.[0]?.message?.content || "";
     if (text) yield { type: "text", text };
 
-    if (data.usage) {
+    const usage = data.usage as { prompt_tokens?: number; completion_tokens?: number } | undefined;
+    if (usage) {
       yield {
         type: "usage",
         usage: {
-          prompt_tokens: data.usage.prompt_tokens || 0,
-          completion_tokens: data.usage.completion_tokens || 0,
+          prompt_tokens: usage.prompt_tokens || 0,
+          completion_tokens: usage.completion_tokens || 0,
         },
       };
     }

@@ -72,7 +72,7 @@ vi.mock("@qdrant/js-client-rest", () => ({
 // Zep mock
 const mockZepMemoryAdd = vi.fn();
 const mockZepInit = vi.fn(() => ({
-  memory: { add: mockZepMemoryAdd },
+  memory: { addMemory: mockZepMemoryAdd },
 }));
 
 vi.mock("@getzep/zep-js", () => ({
@@ -383,8 +383,8 @@ describe("memoryRouter.service", () => {
     const limit = 3;
 
     const localResults = [
-      { content: "result1", similarity: 0.95, sourceName: "doc.pdf" },
-      { content: "result2", similarity: 0.85, sourceName: null },
+      { content: "result1", score: 0.95, sourceName: "doc.pdf" },
+      { content: "result2", score: 0.85, sourceName: null },
     ];
 
     it("searches locally when no backend configured", async () => {
@@ -396,7 +396,7 @@ describe("memoryRouter.service", () => {
       expect(mockSearchSimilar).toHaveBeenCalledWith(USER_ID, query, kbId, limit);
       expect(results).toEqual([
         { content: "result1", score: 0.95, source: "doc.pdf" },
-        { content: "result2", score: 0.85, source: null },
+        { content: "result2", score: 0.85, source: undefined },
       ]);
     });
 

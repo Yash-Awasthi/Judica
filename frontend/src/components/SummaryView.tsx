@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { 
   CheckCircle2, ClipboardList, ArrowRight, Sparkles, 
@@ -18,6 +19,8 @@ interface SummaryViewProps {
 }
 
 export function SummaryView({ data, onGenerate, isGenerating }: SummaryViewProps) {
+  const [systemRef] = useState(() => Math.random().toString(16).slice(2, 8).toUpperCase());
+
   if (!data && !isGenerating) {
     return (
       <div className="flex flex-col items-center justify-center p-20 text-center space-y-8">
@@ -163,7 +166,7 @@ export function SummaryView({ data, onGenerate, isGenerating }: SummaryViewProps
       </div>
 
       <div className="pt-8 border-t border-white/5 flex items-center justify-between opacity-40">
-        <span className="text-[8px] font-diag uppercase tracking-[0.5em]">System_Ref:_0x{Math.random().toString(16).slice(2, 8).toUpperCase()}</span>
+        <span className="text-[8px] font-diag uppercase tracking-[0.5em]">System_Ref:_0x{systemRef}</span>
         <span className="text-[8px] font-diag uppercase tracking-[0.5em]">Index_Stability:_99.9%</span>
       </div>
     </div>

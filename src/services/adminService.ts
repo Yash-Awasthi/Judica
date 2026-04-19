@@ -4,7 +4,7 @@ import { users, usageLogs } from "../db/schema/users.js";
 import { conversations, chats as messages } from "../db/schema/conversations.js";
 import { customProviders } from "../db/schema/council.js";
 import { memoryBackends } from "../db/schema/memory.js";
-import { eq, sql, desc, and, gte, lte, or, ilike, count } from "drizzle-orm";
+import { eq, sql, desc, and, gte, lte, or, ilike } from "drizzle-orm";
 import logger from "../lib/logger.js";
 import { encrypt, decrypt } from "../lib/crypto.js";
 
@@ -14,7 +14,7 @@ export class AdminService {
     actionType: string;
     resourceType: string;
     resourceId?: string;
-    details?: any;
+    details?: Record<string, unknown>;
     status?: "success" | "failure";
     errorMessage?: string;
     ipAddress?: string;
@@ -79,12 +79,12 @@ export class AdminService {
   static async getConfig() {
     const configs = await db.select().from(systemConfigs);
     return configs.reduce((acc, curr) => {
-      acc[curr.key] = curr.value;
+      acc[curr.key] = curr.value as string;
       return acc;
-    }, {} as Record<string, any>);
+    }, {} as Record<string, string>);
   }
 
-  static async updateConfig(key: string, value: any, adminId: number) {
+  static async updateConfig(key: string, value: string, adminId: number) {
     const [existing] = await db.select().from(systemConfigs).where(eq(systemConfigs.key, key)).limit(1);
     
     await db.insert(systemConfigs).values({

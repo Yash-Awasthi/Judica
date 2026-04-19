@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 import { Cpu, Zap, Share2, Layers, Activity } from "lucide-react";
 
@@ -7,6 +8,13 @@ interface NeuralBlueprintProps {
 }
 
 export function NeuralBlueprint({ type, name }: NeuralBlueprintProps) {
+  const [hexStrings] = useState(() =>
+    Array.from({ length: 20 }, () => [
+      Math.random().toString(16).slice(2, 10).toUpperCase(),
+      Math.random().toString(16).slice(2, 10).toUpperCase(),
+    ]));
+  const [sysHash] = useState(() => Math.random().toString(16).slice(2, 6).toUpperCase());
+
   // Define layout structures for different types
   const isWorkflow = type === "workflow";
   const isPersona = type === "persona";
@@ -16,7 +24,7 @@ export function NeuralBlueprint({ type, name }: NeuralBlueprintProps) {
       {/* Background Technical Noise */}
       <div className="absolute inset-0 opacity-[0.03] pointer-events-none font-mono text-[8px] leading-tight break-all p-4 overflow-hidden">
         {Array.from({ length: 20 }).map((_, i) => (
-          <div key={i}>0x{Math.random().toString(16).slice(2, 10).toUpperCase()} 0x{Math.random().toString(16).slice(2, 10).toUpperCase()} F3 A1 09 B2</div>
+          <div key={i}>0x{hexStrings[i][0]} 0x{hexStrings[i][1]} F3 A1 09 B2</div>
         ))}
       </div>
 
@@ -115,7 +123,7 @@ export function NeuralBlueprint({ type, name }: NeuralBlueprintProps) {
         <div className="text-[7px] font-diag text-[var(--text-muted)] flex gap-4 opacity-40 uppercase tracking-widest">
           <span>COORDS: 40.7128N 74.0060W</span>
           <span>DEPTH: B-LEVEL_03</span>
-          <span>SYSHASH: 0x{Math.random().toString(16).slice(2, 6).toUpperCase()}</span>
+          <span>SYSHASH: 0x{sysHash}</span>
         </div>
       </div>
 

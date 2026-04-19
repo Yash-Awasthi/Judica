@@ -6,8 +6,8 @@ export async function withRetry<T>(
     initialDelay?: number;
     maxDelay?: number;
     factor?: number;
-    onRetry?: (error: any, attempt: number) => void;
-    shouldRetry?: (error: any) => boolean;
+    onRetry?: (error: unknown, attempt: number) => void;
+    shouldRetry?: (error: unknown) => boolean;
   } = {}
 ): Promise<T> {
   const {

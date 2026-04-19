@@ -115,7 +115,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }, []);
 
   const logoutRef = useRef(logout);
-  logoutRef.current = logout;
+  useEffect(() => {
+    logoutRef.current = logout;
+  }, [logout]);
 
   const fetchWithAuth = useCallback(async (url: string, options?: RequestInit): Promise<Response> => {
     const currentToken = tokenRef.current;
@@ -165,7 +167,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       const handleMessage = (event: MessageEvent) => {
         if (event.origin !== window.location.origin) return;
         
-        const { type, token: newToken, username: newUsername, role: newRole, error } = event.data;
+        const { type, token: newToken, username: newUsername, role: _newRole, error } = event.data;
         
         if (type === "AUTH_SUCCESS") {
           tokenRef.current = newToken;

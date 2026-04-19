@@ -162,16 +162,17 @@ async function runAgent(agentId: string): Promise<void> {
       agent.lastHeartbeat = new Date();
       notifyProgress(agentId);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
       agent.steps[i].status = "failed";
-      agent.steps[i].error = err.message;
+      agent.steps[i].error = errMsg;
       agent.steps[i].completedAt = new Date();
       agent.status = "failed";
-      agent.error = `Step "${agent.steps[i].name}" failed: ${err.message}`;
+      agent.error = `Step "${agent.steps[i].name}" failed: ${errMsg}`;
       agent.completedAt = new Date();
       notifyProgress(agentId);
 
-      logger.error({ agentId, step: agent.steps[i].name, err: err.message }, "Agent step failed");
+      logger.error({ agentId, step: agent.steps[i].name, err: errMsg }, "Agent step failed");
       return;
     }
   }

@@ -35,12 +35,12 @@ const providersPlugin: FastifyPluginAsync = async (fastify) => {
         .where(eq(councilConfigs.userId, userId))
         .limit(1);
 
-      const config = (rows[0]?.config as any) || {};
-      const providers = config.providers || [];
+      const config = (rows[0]?.config as Record<string, unknown>) || {};
+      const providers = (config.providers || []) as Array<Record<string, unknown>>;
 
-      const maskedProviders = providers.map((p: any) => ({
+      const maskedProviders = providers.map((p) => ({
         ...p,
-        apiKey: p.apiKey ? "••••••••" + p.apiKey.slice(-4) : null,
+        apiKey: p.apiKey ? "••••••••" + (p.apiKey as string).slice(-4) : null,
       }));
 
       return { providers: maskedProviders };
@@ -73,8 +73,8 @@ const providersPlugin: FastifyPluginAsync = async (fastify) => {
         .where(eq(councilConfigs.userId, userId))
         .limit(1);
 
-      const currentConfig = (rows[0]?.config as any) || {};
-      const providers = currentConfig.providers || [];
+      const currentConfig = (rows[0]?.config as Record<string, unknown>) || {};
+      const providers = (currentConfig.providers || []) as Array<Record<string, unknown>>;
 
       const newProvider = {
         id: Date.now().toString(),
@@ -164,10 +164,10 @@ const providersPlugin: FastifyPluginAsync = async (fastify) => {
         .where(eq(councilConfigs.userId, userId))
         .limit(1);
 
-      const currentConfig = (rows[0]?.config as any) || {};
-      const providers = currentConfig.providers || [];
+      const currentConfig = (rows[0]?.config as Record<string, unknown>) || {};
+      const providers = (currentConfig.providers || []) as Array<Record<string, unknown>>;
 
-      const filteredProviders = providers.filter((p: any) => p.id !== id);
+      const filteredProviders = providers.filter((p) => p.id !== id);
 
       if (filteredProviders.length === providers.length) {
         reply.code(404);

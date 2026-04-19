@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Plus, Pencil, Trash2, Download, Upload, Star, Copy,
-  ChevronDown, ChevronUp, Save, X
+  ChevronDown, ChevronUp, Save
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 
@@ -55,7 +55,7 @@ function ArchetypeForm({
   saving: boolean;
 }) {
   const [form, setForm] = useState<CustomArchetype>(initial);
-  const set = (k: keyof CustomArchetype, v: any) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k: keyof CustomArchetype, v: CustomArchetype[keyof CustomArchetype]) => setForm((f) => ({ ...f, [k]: v }));
 
   const toggleTool = (tool: string) => {
     const current = form.tools || [];
@@ -300,6 +300,7 @@ export function ArchetypesView() {
     }
   }, [fetchWithAuth]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
   const handleSave = async (form: CustomArchetype) => {

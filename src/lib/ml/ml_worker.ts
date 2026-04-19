@@ -9,7 +9,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 class MLWorker {
   private process: ChildProcess | null = null;
   private isReady = false;
-  private callbacks: ((data: any) => void)[] = [];
+  private callbacks: ((data: { embeddings?: number[][]; error?: string; score?: number }) => void)[] = [];
   private readyPromise: Promise<void> | null = null;
 
   async init() {
@@ -99,7 +99,7 @@ class MLWorker {
         if (data.error) {
           reject(new Error(data.error));
         } else {
-          resolve(data.score);
+          resolve(data.score ?? 0);
         }
       });
 

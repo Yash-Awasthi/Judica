@@ -288,7 +288,7 @@ export async function runMCTS(
   const scoredBranches: MCTSBranch[] = [];
   const scorePromises = branchResponses.map(async (resp, i) => {
     if (!resp) return;
-    let score = 0;
+    let score;
     try {
       score = await mlWorker.computeSimilarity(resp.text, referenceText);
     } catch {

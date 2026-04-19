@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from "fastify";
 import { db } from "../lib/drizzle.js";
-import { usageLogs, dailyUsage } from "../db/schema/users.js";
+import { usageLogs } from "../db/schema/users.js";
 import { eq, and, gte, lte, sum, count, avg, sql, desc } from "drizzle-orm";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 
@@ -8,7 +8,7 @@ const usagePlugin: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     "/",
     { preHandler: fastifyRequireAuth },
-    async (request, reply) => {
+    async (request, _reply) => {
       const userId = request.userId!;
       const { start_date, end_date } = request.query as {
         start_date?: string;

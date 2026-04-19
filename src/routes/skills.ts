@@ -2,7 +2,7 @@ import { FastifyPluginAsync } from "fastify";
 import { randomUUID } from "crypto";
 import { db } from "../lib/drizzle.js";
 import { userSkills } from "../db/schema/marketplace.js";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, desc } from "drizzle-orm";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { AppError } from "../middleware/errorHandler.js";
 import logger from "../lib/logger.js";
@@ -10,7 +10,7 @@ import { executeUserSkill } from "../lib/tools/skillExecutor.js";
 
 const skillsPlugin: FastifyPluginAsync = async (fastify) => {
     // GET / — list user's skills
-  fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const skills = await db
       .select()
       .from(userSkills)
@@ -56,7 +56,7 @@ const skillsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // PUT /:id — update skill (owner only)
-  fastify.put("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.put("/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [skill] = await db
@@ -96,7 +96,7 @@ const skillsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // DELETE /:id — delete skill (owner only)
-  fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.delete("/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [skill] = await db
@@ -117,7 +117,7 @@ const skillsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // POST /:id/test — test execute skill with sample inputs
-  fastify.post("/:id/test", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.post("/:id/test", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
 
     const [skill] = await db
@@ -137,8 +137,8 @@ const skillsPlugin: FastifyPluginAsync = async (fastify) => {
     try {
       const result = await executeUserSkill(request.userId!, skill.name, inputs || {});
       return { success: true, result };
-    } catch (err: any) {
-      return { success: false, error: err.message };
+    } catch (err: unknown) {
+      return { success: false, error: (err as Error).message };
     }
   });
 };

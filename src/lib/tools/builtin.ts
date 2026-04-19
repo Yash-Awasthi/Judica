@@ -166,7 +166,7 @@ registerTool(
         });
         if (res.ok) {
           const data = await res.json();
-          const results = (data.results || []).map((r: any) => ({
+          const results = (data.results || []).map((r: { title?: string; url?: string; content?: string }) => ({
             title: r.title,
             url: r.url,
             content: (r.content || "").slice(0, 300)
@@ -344,7 +344,7 @@ registerTool(
       if (!res.ok) {
         return JSON.stringify({ error: `Wikipedia article not found for "${query}"` });
       }
-      const data: any = await res.json();
+      const data = await res.json() as { title?: string; extract?: string; content_urls?: { desktop?: { page?: string } } };
       return JSON.stringify({
         title: data.title,
         extract: data.extract || "",

@@ -22,7 +22,7 @@ function parseExpiry(expiresIn?: string): Date | null {
 
 const sharePlugin: FastifyPluginAsync = async (fastify) => {
     // POST /conversations/:id — share a conversation
-  fastify.post("/conversations/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.post("/conversations/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
     const [convo] = await db
       .select()
@@ -54,7 +54,7 @@ const sharePlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // DELETE /conversations/:id — unshare
-  fastify.delete("/conversations/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+  fastify.delete("/conversations/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
     await db
       .delete(sharedConversations)
@@ -68,7 +68,7 @@ const sharePlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // GET /view/:token — public view (no auth)
-  fastify.get("/view/:token", async (request, reply) => {
+  fastify.get("/view/:token", async (request, _reply) => {
     const { token } = request.params as { token: string };
     const [shared] = await db
       .select()
@@ -96,7 +96,7 @@ const sharePlugin: FastifyPluginAsync = async (fastify) => {
     return { conversation, chats: chatList, access: shared.access };
   });
 
-    fastify.post("/workflows/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.post("/workflows/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
     const [wf] = await db
       .select()
@@ -126,7 +126,7 @@ const sharePlugin: FastifyPluginAsync = async (fastify) => {
     return { shareToken: shared.shareToken };
   });
 
-    fastify.get("/workflow/:token", async (request, reply) => {
+    fastify.get("/workflow/:token", async (request, _reply) => {
     const { token } = request.params as { token: string };
     const [shared] = await db
       .select()
@@ -145,7 +145,7 @@ const sharePlugin: FastifyPluginAsync = async (fastify) => {
     return { workflow };
   });
 
-    fastify.post("/prompts/:id", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.post("/prompts/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
     const [prompt] = await db
       .select()
@@ -175,7 +175,7 @@ const sharePlugin: FastifyPluginAsync = async (fastify) => {
     return { shareToken: shared.shareToken };
   });
 
-    fastify.get("/prompt/:token", async (request, reply) => {
+    fastify.get("/prompt/:token", async (request, _reply) => {
     const { token } = request.params as { token: string };
     const [shared] = await db
       .select()

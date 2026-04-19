@@ -31,7 +31,7 @@ async function fastifyRequireAdmin(request: FastifyRequest, reply: FastifyReply)
 // ─── Plugin ─────────────────────────────────────────────────────────────────
 
 const metricsPlugin: FastifyPluginAsync = async (fastify) => {
-    fastify.get("/usage", { preHandler: fastifyRequireAuth }, async (request: any, reply) => {
+    fastify.get("/usage", { preHandler: fastifyRequireAuth }, async (request: FastifyRequest, _reply) => {
     try {
       const userId = request.userId!;
       const { days = "30" } = request.query as { days?: string };
@@ -90,7 +90,7 @@ const metricsPlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-    fastify.get("/system", { preHandler: fastifyRequireAdmin }, async (request: any, reply) => {
+    fastify.get("/system", { preHandler: fastifyRequireAdmin }, async (_request: FastifyRequest, _reply) => {
     try {
       const [totalUsersRow] = await db.select({ value: count() }).from(users);
 
@@ -123,7 +123,7 @@ const metricsPlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-    fastify.get("/conversation/:id", { preHandler: fastifyRequireAuth }, async (request: any, reply) => {
+    fastify.get("/conversation/:id", { preHandler: fastifyRequireAuth }, async (request: FastifyRequest, reply) => {
     try {
       const userId = request.userId!;
       const { id } = request.params as { id: string };
@@ -157,12 +157,12 @@ const metricsPlugin: FastifyPluginAsync = async (fastify) => {
 
       return {
         conversationId: id,
-        title: (conversation as any).title,
+        title: (conversation as unknown as { title?: string }).title,
         totalChats: chatRows.length,
         totalTokens,
         avgDurationMs: Math.round(avgDuration),
-        createdAt: (conversation as any).createdAt,
-        updatedAt: (conversation as any).updatedAt,
+        createdAt: (conversation as unknown as { createdAt?: Date }).createdAt,
+        updatedAt: (conversation as unknown as { updatedAt?: Date }).updatedAt,
       };
     } catch (err) {
       logger.error({ err: (err as Error).message }, "Failed to get conversation metrics");

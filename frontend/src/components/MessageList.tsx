@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import type { Easing } from "framer-motion";
 import { Volume2, Pause, Eye, EyeOff, Gavel, Timer, DollarSign } from "lucide-react";
 import type { ChatMessage } from "../types/index.js";
+import { ModePhasePanel } from "./ModePhasePanel";
 
 interface MessageListProps {
   messages: ChatMessage[];
@@ -17,8 +18,8 @@ interface MessageListProps {
 }
 
 const mdComponents = {
-   
-  code: ({ className, children, ...props }: any) => {
+
+  code: ({ className, children, ...props }: React.HTMLAttributes<HTMLElement> & { children?: React.ReactNode }) => {
     const isBlock = className?.includes("language-");
     if (isBlock) {
       return (
@@ -33,18 +34,18 @@ const mdComponents = {
       </code>
     );
   },
-   
-  p: ({ children }: any) => <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>,
-   
-  ul: ({ children }: any) => <ul className="list-disc list-inside mb-3 space-y-1 text-[var(--text-secondary)]">{children}</ul>,
-   
-  ol: ({ children }: any) => <ol className="list-decimal list-inside mb-3 space-y-1 text-[var(--text-secondary)]">{children}</ol>,
-   
-  li: ({ children }: any) => <li className="text-sm leading-relaxed">{children}</li>,
-   
-  strong: ({ children }: any) => <strong className="font-bold text-[var(--text-primary)]">{children}</strong>,
-   
-  blockquote: ({ children }: any) => (
+
+  p: ({ children }: { children?: React.ReactNode }) => <p className="mb-3 last:mb-0 leading-relaxed">{children}</p>,
+
+  ul: ({ children }: { children?: React.ReactNode }) => <ul className="list-disc list-inside mb-3 space-y-1 text-[var(--text-secondary)]">{children}</ul>,
+
+  ol: ({ children }: { children?: React.ReactNode }) => <ol className="list-decimal list-inside mb-3 space-y-1 text-[var(--text-secondary)]">{children}</ol>,
+
+  li: ({ children }: { children?: React.ReactNode }) => <li className="text-sm leading-relaxed">{children}</li>,
+
+  strong: ({ children }: { children?: React.ReactNode }) => <strong className="font-bold text-[var(--text-primary)]">{children}</strong>,
+
+  blockquote: ({ children }: { children?: React.ReactNode }) => (
     <blockquote className="pl-4 border-l-2 border-[var(--accent-mint)]/30 text-[var(--text-secondary)] my-3 italic">{children}</blockquote>
   ),
 };
@@ -128,6 +129,15 @@ export function MessageList({
               )}
             </div>
           </div>
+
+          {/* Mode Phase Panel — shown for advanced reasoning modes */}
+          {msg.deliberationMode && msg.deliberationMode !== "standard" && (
+            <ModePhasePanel
+              mode={msg.deliberationMode}
+              phases={msg.modePhases ?? []}
+              isStreaming={!msg.verdict && (msg.opinions?.length ?? 0) === 0}
+            />
+          )}
 
           {/* Opinions */}
           {(msg.opinions?.length ?? 0) > 0 && (
