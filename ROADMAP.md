@@ -23,29 +23,9 @@
 
 ---
 
-## Phase 1: Hardening — Detail
+## Remaining
 
-- [x] Rewrite route-level integration tests to use `fastify.inject()` — 48 tests across 6 files (archetypes, auth guard, council, memory, sandbox, templates)
-- [x] Load testing with autocannon — 5 scenarios (health, templates, history, deliberation, archetypes), 200 concurrent connections, p95/p99 thresholds
-- [x] Python sandbox: seccomp-bpf syscall filter — 30+ blocked syscalls, 10 tests
 - [ ] Accessibility: screen reader testing (VoiceOver/NVDA) — manual verification needed
-
----
-
-## Phase 3–4: Service Layers
-
-> All service layers implemented with in-memory stores and full test coverage. Require infrastructure (Redis, WebSocket server, frontend) to become fully operational.
-
-- [x] Long-running background agents — checkpointing, pause/resume, progress tracking (8 tests)
-- [x] Human-in-the-loop gates — 4 gate types, multi-approver, auto-timeout (13 tests)
-- [x] Intermediate artifact streaming — EventEmitter pub/sub, SSE formatting, replay (12 tests)
-- [x] Audio/video input — multi-provider transcription, keyframe extraction (9 tests)
-- [x] Tool federation — registry, search, install/uninstall, toggle (13 tests)
-- [x] Custom workflow nodes — registry, execution, validation (15 tests)
-- [x] Multi-user deliberation — rooms, roles, phases, turn management (18 tests)
-- [x] Live presence — cursors, heartbeat, awareness (17 tests)
-- [x] User annotations — threads, reactions, resolution (13 tests)
-- [x] Synthesis voting — weighted scoring, quorum, delegation (14 tests)
 
 ---
 
