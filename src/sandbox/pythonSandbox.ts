@@ -4,6 +4,7 @@ import path from "path";
 import crypto from "crypto";
 import os from "os";
 import logger from "../lib/logger.js";
+import { generateSeccompPolicy, isSeccompAvailable } from "./seccomp.js";
 
 /**
  * Python sandbox for executing untrusted user code.
@@ -139,6 +140,13 @@ function buildCommand(tmpFile: string, tmpDir: string): string {
     // - New PID/net/UTS namespaces (--unshare-all)
     // - Die with parent (--die-with-parent)
     // - No new privileges
+    // - Seccomp-BPF syscall filter (blocks ptrace, mount, bpf, etc.)
+    const seccompArgs: string[] = [];
+    if (isSeccompAvailable()) {
+      const policyPath = generateSeccompPolicy(tmpDir);
+      seccompArgs.push(`--seccomp 9 9<"${policyPath}"`);
+    }
+
     return [
       `bwrap`,
       `--ro-bind /usr /usr`,
@@ -156,6 +164,7 @@ function buildCommand(tmpFile: string, tmpDir: string): string {
       `--unshare-all`,
       `--die-with-parent`,
       `--new-session`,
+      ...seccompArgs,
       `--chdir /sandbox`,
       `-- bash -c '${ulimits}; exec python3 /sandbox/script.py'`,
     ].join(" ");
