@@ -30,57 +30,7 @@ function sandboxRateLimiter(request: FastifyRequest, reply: FastifyReply, done: 
 }
 
 const sandboxPlugin: FastifyPluginAsync = async (fastify) => {
-  /**
-   * @openapi
-   * /api/sandbox/execute:
-   *   post:
-   *     tags:
-   *       - Sandbox
-   *     summary: Execute code in a sandboxed environment
-   *     security:
-   *       - bearerAuth: []
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             type: object
-   *             required:
-   *               - language
-   *               - code
-   *             properties:
-   *               language:
-   *                 type: string
-   *                 enum:
-   *                   - javascript
-   *                   - typescript
-   *                   - python
-   *                 description: Programming language to execute
-   *               code:
-   *                 type: string
-   *                 maxLength: 50000
-   *                 description: Code to execute
-   *     responses:
-   *       200:
-   *         description: Execution result
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 output:
-   *                   type: string
-   *                 error:
-   *                   type: string
-   *                   nullable: true
-   *                 elapsed_ms:
-   *                   type: number
-   *       400:
-   *         description: Missing fields, unsupported language, or code too long
-   *       401:
-   *         description: Unauthorized
-   */
-  // POST /api/sandbox/execute
+    // POST /api/sandbox/execute
   fastify.post("/execute", { preHandler: [fastifyRequireAuth, sandboxRateLimiter] }, async (request, reply) => {
     const { language, code } = request.body as { language?: string; code?: string };
 

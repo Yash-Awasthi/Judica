@@ -1,4 +1,5 @@
 import { FastifyPluginAsync } from "fastify";
+import fastifyRateLimit from "@fastify/rate-limit";
 import { db } from "../lib/drizzle.js";
 import { users } from "../db/schema/users.js";
 import { customProviders } from "../db/schema/council.js";
@@ -9,16 +10,9 @@ import { AppError } from "../middleware/errorHandler.js";
 import redis from "../lib/redis.js";
 
 const adminPlugin: FastifyPluginAsync = async (fastify) => {
+  await fastify.register(fastifyRateLimit, { max: 60, timeWindow: "1 minute" });
   // All routes in this plugin require admin role
   fastify.addHook("preHandler", fastifyRequireAdmin);
-
-  // Tighter rate limit for admin endpoints
-  fastify.addHook("onRoute", (routeOptions) => {
-    routeOptions.config = {
-      ...routeOptions.config,
-      rateLimit: { max: 60, timeWindow: "1 minute" },
-    };
-  });
 
   // ─── USER MANAGEMENT ───────────────────────────────────────────────────────
 

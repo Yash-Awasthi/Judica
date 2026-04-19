@@ -132,27 +132,7 @@ const realtimePlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-  /**
-   * @openapi
-   * /api/realtime/statistics:
-   *   get:
-   *     tags:
-   *       - Realtime
-   *     summary: Get real-time cost statistics
-   *     security:
-   *       - bearerAuth: []
-   *     parameters:
-   *       - in: query
-   *         name: hours
-   *         schema:
-   *           type: integer
-   *           default: 24
-   *         description: Number of hours for statistics
-   *     responses:
-   *       200:
-   *         description: Cost statistics
-   */
-  fastify.get("/statistics", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.get("/statistics", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     try {
       const { hours = 24 } = request.query as { hours?: string };
 

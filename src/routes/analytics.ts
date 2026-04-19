@@ -6,66 +6,7 @@ import { traces } from "../db/schema/traces.js";
 import { eq, count, sum, avg, sql } from "drizzle-orm";
 
 const analyticsPlugin: FastifyPluginAsync = async (fastify) => {
-  /**
-   * @openapi
-   * /api/analytics/overview:
-   *   get:
-   *     tags:
-   *       - Analytics
-   *     summary: Get analytics overview for the authenticated user
-   *     security:
-   *       - bearerAuth: []
-   *     responses:
-   *       200:
-   *         description: Analytics overview including conversations, messages, tokens, costs, daily usage, model distribution, and top tools
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 totalConversations:
-   *                   type: integer
-   *                 totalMessages:
-   *                   type: integer
-   *                 totalTokensUsed:
-   *                   type: integer
-   *                 totalCostUsd:
-   *                   type: number
-   *                 avgLatencyMs:
-   *                   type: integer
-   *                 modelDistribution:
-   *                   type: array
-   *                   items:
-   *                     type: object
-   *                     properties:
-   *                       model:
-   *                         type: string
-   *                       count:
-   *                         type: integer
-   *                 dailyUsage:
-   *                   type: array
-   *                   items:
-   *                     type: object
-   *                     properties:
-   *                       date:
-   *                         type: string
-   *                       tokens:
-   *                         type: integer
-   *                       cost:
-   *                         type: number
-   *                 topTools:
-   *                   type: array
-   *                   items:
-   *                     type: object
-   *                     properties:
-   *                       tool:
-   *                         type: string
-   *                       count:
-   *                         type: integer
-   *       401:
-   *         description: Unauthorized
-   */
-  fastify.get("/overview", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    fastify.get("/overview", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const userId = request.userId!;
 
     // Total conversations
