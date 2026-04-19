@@ -41,6 +41,8 @@ export interface ChatMessage {
   totalCostUsd?: number;
   durationMs?: number;
   cacheHit?: boolean;
+  /** Preview URLs for images attached to this message (client-side only) */
+  attachmentPreviews?: { url: string; name: string }[];
 }
 
 export interface CouncilMember {

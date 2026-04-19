@@ -1,12 +1,13 @@
-import { useReducer, useRef, useEffect, useMemo, Dispatch, SetStateAction } from "react";
+import { useReducer, useRef, useEffect, useMemo, useState, useCallback, Dispatch, SetStateAction } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { 
-  Settings2, Download, FileText, FileJson, Share2, Network, 
+import {
+  Settings2, Download, FileText, FileJson, Share2, Network,
   ShieldCheck, Maximize2, Layers, Zap, MessageCircle
 } from "lucide-react";
 import { useAuth } from "../context/AuthContext";
 import { MessageList } from "./MessageList";
 import { InputArea } from "./InputArea";
+import type { AttachedFile } from "./InputArea";
 import { StreamingStatus } from "./StreamingStatus";
 import { CouncilConfigPanel } from "./CouncilConfigPanel";
 import { SkeletonLoader } from "./SkeletonLoader";
@@ -19,7 +20,7 @@ import type { ChatMessage, CouncilMember, Link } from "../types";
 interface ChatAreaProps {
   messages: ChatMessage[];
   isStreaming: boolean;
-  onSendMessage: (text: string, summon: string, useStream: boolean, rounds: number) => void;
+  onSendMessage: (text: string, summon: string, useStream: boolean, rounds: number, uploadIds?: string[]) => void;
   onToggleSidebar: () => void;
   _onToggleSidebar?: () => void; // internal use or future proof
   activeTitle: string;
@@ -129,6 +130,45 @@ export function ChatArea({
   const scrollRef = useRef<HTMLDivElement>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
+  // ── File attachments ────────────────────────────────────────────────────
+  const [attachedFiles, setAttachedFiles] = useState<AttachedFile[]>([]);
+  const [uploadIds, setUploadIds] = useState<string[]>([]);
+
+  const handleAttach = useCallback(async (files: FileList) => {
+    const newAttached: AttachedFile[] = [];
+    const formData = new FormData();
+    let hasFiles = false;
+
+    for (const file of Array.from(files)) {
+      const id = crypto.randomUUID();
+      const previewUrl = file.type.startsWith("image/") ? URL.createObjectURL(file) : undefined;
+      newAttached.push({ id, name: file.name, mimeType: file.type, previewUrl });
+      formData.append("files", file, file.name);
+      hasFiles = true;
+    }
+    if (!hasFiles) return;
+
+    setAttachedFiles((prev) => [...prev, ...newAttached]);
+
+    try {
+      const res = await fetchWithAuth("/api/uploads", { method: "POST", body: formData });
+      if (res.ok) {
+        const data = await res.json() as { uploads: { id: string }[] };
+        setUploadIds((prev) => [...prev, ...data.uploads.map((u) => u.id)]);
+      }
+    } catch (err) {
+      console.error("File upload failed", err);
+    }
+  }, [fetchWithAuth]);
+
+  const handleRemoveAttachment = useCallback((id: string) => {
+    setAttachedFiles((prev) => {
+      const file = prev.find((f) => f.id === id);
+      if (file?.previewUrl) URL.revokeObjectURL(file.previewUrl);
+      return prev.filter((f) => f.id !== id);
+    });
+  }, []);
+
   const handlePlayTTS = async (msgId: string, text: string) => {
     if (playingAudioId === msgId) {
       if (audioRef.current) { audioRef.current.pause(); audioRef.current = null; }
@@ -167,9 +207,13 @@ export function ChatArea({
 
   const handleSend = () => {
     const text = input.trim();
-    if (!text || isStreaming) return;
+    if ((!text && attachedFiles.length === 0) || isStreaming) return;
     setInput("");
-    onSendMessage(text, summon, useStream, rounds);
+    // Clean up preview URLs before clearing
+    attachedFiles.forEach((f) => { if (f.previewUrl) URL.revokeObjectURL(f.previewUrl); });
+    setAttachedFiles([]);
+    setUploadIds([]);
+    onSendMessage(text, summon, useStream, rounds, uploadIds);
   };
 
   const getMemberColor = (name: string) => {
@@ -472,6 +516,9 @@ export function ChatArea({
                   isStreaming={isStreaming}
                   onSend={handleSend}
                   placeholder="Designate command for the neural lattice..."
+                  attachedFiles={attachedFiles}
+                  onAttach={handleAttach}
+                  onRemoveAttachment={handleRemoveAttachment}
                 />
                 
                 {/* Visual Telemetry Overlays */}

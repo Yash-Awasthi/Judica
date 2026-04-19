@@ -82,7 +82,7 @@ export function useDeliberation({
   });
 
   const sendMessage = useCallback(
-    async (text: string, summon: string, useStream: boolean, rounds: number) => {
+    async (text: string, summon: string, useStream: boolean, rounds: number, uploadIds?: string[]) => {
       setIsStreaming(true);
       const msgId = uuidv4();
       activeMsgIdRef.current = msgId;
@@ -97,6 +97,7 @@ export function useDeliberation({
         summon: summon || undefined,
         rounds: rounds || undefined,
         conversationId: conversationId || undefined,
+        upload_ids: uploadIds && uploadIds.length > 0 ? uploadIds : undefined,
         members: members
           .filter((m) => m.active)
           .map((m) => ({
