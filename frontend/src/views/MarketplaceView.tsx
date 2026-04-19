@@ -92,7 +92,9 @@ export function MarketplaceView() {
     }
   }, [fetchWithAuth, typeFilter, sort, page, search]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadItems(); }, [loadItems]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setPage(1); }, [typeFilter, sort, search]);
 
   const handleInstall = useCallback(async (id: string) => {

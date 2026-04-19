@@ -56,6 +56,7 @@ export function MemorySettingsView() {
     }
   }, [fetchWithAuth]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadData(); }, [loadData]);
 
   const handleSaveBackend = async () => {

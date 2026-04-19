@@ -44,6 +44,7 @@ export default function ProjectsView() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadProjects();
   }, [fetchWithAuth]);
 

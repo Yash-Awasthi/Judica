@@ -12,6 +12,12 @@ import { ThemeToggle } from "./ThemeToggle";
 import type { Conversation, Project, SearchResult } from "../types/index";
 
 function IntelligencePulse() {
+  const [barAnimations] = useState(() =>
+    Array.from({ length: 28 }, () => ({
+      heights: [`${20 + Math.random() * 40}%`, `${60 + Math.random() * 40}%`, `${20 + Math.random() * 40}%`],
+      duration: 1.2 + Math.random(),
+    })));
+
   return (
     <div className="px-5 py-5 mt-2 border-t border-white/5 bg-white/[0.01]">
       <div className="flex items-center justify-between mb-4">
@@ -29,11 +35,11 @@ function IntelligencePulse() {
           <motion.div 
             key={i}
             className={`w-[2.5px] rounded-t-sm ${i % 6 === 0 ? "bg-[var(--accent-mint)]" : "bg-[var(--accent-mint)]/10"}`}
-            animate={{ 
-              height: [`${20 + Math.random() * 40}%`, `${60 + Math.random() * 40}%`, `${20 + Math.random() * 40}%`],
+            animate={{
+              height: barAnimations[i].heights,
               opacity: [0.2, 0.5, 0.2]
             }}
-            transition={{ repeat: Infinity, duration: 1.2 + Math.random(), ease: "easeInOut" }}
+            transition={{ repeat: Infinity, duration: barAnimations[i].duration, ease: "easeInOut" }}
           />
         ))}
       </div>

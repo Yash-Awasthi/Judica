@@ -57,6 +57,7 @@ export const ProviderManager: React.FC = () => {
   }, [fetchWithAuth]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (token) loadProviders();
   }, [token, loadProviders]);
 

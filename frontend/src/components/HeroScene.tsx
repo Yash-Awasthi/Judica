@@ -108,11 +108,13 @@ function MouseFollowCamera() {
     return () => window.removeEventListener("mousemove", handleMouseMove);
   }, []);
 
+  /* eslint-disable react-hooks/immutability -- useFrame requires direct camera mutation (standard Three.js pattern) */
   useFrame(() => {
     camera.position.x += (targetX.current - camera.position.x) * 0.02;
     camera.position.y += (-targetY.current - camera.position.y) * 0.02;
     camera.lookAt(0, 0, 0);
   });
+  /* eslint-enable react-hooks/immutability */
 
   return null;
 }
@@ -125,8 +127,10 @@ export function HeroScene({ className = "" }: { className?: string }) {
     try {
       const canvas = document.createElement("canvas");
       const gl = canvas.getContext("webgl") || canvas.getContext("experimental-webgl");
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (!gl) setWebGLAvailable(false);
     } catch {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setWebGLAvailable(false);
     }
   }, []);

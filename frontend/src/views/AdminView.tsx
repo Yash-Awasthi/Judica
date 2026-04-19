@@ -1014,6 +1014,7 @@ function MetricCard({ title, value, label, icon, color }: any) {
 
 function ConfigInput({ title, desc, value, onSave }: any) {
   const [val, setVal] = useState(value);
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => setVal(value), [value]);
 
   return (

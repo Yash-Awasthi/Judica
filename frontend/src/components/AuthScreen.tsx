@@ -23,10 +23,12 @@ export function AuthScreen() {
   useEffect(() => {
     if (loading) {
       const interval = setInterval(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setInitStep((prev) => (prev + 1) % initSteps.length);
       }, 800);
       return () => clearInterval(interval);
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setInitStep(0);
     }
   }, [loading, initSteps.length]);

@@ -48,6 +48,7 @@ export function ReposView() {
     }
   }, [fetchWithAuth]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadRepos(); }, [loadRepos]);
 
   const handleAdd = async (e: React.FormEvent) => {

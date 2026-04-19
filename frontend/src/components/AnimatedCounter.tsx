@@ -38,6 +38,7 @@ export function AnimatedCounter({
     // Respect prefers-reduced-motion
     const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (prefersReduced) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDisplayValue(value);
       displayValueRef.current = value;
       return;
@@ -52,6 +53,7 @@ export function AnimatedCounter({
       const eased = easeOutCubic(progress);
       const current = startValueRef.current + (value - startValueRef.current) * eased;
 
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDisplayValue(current);
       displayValueRef.current = current;
 

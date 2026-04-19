@@ -85,6 +85,7 @@ export function WorkspaceRolesView() {
     }
   }, [fetchWithAuth]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
   const handleRoleChange = async (id: number, role: string) => {

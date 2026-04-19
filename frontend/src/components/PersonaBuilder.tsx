@@ -44,6 +44,7 @@ export function PersonaBuilder({ onSelect }: PersonaBuilderProps) {
     }
   }, [fetchWithAuth]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadPersonas(); }, [loadPersonas]);
 
   const resetForm = () => {

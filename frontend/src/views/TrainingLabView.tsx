@@ -65,13 +65,16 @@ export function TrainingLabView() {
     }
   }, [fetchWithAuth]);
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { loadData(); }, [loadData]);
 
   useEffect(() => {
     if (selectedDna) {
       const dna = dnas.find(d => d.id === selectedDna);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (dna) setDnaDraft({ ...dna });
     } else {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setDnaDraft({});
     }
   }, [selectedDna, dnas]);

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "framer-motion";
 
 export function CircuitBackground() {
@@ -48,14 +49,15 @@ export function CircuitBackground() {
 
 function DataPulse({ index }: { index: number }) {
   const horizontal = index % 2 === 0;
-  const position = Math.random() * 100;
+  const [position] = useState(() => Math.random() * 100);
+  const [duration] = useState(() => 10 + Math.random() * 20);
   
   return (
     <motion.div
       initial={horizontal ? { left: "-10%", top: `${position}%` } : { top: "-10%", left: `${position}%` }}
       animate={horizontal ? { left: "110%" } : { top: "110%" }}
       transition={{
-        duration: 10 + Math.random() * 20,
+        duration: duration,
         repeat: Infinity,
         delay: index * 2,
         ease: "linear",

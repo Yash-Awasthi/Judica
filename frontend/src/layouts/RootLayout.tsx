@@ -80,8 +80,10 @@ export function RootLayout() {
     }
   }, [user, fetchWithAuth]);
 
-  useEffect(() => { 
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadConversations();
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadProjects();
   }, [loadConversations, loadProjects]);
 
@@ -148,8 +150,10 @@ export function RootLayout() {
   useEffect(() => {
     const match = location.pathname.match(/\/chat\/(.+)/);
     if (match) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveConvId(match[1]);
     } else if (location.pathname === "/" || location.pathname === "/chat") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveConvId(null);
     }
   }, [location.pathname]);

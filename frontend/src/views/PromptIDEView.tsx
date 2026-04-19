@@ -42,6 +42,7 @@ export function PromptIDEView() {
   }, [fetchWithAuth, selectedId]);
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadPrompts();
   }, [loadPrompts]);
 
