@@ -67,7 +67,7 @@ export function useDeliberation({
             updated.modePhases = [];
             break;
           case "mode_phase":
-            updated.modePhases = [...(updated.modePhases || []), event as any];
+            updated.modePhases = [...(updated.modePhases || []), event];
             break;
           case "done":
             if (event.verdict) updated.verdict = cleanContent(event.verdict);

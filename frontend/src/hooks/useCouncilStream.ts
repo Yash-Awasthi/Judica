@@ -1,6 +1,6 @@
 import { useRef, useEffect, useCallback, useState } from "react";
 import { useAuth } from "../context/AuthContext";
-import type { PeerReview, ScoredOpinion, ModelCost } from "../types/index.js";
+import type { Opinion, PeerReview, ScoredOpinion, ModelCost } from "../types/index.js";
 
 export type SSEEvent =
   | { type: "member_chunk"; name: string; chunk: string }
@@ -10,9 +10,11 @@ export type SSEEvent =
   | { type: "peer_review"; round: number; reviews: PeerReview[] }
   | { type: "scored"; round: number; scored: ScoredOpinion[] }
   | { type: "cost"; models: ModelCost[]; totalUsd: number }
-  | { type: "done"; verdict: string; latency?: number; cacheHit?: boolean; tokensUsed?: number; conversationId?: string | null }
+  | { type: "done"; verdict: string; opinions?: Opinion[]; latency?: number; cacheHit?: boolean; tokensUsed?: number; conversationId?: string | null }
   | { type: "error"; message: string }
-  | { type: "status"; message: string; round?: number };
+  | { type: "status"; message: string; round?: number }
+  | { type: "mode_start"; mode: string }
+  | { type: "mode_phase"; phase: string; qa?: { q: string; a: string }[]; redArguments?: string; blueArguments?: string; round?: { round: number; phase: "propose" | "falsify" | "revise"; hypotheses: { agent: string; text: string }[] }; opinions?: { agent: string; opinion: string; confidence: number; reasoning: string }[] };
 
 interface UseCouncilStreamProps {
   onEvent: (event: SSEEvent) => void;
