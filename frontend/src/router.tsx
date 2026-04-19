@@ -23,6 +23,7 @@ const SkillsView = lazy(() => import("./views/SkillsView").then(m => ({ default:
 const ReposView = lazy(() => import("./views/ReposView").then(m => ({ default: m.ReposView })));
 const EvaluationView = lazy(() => import("./views/EvaluationView").then(m => ({ default: m.EvaluationView })));
 const TrainingLabView = lazy(() => import("./views/TrainingLabView").then(m => ({ default: m.TrainingLabView })));
+const ArchetypesView = lazy(() => import("./views/ArchetypesView").then(m => ({ default: m.ArchetypesView })));
 const ProjectsView = lazy(() => import("./views/ProjectsView"));
 
 function NotFoundView() {
@@ -228,6 +229,16 @@ export const router = createBrowserRouter([
             </Suspense>
           </RouteErrorBoundary>
         ) 
+      },
+      {
+        path: "archetypes",
+        element: (
+          <RouteErrorBoundary>
+            <Suspense fallback={<ViewSkeleton />}>
+              <ArchetypesView />
+            </Suspense>
+          </RouteErrorBoundary>
+        )
       },
       { path: "settings", element: <Settings /> },
       { path: "*", element: <NotFoundView /> },
