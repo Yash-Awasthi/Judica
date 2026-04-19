@@ -129,8 +129,9 @@ async function runAgent(agentId: string): Promise<void> {
   const previousResults: unknown[] = [];
 
   for (let i = startIndex; i < stepHandlers.length; i++) {
-    // Check if paused or cancelled
-    if (agent.status === "paused" || agent.status === "cancelled") break;
+    // Check if paused or cancelled (status may change from external calls)
+    const currentStatus = agent.status as string;
+    if (currentStatus === "paused" || currentStatus === "cancelled") break;
 
     agent.currentStepIndex = i;
     agent.steps[i].status = "running";
