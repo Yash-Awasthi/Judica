@@ -10,6 +10,12 @@
 
 ---
 
+## 👁️ Platform Vision
+**AIBYAI is not just another LLM wrapper—it is a self-governing, mathematically verifiable AI Council.**
+The vision is to build the world's first *Trust-by-Design* autonomous platform. By enforcing structured agent debate, cryptographic memory, zero-context validation, and deterministic ML scoring, AIBYAI ensures that every output is logically sound, heavily scrutinized, and completely devoid of unverified hallucinations. We are moving from single-model "best guesses" to multi-modal, peer-reviewed, and verifiable machine consensus.
+
+---
+
 ## The 13-Tier Roadmap (Pending Phases)
 
 ### Phase 5: Bloom Gate Anti-Convergence & ML Scoring
@@ -25,6 +31,10 @@
 - [ ] #### Pairwise claim comparison refinement
   - **How:** Enhance `src/agents/conflictDetector.ts` to extract discrete factual claims from agent outputs, rigorously compare them pair-by-pair, and assign a 1–5 severity scale score for contradictions.
   - **Why:** To isolate exactly *what* the agents disagree on rather than just knowing that they generally disagree, allowing for targeted, productive debate rounds.
+
+- [ ] #### Dedicated Adversarial Red-Team Agent
+  - **How:** Introduce a new "Devil's Advocate" archetype directly into the debate orchestrator (`src/agents/orchestrator.ts`). This agent's only objective is to deliberately find edge cases, logical fallacies, and security risks in the other agents' claims during the Peer Review phase.
+  - **Why:** Standard LLMs tend to be agreeable. A forced adversarial perspective guarantees that outputs are stress-tested against the worst-case scenarios, elevating the robustness of the final synthesis far beyond standard multi-agent systems.
 
 ### Phase 6: Master Synthesis & Cold Validation
 
@@ -72,6 +82,10 @@
   - **How:** Implement background cron jobs (`src/lib/memoryCrons.ts`) to decay the strength/relevance of older context chunks (e.g., a 14-day half-life) while maintaining or boosting the strength of heavily accessed facts.
   - **Why:** As context window size increases, noise increases. Temporal decay ensures that outdated information naturally fades away, preventing the AI from hallucinating based on stale facts.
 
+- [ ] #### Subconscious Background Synthesis
+  - **How:** Create a background worker queue (`src/queue/workers.ts`) that automatically analyzes dormant conversations. It will continuously compress raw chat logs into dense, versioned knowledge graph nodes (`SharedFact` schemas) while the user is away.
+  - **Why:** Real-time retrieval on massive conversations is slow. Pre-computing "subconscious" insights guarantees ultra-low latency RAG queries when the user returns, giving the illusion that the AI is "always thinking."
+
 ### Phase 9: Workflow Engine (Dify / Flowise / Langflow Patterns)
 
 - [ ] #### Drag-and-drop canvas implementation
@@ -86,11 +100,19 @@
   - **How:** Implement the backend execution handlers for 12 core node types (e.g., `src/workflow/nodes/http.handler.ts`) including strict validation, state passing, and Server-Side Request Forgery (SSRF) protection for network calls.
   - **Why:** To make the workflow engine actually functional and secure. SSRF protection is critical to prevent malicious workflows from accessing internal infrastructure.
 
+- [ ] #### Self-Healing Agentic Workflows
+  - **How:** Extend the `executor.ts` pipeline to catch node execution errors (e.g., API failures, malformed JSON). Instead of crashing the workflow, automatically route the error context back to a recovery LLM node with instructions to rewrite the prompt or adjust tool parameters, then re-try the node.
+  - **Why:** Traditional workflows are brittle. A self-healing capability creates truly resilient automation that can recover from external api changes or prompt drift without requiring human debugging.
+
 ### Phase 10: Agent Skills & Autonomy (MetaGPT / CAMEL / OWU Patterns)
 
 - [ ] #### Goal Decomposition Engine
   - **How:** Expand `src/services/goalDecomposition.service.ts` to take high-level user prompts and use an LLM to break them into a DAG of 3-8 concrete subtasks, assigning specific archetypes and tracking step-by-step progress.
   - **Why:** LLMs struggle with massive, multi-step tasks. Breaking a goal into smaller, modular subtasks ensures higher accuracy, easier debugging, and allows specialized agents to handle specific pieces.
+
+- [ ] #### Monte Carlo Thought Trees (MCTS) for Deliberation
+  - **How:** Modify the orchestrator logic (`src/agents/orchestrator.ts`) for complex coding or logic tasks to simulate multiple reasoning branches (Tree of Thoughts) and use the ML Scoring Engine to aggressively prune invalid logic trees before they reach the debate phase.
+  - **Why:** Simple parallel generation is not enough for highly complex logic. Simulating multiple future outcome paths guarantees the agents are solving problems optimally, rivaling O1-level reasoning capabilities directly within the open-source pipeline.
 
 - [ ] #### Tool Chaining
   - **How:** Implement autonomous sequencing in `src/services/toolChain.service.ts` where the output of one tool seamlessly pipes into the input of the next (e.g., web search -> extraction -> analysis -> chart generation).
