@@ -3,7 +3,8 @@ import fastifyRateLimit from "@fastify/rate-limit";
 import { db } from "../lib/drizzle.js";
 import { users } from "../db/schema/users.js";
 import { customProviders } from "../db/schema/council.js";
-import { eq, desc, ilike, or, sql } from "drizzle-orm";
+import { auditLogs } from "../db/schema/conversations.js";
+import { eq, desc, ilike, or, sql, gte, lte } from "drizzle-orm";
 import { fastifyRequireAdmin } from "../middleware/fastifyAuth.js";
 import { AdminService } from "../services/adminService.js";
 import { AppError } from "../middleware/errorHandler.js";
@@ -226,11 +227,11 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   // POST /security/key-rotation — trigger manual rotation
   fastify.post("/security/key-rotation", async (request, reply) => {
     const { old_key, new_key } = request.body as any;
-    
+
     if (!old_key || !new_key) {
       throw new AppError(400, "old_key and new_key are required");
     }
-    
+
     if (new_key.length < 32) {
       throw new AppError(400, "new_key must be at least 32 characters");
     }
@@ -240,6 +241,66 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
       oldKey: old_key,
       newKey: new_key
     });
+  });
+
+  // GET /api/admin/audit/export — stream all audit logs as JSONL
+  fastify.get("/audit/export", async (request, reply) => {
+    const { from, to, limit: rawLimit } = request.query as {
+      from?: string;
+      to?: string;
+      limit?: string;
+    };
+
+    const limit = Math.min(parseInt(rawLimit || "10000", 10), 50_000);
+    const conditions = [];
+    if (from) conditions.push(gte(auditLogs.createdAt, new Date(from)));
+    if (to) conditions.push(lte(auditLogs.createdAt, new Date(to)));
+
+    const rows = await db
+      .select()
+      .from(auditLogs)
+      .where(conditions.length > 0 ? sql`${conditions.reduce((acc, c) => sql`${acc} AND ${c}`)}` : undefined)
+      .orderBy(desc(auditLogs.createdAt))
+      .limit(limit);
+
+    const jsonl = rows.map((r) => JSON.stringify(r)).join("\n");
+    const filename = `audit-export-${new Date().toISOString().split("T")[0]}.jsonl`;
+
+    reply
+      .header("Content-Type", "application/x-ndjson")
+      .header("Content-Disposition", `attachment; filename="${filename}"`)
+      .send(jsonl);
+  });
+
+  // GET /api/admin/workspace/members — list all workspace members with roles
+  fastify.get("/workspace/members", async (request, reply) => {
+    const rows = await db
+      .select({
+        id: users.id,
+        username: users.username,
+        email: users.email,
+        role: users.role,
+        createdAt: users.createdAt,
+      })
+      .from(users)
+      .orderBy(desc(users.createdAt))
+      .limit(200);
+
+    return { members: rows };
+  });
+
+  // PUT /api/admin/workspace/members/:id/role — update member role
+  fastify.put("/workspace/members/:id/role", async (request, reply) => {
+    const { id } = request.params as { id: string };
+    const { role } = request.body as { role: string };
+
+    const validRoles = ["owner", "admin", "member", "viewer"];
+    if (!validRoles.includes(role)) {
+      throw new AppError(400, `Invalid role. Must be one of: ${validRoles.join(", ")}`);
+    }
+
+    await AdminService.updateUserRole(parseInt(id), role, request.userId!);
+    return { success: true, id, role };
   });
 };
 

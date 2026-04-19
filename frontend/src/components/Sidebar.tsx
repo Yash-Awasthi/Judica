@@ -284,6 +284,7 @@ export function Sidebar({
         {role === "admin" && (
           <>
             <NavItem to="/analytics" icon={<BarChart3 size={18} />} label="Global_Telemetry" sector="TELE-08" active={currentPath === "/analytics"} collapsed={collapsed} />
+            <NavItem to="/workspace" icon={<Users size={18} />} label="Workspace_Roles" sector="ACL-13" active={currentPath === "/workspace"} collapsed={collapsed} />
             <NavItem to="/admin" icon={<Shield size={18} />} label="Root_Admin" sector="SYS-AD" active={currentPath === "/admin"} collapsed={collapsed} />
           </>
         )}
