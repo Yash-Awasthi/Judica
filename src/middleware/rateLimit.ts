@@ -4,9 +4,9 @@ import IORedisDefault from "ioredis";
 const IORedis = IORedisDefault.default || IORedisDefault;
 
 // Redis client used for rate limit state — needs cleanup on shutdown
-let rateLimitRedisClient: any;
+let rateLimitRedisClient: InstanceType<typeof IORedis> | undefined;
 try {
-  rateLimitRedisClient = new (IORedis as any)(env.REDIS_URL || "redis://localhost:6379", {
+  rateLimitRedisClient = new (IORedis as typeof IORedis)(env.REDIS_URL || "redis://localhost:6379", {
     maxRetriesPerRequest: null,
     enableOfflineQueue: false,
     lazyConnect: true,
@@ -19,7 +19,7 @@ try {
 }
 
 /** The ioredis client for @fastify/rate-limit Redis store. May be undefined if Redis is unavailable. */
-export function getRateLimitRedis(): any {
+export function getRateLimitRedis(): InstanceType<typeof IORedis> | undefined {
   return rateLimitRedisClient;
 }
 

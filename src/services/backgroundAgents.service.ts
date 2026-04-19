@@ -162,7 +162,7 @@ async function runAgent(agentId: string): Promise<void> {
       agent.lastHeartbeat = new Date();
       notifyProgress(agentId);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       agent.steps[i].status = "failed";
       agent.steps[i].error = err.message;
       agent.steps[i].completedAt = new Date();

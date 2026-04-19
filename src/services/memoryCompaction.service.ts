@@ -75,7 +75,7 @@ export async function compact(userId: number): Promise<CompactionResult> {
   // Embed all chunks
   const chunksWithEmbeddings: MemoryChunkWithEmbedding[] = [];
   for (const mem of oldMemories) {
-    const embeddingRaw = (mem as any).embedding as unknown;
+    const embeddingRaw = (mem as Record<string, unknown>).embedding as unknown;
     let embedding: number[];
     if (Array.isArray(embeddingRaw)) {
       embedding = embeddingRaw as number[];

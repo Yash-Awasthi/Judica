@@ -7,6 +7,7 @@ import type {
 import { createStreamResult } from "./types.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
 import { getBreaker } from "../lib/breaker.js";
+import type { Provider } from "../lib/providers.js";
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 
@@ -62,12 +63,13 @@ export class GeminiAdapter implements IProviderAdapter {
         signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
       });
 
-    const breaker = getBreaker({ name: this.providerId } as any, fetchGemini);
+    const breaker = getBreaker({ name: this.providerId } as Provider, fetchGemini);
     const res: Response = await breaker.fire();
 
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error((err as any)?.error?.message ?? `Gemini API error: ${res.status}`);
+      const err = await res.json().catch(() => ({})) as Record<string, unknown>;
+      const errObj = err as { error?: { message?: string } };
+      throw new Error(errObj?.error?.message ?? `Gemini API error: ${res.status}`);
     }
 
     const self = this;
@@ -204,10 +206,10 @@ export class GeminiAdapter implements IProviderAdapter {
         }
       );
       if (!res.ok) return [];
-      const data: any = await res.json();
+      const data = await res.json() as { models?: Array<{ name?: string }> };
       return (data.models || [])
-        .filter((m: any) => m.name?.includes("gemini"))
-        .map((m: any) => m.name.replace("models/", ""))
+        .filter((m) => m.name?.includes("gemini"))
+        .map((m) => m.name!.replace("models/", ""))
         .sort();
     } catch {
       return [];

@@ -25,8 +25,9 @@ export function fastifyErrorHandler(error: FastifyError | Error, request: Fastif
     return;
   }
 
-  if ((error as any).name === "ZodError" || (error as any).issues) {
-    reply.code(400).send({ error: "Validation failed", details: (error as any).issues });
+  const zodError = error as { name?: string; issues?: unknown[] };
+  if (zodError.name === "ZodError" || zodError.issues) {
+    reply.code(400).send({ error: "Validation failed", details: zodError.issues });
     return;
   }
 

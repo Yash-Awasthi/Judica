@@ -59,9 +59,10 @@ export class AnthropicProvider extends BaseProvider {
       });
 
       if (!res.ok) {
-        let errorData: any = {};
-        try { errorData = await res.json(); } catch { /* ignore */ }
-        throw new Error(errorData?.error?.message ?? `Anthropic API error: ${res.status}`);
+        let errorData: Record<string, unknown> = {};
+        try { errorData = await res.json() as Record<string, unknown>; } catch { /* ignore */ }
+        const errObj = errorData as { error?: { message?: string } };
+        throw new Error(errObj?.error?.message ?? `Anthropic API error: ${res.status}`);
       }
 
       if (onChunk && res.body) {
@@ -124,7 +125,7 @@ export class AnthropicProvider extends BaseProvider {
 
       const data = await res.json();
       const content = data.content || [];
-      const toolCalls = content.filter((c: any) => c.type === "tool_use");
+      const toolCalls = content.filter((c: Record<string, unknown>) => c.type === "tool_use");
 
       if (toolCalls.length > 0) {
         logger.info({ 
@@ -155,13 +156,13 @@ export class AnthropicProvider extends BaseProvider {
                 content: safeResult
               }
             ]
-          } as any);
+          } as Message);
         }
 
         return this.call({ messages: nextMessages, signal, maxTokens, isFallback, onChunk, _depth: _depth + 1 });
       }
 
-      const text = content.find((c: any) => c.type === "text")?.text || "";
+      const text = content.find((c: Record<string, unknown>) => c.type === "text")?.text as string || "";
       
       const usage = {
         promptTokens: data.usage?.input_tokens || 0,

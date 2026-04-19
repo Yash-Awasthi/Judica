@@ -33,7 +33,7 @@ async function isTokenRevoked(token: string): Promise<boolean> {
 export async function fastifyOptionalAuth(request: FastifyRequest, _reply: FastifyReply) {
   const authHeader = request.headers.authorization;
   const tokenFromHeader = authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
-  const tokenFromCookie = (request as any).cookies?.access_token;
+  const tokenFromCookie = (request as { cookies?: { access_token?: string } }).cookies?.access_token;
   const token = tokenFromHeader || tokenFromCookie;
 
   if (!token) return;
@@ -55,7 +55,7 @@ export async function fastifyOptionalAuth(request: FastifyRequest, _reply: Fasti
 export async function fastifyRequireAuth(request: FastifyRequest, reply: FastifyReply) {
   const authHeader = request.headers.authorization;
   const tokenFromHeader = authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
-  const tokenFromCookie = (request as any).cookies?.access_token;
+  const tokenFromCookie = (request as { cookies?: { access_token?: string } }).cookies?.access_token;
   const token = tokenFromHeader || tokenFromCookie;
 
   if (!token) {
@@ -90,8 +90,9 @@ export async function fastifyRequireAuth(request: FastifyRequest, reply: Fastify
     request.userId = payload.userId;
     request.username = payload.username;
     request.role = payload.role;
-  } catch (e: any) {
-    logger.debug({ error: e.message, url: request.url }, "JWT Verification failed");
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : String(e);
+    logger.debug({ error: message, url: request.url }, "JWT Verification failed");
     reply.code(401).send({ error: "Invalid or expired token" });
   }
 }

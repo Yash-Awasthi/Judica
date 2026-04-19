@@ -202,7 +202,7 @@ const redisWrapper = {
         void initPromise.then(() => clientMulti?.del(key));
         return this;
       },
-      async exec(): Promise<Array<[null, any]>> {
+      async exec(): Promise<Array<[null, unknown]>> {
         try {
           await initPromise;
           if (!clientMulti) return [];

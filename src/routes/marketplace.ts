@@ -32,7 +32,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
     const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
     const skip = (pageNum - 1) * limitNum;
 
-    const conditions: any[] = [eq(marketplaceItems.published, true)];
+    const conditions = [eq(marketplaceItems.published, true)];
 
     if (type) {
       conditions.push(eq(marketplaceItems.type, type));
@@ -124,7 +124,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
 
     // POST / — publish item
   fastify.post("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
-    const { type, name, description, content, tags } = request.body as any;
+    const { type, name, description, content, tags } = request.body as { type?: string; name?: string; description?: string; content?: string; tags?: string[] };
 
     if (!type || !name || !description || !content) {
       throw new AppError(400, "type, name, description, and content are required", "MISSING_FIELDS");
@@ -184,7 +184,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(403, "Not authorized to update this item", "FORBIDDEN");
     }
 
-    const { name, description, content, tags, version, published } = request.body as any;
+    const { name, description, content, tags, version, published } = request.body as { name?: string; description?: string; content?: string; tags?: string[]; version?: string; published?: boolean };
 
     const data: Record<string, unknown> = { updatedAt: new Date() };
     if (name !== undefined) data.name = name;
@@ -246,7 +246,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(404, "Item not found", "ITEM_NOT_FOUND");
     }
 
-    const content = item.content as Record<string, any>;
+    const content = item.content as Record<string, unknown>;
 
     // Import item into user's account based on type
     try {
@@ -364,7 +364,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
     // POST /:id/reviews — add review
   fastify.post("/:id/reviews", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const { id: itemId } = request.params as { id: string };
-    const { rating, comment } = request.body as any;
+    const { rating, comment } = request.body as { rating?: number; comment?: string };
 
     if (!rating || rating < 1 || rating > 5) {
       throw new AppError(400, "Rating must be between 1 and 5", "INVALID_RATING");

@@ -44,7 +44,7 @@ export function DebateDashboardView() {
   const [exchanges, setExchanges] = useState<DebateExchange[]>([]);
   const [synthesis, setSynthesis] = useState<string | null>(null);
   const [consensusScore, setConsensusScore] = useState<number | null>(null);
-  const [, setConsensusBreakdown] = useState<Record<string, any> | null>(null);
+  const [, setConsensusBreakdown] = useState<Record<string, unknown> | null>(null);
   const [running, setRunning] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
   const [factsCount, setFactsCount] = useState(0);
@@ -75,7 +75,7 @@ export function DebateDashboardView() {
     } catch (_err) { /* ignore tts errors */ }
   };
 
-  const handleEvent = useCallback((data: Record<string, any>) => {
+  const handleEvent = useCallback((data: Record<string, unknown>) => {
     const type = data.type as string;
 
     switch (type) {
@@ -160,7 +160,7 @@ export function DebateDashboardView() {
         break;
       case "confidence_score":
         setConsensusScore(data.score as number);
-        setConsensusBreakdown(data.breakdown as Record<string, any>);
+        setConsensusBreakdown(data.breakdown as Record<string, unknown>);
         break;
       case "orchestration_error":
         setRunning(false);

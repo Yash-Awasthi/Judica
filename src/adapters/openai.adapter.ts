@@ -7,6 +7,7 @@ import type {
 import { createStreamResult } from "./types.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
 import { getBreaker } from "../lib/breaker.js";
+import type { Provider } from "../lib/providers.js";
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 
@@ -53,12 +54,13 @@ export class OpenAIAdapter implements IProviderAdapter {
         signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
       });
 
-    const breaker = getBreaker({ name: this.providerId } as any, fetchChat);
+    const breaker = getBreaker({ name: this.providerId } as Provider, fetchChat);
     const res: Response = await breaker.fire();
 
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error((err as any)?.error?.message ?? `OpenAI API error: ${res.status}`);
+      const err = await res.json().catch(() => ({})) as Record<string, unknown>;
+      const errObj = err as { error?: { message?: string } };
+      throw new Error(errObj?.error?.message ?? `OpenAI API error: ${res.status}`);
     }
 
     const self = this;
@@ -187,10 +189,10 @@ export class OpenAIAdapter implements IProviderAdapter {
         signal: AbortSignal.timeout(10000),
       });
       if (!res.ok) return [];
-      const data: any = await res.json();
+      const data = await res.json() as { data?: Array<{ id: string }>; };
       return (data.data || [])
-        .filter((m: any) => m.id.includes("gpt") || m.id.includes("o1") || m.id.includes("o3") || m.id.includes("o4"))
-        .map((m: any) => m.id)
+        .filter((m) => m.id.includes("gpt") || m.id.includes("o1") || m.id.includes("o3") || m.id.includes("o4"))
+        .map((m) => m.id)
         .sort();
     } catch {
       return [];

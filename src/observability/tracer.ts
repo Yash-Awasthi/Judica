@@ -65,7 +65,7 @@ export async function endTrace(ctx: TraceContext): Promise<string> {
       type: ctx.type,
       conversationId: ctx.conversationId ?? null,
       workflowRunId: ctx.workflowRunId ?? null,
-      steps: ctx.steps as any,
+      steps: ctx.steps as unknown as Record<string, unknown>[],
       totalLatencyMs,
       totalTokens,
       totalCostUsd,
@@ -130,7 +130,7 @@ async function sendToLangfuse(
       }
     }
 
-    await (langfuse as any).shutdownAsync();
+    await (langfuse as unknown as { shutdownAsync(): Promise<void> }).shutdownAsync();
   } catch {
     // Langfuse is optional — never break if it's not installed or fails
   }

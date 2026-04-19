@@ -9,7 +9,7 @@ const MAX_DAILY_REQUESTS = DAILY_REQUEST_LIMIT;
 const MAX_DAILY_TOKENS = DAILY_TOKEN_LIMIT;
 
 export async function fastifyCheckQuota(request: FastifyRequest, reply: FastifyReply) {
-  const userId = (request as any).userId;
+  const userId = (request as unknown as { userId?: number }).userId;
   if (!userId) return;
 
   const today = new Date();
@@ -29,7 +29,7 @@ export async function fastifyCheckQuota(request: FastifyRequest, reply: FastifyR
       userId,
       requests: currentRequests,
       tokens: currentTokens,
-      requestId: (request as any).requestId
+      requestId: (request as unknown as { requestId?: string }).requestId
     }, "User exceeded daily quota limit");
     reply.header("X-Quota-Limit", MAX_DAILY_REQUESTS.toString());
     reply.header("X-Quota-Used", currentRequests.toString());

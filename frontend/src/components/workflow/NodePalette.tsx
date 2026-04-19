@@ -1,6 +1,6 @@
-import { motion } from "framer-motion";
+import { motion, type PanInfo } from "framer-motion";
 import { Brain, Wrench, GitBranch, FileText, Code, Globe, UserCheck, Repeat, ArrowRightCircle, ArrowLeftCircle, Merge, Split } from "lucide-react";
-import type { DragEvent, KeyboardEvent } from "react";
+import { type DragEvent, type KeyboardEvent } from "react";
 
 const NODE_GROUPS = [
   {
@@ -82,7 +82,7 @@ export function NodePalette() {
                   role="listitem"
                   tabIndex={0}
                   aria-label={`Add ${item.label} node`}
-                  onDragStart={(e: any) => handleDragStart(e, item.type)}
+                  onDragStart={((e: DragEvent<HTMLDivElement>) => handleDragStart(e, item.type)) as unknown as (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => void}
                   onKeyDown={(e) => onKeyDown(e, item.type)}
                 >
                   <div className={`p-2 rounded-xl bg-[rgba(255,255,255,0.03)] group-hover:bg-transparent ${item.color} transition-colors`}>

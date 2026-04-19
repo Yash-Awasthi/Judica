@@ -109,11 +109,11 @@ export async function routedStoreChunk(
   if (backend.type === "getzep") {
     try {
       const { ZepClient } = await import("@getzep/zep-js");
-      const client = await (ZepClient as any).init(backend.url || "", backend.apiKey);
+      const client = await (ZepClient as unknown as { init: (url: string, key: string) => Promise<{ memory: { addMemory: (sessionId: string, messages: unknown[]) => Promise<void>; searchMemory: (sessionId: string, opts: Record<string, unknown>) => Promise<Array<{ message?: { content: string }; score: number; metadata?: Record<string, unknown> }>> } }> }).init(backend.url || "", backend.apiKey);
       const sessionId = backend.sessionId || `user_${userId}`;
 
       await client.memory.add(sessionId, [
-        { role: "system", content, metadata: { userId, kbId, sourceName, chunkIndex } } as any,
+        { role: "system", content, metadata: { userId, kbId, sourceName, chunkIndex } } as Record<string, unknown>,
       ]);
 
       return `zep_${sessionId}_${Date.now()}`;
@@ -138,7 +138,7 @@ export async function routedSearch(
 
   if (!backend || backend.type === "local") {
     const results = await searchSimilar(userId, query, kbId, limit);
-    return results.map((r: any) => ({
+    return results.map((r: { content?: string; score?: number; similarity?: number; source?: string; sourceName?: string; metadata?: Record<string, unknown> }) => ({
       content: r.content,
       score: r.similarity || 0,
       source: r.sourceName,
@@ -164,7 +164,7 @@ export async function routedSearch(
           : undefined,
       });
 
-      return results.map((r: any) => ({
+      return results.map((r: { content?: string; score?: number; similarity?: number; source?: string; sourceName?: string; metadata?: Record<string, unknown> }) => ({
         content: r.payload?.content || "",
         score: r.score,
         source: r.payload?.sourceName,
@@ -172,11 +172,11 @@ export async function routedSearch(
     } catch (err) {
       logger.error({ err, userId }, "Qdrant search failed, falling back to local");
       const results = await searchSimilar(userId, query, kbId, limit);
-      return results.map((r: any) => ({ content: r.content, score: r.similarity || 0, source: r.sourceName }));
+      return results.map((r: { content?: string; score?: number; similarity?: number; source?: string; sourceName?: string; metadata?: Record<string, unknown> }) => ({ content: r.content, score: r.similarity || 0, source: r.sourceName }));
     }
   }
 
   // Fallback to local
   const results = await searchSimilar(userId, query, kbId, limit);
-  return results.map((r: any) => ({ content: r.content, score: r.similarity || 0, source: r.sourceName }));
+  return results.map((r: { content?: string; score?: number; similarity?: number; source?: string; sourceName?: string; metadata?: Record<string, unknown> }) => ({ content: r.content, score: r.similarity || 0, source: r.sourceName }));
 }

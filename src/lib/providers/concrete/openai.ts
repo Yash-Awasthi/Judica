@@ -58,9 +58,10 @@ export class OpenAIProvider extends BaseProvider {
       });
 
       if (!res.ok) {
-        let errorData: any = {};
-        try { errorData = await res.json(); } catch { /* ignore */ }
-        throw new Error(errorData?.error?.message ?? `OpenAI API error: ${res.status}`);
+        let errorData: Record<string, unknown> = {};
+        try { errorData = await res.json() as Record<string, unknown>; } catch { /* ignore */ }
+        const errObj = errorData as { error?: { message?: string } };
+        throw new Error(errObj?.error?.message ?? `OpenAI API error: ${res.status}`);
       }
 
       if (onChunk && res.body) {
@@ -136,12 +137,12 @@ export class OpenAIProvider extends BaseProvider {
           });
           
           const safeResult = `[UNTRUSTED TOOL OUTPUT]\n${result.result || result}\n[/UNTRUSTED TOOL OUTPUT]`;
-          nextMessages.push({ 
-            role: "tool", 
-            tool_call_id: tc.id, 
-            name: tc.function.name, 
-            content: safeResult 
-          } as any);
+          nextMessages.push({
+            role: "tool",
+            tool_call_id: tc.id,
+            name: tc.function.name,
+            content: safeResult
+          } as Message);
         }
 
         return this.call({ messages: nextMessages, signal, maxTokens, isFallback, onChunk, _depth: _depth + 1 });

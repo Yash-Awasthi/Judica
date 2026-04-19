@@ -2,6 +2,15 @@ import type { Message, Provider } from "../providers.js";
 import { getToolDefinitions, callTool } from "../tools/index.js";
 import { validateSafeUrl } from "../ssrf.js";
 
+interface ProviderResult {
+  text: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+}
+
 export async function askOpenAI(
   provider: Provider,
   normMessages: Message[],
@@ -9,8 +18,8 @@ export async function askOpenAI(
   maxTokens: number,
   signal: AbortSignal,
   isFallback: boolean,
-  askFn: (provider: Provider, messages: Message[], isFallback: boolean) => Promise<any>
-): Promise<any> {
+  askFn: (provider: Provider, messages: Message[], isFallback: boolean) => Promise<ProviderResult>
+): Promise<ProviderResult> {
   const url = (resolvedBaseUrl ?? "https://api.openai.com/v1").replace(/\/$/, "");
   await validateSafeUrl(url);
 
@@ -37,12 +46,12 @@ export async function askOpenAI(
       ...(oaiTools?.length ? { tools: oaiTools, tool_choice: "auto" } : {}),
     }),
   });
-  const data = (await res.json()) as any;
+  const data = (await res.json()) as { error?: { message?: string }; choices?: Array<{ message?: { content?: string; reasoning?: string; tool_calls?: Array<{ id: string; function: { name: string; arguments: string } }> } }>; usage?: { prompt_tokens: number; completion_tokens: number; total_tokens: number } };
   if (!res.ok) throw new Error(data.error?.message ?? `Provider error ${res.status}`);
 
   const msg = data.choices?.[0]?.message;
   if (msg?.tool_calls?.length) {
-    const nextMessages = [...normMessages, msg];
+    const nextMessages: Message[] = [...normMessages, { role: 'assistant' as const, content: msg.content || '' }];
     for (const tc of msg.tool_calls) {
       const result = await callTool({ id: tc.id, name: tc.function.name, arguments: JSON.parse(tc.function.arguments) });
       const safeResult = `[UNTRUSTED TOOL OUTPUT]\n${result}\n[/UNTRUSTED TOOL OUTPUT]`;
@@ -72,8 +81,8 @@ export async function streamOpenAI(
   signal: AbortSignal,
   isFallback: boolean,
   onChunk: (chunk: string) => void,
-  streamFn: (provider: Provider, messages: Message[], onChunk: (c: string) => void, isFallback: boolean) => Promise<any>
-): Promise<any> {
+  streamFn: (provider: Provider, messages: Message[], onChunk: (c: string) => void, isFallback: boolean) => Promise<ProviderResult>
+): Promise<ProviderResult> {
   const url = (resolvedBaseUrl ?? "https://api.openai.com/v1").replace(/\/$/, "");
   await validateSafeUrl(url);
 
@@ -102,14 +111,14 @@ export async function streamOpenAI(
     }),
   });
 
-  if (!res.ok) throw new Error(((await res.json()) as any).error?.message ?? `Provider error ${res.status}`);
+  if (!res.ok) throw new Error(((await res.json()) as { error?: { message?: string } }).error?.message ?? `Provider error ${res.status}`);
 
   const reader = res.body!.getReader();
   const decoder = new TextDecoder();
   let fullText = "";
-  let usage: any;
+  let usage: ProviderResult["usage"];
   let inThink = false;
-  const toolCalls: any[] = [];
+  const toolCalls: Array<{ id: string; name: string; args: string }> = [];
 
   while (true) {
     const { done, value } = await reader.read();
@@ -168,7 +177,7 @@ export async function streamOpenAI(
       {
         role: "assistant", content: fullText,
         tool_calls: finalToolCalls.map(tc => ({ id: tc.id, type: "function", function: { name: tc.name, arguments: tc.args } }))
-      } as any
+      } as Message
     ];
     for (const tc of finalToolCalls) {
       const result = await callTool({ id: tc.id, name: tc.name, arguments: JSON.parse(tc.args) });

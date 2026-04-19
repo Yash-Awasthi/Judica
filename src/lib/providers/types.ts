@@ -1,8 +1,14 @@
 export interface Message {
   role: "user" | "assistant" | "system" | "tool";
-  content: string | any[];
+  content: string | ContentBlock[];
   name?: string;
   tool_call_id?: string;
+}
+
+export interface ContentBlock {
+  [key: string]: unknown;
+  type?: string;
+  text?: string;
 }
 
 export interface ProviderUsage {
@@ -15,7 +21,7 @@ export interface ProviderResponse {
   text: string;
   usage: ProviderUsage;
   cost?: number;
-  raw?: any;
+  raw?: unknown;
 }
 
 export interface ProviderConfig {

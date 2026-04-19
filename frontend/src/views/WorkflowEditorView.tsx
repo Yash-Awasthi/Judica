@@ -12,6 +12,7 @@ import {
   type Connection,
   type Node,
   type Edge,
+  type ReactFlowInstance,
   ReactFlowProvider,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
@@ -72,7 +73,7 @@ function WorkflowEditorInner() {
   const [runInputs, setRunInputs] = useState<Record<string, string>>({});
   const [nodeStatuses, setNodeStatuses] = useState<Record<string, "running" | "done" | "error">>({});
   const [runOutputs, setRunOutputs] = useState<Record<string, unknown> | null>(null);
-  const [reactFlowInstance, setReactFlowInstance] = useState<any>(null);
+  const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
 
   // Load workflow if editing
   useEffect(() => {
@@ -101,7 +102,7 @@ function WorkflowEditorInner() {
     [setEdges]
   );
 
-  const onNodeClick = useCallback((_: any, node: Node) => {
+  const onNodeClick = useCallback((_: React.MouseEvent, node: Node) => {
     setSelectedNode(node);
   }, []);
 

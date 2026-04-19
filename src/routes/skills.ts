@@ -137,7 +137,7 @@ const skillsPlugin: FastifyPluginAsync = async (fastify) => {
     try {
       const result = await executeUserSkill(request.userId!, skill.name, inputs || {});
       return { success: true, result };
-    } catch (err: any) {
+    } catch (err: unknown) {
       return { success: false, error: err.message };
     }
   });

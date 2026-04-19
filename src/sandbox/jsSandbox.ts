@@ -48,7 +48,7 @@ export async function executeJS(code: string, timeout: number = 5000): Promise<S
       error: null,
       elapsedMs: Date.now() - start,
     };
-  } catch (err: any) {
+  } catch (err: unknown) {
     return {
       output,
       error: err.message || "Execution error",

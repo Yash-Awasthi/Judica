@@ -122,7 +122,7 @@ export async function extractAndStoreFacts(
     const validTypes = ["fact", "decision", "assumption", "contradiction"] as const;
     const stored: SharedFactData[] = [];
     for (const claim of claims.slice(0, 5)) {
-      const claimType = validTypes.includes(claim.type as any) ? claim.type as typeof validTypes[number] : "fact";
+      const claimType = validTypes.includes(claim.type as typeof validTypes[number]) ? claim.type as typeof validTypes[number] : "fact";
       const fact = await addFact(
         conversationId,
         claim.content,

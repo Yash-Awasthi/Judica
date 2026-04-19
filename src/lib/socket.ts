@@ -149,7 +149,7 @@ export function getSocket(): WebSocketServer | null {
   return wss;
 }
 
-export function emitToConversation(conversationId: string, event: string, data: any): void {
+export function emitToConversation(conversationId: string, event: string, data: unknown): void {
   if (!wss) return;
   const room = `conversation:${conversationId}`;
   const payload = JSON.stringify({ event, data });
@@ -160,7 +160,7 @@ export function emitToConversation(conversationId: string, event: string, data: 
   }
 }
 
-export function emitToAll(event: string, data: any): void {
+export function emitToAll(event: string, data: unknown): void {
   if (!wss) return;
   const payload = JSON.stringify({ event, data });
   for (const client of wss.clients) {

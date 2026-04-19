@@ -120,7 +120,7 @@ export class DeliberationOrchestrator {
       try {
         const chunks = await hybridSearch(userId ?? 0, query, kbId, 5);
         ragContext = chunks
-          .map((c: any) => c.content)
+          .map((c: { content?: string }) => c.content)
           .join("\n\n");
       } catch (err) {
         logger.warn({ err }, "RAG retrieval failed during orchestration");

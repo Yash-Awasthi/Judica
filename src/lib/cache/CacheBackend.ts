@@ -2,14 +2,14 @@
 
 export interface CacheEntry {
   verdict: string;
-  opinions: any[];
+  opinions: Array<{ name: string; opinion: string; [key: string]: unknown }>;
   metadata?: Record<string, unknown>;
 }
 
 export interface SemanticSearchResult {
   keyHash: string;
   verdict: string;
-  opinions: any[];
+  opinions: Array<{ name: string; opinion: string; [key: string]: unknown }>;
   distance: number;
 }
 

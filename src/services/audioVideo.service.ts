@@ -130,9 +130,9 @@ async function transcribeWithWhisper(
     throw new Error(`Whisper API error: ${response.status} ${response.statusText}`);
   }
 
-  const data = await response.json() as any;
+  const data = await response.json() as { results: Array<{ text: string }>; text?: string };
 
-  const segments: TranscriptionSegment[] = (data.segments || []).map((s: any) => ({
+  const segments: TranscriptionSegment[] = (data.segments || []).map((s: { text: string; start: number; end: number }) => ({
     start: s.start,
     end: s.end,
     text: s.text.trim(),
@@ -177,10 +177,10 @@ async function transcribeWithGoogleSTT(
     throw new Error(`Google STT error: ${response.status}`);
   }
 
-  const data = await response.json() as any;
+  const data = await response.json() as { results?: Array<{ text?: string; alternatives?: Array<{ transcript?: string }> }>; text?: string };
   const results = data.results || [];
 
-  const segments: TranscriptionSegment[] = results.map((r: any, i: number) => ({
+  const segments: TranscriptionSegment[] = results.map((r: { text: string }, i: number) => ({
     start: i * 30,
     end: (i + 1) * 30,
     text: r.alternatives?.[0]?.transcript || "",
@@ -319,7 +319,7 @@ export async function processMedia(
       "Media processing completed",
     );
 
-  } catch (err: any) {
+  } catch (err: unknown) {
     result.status = "failed";
     result.error = err.message;
     result.processingMs = Date.now() - start;

@@ -38,7 +38,7 @@ async function searchConversations(
       LIMIT ${limit}
     `);
 
-    return (result.rows as any[]).map((row) => ({
+    return (result.rows as Array<{ [key: string]: unknown }>).map((row) => ({
       id: row.id,
       content: `Q: ${row.question}\nA: ${row.verdict}`,
       source: "conversation" as const,
@@ -114,7 +114,7 @@ async function searchFacts(
       LIMIT ${limit}
     `);
 
-    return (result.rows as any[]).map((row) => ({
+    return (result.rows as Array<{ [key: string]: unknown }>).map((row) => ({
       id: row.id,
       content: `[${row.type}] ${row.content} (confidence: ${row.confidence}, source: ${row.sourceAgent})`,
       source: "fact" as const,

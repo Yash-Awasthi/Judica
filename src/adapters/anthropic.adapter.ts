@@ -7,6 +7,7 @@ import type {
 import { createStreamResult } from "./types.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
 import { getBreaker } from "../lib/breaker.js";
+import type { Provider } from "../lib/providers.js";
 import logger from "../lib/logger.js";
 
 const DEFAULT_TIMEOUT_MS = 60_000;
@@ -54,12 +55,13 @@ export class AnthropicAdapter implements IProviderAdapter {
         signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
       });
 
-    const breaker = getBreaker({ name: this.providerId } as any, fetchMessages);
+    const breaker = getBreaker({ name: this.providerId } as Provider, fetchMessages);
     const res: Response = await breaker.fire();
 
     if (!res.ok) {
-      const err = await res.json().catch(() => ({}));
-      throw new Error((err as any)?.error?.message ?? `Anthropic API error: ${res.status}`);
+      const err = await res.json().catch(() => ({})) as Record<string, unknown>;
+      const errObj = err as { error?: { message?: string } };
+      throw new Error(errObj?.error?.message ?? `Anthropic API error: ${res.status}`);
     }
 
     const self = this;

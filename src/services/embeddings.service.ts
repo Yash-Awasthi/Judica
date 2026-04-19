@@ -25,7 +25,7 @@ export async function embed(text: string): Promise<number[]> {
       body: JSON.stringify({ model: "text-embedding-3-small", input: text }),
     });
     if (!res.ok) throw new Error(`OpenAI embeddings failed: ${res.status} ${await res.text()}`);
-    const data = await res.json() as any;
+    const data = await res.json() as { data: Array<{ embedding: number[] }> };
     embedding = data.data[0].embedding;
   } else if (env.GOOGLE_API_KEY) {
     const TARGET_DIMENSIONS = 1536;
@@ -41,7 +41,7 @@ export async function embed(text: string): Promise<number[]> {
       }
     );
     if (!res.ok) throw new Error(`Gemini embeddings failed: ${res.status} ${await res.text()}`);
-    const data = await res.json() as any;
+    const data = await res.json() as { embedding: { values: number[] } };
     const rawEmbedding: number[] = data.embedding.values;
 
     // If Gemini returns fewer dimensions than required (e.g. 768 instead of 1536),

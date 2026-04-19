@@ -1,12 +1,21 @@
 import type { Message, Provider } from "../providers.js";
 import { getToolDefinitions, callTool } from "../tools/index.js";
 
+interface ProviderResult {
+  text: string;
+  usage?: {
+    promptTokens: number;
+    completionTokens: number;
+    totalTokens: number;
+  };
+}
+
 export async function askGoogle(
   provider: Provider,
   normMessages: Message[],
   maxTokens: number,
   signal: AbortSignal
-): Promise<any> {
+): Promise<ProviderResult> {
   const googleContents = normMessages.map((m) => ({
     role: m.role === "assistant" ? "model" : "user",
     parts: [{ text: m.content }],
@@ -34,7 +43,7 @@ export async function askGoogle(
       }),
     }
   );
-  const data = (await res.json()) as any;
+  const data = (await res.json()) as { error?: { message?: string }; candidates?: Array<{ content?: { parts?: Array<{ text?: string; functionCall?: { name: string; args: Record<string, unknown> } }> } }>; usageMetadata?: { promptTokenCount: number; candidatesTokenCount: number; totalTokenCount: number } };
   if (!res.ok) throw new Error(data.error?.message ?? `Google error ${res.status}`);
 
   const candidate = data.candidates?.[0];
@@ -68,7 +77,7 @@ export async function streamGoogle(
   maxTokens: number,
   signal: AbortSignal,
   onChunk: (chunk: string) => void
-): Promise<any> {
+): Promise<ProviderResult> {
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${provider.model || "gemini-2.5-flash"}:streamGenerateContent?key=${provider.apiKey}&alt=sse`,
     {
@@ -83,12 +92,12 @@ export async function streamGoogle(
     }
   );
 
-  if (!res.ok) throw new Error(((await res.json()) as any).error?.message ?? `Google error ${res.status}`);
+  if (!res.ok) throw new Error(((await res.json()) as { error?: { message?: string } }).error?.message ?? `Google error ${res.status}`);
 
   const reader = res.body!.getReader();
   const decoder = new TextDecoder();
   let fullText = "";
-  let usage: any;
+  let usage: ProviderResult["usage"];
 
   while (true) {
     const { done, value } = await reader.read();

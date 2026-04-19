@@ -66,11 +66,11 @@ async function issueTokenPair(userId: number, username: string, role: string, re
   return { token: accessToken, username, role };
 }
 
-function fastifyValidate(schema: any) {
-  return async (request: any, _reply: any) => {
+function fastifyValidate(schema: { parse: (v: unknown) => unknown; safeParse: (v: unknown) => { success: boolean; data?: unknown; error?: { issues: Array<{ message: string }> } } }) {
+  return async (request: FastifyRequest, _reply: FastifyReply) => {
     const result = schema.safeParse(request.body);
     if (!result.success) {
-      throw new AppError(400, result.error.issues.map((i: any) => i.message).join(", "));
+      throw new AppError(400, result.error!.issues.map((i: { message: string }) => i.message).join(", "));
     }
     request.body = result.data;
   };
@@ -114,7 +114,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
 
     fastify.post("/register", { preHandler: [authRateLimit, fastifyValidate(authSchema)] }, async (request, reply) => {
     try {
-      const { username, password } = request.body as any;
+      const { username, password } = request.body as { username: string; password: string };
       const hash = await argon2.hash(password, { type: argon2.argon2id, memoryCost: 65536, timeCost: 3 });
 
       const [user] = await db.insert(users).values({ username, passwordHash: hash }).returning();
@@ -122,7 +122,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
       logger.info({ username }, "New user registered");
       reply.code(201);
       return issueTokenPair(user.id, username, user.role, reply);
-    } catch (e: any) {
+    } catch (e: unknown) {
       if (e.code === "23505") {
         throw new AppError(409, "Username already taken");
       }
@@ -131,7 +131,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     fastify.post("/login", { preHandler: [authRateLimit, fastifyValidate(authSchema)] }, async (request, reply) => {
-    const { username, password } = request.body as any;
+    const { username, password } = request.body as { username: string; password: string };
     const [user] = await db.select().from(users).where(eq(users.username, username)).limit(1);
 
     if (!user) {
@@ -181,7 +181,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     const authHeader = request.headers.authorization;
     if (authHeader?.startsWith("Bearer ")) {
        const token = authHeader.split(" ")[1];
-       const payload = jwt.decode(token) as any;
+       const payload = jwt.decode(token) as { userId?: number; exp?: number } | null;
        const expiresAt = payload?.exp ? new Date(payload.exp * 1000) : new Date(Date.now() + 15 * 60 * 1000);
 
        const ttlSecs = Math.max(1, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
@@ -191,7 +191,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     // Revoke refresh token
-    const refreshToken = (request as any).cookies?.refresh_token;
+    const refreshToken = (request as unknown as { cookies?: { refresh_token?: string } }).cookies?.refresh_token;
     if (refreshToken) {
       const tokenHash = hashRefreshToken(refreshToken);
       await db.delete(refreshTokens).where(eq(refreshTokens.tokenHash, tokenHash));
@@ -216,7 +216,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     fastify.post("/refresh", { preHandler: [authRateLimit] }, async (request, reply) => {
-    const refreshToken = (request as any).cookies?.refresh_token;
+    const refreshToken = (request as unknown as { cookies?: { refresh_token?: string } }).cookies?.refresh_token;
     if (!refreshToken) {
       throw new AppError(401, "No refresh token provided");
     }
@@ -246,7 +246,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     fastify.patch("/me", { preHandler: [fastifyRequireAuth] }, async (request, _reply) => {
-    const { custom_instructions } = request.body as any;
+    const { custom_instructions } = request.body as { custom_instructions?: string };
     if (typeof custom_instructions !== "string") {
       throw new AppError(400, "custom_instructions must be a string");
     }
@@ -257,7 +257,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     fastify.post("/config", { preHandler: [fastifyRequireAuth, fastifyValidate(configSchema)] }, async (request, _reply) => {
-    const encrypted = encrypt(JSON.stringify((request.body as any).config));
+    const encrypted = encrypt(JSON.stringify((request.body as Record<string, string>).config));
 
     await db.insert(councilConfigs).values({
       userId: request.userId!,

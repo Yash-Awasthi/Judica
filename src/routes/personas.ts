@@ -34,7 +34,7 @@ const personasPlugin: FastifyPluginAsync = async (fastify) => {
     // POST / — create custom persona
   fastify.post("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const { name, systemPrompt, temperature, critiqueStyle, domain, aggressiveness } =
-      request.body as Record<string, any>;
+      request.body as { name?: string; systemPrompt?: string; temperature?: number; critiqueStyle?: string; domain?: string; aggressiveness?: number };
 
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       throw new AppError(400, "Name is required", "PERSONA_NAME_REQUIRED");
@@ -74,7 +74,7 @@ const personasPlugin: FastifyPluginAsync = async (fastify) => {
     if (!existing) throw new AppError(404, "Persona not found", "PERSONA_NOT_FOUND");
 
     const { name, systemPrompt, temperature, critiqueStyle, domain, aggressiveness } =
-      request.body as Record<string, any>;
+      request.body as { name?: string; systemPrompt?: string; temperature?: number; critiqueStyle?: string; domain?: string; aggressiveness?: number };
 
     const data: Record<string, unknown> = {};
     if (name !== undefined) data.name = name.trim();

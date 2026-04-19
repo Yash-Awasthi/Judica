@@ -13,7 +13,7 @@ import type { WorkflowExecutor } from "../workflow/executor.js";
  * Validate that a workflow definition has well-formed node and edge structures.
  * Throws AppError on malformed definitions to prevent runtime crashes.
  */
-function validateWorkflowDefinition(definition: any): void {
+function validateWorkflowDefinition(definition: Record<string, unknown>): void {
   const { nodes, edges } = definition;
 
   if (!Array.isArray(nodes) || !Array.isArray(edges)) {
@@ -101,8 +101,8 @@ if (_sweepInterval.unref) _sweepInterval.unref();
 const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
     // GET / — list user's workflows
   fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
-    const limit = Math.min(Math.max(Number((request.query as any).limit) || 20, 1), 100);
-    const offset = Math.max(Number((request.query as any).offset) || 0, 0);
+    const limit = Math.min(Math.max(Number((request.query as { limit?: string }).limit) || 20, 1), 100);
+    const offset = Math.max(Number((request.query as { offset?: string }).offset) || 0, 0);
 
     const whereClause = eq(workflows.userId, request.userId!);
 
@@ -125,7 +125,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
 
     // POST / — create workflow
   fastify.post("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
-    const { name, description, definition } = request.body as any;
+    const { name, description, definition } = request.body as { name?: string; description?: string; definition?: Record<string, unknown> };
 
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       throw new AppError(400, "Name is required", "WORKFLOW_NAME_REQUIRED");
@@ -185,7 +185,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
 
     if (!workflow) throw new AppError(404, "Workflow not found", "WORKFLOW_NOT_FOUND");
 
-    const { name, description, definition } = request.body as any;
+    const { name, description, definition } = request.body as { name?: string; description?: string; definition?: Record<string, unknown> };
 
     const data: Record<string, unknown> = { updatedAt: new Date() };
     if (name !== undefined) data.name = name.trim();
@@ -261,7 +261,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
 
     if (!workflow) throw new AppError(404, "Workflow not found", "WORKFLOW_NOT_FOUND");
 
-    const { inputs } = request.body as any;
+    const { inputs } = request.body as { inputs?: Record<string, unknown> };
 
     const [run] = await db
       .insert(workflowRuns)
@@ -276,7 +276,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
 
     // Import executor dynamically and start execution in background
     const { WorkflowExecutor: ExecutorClass } = await import("../workflow/executor.js");
-    const executor = new ExecutorClass(workflow.definition as any, run.id, request.userId!);
+    const executor = new ExecutorClass(workflow.definition as Record<string, unknown>, run.id, request.userId!);
 
     // Enforce bounded map size — evict oldest entry if at capacity
     if (activeRuns.size >= MAX_ACTIVE_RUNS) {
@@ -299,7 +299,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
           if (event.type === "workflow_complete") {
             await db
               .update(workflowRuns)
-              .set({ status: "done", outputs: (event.outputs as any) ?? {}, endedAt: new Date() })
+              .set({ status: "done", outputs: (event.outputs as Record<string, unknown>) ?? {}, endedAt: new Date() })
               .where(eq(workflowRuns.id, run.id));
           } else if (event.type === "workflow_error") {
             await db
@@ -439,7 +439,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
 
     if (!run) throw new AppError(404, "Workflow run not found", "WORKFLOW_RUN_NOT_FOUND");
 
-    const { choice, nodeId } = request.body as any;
+    const { choice, nodeId } = request.body as { choice?: string; nodeId?: string };
     if (!choice) throw new AppError(400, "Choice is required", "GATE_CHOICE_REQUIRED");
 
     const active = activeRuns.get(run.id);

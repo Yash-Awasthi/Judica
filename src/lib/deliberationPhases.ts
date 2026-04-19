@@ -6,13 +6,13 @@ import { groundingModule } from "./grounding.js";
 import { computeConsensus } from "./metrics.js";
 import { getFallbackProvider } from "../config/fallbacks.js";
 
-let scoreOpinions: any = null;
-async function lazyScoreOpinions(...args: any[]) {
+let scoreOpinions: typeof import('./scoring.js').scoreOpinions | null = null;
+async function lazyScoreOpinions(...args: Parameters<typeof import('./scoring.js').scoreOpinions>) {
   if (!scoreOpinions) {
     const mod = await import("./scoring.js");
     scoreOpinions = mod.scoreOpinions;
   }
-  return scoreOpinions(...args);
+  return scoreOpinions!(...args);
 }
 
 export interface OpinionResult {
@@ -270,8 +270,8 @@ Do not include any text outside the JSON object.`;
       opinion: o.opinion, 
       structured: o.structured!,
       isFallback: o.isFallback,
-      adversarial: (o as any).adversarial,
-      grounding: (o as any).grounding
+      adversarial: (o as unknown as { adversarial?: unknown }).adversarial,
+      grounding: (o as unknown as { grounding?: unknown }).grounding
     })),
     reviews,
     anonymizedLabels

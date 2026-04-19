@@ -11,7 +11,7 @@ const ALLOWED_LANGUAGES = new Set(["javascript", "python", "typescript"]);
 const rateBuckets = new Map<string, { count: number; resetAt: number }>();
 
 function sandboxRateLimiter(request: FastifyRequest, reply: FastifyReply, done: () => void) {
-  const key = `sandbox:${(request as any).userId || request.ip}`;
+  const key = `sandbox:${(request as unknown as { userId?: number }).userId || request.ip}`;
   const now = Date.now();
   let bucket = rateBuckets.get(key);
 
@@ -46,7 +46,7 @@ const sandboxPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(400, "Code must be a string under 50,000 characters", "SANDBOX_CODE_TOO_LONG");
     }
 
-    logger.info({ userId: (request as any).userId, language, codeLength: code.length }, "Sandbox execution requested");
+    logger.info({ userId: (request as unknown as { userId?: number }).userId, language, codeLength: code.length }, "Sandbox execution requested");
 
     let result;
 
@@ -65,7 +65,7 @@ const sandboxPlugin: FastifyPluginAsync = async (fastify) => {
         error: result.error,
         elapsed_ms: result.elapsedMs,
       };
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof AppError) throw err;
       logger.error({ err }, "Sandbox execution error");
       throw new AppError(500, `Execution failed: ${err.message}`, "SANDBOX_EXEC_FAILED");

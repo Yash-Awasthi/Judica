@@ -28,7 +28,7 @@ const realtimePlugin: FastifyPluginAsync = async (fastify) => {
             return;
           }
           try {
-            const payload = jwt.verify(msg.token, env.JWT_SECRET, { algorithms: ['HS256'] }) as any;
+            const payload = jwt.verify(msg.token, env.JWT_SECRET, { algorithms: ['HS256'] }) as { userId?: number; username?: string };
             const userId = payload.userId || payload.id || payload.sub;
             if (!userId) {
               ws.send(JSON.stringify({ event: 'error', data: { message: 'Invalid token: no userId' } }));

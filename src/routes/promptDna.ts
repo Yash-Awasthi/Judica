@@ -21,7 +21,7 @@ const promptDnaPlugin: FastifyPluginAsync = async (fastify) => {
     // POST / — create PromptDNA
   fastify.post("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const { name, systemPrompt, steeringRules, consensusBias, critiqueStyle } =
-      request.body as Record<string, any>;
+      request.body as { name?: string; systemPrompt?: string; steeringRules?: string; consensusBias?: string; critiqueStyle?: string };
 
     if (!name || typeof name !== "string") {
       throw new AppError(400, "Name is required", "DNA_NAME_REQUIRED");
@@ -60,7 +60,7 @@ const promptDnaPlugin: FastifyPluginAsync = async (fastify) => {
     if (!existing) throw new AppError(404, "PromptDNA not found", "DNA_NOT_FOUND");
 
     const { name, systemPrompt, steeringRules, consensusBias, critiqueStyle } =
-      request.body as Record<string, any>;
+      request.body as { name?: string; systemPrompt?: string; steeringRules?: string; consensusBias?: string; critiqueStyle?: string };
 
     const data: Record<string, unknown> = {};
     if (name !== undefined) data.name = name.trim();

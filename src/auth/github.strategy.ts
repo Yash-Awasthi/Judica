@@ -14,11 +14,11 @@ export function createGitHubStrategy() {
       callbackURL: `${env.OAUTH_CALLBACK_BASE_URL}/api/auth/github/callback`,
       scope: ["user:email"],
     },
-    async (_accessToken: string, _refreshToken: string, profile: any, done: any) => {
+    async (_accessToken: string, _refreshToken: string, profile: { username?: string; displayName?: string; emails?: Array<{ value?: string; verified?: boolean; primary?: boolean }> }, done: (error: Error | null, user?: Record<string, unknown>) => void) => {
       try {
         // SEC-7: Only accept verified emails from GitHub to prevent email spoofing
         // and cross-provider account collision attacks.
-        const emailObj = profile.emails?.find((e: any) => e.verified || e.primary);
+        const emailObj = profile.emails?.find((e) => e.verified || e.primary);
         if (!emailObj?.value) return done(new Error("No verified email from GitHub. Please make your email public in GitHub settings."));
         const email = emailObj.value;
 
@@ -47,7 +47,7 @@ export function createGitHubStrategy() {
 
         done(null, user);
       } catch (err) {
-        done(err);
+        done(err as Error);
       }
     }
   );

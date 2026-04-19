@@ -31,7 +31,7 @@ export abstract class BaseProvider {
     const fetchFn = async () => fetch(url, init);
     // Give the function a name for the breaker registry key
     Object.defineProperty(fetchFn, "name", { value: "fetch" });
-    const breaker = getBreaker({ name: this.name } as any, fetchFn);
+    const breaker = getBreaker({ name: this.name } as ProviderConfig, fetchFn);
     return await breaker.fire() as Response;
   }
 

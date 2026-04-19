@@ -13,8 +13,8 @@ import { executePython } from "../../sandbox/pythonSandbox.js";
 export async function executeUserSkill(
   userId: number | string,
   skillName: string,
-  inputs: Record<string, any>
-): Promise<any> {
+  inputs: Record<string, unknown>
+): Promise<unknown> {
   const numericUserId = typeof userId === "string" ? Number(userId) : userId;
   const [skill] = await db
     .select()
@@ -37,10 +37,10 @@ export async function executeUserSkill(
 
 function runSkillCode(
   code: string,
-  inputs: Record<string, any>,
+  inputs: Record<string, unknown>,
   userId: string | number,
   skillName: string
-): Promise<any> {
+): Promise<unknown> {
   // Build Python script: inject inputs as variables, then append skill code
   const inputLines = Object.entries(inputs)
     .map(([key, value]) => {
@@ -99,10 +99,10 @@ export function registerUserSkillsAsTools(): void {
         return JSON.stringify({ error: "User authentication required to execute skills" });
       }
 
-      let inputs: Record<string, any> = {};
+      let inputs: Record<string, unknown> = {};
       if (args.inputs) {
         try {
-          inputs = typeof args.inputs === "string" ? JSON.parse(args.inputs) : (args.inputs as Record<string, any>);
+          inputs = typeof args.inputs === "string" ? JSON.parse(args.inputs) : (args.inputs as Record<string, unknown>);
         } catch {
           return JSON.stringify({ error: "Invalid inputs JSON" });
         }

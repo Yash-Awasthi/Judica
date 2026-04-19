@@ -187,12 +187,12 @@ const uploadsPlugin: FastifyPluginAsync = async (fastify) => {
         .set({
           processed: true,
           extractedText: result.text || null,
-          metadata: (result.metadata || undefined) as any,
+          metadata: (result.metadata || undefined) as Record<string, unknown> | undefined,
         })
         .where(eq(uploads.id, record.id));
 
       return { success: true, extracted_text_length: result.text?.length || 0, type: result.type };
-    } catch (err: any) {
+    } catch (err: unknown) {
       logger.error({ err, uploadId: record.id }, "File processing failed");
       throw new AppError(500, `Processing failed: ${err.message}`, "PROCESSING_FAILED");
     }

@@ -1,6 +1,6 @@
 import { useState, useCallback, type FC } from 'react';
 import { ChatArea } from '../ChatArea';
-import type { ChatMessage, CouncilMember } from '../../types/index.js';
+import type { ChatMessage, CouncilMember, Opinion } from '../../types/index.js';
 import { EnhancedSearch } from '../EnhancedSearch';
 import { CostTracker } from '../CostTracker';
 import { AuditLogs } from '../AuditLogs';
@@ -74,7 +74,7 @@ export const MainTabs: FC<MainTabsProps> = ({ initialTab = 'ask' }) => {
       switch (event.type) {
         case 'member_chunk': {
           if (!currentMsg.opinions) currentMsg.opinions = [];
-          const opIndex = currentMsg.opinions.findIndex((o: any) => o.name === event.name);
+          const opIndex = currentMsg.opinions.findIndex((o: Opinion) => o.name === event.name);
           if (opIndex === -1) {
             currentMsg.opinions.push({ name: event.name, archetype: '', opinion: event.chunk });
           } else {
@@ -85,7 +85,7 @@ export const MainTabs: FC<MainTabsProps> = ({ initialTab = 'ask' }) => {
         }
         case 'opinion': {
           if (!currentMsg.opinions) currentMsg.opinions = [];
-          const existingOp = currentMsg.opinions.findIndex((o: any) => o.name === event.name);
+          const existingOp = currentMsg.opinions.findIndex((o: Opinion) => o.name === event.name);
           if (existingOp === -1) {
             currentMsg.opinions.push({ name: event.name, archetype: event.archetype, opinion: event.opinion });
           } else {

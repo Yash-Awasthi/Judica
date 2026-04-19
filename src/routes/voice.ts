@@ -34,7 +34,7 @@ const voicePlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(502, "Transcription failed", "STT_FAILED");
     }
 
-    const data = await response.json() as any;
+    const data = await response.json() as { text: string };
     return { text: data.text };
   });
 

@@ -55,7 +55,7 @@ function ArchetypeForm({
   saving: boolean;
 }) {
   const [form, setForm] = useState<CustomArchetype>(initial);
-  const set = (k: keyof CustomArchetype, v: any) => setForm((f) => ({ ...f, [k]: v }));
+  const set = (k: keyof CustomArchetype, v: CustomArchetype[keyof CustomArchetype]) => setForm((f) => ({ ...f, [k]: v }));
 
   const toggleTool = (tool: string) => {
     const current = form.tools || [];

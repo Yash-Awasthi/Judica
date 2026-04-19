@@ -39,7 +39,7 @@ const promptsPlugin: FastifyPluginAsync = async (fastify) => {
 
     // POST / — create prompt + first version
   fastify.post("/", { preHandler: fastifyRequireAuth }, async (request, reply) => {
-    const { name, description, content, model, temperature } = request.body as any;
+    const { name, description, content, model, temperature } = request.body as { name?: string; content?: string; description?: string; tags?: string[]; category?: string; isPublic?: boolean; model?: string; [key: string]: unknown };
 
     if (!name || typeof name !== "string" || name.trim().length === 0) {
       throw new AppError(400, "Name is required", "PROMPT_NAME_REQUIRED");
@@ -144,7 +144,7 @@ const promptsPlugin: FastifyPluginAsync = async (fastify) => {
 
     if (!prompt) throw new AppError(404, "Prompt not found", "PROMPT_NOT_FOUND");
 
-    const { content, model, temperature, notes } = request.body as any;
+    const { content, model, temperature, notes } = request.body as { name?: string; content?: string; description?: string; tags?: string[]; category?: string; isPublic?: boolean; model?: string; [key: string]: unknown };
     if (!content || typeof content !== "string" || content.trim().length === 0) {
       throw new AppError(400, "Content is required", "VERSION_CONTENT_REQUIRED");
     }
@@ -209,7 +209,7 @@ const promptsPlugin: FastifyPluginAsync = async (fastify) => {
 
     // POST /test — test a prompt against LLM
   fastify.post("/test", { preHandler: fastifyRequireAuth }, async (request, reply) => {
-    const { content, model, temperature, test_input } = request.body as any;
+    const { content, model, temperature, test_input } = request.body as { name?: string; content?: string; description?: string; tags?: string[]; category?: string; isPublic?: boolean; model?: string; [key: string]: unknown };
 
     if (!content || typeof content !== "string" || content.trim().length === 0) {
       throw new AppError(400, "Content is required", "TEST_CONTENT_REQUIRED");

@@ -2,8 +2,8 @@ import { motion } from "framer-motion";
 import { Terminal } from "lucide-react";
 
 interface AssetPublishFormProps {
-  pubType: any;
-  setPubType: (t: any) => void;
+  pubType: string;
+  setPubType: (t: string) => void;
   pubName: string;
   setPubName: (s: string) => void;
   pubDesc: string;

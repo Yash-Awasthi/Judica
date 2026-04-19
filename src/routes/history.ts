@@ -229,7 +229,7 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
       if (!conv) {
         throw new AppError(404, "Conversation not found");
       }
-      return (conv as any).summaryData || null;
+      return (conv as unknown as { summaryData?: unknown }).summaryData || null;
     } catch (err) {
       if (err instanceof AppError) throw err;
       logger.error({ err, id }, "Failed to fetch summary");

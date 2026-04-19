@@ -14,7 +14,7 @@ export interface ResearchStep {
   error?: string;
 }
 
-type EventEmitter = (event: string, data: any) => void;
+type EventEmitter = (event: string, data: unknown) => void;
 
 async function webSearch(query: string, maxResults: number = 5): Promise<{ title: string; url: string; content: string }[]> {
   // Use Tavily if available, otherwise SerpAPI
@@ -32,8 +32,8 @@ async function webSearch(query: string, maxResults: number = 5): Promise<{ title
         signal: AbortSignal.timeout(15000),
       });
       if (res.ok) {
-        const data = (await res.json()) as any;
-        return (data.results || []).map((r: any) => ({
+        const data = (await res.json()) as { results?: Array<{ title: string; url: string; content?: string }> };
+        return (data.results || []).map((r) => ({
           title: r.title || "",
           url: r.url || "",
           content: (r.content || "").slice(0, 2000),
@@ -59,8 +59,8 @@ async function webSearch(query: string, maxResults: number = 5): Promise<{ title
         signal: AbortSignal.timeout(15000),
       });
       if (res.ok) {
-        const data = (await res.json()) as any;
-        return (data.organic_results || []).slice(0, maxResults).map((r: any) => ({
+        const data = (await res.json()) as { organic_results?: Array<{ title: string; link: string; snippet?: string }> };
+        return (data.organic_results || []).slice(0, maxResults).map((r) => ({
           title: r.title || "",
           url: r.link || "",
           content: (r.snippet || "").slice(0, 2000),
@@ -209,7 +209,7 @@ Format with proper Markdown: headers, bullet points, bold for emphasis.`,
 
     emit?.("report_ready", { report });
     emit?.("done", { jobId });
-  } catch (err: any) {
+  } catch (err: unknown) {
     logger.error({ err, jobId }, "Research job failed");
     await db.update(researchJobs).set({ status: "failed" }).where(eq(researchJobs.id, jobId));
     emit?.("error", { message: err.message });

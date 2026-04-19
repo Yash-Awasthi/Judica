@@ -88,7 +88,7 @@ export async function linkConversationTopics(
       LIMIT 1
     `);
 
-    const topRow = (existing.rows as any[])[0];
+    const topRow = (existing.rows as Array<{ [key: string]: unknown }>)[0];
 
     if (topRow && topRow.similarity > 0.88) {
       // Merge with existing topic
@@ -182,7 +182,7 @@ export async function findRelatedConversations(
   // Aggregate by conversation
   const convMap = new Map<string, { topics: string[]; score: number }>();
 
-  for (const row of result.rows as any[]) {
+  for (const row of result.rows as Array<{ [key: string]: unknown }>) {
     if (row.score < 0.5) continue;
     const convIds: string[] = row.conversationIds || [];
     for (const convId of convIds) {
@@ -229,7 +229,7 @@ export async function getTopicGraph(userId: number): Promise<TopicGraph> {
 
   return {
     nodes: nodes as TopicNode[],
-    edges: (edges.rows as any[]).map((e) => ({
+    edges: (edges.rows as Array<{ [key: string]: unknown }>).map((e) => ({
       sourceTopicId: e.sourceTopicId,
       targetTopicId: e.targetTopicId,
       weight: e.weight,

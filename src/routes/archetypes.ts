@@ -38,7 +38,7 @@ const archetypesPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(401, "Authentication required for custom archetypes");
     }
 
-    const { archetypeId, ...archetypeData } = request.body as any;
+    const { archetypeId, ...archetypeData } = request.body as Record<string, unknown>;
 
     const validation = validateArchetype(archetypeData);
     if (!validation.valid) {
@@ -59,7 +59,7 @@ const archetypesPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(401, "Authentication required");
     }
 
-    const { id } = request.params as any;
+    const { id } = request.params as { id: string };
     await deleteUserArchetype(userId, id as string);
 
     return { message: "Archetype deleted successfully" };
@@ -71,7 +71,7 @@ const archetypesPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(401, "Authentication required");
     }
 
-    const { id } = request.params as any;
+    const { id } = request.params as { id: string };
     const isActive = await toggleArchetypeStatus(userId, id as string);
 
     return {
@@ -86,10 +86,10 @@ const archetypesPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(401, "Authentication required");
     }
 
-    const { id } = request.params as any;
+    const { id } = request.params as { id: string };
     const clonedData = cloneDefaultArchetype(id as string);
 
-    const customizations = request.body as any;
+    const customizations = request.body as Record<string, unknown>;
     const finalData = { ...clonedData, ...customizations };
 
     const validation = validateArchetype(finalData);
@@ -124,7 +124,7 @@ const archetypesPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(401, "Authentication required");
     }
 
-    const { jsonData } = request.body as any;
+    const { jsonData } = request.body as { jsonData?: string };
     if (!jsonData) {
       throw new AppError(400, "JSON data is required");
     }

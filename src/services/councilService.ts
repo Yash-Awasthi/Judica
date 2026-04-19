@@ -214,7 +214,7 @@ export function resolveMembersApiKeys(members: ApiKeyResolutionInput[]): Council
 export function composeCouncilFromUserConfig(
   userConfig?: Partial<UserCouncilConfig>
 ): CouncilComposition {
-  const validation = validateUserConfig((userConfig as any) ?? null);
+  const validation = validateUserConfig((userConfig as Record<string, unknown>) ?? null);
   if (!validation.valid) {
     throw new CouncilServiceError(
       "INVALID_CONFIG",

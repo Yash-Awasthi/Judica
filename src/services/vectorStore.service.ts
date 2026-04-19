@@ -46,7 +46,7 @@ export async function storeChunk(
     RETURNING "id"
   `);
 
-  return (result.rows[0] as any).id;
+  return (result.rows[0] as { id: string }).id;
 }
 
 // Vector similarity search using cosine distance
@@ -71,7 +71,7 @@ export async function searchSimilar(
   `);
 
   // Refresh lastAccessedAt for accessed memories (fire-and-forget)
-  const ids = (results.rows as any[]).map((r) => r.id);
+  const ids = (results.rows as Array<{ id: string }>).map((r) => r.id);
   if (ids.length > 0) {
     db.execute(sql`
       UPDATE "Memory"
@@ -184,7 +184,7 @@ export async function enrichWithParentContext(chunks: MemoryChunk[]): Promise<Me
   `);
 
   const parentIdMap = new Map<string, string>();
-  for (const row of parentInfo.rows as any[]) {
+  for (const row of parentInfo.rows as Array<{ [key: string]: unknown }>) {
     if (row.parentChunkId) {
       parentIdMap.set(row.id, row.parentChunkId);
     }
@@ -200,7 +200,7 @@ export async function enrichWithParentContext(chunks: MemoryChunk[]): Promise<Me
   `);
 
   const parentContentMap = new Map<string, string>();
-  for (const row of parents.rows as any[]) {
+  for (const row of parents.rows as Array<{ [key: string]: unknown }>) {
     parentContentMap.set(row.id, row.content);
   }
 
