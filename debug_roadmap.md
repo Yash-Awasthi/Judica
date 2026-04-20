@@ -2950,13 +2950,13 @@ TOTAL: 228 tasks
               before error can propagate; error is swallowed and test passes
               when it should fail.
 
-[ ] [P11-102] Error swallowing in ingestion pipeline â€” test for failed
+[x] [P11-102] Error swallowing in ingestion pipeline â€” test for failed
               ingestion doesn't verify the error is surfaced to the caller;
               silent swallow makes pipeline appear healthy on failure.
 
 ### livePresence.test.ts
 --------------------------------------------------------------------------------
-[ ] [P11-103] No real WebSocket protocol tests â€” presence tests use mocked
+[x] [P11-103] No real WebSocket protocol tests â€” presence tests use mocked
               WS connections; actual WebSocket handshake, ping/pong, and
               reconnect behavior never tested.
 
