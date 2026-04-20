@@ -2496,88 +2496,88 @@ TOTAL: 228 tasks
              chunks; billing correctness is completely untested. Add tests
              with known token counts and assert accumulated cost.
 
-[ ] [P11-03] Secret/decrypt path never tested â€” `decryptApiKey()` is mocked
+[x] [P11-03] Secret/decrypt path never tested â€” `decryptApiKey()` is mocked
              in every test; real decryption failures, wrong-key errors, and
              corrupted ciphertext never exercised. Add tests for decrypt
              success and failure paths.
 
-[ ] [P11-04] OpenAI-compatible adapter hides capability loss â€” tests treat
+[x] [P11-04] OpenAI-compatible adapter hides capability loss â€” tests treat
              all providers as OpenAI-compatible; provider-specific features
              (citations, safety ratings, function-call formats) never tested.
              Add per-provider capability test matrix.
 
 ### anthropic.test.ts
 --------------------------------------------------------------------------------
-[ ] [P11-05] Wrong SSE format in test fixtures â€” test SSE fixtures use
+[x] [P11-05] Wrong SSE format in test fixtures â€” test SSE fixtures use
              single `\n` separators instead of `\n\n`; real Anthropic stream
              uses `\n\n`. Tests pass against wrong format and will not catch
              parser regressions.
 
-[ ] [P11-06] Weak API key format validation â€” test only checks key is
+[x] [P11-06] Weak API key format validation â€” test only checks key is
              non-empty; does not verify `sk-ant-` prefix or minimum length.
              A misconfigured key passes validation silently.
 
-[ ] [P11-07] Malformed tool JSON silently accepted â€” test for tool-call
+[x] [P11-07] Malformed tool JSON silently accepted â€” test for tool-call
              response with invalid JSON in `arguments` field does not assert
              that an error is thrown or logged; malformed input passes through.
 
-[ ] [P11-08] No error SSE event tests â€” no test for SSE stream that
+[x] [P11-08] No error SSE event tests â€” no test for SSE stream that
              contains an `event: error` message mid-stream; error handling
              in the parser is untested.
 
-[ ] [P11-09] Hardcoded model list assertions â€” tests assert against a
+[x] [P11-09] Hardcoded model list assertions â€” tests assert against a
              fixed model list; adding or removing a model breaks tests for
              the wrong reason. Use snapshot or schema-based assertion.
 
 ### custom.test.ts
 --------------------------------------------------------------------------------
-[ ] [P11-10] Decrypt mocked â€” real secret validation never tested â€” all
+[x] [P11-10] Decrypt mocked â€” real secret validation never tested â€” all
              `decryptApiKey` calls mocked to return a fixed string; corrupt
              keys, wrong master key, and re-encrypted values never tested.
 
-[ ] [P11-11] No malformed auth config tests â€” tests don't cover: missing
+[x] [P11-11] No malformed auth config tests â€” tests don't cover: missing
              auth header config, both bearer and basic auth set simultaneously,
              auth config with empty credentials.
 
-[ ] [P11-12] No base URL validation tests â€” custom adapter accepts arbitrary
+[x] [P11-12] No base URL validation tests â€” custom adapter accepts arbitrary
              base URLs; tests don't verify that `file://`, `gopher://`, or
              internal IP URLs are rejected.
 
-[ ] [P11-13] No streaming format mismatch test â€” when a custom endpoint
+[x] [P11-13] No streaming format mismatch test â€” when a custom endpoint
              returns non-SSE content-type for a streaming request, behavior
              is untested; likely silent hang or parse error.
 
-[ ] [P11-14] Usage normalization fragile and untested â€” different custom
+[x] [P11-14] Usage normalization fragile and untested â€” different custom
              endpoints return usage in different field names (tokens_used vs
              usage.total_tokens); normalization logic has no dedicated tests.
 
-[ ] [P11-15] providerId not sanitized in tests â€” tests pass arbitrary strings
+[x] [P11-15] providerId not sanitized in tests â€” tests pass arbitrary strings
              as providerId without verifying sanitization; SQL/log injection
              via providerId untested.
 
-[ ] [P11-16] Tool-call capability untested for custom adapters â€” no test
+[x] [P11-16] Tool-call capability untested for custom adapters â€” no test
              verifies that tool definitions are forwarded to custom endpoints
              or that tool-call responses are parsed correctly.
 
 ### gemini.test.ts
 --------------------------------------------------------------------------------
-[ ] [P11-17] image_urlâ†’text degradation not tested as failure â€” test accepts
+[x] [P11-17] image_urlâ†’text degradation not tested as failure â€” test accepts
              silent image-to-text conversion; should assert that image content
              is preserved as image type, not downgraded.
 
-[ ] [P11-18] SSE-only streaming assumption â€” test only covers SSE streaming;
+[x] [P11-18] SSE-only streaming assumption â€” test only covers SSE streaming;
              Gemini also supports server-sent JSON (non-SSE) format which is
              untested and likely broken.
 
-[ ] [P11-19] Tool role fallback not tested â€” when Gemini returns a tool call
+[x] [P11-19] Tool role fallback not tested â€” when Gemini returns a tool call
              with an unexpected role field, fallback behavior is untested;
              likely maps to wrong role silently.
 
-[ ] [P11-20] No temperature/parameter clamping test â€” Gemini has strict
+[x] [P11-20] No temperature/parameter clamping test â€” Gemini has strict
              bounds on temperature (0â€“1) and top_p; no test verifies
              out-of-range values are clamped or rejected.
 
-[ ] [P11-21] No safety rating or finishReason tests â€” Gemini responses
+[x] [P11-21] No safety rating or finishReason tests â€” Gemini responses
              include safety ratings and finish_reason (STOP, SAFETY, etc.)
              that affect downstream behavior; none tested.
 
