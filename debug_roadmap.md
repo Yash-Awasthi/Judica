@@ -2760,26 +2760,26 @@ TOTAL: 228 tasks
              and navigates away; no assertion that workflow appears in the
              list or is persisted to the DB.
 
-[ ] [P11-62] No workflow execution test â€” test validates workflow creation
+[x] [P11-62] No workflow execution test â€” test validates workflow creation
              UI but never triggers execution; execution engine path entirely
              untested by E2E suite.
 
 ### Middleware Test Gaps (from pt7)
 --------------------------------------------------------------------------------
-[ ] [P11-63] JWT fully mocked â€” no real auth path tested â€” middleware tests
+[x] [P11-63] JWT fully mocked â€” no real auth path tested â€” middleware tests
              mock `jwt.verify()` to return a fixed payload; real JWT
              signature verification, expiry, and claim validation never
              exercised.
 
-[ ] [P11-64] Redis and DB fully mocked in middleware tests â€” no integration
+[x] [P11-64] Redis and DB fully mocked in middleware tests â€” no integration
              test verifies that rate limiting, session revocation, or quota
              checks work against real Redis/DB state.
 
-[ ] [P11-65] CSP nonce is a constant in tests â€” nonce middleware tested
+[x] [P11-65] CSP nonce is a constant in tests â€” nonce middleware tested
              with a fixed string; no test verifies that a new random nonce
              is generated per request, or that entropy is sufficient.
 
-[ ] [P11-66] Error handler tested with fake error objects â€” error handler
+[x] [P11-66] Error handler tested with fake error objects â€” error handler
              tests pass plain objects `{message: "..."}` instead of real
              Error instances; `instanceof Error` checks and stack traces
              never tested.
