@@ -2716,47 +2716,47 @@ TOTAL: 228 tasks
              `if (await btn.isVisible()) btn.click()` pattern; test passes
              whether or not the button was actually clicked.
 
-[ ] [P11-52] DB pollution via Date.now() usernames â€” test users created
+[x] [P11-52] DB pollution via Date.now() usernames â€” test users created
              with `user_${Date.now()}` names accumulate in the DB across
              runs; no cleanup causes eventual unique constraint violations.
 
-[ ] [P11-53] No assertion on real error message text â€” error cases assert
+[x] [P11-53] No assertion on real error message text â€” error cases assert
              that "some error" is visible but not the specific message;
              wrong error messages pass the test.
 
-[ ] [P11-54] No backend DB verification after auth actions â€” after login,
+[x] [P11-54] No backend DB verification after auth actions â€” after login,
              logout, and registration, no test checks the DB to verify
              sessions were created/destroyed correctly.
 
 ### deliberation.spec.ts
 --------------------------------------------------------------------------------
-[ ] [P11-55] Hardcoded credentials in E2E test â€” test uses hardcoded
+[x] [P11-55] Hardcoded credentials in E2E test â€” test uses hardcoded
              username/password strings in source; if credentials change,
              test fails silently or exposes credentials in logs.
 
-[ ] [P11-56] No validation of deliberation output â€” test asserts that
+[x] [P11-56] No validation of deliberation output â€” test asserts that
              "some response appeared" but doesn't validate response
              structure, archetype attribution, or confidence scores.
 
-[ ] [P11-57] Real LLM dependency makes test non-deterministic â€” outputs
+[x] [P11-57] Real LLM dependency makes test non-deterministic â€” outputs
              vary per run; flaky assertions based on response content.
 
-[ ] [P11-58] Weak streaming selectors â€” streaming text validated by checking
+[x] [P11-58] Weak streaming selectors â€” streaming text validated by checking
              if a container is non-empty; partial renders and empty error
              states both pass.
 
 ### marketplace.spec.ts
 --------------------------------------------------------------------------------
-[ ] [P11-59] Test is entirely conditional â€” entire test body inside
+[x] [P11-59] Test is entirely conditional â€” entire test body inside
              `if (items.length > 0)` check; when marketplace is empty (e.g.,
              fresh DB), zero assertions run and test passes vacuously.
 
-[ ] [P11-60] No data assertions â€” test checks that items render but doesn't
+[x] [P11-60] No data assertions â€” test checks that items render but doesn't
              assert item count, correct titles, prices, or author attribution.
 
 ### workflow.spec.ts (additional)
 --------------------------------------------------------------------------------
-[ ] [P11-61] No workflow save/persist verification â€” test creates a workflow
+[x] [P11-61] No workflow save/persist verification â€” test creates a workflow
              and navigates away; no assertion that workflow appears in the
              list or is persisted to the DB.
 
