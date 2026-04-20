@@ -111,7 +111,7 @@ vi.mock("../../src/middleware/errorHandler.js", () => ({
   },
 }));
 
-vi.mock("../../src/services/conversationService.js", () => ({
+vi.mock("../../src/services/conversation.service.js", () => ({
   getConversationList: vi.fn().mockResolvedValue({ conversations: [], total: 0 }),
   deleteConversation: vi.fn(),
   updateConversationTitle: vi.fn(),

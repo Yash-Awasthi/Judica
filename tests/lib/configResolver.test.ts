@@ -7,7 +7,7 @@ import {
   composeCouncil 
 } from "../../src/lib/configResolver.js";
 import { env } from "../../src/config/env.js";
-import { CouncilServiceError } from "../../src/services/councilService.js";
+import { CouncilServiceError } from "../../src/services/council.service.js";
 
 vi.mock("../../src/config/env.js", () => ({
   env: {

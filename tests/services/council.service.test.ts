@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { getDefaultMembers, getDefaultMaster, resolveApiKey, resolveMembersApiKeys, composeCouncilFromUserConfig, prepareCouncilMembers, CouncilServiceError } from "../../src/services/councilService.js";
+import { getDefaultMembers, getDefaultMaster, resolveApiKey, resolveMembersApiKeys, composeCouncilFromUserConfig, prepareCouncilMembers, CouncilServiceError } from "../../src/services/council.service.js";
 import { env } from "../../src/config/env.js";
 import * as libConfig from "../../src/lib/configResolver.js";
 

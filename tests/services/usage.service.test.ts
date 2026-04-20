@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { updateDailyUsage, getDailyUsage, getUsageStats } from "../../src/services/usageService.js";
+import { updateDailyUsage, getDailyUsage, getUsageStats } from "../../src/services/usage.service.js";
 import { db } from "../../src/lib/drizzle.js";
 import { dailyUsage } from "../../src/db/schema/users.js";
 

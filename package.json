@@ -17,7 +17,7 @@
     "format": "prettier --write 'src/**/*.ts'",
     "format:check": "prettier --check 'src/**/*.ts'",
     "test": "vitest run",
-    "test:ci": "vitest run --reporter=verbose --bail=5",
+    "test:ci": "vitest run --reporter=verbose",
     "test:watch": "vitest",
     "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
@@ -50,7 +50,7 @@
   "packageManager": "npm@10.9.2",
   "description": "A production-grade multi-model AI orchestration engine with agentic tools and semantic caching.",
   "_dependencyNotes": {
-    "redis+ioredis": "Both Redis clients are required: 'redis' is used by src/lib/redis.ts for general caching/pub-sub, 'ioredis' is required by BullMQ (src/queue/connection.ts) and rate-limit state (src/middleware/rateLimit.ts)."
+    "ioredis": "Unified Redis client for all operations: general caching (src/lib/redis.ts), BullMQ queues (src/queue/connection.ts), and rate-limit state (src/middleware/rateLimit.ts)."
   },
   "dependencies": {
     "@fastify/compress": "^8.0.2",
@@ -83,7 +83,6 @@
     "pg": "8.20.0",
     "pino": "10.3.1",
     "prom-client": "^15.1.0",
-    "redis": "5.11.0",
     "ws": "^8.20.0",
     "zod": "4.3.6"
   },

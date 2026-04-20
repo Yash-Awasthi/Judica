@@ -19,7 +19,7 @@ import {
   CouncilComposition
 } from "../types/userConfig.js";
 import { env } from "../config/env.js";
-import { CouncilServiceError } from "../services/councilService.js";
+import { CouncilServiceError } from "../services/council.service.js";
 
 export function validateUserConfig(
   config: UserCouncilConfig | null
