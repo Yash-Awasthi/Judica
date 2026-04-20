@@ -2583,69 +2583,69 @@ TOTAL: 228 tasks
 
 ### groq.test.ts
 --------------------------------------------------------------------------------
-[ ] [P11-22] No Groq-specific feature tests â€” test is a copy of OpenAI test
+[x] [P11-22] No Groq-specific feature tests â€” test is a copy of OpenAI test
              with provider name swapped; Groq-specific behaviors (speed SLA,
              model availability, 429 format) never tested.
 
-[ ] [P11-23] No 429 rate-limit retry test â€” Groq has aggressive rate limits;
+[x] [P11-23] No 429 rate-limit retry test â€” Groq has aggressive rate limits;
              no test verifies that a 429 response triggers correct retry with
              backoff.
 
-[ ] [P11-24] Weak schema validation in tests â€” response schema assertions
+[x] [P11-24] Weak schema validation in tests â€” response schema assertions
              use loose checks (`toBeDefined()` instead of exact shape);
              structural regressions pass undetected.
 
 ### ollama.test.ts
 --------------------------------------------------------------------------------
-[ ] [P11-25] SSRF localhost bypass tested as valid â€” test explicitly passes
+[x] [P11-25] SSRF localhost bypass tested as valid â€” test explicitly passes
              `http://localhost:11434` and asserts it succeeds; this should
              be a negative test asserting rejection, not acceptance.
 
-[ ] [P11-26] Tool role mapped to "user" â€” test accepts tool-call response
+[x] [P11-26] Tool role mapped to "user" â€” test accepts tool-call response
              with role "user" when it should be "tool"; semantic corruption
              silently accepted.
 
-[ ] [P11-27] No auth header tests â€” Ollama supports Bearer token auth for
+[x] [P11-27] No auth header tests â€” Ollama supports Bearer token auth for
              protected instances; no test covers authenticated Ollama requests.
 
-[ ] [P11-28] NDJSON fragmentation not tested â€” Ollama streams NDJSON
+[x] [P11-28] NDJSON fragmentation not tested â€” Ollama streams NDJSON
              (one JSON object per line); tests use complete single-line
              responses; split-line responses (partial JSON across chunks)
              never tested.
 
-[ ] [P11-29] Tool call support missing in tests â€” Ollama supports tool
+[x] [P11-29] Tool call support missing in tests â€” Ollama supports tool
              calls since v0.3; no test verifies tool definitions are sent
              or responses parsed.
 
 ### openai.test.ts
 --------------------------------------------------------------------------------
-[ ] [P11-30] Tool-call parse errors hidden in tests â€” test for malformed
+[x] [P11-30] Tool-call parse errors hidden in tests â€” test for malformed
              `arguments` JSON in tool call does not assert that error is
              propagated; silently discards parse failure.
 
-[ ] [P11-31] Unknown content block coerced to text â€” test accepts silent
+[x] [P11-31] Unknown content block coerced to text â€” test accepts silent
              coercion of unrecognized content block types to text strings;
              should assert unsupported types throw or are skipped explicitly.
 
-[ ] [P11-32] Cost accumulation not tested end-to-end â€” usage fields from
+[x] [P11-32] Cost accumulation not tested end-to-end â€” usage fields from
              stream chunks are mocked; no test accumulates usage from a
              multi-chunk stream and asserts final cost.
 
-[ ] [P11-33] No function-call-only response test â€” responses containing
+[x] [P11-33] No function-call-only response test â€” responses containing
              only tool calls (no text content) not tested; likely fails or
              returns empty string.
 
-[ ] [P11-34] Provider ID ambiguity â€” test uses "openai" and "openai-compat"
+[x] [P11-34] Provider ID ambiguity â€” test uses "openai" and "openai-compat"
              interchangeably; no test verifies routing behavior differs
              between them.
 
-[ ] [P11-35] No reasoning/thinking token tracking test â€” o1/o3 models
+[x] [P11-35] No reasoning/thinking token tracking test â€” o1/o3 models
              return reasoning_tokens in usage; no test verifies these are
              tracked separately.
 
 ### openrouter.test.ts
 --------------------------------------------------------------------------------
-[ ] [P11-36] Multimodal content lost in tests â€” test passes image_url in
+[x] [P11-36] Multimodal content lost in tests â€” test passes image_url in
              message content and does not assert it reaches the API; likely
              JSON.stringify flattens it silently.
 
