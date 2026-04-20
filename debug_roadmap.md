@@ -2926,27 +2926,27 @@ TOTAL: 228 tasks
 
 ### goalDecomposition.test.ts
 --------------------------------------------------------------------------------
-[ ] [P11-97] LLM output parsing fragile and untested for variations â€”
+[x] [P11-97] LLM output parsing fragile and untested for variations â€”
              test uses a single well-formed LLM response; malformed JSON,
              missing required fields, and extra unknown fields not tested.
 
-[ ] [P11-98] No large DAG test â€” goal decomposition with many sub-goals
+[x] [P11-98] No large DAG test â€” goal decomposition with many sub-goals
              (20+) not tested; cycle detection and performance at scale
              untested.
 
 ### imageAware.test.ts
 --------------------------------------------------------------------------------
-[ ] [P11-99] Filename-based image detection only â€” test verifies image
+[x] [P11-99] Filename-based image detection only â€” test verifies image
              detection by filename extension (.jpg, .png); no test inspects
              actual byte content (magic bytes) to confirm format.
 
-[ ] [P11-100] No base64 validation â€” test passes base64 image strings
+[x] [P11-100] No base64 validation â€” test passes base64 image strings
               without verifying the decode is valid; truncated or corrupted
               base64 silently accepted.
 
 ### ingestion.test.ts
 --------------------------------------------------------------------------------
-[ ] [P11-101] Timer masking hides async errors â€” fake timers advance clock
+[x] [P11-101] Timer masking hides async errors â€” fake timers advance clock
               before error can propagate; error is swallowed and test passes
               when it should fail.
 
