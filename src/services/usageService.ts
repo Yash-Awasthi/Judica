@@ -16,6 +16,9 @@ export interface UsageUpdateInput {
   isCacheHit: boolean;
 }
 
+// P0-42: Only bill tokens after successful completion.
+// Request count is already incremented atomically in fastifyCheckQuota (P0-41).
+// This function now ONLY updates token usage — never double-counts requests.
 export async function updateDailyUsage(input: UsageUpdateInput): Promise<void> {
   const { userId, tokensUsed, isCacheHit } = input;
 
@@ -28,13 +31,12 @@ export async function updateDailyUsage(input: UsageUpdateInput): Promise<void> {
         userId,
         date: today,
         tokens: tokensUsed,
-        requests: 1,
+        requests: 0,
         updatedAt: new Date(),
       }).onConflictDoUpdate({
         target: [dailyUsage.userId, dailyUsage.date],
         set: {
           tokens: sql`${dailyUsage.tokens} + ${tokensUsed}`,
-          requests: sql`${dailyUsage.requests} + 1`,
           updatedAt: new Date(),
         },
       });

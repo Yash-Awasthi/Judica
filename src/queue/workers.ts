@@ -1,12 +1,14 @@
 import { Worker, Job } from "bullmq";
 import connection from "./connection.js";
-import { deadLetterQueue } from "./queues.js";
+import { deadLetterQueue, ingestionQueue, researchQueue, repoQueue, compactionQueue } from "./queues.js";
 import logger from "../lib/logger.js";
+import { queueJobLag, queueWaitingJobs, queueActiveJobs } from "../lib/prometheusMetrics.js";
 
 let ingestionWorker: Worker;
 let repoWorker: Worker;
 let compactionWorker: Worker;
 let researchWorker: Worker;
+let autoscaleInterval: ReturnType<typeof setInterval>;
 
 /**
  * Move a permanently failed job to the dead-letter queue for manual inspection.
@@ -101,12 +103,41 @@ export function startWorkers() {
     worker.on("completed", (job) => {
       logger.info({ jobId: job?.id, queue: worker.name }, "Worker job completed");
     });
+
+    // P4-16: Track job lag (time spent waiting in queue before pickup)
+    worker.on("active", (job) => {
+      if (job?.processedOn && job?.timestamp) {
+        const lagMs = job.processedOn - job.timestamp;
+        queueJobLag.observe({ queue: worker.name }, lagMs / 1000);
+      }
+    });
   }
+
+  // P4-16: Periodically scrape queue depths for autoscaling signals
+  autoscaleInterval = setInterval(async () => {
+    const queues = [
+      { name: "ingestion", q: ingestionQueue },
+      { name: "repo-ingestion", q: repoQueue },
+      { name: "research", q: researchQueue },
+      { name: "compaction", q: compactionQueue },
+    ];
+    for (const { name, q } of queues) {
+      try {
+        const waiting = await q.getWaitingCount();
+        const active = await q.getActiveCount();
+        queueWaitingJobs.set({ queue: name }, waiting);
+        queueActiveJobs.set({ queue: name }, active);
+      } catch {
+        // best-effort metrics
+      }
+    }
+  }, 15_000); // every 15s
 
   logger.info("BullMQ workers started (ingestion, repo, research, compaction)");
 }
 
 export async function stopWorkers() {
+  if (autoscaleInterval) clearInterval(autoscaleInterval);
   const workers = [ingestionWorker, repoWorker, researchWorker, compactionWorker].filter(Boolean);
   await Promise.all(workers.map((w) => w.close()));
   logger.info("BullMQ workers stopped");

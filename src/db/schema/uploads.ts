@@ -26,7 +26,7 @@ export const uploads = pgTable(
     processed: boolean("processed").default(false).notNull(),
     extractedText: text("extractedText"),
     metadata: jsonb("metadata"),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("Upload_userId_createdAt_idx").on(table.userId, table.createdAt),
@@ -43,8 +43,8 @@ export const knowledgeBases = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     description: text("description"),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt", { mode: "date" }).notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull(),
   },
   (table) => [
     uniqueIndex("KnowledgeBase_userId_name_key").on(table.userId, table.name),
@@ -65,8 +65,8 @@ export const kbDocuments = pgTable(
     filename: text("filename").notNull(),
     chunkCount: integer("chunkCount").default(0).notNull(),
     indexed: boolean("indexed").default(false).notNull(),
-    indexedAt: timestamp("indexedAt", { mode: "date" }),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+    indexedAt: timestamp("indexedAt", { mode: "date", withTimezone: true }),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("KBDocument_kbId_idx").on(table.kbId),

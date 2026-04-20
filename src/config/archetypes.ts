@@ -34,6 +34,10 @@ export interface Archetype {
   colorBg?: string;
 }
 
+// P7-43: Tool assignment policy:
+// - Archetypes that need external data get ["web_search", "read_webpage"]
+// - Archetypes that need computation get ["execute_code"]
+// - Pure reasoning archetypes get no tools (they synthesize from other agents' findings)
 export const ARCHETYPES: Record<string, Archetype> = {
   architect: {
     id: "architect",
@@ -197,16 +201,19 @@ Be precise, clinical, and merciless. Do not soften criticism. The council is str
   }
 };
 
+// P7-42: SUMMONS defines priority-ordered subsets per task type.
+// Only the first 5 archetypes are summoned by default (configurable via council size).
+// Previously all 13+ were listed making filtering a no-op.
 export const SUMMONS: Record<string, string[]> = {
-  debate:    ["contrarian", "strategist", "ethicist", "historian", "outsider", "architect", "pragmatist", "empiricist", "creator", "minimalist", "futurist", "empath", "devils_advocate"],
-  research:  ["empiricist", "historian", "outsider", "ethicist", "architect", "strategist", "pragmatist", "minimalist", "futurist", "contrarian", "creator", "empath", "devils_advocate"],
-  business:  ["strategist", "pragmatist", "ethicist", "futurist", "contrarian", "architect", "minimalist", "empiricist", "creator", "historian", "empath", "outsider", "devils_advocate"],
-  technical: ["architect", "minimalist", "empiricist", "outsider", "strategist", "pragmatist", "contrarian", "creator", "futurist", "ethicist", "historian", "empath", "devils_advocate"],
-  personal:  ["empath", "contrarian", "futurist", "pragmatist", "ethicist", "minimalist", "outsider", "creator", "historian", "architect", "strategist", "empiricist", "devils_advocate"],
-  creative:  ["creator", "outsider", "historian", "minimalist", "architect", "futurist", "contrarian", "empath", "ethicist", "pragmatist", "strategist", "empiricist", "devils_advocate"],
-  ethical:   ["ethicist", "contrarian", "empiricist", "empath", "historian", "futurist", "outsider", "creator", "minimalist", "architect", "strategist", "pragmatist", "devils_advocate"],
-  strategy:  ["strategist", "historian", "futurist", "contrarian", "pragmatist", "architect", "ethicist", "empiricist", "outsider", "creator", "minimalist", "empath", "devils_advocate"],
-  default:   ["pragmatist", "strategist", "architect", "contrarian", "minimalist", "empiricist", "futurist", "ethicist", "historian", "empath", "outsider", "creator", "devils_advocate"]
+  debate:    ["contrarian", "strategist", "ethicist", "historian", "outsider"],
+  research:  ["empiricist", "historian", "outsider", "ethicist", "architect"],
+  business:  ["strategist", "pragmatist", "ethicist", "futurist", "contrarian"],
+  technical: ["architect", "minimalist", "empiricist", "outsider", "strategist"],
+  personal:  ["empath", "contrarian", "futurist", "pragmatist", "ethicist"],
+  creative:  ["creator", "outsider", "historian", "minimalist", "architect"],
+  ethical:   ["ethicist", "contrarian", "empiricist", "empath", "historian"],
+  strategy:  ["strategist", "historian", "futurist", "contrarian", "pragmatist"],
+  default:   ["pragmatist", "strategist", "architect", "contrarian", "minimalist"]
 };
 
 export interface CouncilTemplate {
@@ -260,3 +267,33 @@ export const COUNCIL_TEMPLATES: Record<string, CouncilTemplate> = {
 };
 
 export const UNIVERSAL_PROMPT = "You are a highly capable, balanced AI assistant. Provide a direct, factual, and comprehensive answer without any specific persona bias.";
+
+// P4-04: Zod validation for archetypes config at module load time
+import { z } from "zod";
+
+const archetypeSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  thinkingStyle: z.string(),
+  asks: z.string(),
+  blindSpot: z.string(),
+  systemPrompt: z.string().min(1),
+  tools: z.array(z.string()).optional(),
+  icon: z.string().optional(),
+  colorBg: z.string().optional(),
+});
+
+const archetypesMapSchema = z.record(z.string(), archetypeSchema);
+const summonsMapSchema = z.record(z.string(), z.array(z.string()));
+const templateSchema = z.object({
+  id: z.string().min(1),
+  name: z.string().min(1),
+  masterPrompt: z.string().min(1),
+  memberPrompts: z.array(z.string()),
+});
+const templatesMapSchema = z.record(z.string(), templateSchema);
+
+// Validate at module load — throws at startup if config is malformed
+archetypesMapSchema.parse(ARCHETYPES);
+summonsMapSchema.parse(SUMMONS);
+templatesMapSchema.parse(COUNCIL_TEMPLATES);

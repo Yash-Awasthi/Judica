@@ -58,7 +58,7 @@ vi.mock("../../src/lib/logger.js", () => ({
   },
 }));
 
-vi.mock("../../src/lib/archetypes.js", () => ({
+vi.mock("../../src/lib/archetypeManager.js", () => ({
   getUserArchetypes: vi.fn().mockResolvedValue([
     { id: "custom-1", name: "Custom Archetype", thinkingStyle: "analytical" },
   ]),

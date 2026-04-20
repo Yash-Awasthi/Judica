@@ -9,6 +9,33 @@ import { routeAndCollect } from "../router/index.js";
 import logger from "./logger.js";
 import type { Provider } from "./providers.js";
 
+// P10-75: Configurable max reasoning output length
+const MAX_REASONING_LENGTH = parseInt(process.env.MAX_REASONING_OUTPUT_CHARS || "10000", 10);
+
+// P10-78: Track reasoning mode costs for billing
+let _lastReasoningUsage = { promptTokens: 0, completionTokens: 0 };
+
+/** P10-78: Get accumulated usage from last reasoning mode run for billing */
+export function getLastReasoningUsage() {
+  return { ..._lastReasoningUsage };
+}
+
+function trackUsage(usage: { prompt_tokens: number; completion_tokens: number }) {
+  _lastReasoningUsage.promptTokens += usage.prompt_tokens;
+  _lastReasoningUsage.completionTokens += usage.completion_tokens;
+}
+
+function resetUsageTracking() {
+  _lastReasoningUsage = { promptTokens: 0, completionTokens: 0 };
+}
+
+// P10-75: Truncate with warning indicator
+function safeTruncate(text: string, label: string): string {
+  if (text.length <= MAX_REASONING_LENGTH) return text;
+  logger.warn({ label, originalLength: text.length, maxLength: MAX_REASONING_LENGTH }, "Reasoning output truncated");
+  return text.slice(0, MAX_REASONING_LENGTH) + "\n\n[⚠️ OUTPUT TRUNCATED — original was " + text.length + " chars]";
+}
+
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 export type ReasoningMode =
@@ -33,15 +60,20 @@ export interface ModeEvent {
  */
 export async function runSocraticPrelude(
   question: string,
-  members: Provider[]
+  members: Provider[],
+  abortSignal?: AbortSignal // P10-76: Accept abort signal
 ): Promise<{ augmentedContext: string; qa: { q: string; a: string }[] }> {
+  resetUsageTracking(); // P10-78: Reset usage tracking for this run
   logger.info({ memberCount: members.length }, "Socratic prelude: collecting clarifying questions");
 
   // Each agent generates up to 2 clarifying questions
   const questionPromises = members.slice(0, 6).map(async (m) => {
     try {
+      // P10-76: Check abort before each call
+      if (abortSignal?.aborted) return [];
+
       const res = await routeAndCollect({
-        model: "auto",
+        model: m.model || "auto", // P10-72: Respect provider model config
         messages: [
           {
             role: "system",
@@ -51,9 +83,16 @@ export async function runSocraticPrelude(
         ],
         temperature: 0.3,
       });
+      // P10-73: Use JSON.parse with proper error handling instead of fragile string splitting
       const match = res.text.match(/\[[\s\S]*?\]/);
       if (!match) return [];
-      return (JSON.parse(match[0]) as string[]).slice(0, 2);
+      try {
+        const parsed = JSON.parse(match[0]);
+        if (!Array.isArray(parsed)) return [];
+        return (parsed as string[]).filter(q => typeof q === 'string' && q.length > 0).slice(0, 2);
+      } catch {
+        return [];
+      }
     } catch {
       return [];
     }
@@ -109,17 +148,37 @@ export interface RedBlueResult {
  */
 export async function runRedBlueDebate(
   question: string,
-  members: Provider[]
+  members: Provider[],
+  abortSignal?: AbortSignal // P10-76: Accept abort signal
 ): Promise<RedBlueResult> {
+  // P10-74: Reject debate mode for single-archetype councils
+  if (members.length < 2) {
+    logger.warn("Red/Blue debate requires at least 2 members — falling back to single-agent response");
+    const res = await routeAndCollect({
+      model: members[0]?.model || "auto",
+      messages: [
+        { role: "system", content: members[0]?.systemPrompt || "Provide a balanced analysis of both sides." },
+        { role: "user", content: question },
+      ],
+      temperature: 0.5,
+    });
+    return { redArguments: "", blueArguments: "", judgeVerdict: res.text };
+  }
+
   const mid = Math.floor(members.length / 2);
   const redTeam = members.slice(0, Math.max(1, mid));
   const blueTeam = members.slice(mid);
 
   logger.info({ red: redTeam.length, blue: blueTeam.length }, "Red/Blue debate starting");
 
+  // P10-76: Check abort signal
+  if (abortSignal?.aborted) {
+    return { redArguments: "", blueArguments: "", judgeVerdict: "Debate cancelled." };
+  }
+
   const [redRes, blueRes] = await Promise.all([
     routeAndCollect({
-      model: "auto",
+      model: redTeam[0]?.model || "auto", // P10-72: Use provider model
       messages: [
         {
           role: "system",
@@ -133,7 +192,7 @@ export async function runRedBlueDebate(
       temperature: 0.6,
     }),
     routeAndCollect({
-      model: "auto",
+      model: blueTeam[0]?.model || "auto", // P10-72: Use provider model
       messages: [
         {
           role: "system",
@@ -172,9 +231,9 @@ export async function runRedBlueDebate(
   logger.info("Red/Blue debate complete");
 
   return {
-    redArguments: redRes.text,
-    blueArguments: blueRes.text,
-    judgeVerdict: judgeRes.text,
+    redArguments: safeTruncate(redRes.text, "red_team"),
+    blueArguments: safeTruncate(blueRes.text, "blue_team"),
+    judgeVerdict: safeTruncate(judgeRes.text, "judge_verdict"),
   };
 }
 
@@ -200,7 +259,7 @@ export interface HypothesisResult {
  */
 export async function runHypothesisRefinement(
   question: string,
-  members: Provider[]
+  members: Provider[], abortSignal?: AbortSignal
 ): Promise<HypothesisResult> {
   const agents = members.slice(0, 5); // cap for token budget
   const rounds: HypothesisRound[] = [];
@@ -289,7 +348,7 @@ export async function runHypothesisRefinement(
 
   logger.info({ rounds: rounds.length }, "Hypothesis refinement complete");
 
-  return { rounds, finalSynthesis: synthRes.text };
+  return { rounds, finalSynthesis: safeTruncate(synthRes.text, "hypothesis_synthesis") };
 }
 
 // ─── Confidence Calibration ───────────────────────────────────────────────────
@@ -390,5 +449,5 @@ export async function runConfidenceCalibration(
 
   logger.info({ agents: opinionResults.length }, "Confidence calibration complete");
 
-  return { opinions: opinionResults, weightedSynthesis: synthRes.text };
+  return { opinions: opinionResults, weightedSynthesis: safeTruncate(synthRes.text, "confidence_synthesis") };
 }

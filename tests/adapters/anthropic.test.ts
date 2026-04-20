@@ -101,7 +101,7 @@ describe("AnthropicAdapter", () => {
 
       expect(url).toBe("https://api.anthropic.com/v1/messages");
       expect(options.headers["x-api-key"]).toBe(mockApiKey);
-      expect(options.headers["anthropic-version"]).toBe("2023-06-01");
+      expect(options.headers["anthropic-version"]).toBe("2023-10-01");
       expect(options.headers["Content-Type"]).toBe("application/json");
       expect(options.method).toBe("POST");
     });

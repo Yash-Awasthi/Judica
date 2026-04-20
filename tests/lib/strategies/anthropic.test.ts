@@ -50,7 +50,7 @@ describe("Anthropic Strategy", () => {
 
       const options = fetchCall[1];
       expect(options.headers["x-api-key"]).toBe("sk-ant-test-key");
-      expect(options.headers["anthropic-version"]).toBe("2023-06-01");
+      expect(options.headers["anthropic-version"]).toBe("2023-10-01");
       expect(options.headers["Content-Type"]).toBe("application/json");
       expect(options.method).toBe("POST");
     });

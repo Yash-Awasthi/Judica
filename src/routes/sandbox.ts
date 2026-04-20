@@ -4,29 +4,65 @@ import { AppError } from "../middleware/errorHandler.js";
 import { executeJS } from "../sandbox/jsSandbox.js";
 import { executePython } from "../sandbox/pythonSandbox.js";
 import logger from "../lib/logger.js";
+import redis from "../lib/redis.js";
 
+// P4-05: Per-route rate limit is enforced below (1 exec/min for sandbox via custom limiter).
+// The sandbox has a much tighter rate limit (10/min) compared to the global 120/min.
 const ALLOWED_LANGUAGES = new Set(["javascript", "python", "typescript"]);
+const MAX_EXECUTIONS_PER_MINUTE = 10;
+const MAX_CONCURRENT_PER_USER = 3; // P1-22: cap concurrent sandbox executions
 
-// In-memory rate limiter: 10 executions per user per minute
-const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+// P1-22: Track in-flight executions per user
+const inflightMap = new Map<string, number>();
 
-function sandboxRateLimiter(request: FastifyRequest, reply: FastifyReply, done: () => void) {
-  const key = `sandbox:${(request as unknown as { userId?: number }).userId || request.ip}`;
-  const now = Date.now();
-  let bucket = rateBuckets.get(key);
+// P1-21: Redis-backed rate limiter with in-memory fallback
+const memoryBuckets = new Map<string, { count: number; resetAt: number }>();
 
-  if (!bucket || now >= bucket.resetAt) {
-    bucket = { count: 0, resetAt: now + 60_000 };
-    rateBuckets.set(key, bucket);
+async function sandboxRateLimiter(request: FastifyRequest, reply: FastifyReply) {
+  const userId = (request as unknown as { userId?: number }).userId || request.ip;
+  const key = `sandbox:rl:${userId}`;
+
+  // P1-21: Try Redis first for multi-replica consistency
+  try {
+    const count = await redis.incr(key);
+    if (count === 1) {
+      await redis.expire(key, 60);
+    }
+    if (count > MAX_EXECUTIONS_PER_MINUTE) {
+      reply.code(429).send({ error: "Too many sandbox executions. Max 10 per minute.", code: "SANDBOX_RATE_LIMIT" });
+      return;
+    }
+    return;
+  } catch {
+    // Fall back to in-memory
   }
 
+  // In-memory fallback
+  const now = Date.now();
+  let bucket = memoryBuckets.get(key);
+  if (!bucket || now >= bucket.resetAt) {
+    bucket = { count: 0, resetAt: now + 60_000 };
+    memoryBuckets.set(key, bucket);
+  }
   bucket.count++;
-  if (bucket.count > 10) {
+  if (bucket.count > MAX_EXECUTIONS_PER_MINUTE) {
     reply.code(429).send({ error: "Too many sandbox executions. Max 10 per minute.", code: "SANDBOX_RATE_LIMIT" });
     return;
   }
+}
 
-  done();
+// P1-22: Concurrency guard
+function acquireConcurrency(userId: string): boolean {
+  const current = inflightMap.get(userId) || 0;
+  if (current >= MAX_CONCURRENT_PER_USER) return false;
+  inflightMap.set(userId, current + 1);
+  return true;
+}
+
+function releaseConcurrency(userId: string): void {
+  const current = inflightMap.get(userId) || 1;
+  if (current <= 1) inflightMap.delete(userId);
+  else inflightMap.set(userId, current - 1);
 }
 
 const sandboxPlugin: FastifyPluginAsync = async (fastify) => {
@@ -46,13 +82,19 @@ const sandboxPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(400, "Code must be a string under 50,000 characters", "SANDBOX_CODE_TOO_LONG");
     }
 
-    logger.info({ userId: (request as unknown as { userId?: number }).userId, language, codeLength: code.length }, "Sandbox execution requested");
+    const userKey = String((request as unknown as { userId?: number }).userId || request.ip);
 
-    let result;
+    // P1-22: Enforce concurrency cap
+    if (!acquireConcurrency(userKey)) {
+      throw new AppError(429, `Max ${MAX_CONCURRENT_PER_USER} concurrent sandbox executions allowed`, "SANDBOX_CONCURRENCY_LIMIT");
+    }
+
+    logger.info({ userId: userKey, language, codeLength: code.length }, "Sandbox execution requested");
 
     try {
+      let result;
+
       if (language === "javascript" || language === "typescript") {
-        // TypeScript is executed as JS (no type checking in sandbox)
         result = await executeJS(code, 5000);
       } else if (language === "python") {
         result = await executePython(code, 10000);
@@ -69,6 +111,8 @@ const sandboxPlugin: FastifyPluginAsync = async (fastify) => {
       if (err instanceof AppError) throw err;
       logger.error({ err }, "Sandbox execution error");
       throw new AppError(500, `Execution failed: ${(err as Error).message}`, "SANDBOX_EXEC_FAILED");
+    } finally {
+      releaseConcurrency(userKey);
     }
   });
 };

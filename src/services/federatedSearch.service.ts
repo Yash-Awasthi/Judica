@@ -135,6 +135,8 @@ export interface FederatedSearchOptions {
   limit?: number;
   /** Which indexes to search. Defaults to all. */
   indexes?: ("kb" | "repo" | "conversation" | "fact")[];
+  /** P4-18: Per-source timeout in ms. Defaults to 10s. Prevents one slow backend from stalling the whole call. */
+  perSourceTimeoutMs?: number;
 }
 
 /**
@@ -149,9 +151,28 @@ export async function federatedSearch(opts: FederatedSearchOptions): Promise<Fed
     conversationId,
     limit = 10,
     indexes = ["kb", "repo", "conversation", "fact"],
+    perSourceTimeoutMs = 10_000,
   } = opts;
 
   const k = 60; // RRF constant
+
+  // P4-18: Helper to race a search against a per-source timeout.
+  // Returns empty results on timeout instead of failing the whole federated search.
+  function withTimeout<T>(
+    source: string,
+    promise: Promise<T>,
+    fallback: T,
+  ): Promise<T> {
+    return Promise.race([
+      promise,
+      new Promise<T>((resolve) =>
+        setTimeout(() => {
+          logger.warn({ source, timeoutMs: perSourceTimeoutMs }, "Federated search source timed out");
+          resolve(fallback);
+        }, perSourceTimeoutMs),
+      ),
+    ]);
+  }
 
   // Embed query once, reuse across all indexes
   const queryEmbedding = await embed(query);
@@ -162,43 +183,55 @@ export async function federatedSearch(opts: FederatedSearchOptions): Promise<Fed
 
   if (indexes.includes("kb")) {
     searches.push(
-      hybridSearch(userId, query, kbId || null, perIndexLimit).then((chunks) => ({
-        source: "kb",
-        results: chunks.map((c) => ({
-          id: c.id,
-          content: c.content,
-          source: "kb" as const,
-          sourceName: c.sourceName,
-          score: c.score,
+      withTimeout("kb",
+        hybridSearch(userId, query, kbId || null, perIndexLimit).then((chunks) => ({
+          source: "kb",
+          results: chunks.map((c) => ({
+            id: c.id,
+            content: c.content,
+            source: "kb" as const,
+            sourceName: c.sourceName,
+            score: c.score,
+          })),
         })),
-      }))
+        { source: "kb", results: [] },
+      )
     );
   }
 
   if (indexes.includes("repo")) {
     searches.push(
-      searchAllRepos(userId, queryEmbedding, perIndexLimit).then((results) => ({
-        source: "repo",
-        results,
-      }))
+      withTimeout("repo",
+        searchAllRepos(userId, queryEmbedding, perIndexLimit).then((results) => ({
+          source: "repo",
+          results,
+        })),
+        { source: "repo", results: [] },
+      )
     );
   }
 
   if (indexes.includes("conversation")) {
     searches.push(
-      searchConversations(userId, queryEmbedding, perIndexLimit).then((results) => ({
-        source: "conversation",
-        results,
-      }))
+      withTimeout("conversation",
+        searchConversations(userId, queryEmbedding, perIndexLimit).then((results) => ({
+          source: "conversation",
+          results,
+        })),
+        { source: "conversation", results: [] },
+      )
     );
   }
 
   if (indexes.includes("fact") && conversationId) {
     searches.push(
-      searchFacts(queryEmbedding, conversationId, perIndexLimit).then((results) => ({
-        source: "fact",
-        results,
-      }))
+      withTimeout("fact",
+        searchFacts(queryEmbedding, conversationId, perIndexLimit).then((results) => ({
+          source: "fact",
+          results,
+        })),
+        { source: "fact", results: [] },
+      )
     );
   }
 

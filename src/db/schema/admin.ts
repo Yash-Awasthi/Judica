@@ -26,7 +26,7 @@ export const adminAuditLogs = pgTable(
     status: text("status").default("success").notNull(), // 'success', 'failure'
     errorMessage: text("errorMessage"),
     ipAddress: text("ipAddress"),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("AdminAuditLog_adminId_idx").on(table.adminId),
@@ -44,13 +44,18 @@ export const systemConfigs = pgTable(
     key: text("key").notNull().unique(), // e.g., 'default_llm_model', 'maintenance_mode'
     value: jsonb("value").default({}).notNull(),
     description: text("description"),
-    updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
     updatedBy: integer("updatedBy").references(() => users.id, {
       onDelete: "set null",
     }),
   },
   (table) => [uniqueIndex("SystemConfig_key_idx").on(table.key)],
 );
+
+// P8-44: OrgGroup system is defined here but not enforced in application routes.
+// Either add orgIsolation middleware to all data routes (conversations, chats, usage)
+// or remove these tables. Current state: partially implemented via admin.service.ts.
+// Decision: KEEP — wire up org isolation via middleware/orgIsolation.ts.
 
 // ─── OrgGroup ──────────────────────────────────────────────────────────────────
 export const orgGroups = pgTable(
@@ -59,7 +64,7 @@ export const orgGroups = pgTable(
     id: serial("id").primaryKey(),
     name: text("name").notNull().unique(),
     description: text("description"),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
     createdBy: integer("createdBy").references(() => users.id, {
       onDelete: "set null",
     }),
@@ -79,7 +84,7 @@ export const orgGroupMemberships = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     role: text("role").default("member").notNull(), // 'owner', 'admin', 'member'
-    joinedAt: timestamp("joinedAt", { mode: "date" }).defaultNow().notNull(),
+    joinedAt: timestamp("joinedAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     uniqueIndex("OrgGroupMembership_groupId_userId_key").on(

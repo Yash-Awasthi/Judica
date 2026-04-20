@@ -1,3 +1,18 @@
+/**
+ * P7-44: DEPRECATED persona mechanism.
+ * This file defines "personas" used by the critique/review system.
+ * The canonical persona system is now ARCHETYPES in src/config/archetypes.ts.
+ *
+ * P8-29: These should be migrated to a database table with admin CRUD API.
+ * Until then, this in-memory list serves as the source of truth for built-ins.
+ *
+ * Migration path: callers should use ARCHETYPES.systemPrompt instead of
+ * PersonaDefinition.systemPrompt. This file is kept for backward compatibility
+ * with the /api/personas CRUD routes until they are migrated.
+ */
+
+// P8-30: Unified schema — both built-in and custom personas use this interface.
+// Custom personas from the DB must conform to the same shape.
 export interface PersonaDefinition {
   id: string;
   name: string;
@@ -6,6 +21,10 @@ export interface PersonaDefinition {
   critiqueStyle: string;
   domain: string;
   isBuiltIn: boolean;
+  // P8-30: Optional fields that custom personas may include
+  icon?: string;
+  colorBg?: string;
+  tools?: string[];
 }
 
 export const BUILT_IN_PERSONAS: PersonaDefinition[] = [

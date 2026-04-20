@@ -56,9 +56,12 @@ async function extractClaims(agentId: string, text: string): Promise<Claim[]> {
   });
 
   try {
+    // P8-21: Use JSON.parse() with proper validation instead of regex-only extraction
     const match = result.text.match(/\[[\s\S]*\]/);
     if (!match) return [];
-    const claims: string[] = JSON.parse(match[0]);
+    const parsed = JSON.parse(match[0]);
+    if (!Array.isArray(parsed)) return [];
+    const claims: string[] = parsed.filter((item: unknown) => typeof item === "string");
     return claims.map((claim) => ({ agentId, claim }));
   } catch {
     return [];
@@ -122,10 +125,13 @@ export async function detectConflicts(responses: AgentResponse[]): Promise<Confl
     responses.map((r) => extractClaims(r.agentId, r.text))
   );
 
-  // Compare each pair
+  // P8-20: Pre-filter using text similarity to avoid O(n²) LLM calls.
+  // Only compare pairs whose claim texts have meaningful overlap (cosine-like check).
   const comparisons: Promise<Conflict[]>[] = [];
   for (let i = 0; i < responses.length; i++) {
     for (let j = i + 1; j < responses.length; j++) {
+      // Simple keyword overlap heuristic: if claims share < 2 significant words, skip
+      if (!hasTopicOverlap(claimSets[i], claimSets[j])) continue;
       comparisons.push(
         compareClaimSets(
           claimSets[i],
@@ -142,6 +148,24 @@ export async function detectConflicts(responses: AgentResponse[]): Promise<Confl
     conflicts.push(...result);
   }
 
-  // Only return conflicts with severity >= 3
-  return conflicts.filter((c) => c.severity >= 3);
+  // P8-22: Configurable severity threshold (default 3)
+  const severityThreshold = parseInt(process.env.CONFLICT_SEVERITY_THRESHOLD || "3", 10);
+  return conflicts.filter((c) => c.severity >= severityThreshold);
+}
+
+// P8-20: Simple keyword overlap check to pre-filter unlikely-to-conflict pairs
+function hasTopicOverlap(claimsA: Claim[], claimsB: Claim[]): boolean {
+  if (claimsA.length === 0 || claimsB.length === 0) return false;
+  const STOP_WORDS = new Set(["the", "a", "an", "is", "are", "was", "were", "be", "been", "has", "have", "had", "do", "does", "did", "will", "would", "could", "should", "may", "might", "can", "shall", "this", "that", "these", "those", "it", "its", "of", "in", "on", "at", "to", "for", "with", "by", "from", "and", "or", "but", "not", "no"]);
+  const wordsA = new Set(
+    claimsA.flatMap(c => c.claim.toLowerCase().split(/\W+/).filter(w => w.length > 3 && !STOP_WORDS.has(w)))
+  );
+  const wordsB = new Set(
+    claimsB.flatMap(c => c.claim.toLowerCase().split(/\W+/).filter(w => w.length > 3 && !STOP_WORDS.has(w)))
+  );
+  let overlap = 0;
+  for (const w of wordsA) {
+    if (wordsB.has(w)) overlap++;
+  }
+  return overlap >= 2;
 }

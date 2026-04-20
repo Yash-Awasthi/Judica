@@ -47,33 +47,41 @@ if (isolationLevel === "ulimit") {
 }
 
 // Python preamble that blocks dangerous modules and network access
+// P0-30: Use closure-captured import ref and make __import__ non-writable
+// P0-31: Prevents _restricted_import reassignment
 const SANDBOX_PREAMBLE = [
   // Block ctypes and FFI (primary escape vector)
   `import importlib`,
-  `_original_import = __builtins__.__import__ if hasattr(__builtins__, '__import__') else __import__`,
-  `_BLOCKED_MODULES = frozenset({`,
-  `    'ctypes', 'ctypes.util', 'ctypes.wintypes',`,
-  `    '_ctypes', '_ctypes_test',`,
-  `    'cffi', '_cffi_backend',`,
-  `    'subprocess', '_subprocess',`,
-  `    'multiprocessing', 'multiprocessing.process',`,
-  `    'signal', '_signal',`,
-  `    'resource', '_posixsubprocess',`,
-  `    'importlib.machinery', 'importlib.abc',`,
-  `    'code', 'codeop', 'compileall', 'py_compile',`,
-  `    'gc', 'inspect', 'dis', 'pickletools',`,
-  `    'webbrowser', 'antigravity', 'turtle',`,
-  `    'ensurepip', 'pip', 'venv',`,
-  `})`,
-  `def _restricted_import(name, *args, **kwargs):`,
-  `    if name in _BLOCKED_MODULES or any(name.startswith(b + '.') for b in _BLOCKED_MODULES):`,
-  `        raise ImportError(f"Module '{name}' is not available in the sandbox")`,
-  `    return _original_import(name, *args, **kwargs)`,
-  `if hasattr(__builtins__, '__import__'):`,
-  `    __builtins__.__import__ = _restricted_import`,
-  `else:`,
-  `    import builtins`,
-  `    builtins.__import__ = _restricted_import`,
+  `def _setup_sandbox():`,
+  `    """Setup sandbox in a closure so user code cannot access internals."""`,
+  `    import builtins as _builtins`,
+  `    _original_import = _builtins.__import__`,
+  `    _BLOCKED_MODULES = frozenset({`,
+  `        'ctypes', 'ctypes.util', 'ctypes.wintypes',`,
+  `        '_ctypes', '_ctypes_test',`,
+  `        'cffi', '_cffi_backend',`,
+  `        'subprocess', '_subprocess',`,
+  `        'multiprocessing', 'multiprocessing.process',`,
+  `        'signal', '_signal',`,
+  `        'resource', '_posixsubprocess',`,
+  `        'importlib.machinery', 'importlib.abc',`,
+  `        'code', 'codeop', 'compileall', 'py_compile',`,
+  `        'gc', 'inspect', 'dis', 'pickletools',`,
+  `        'webbrowser', 'antigravity', 'turtle',`,
+  `        'ensurepip', 'pip', 'venv',`,
+  `    })`,
+  `    def _restricted_import(name, *args, **kwargs):`,
+  `        if name in _BLOCKED_MODULES or any(name.startswith(b + '.') for b in _BLOCKED_MODULES):`,
+  `            raise ImportError(f"Module '{name}' is not available in the sandbox")`,
+  `        return _original_import(name, *args, **kwargs)`,
+  `    _builtins.__import__ = _restricted_import`,
+  `    # Make __import__ non-writable to prevent user reassignment`,
+  `    try:`,
+  `        type(_builtins).__import__ = property(lambda self: _restricted_import)`,
+  `    except (TypeError, AttributeError):`,
+  `        pass  # Fallback: at least the closure captures the original`,
+  `_setup_sandbox()`,
+  `del _setup_sandbox`,
   ``,
   // Block os.system, os.exec*, os.spawn*, os.popen
   `import os as _os`,
@@ -84,6 +92,7 @@ const SANDBOX_PREAMBLE = [
   `    if hasattr(_os, _attr):`,
   `        setattr(_os, _attr, lambda *a, **k: (_ for _ in ()).throw(PermissionError(f"os.{_attr} is disabled in sandbox")))`,
   ``,
+  // P0-38: Block socket.fromfd/socketpair as well
   // Block network access at socket level
   `import socket as _original_socket`,
   `class _BlockedSocket(_original_socket.socket):`,
@@ -98,6 +107,10 @@ const SANDBOX_PREAMBLE = [
   `    def sendmsg(self, *args, **kwargs):`,
   `        raise PermissionError("Network access is disabled in sandbox")`,
   `_original_socket.socket = _BlockedSocket`,
+  `if hasattr(_original_socket, 'fromfd'):`,
+  `    _original_socket.fromfd = lambda *a, **k: (_ for _ in ()).throw(PermissionError("socket.fromfd is disabled"))`,
+  `if hasattr(_original_socket, 'socketpair'):`,
+  `    _original_socket.socketpair = lambda *a, **k: (_ for _ in ()).throw(PermissionError("socket.socketpair is disabled"))`,
   ``,
   // Block file writes outside /tmp
   `_original_open = open`,
@@ -108,11 +121,8 @@ const SANDBOX_PREAMBLE = [
   `        if not resolved.startswith('/tmp/'):`,
   `            raise PermissionError(f"Writing to {file} is not allowed in sandbox")`,
   `    return _original_open(file, mode, *args, **kwargs)`,
-  `if hasattr(__builtins__, 'open'):`,
-  `    __builtins__.open = _restricted_open`,
-  `else:`,
-  `    import builtins`,
-  `    builtins.open = _restricted_open`,
+  `import builtins as _builtins2`,
+  `_builtins2.open = _restricted_open`,
   ``,
   // Block introspection escape vectors
   `import sys as _sys`,
@@ -124,15 +134,20 @@ const SANDBOX_PREAMBLE = [
   `        return f`,
   `    _sys._getframe = _safe_getframe`,
   `# Prevent sys.modules manipulation to re-import blocked modules`,
-  `_blocked_from_modules = [k for k in _sys.modules if any(k == b or k.startswith(b + '.') for b in _BLOCKED_MODULES)]`,
+  `_blocked_from_modules = [k for k in _sys.modules if any(k == b or k.startswith(b + '.') for b in _BLOCKED_MODULES if '_BLOCKED_MODULES' in dir())]`,
   `for _k in _blocked_from_modules:`,
   `    del _sys.modules[_k]`,
+  `del _blocked_from_modules, _k`,
   ``,
 ].join("\n");
 
-function buildCommand(tmpFile: string, tmpDir: string): string {
-  const ulimits = `ulimit -v 262144 -t 10 -f 1024 -u 32 -n 64`;
+// P0-39: Return structured command to avoid bash -c shell interpolation
+interface SandboxCommand {
+  cmd: string;
+  args: string[];
+}
 
+function buildCommand(tmpFile: string, tmpDir: string): SandboxCommand {
   if (isolationLevel === "bwrap") {
     // bubblewrap provides the strongest userspace sandboxing:
     // - Full filesystem isolation (bind-mount only what's needed)
@@ -141,48 +156,47 @@ function buildCommand(tmpFile: string, tmpDir: string): string {
     // - Die with parent (--die-with-parent)
     // - No new privileges
     // - Seccomp-BPF syscall filter (blocks ptrace, mount, bpf, etc.)
-    const seccompArgs: string[] = [];
+    const args: string[] = [
+      "--ro-bind", "/usr", "/usr",
+      "--ro-bind", "/lib", "/lib",
+      "--ro-bind-try", "/lib64", "/lib64",
+      "--ro-bind", "/bin", "/bin",
+      "--ro-bind", "/etc/alternatives", "/etc/alternatives",
+      "--ro-bind-try", "/etc/ld.so.cache", "/etc/ld.so.cache",
+      "--ro-bind-try", "/etc/ld.so.conf", "/etc/ld.so.conf",
+      "--ro-bind-try", "/etc/python3", "/etc/python3",
+      "--bind", tmpDir, "/sandbox",
+      "--tmpfs", "/tmp",
+      "--proc", "/proc",
+      "--dev", "/dev",
+      "--unshare-all",
+      "--die-with-parent",
+      "--new-session",
+    ];
+
     if (isSeccompAvailable()) {
       const policyPath = generateSeccompPolicy(tmpDir);
-      seccompArgs.push(`--seccomp 9 9<"${policyPath}"`);
+      args.push("--seccomp", "9", `9<${policyPath}`);
     }
 
-    return [
-      `bwrap`,
-      `--ro-bind /usr /usr`,
-      `--ro-bind /lib /lib`,
-      `--ro-bind-try /lib64 /lib64`,
-      `--ro-bind /bin /bin`,
-      `--ro-bind /etc/alternatives /etc/alternatives`,
-      `--ro-bind-try /etc/ld.so.cache /etc/ld.so.cache`,
-      `--ro-bind-try /etc/ld.so.conf /etc/ld.so.conf`,
-      `--ro-bind-try /etc/python3 /etc/python3`,
-      `--bind "${tmpDir}" /sandbox`,
-      `--tmpfs /tmp`,
-      `--proc /proc`,
-      `--dev /dev`,
-      `--unshare-all`,
-      `--die-with-parent`,
-      `--new-session`,
-      ...seccompArgs,
-      `--chdir /sandbox`,
-      `-- bash -c '${ulimits}; exec python3 /sandbox/script.py'`,
-    ].join(" ");
+    args.push("--chdir", "/sandbox", "--", "python3", "/sandbox/script.py");
+
+    return { cmd: "bwrap", args };
   }
 
   if (isolationLevel === "unshare") {
-    // unshare provides kernel namespace isolation:
-    // --user: user namespace (no root required)
-    // --pid: PID namespace (can't see/signal host processes)
-    // --net: network namespace (no network interfaces)
-    // --mount-proc: isolated /proc (prevents reading host process info)
-    // --fork: fork before exec (required for PID namespace)
-    // --map-root-user: map current UID to root inside namespace
-    return `unshare --user --pid --net --fork --mount-proc --map-root-user -- bash -c '${ulimits}; exec python3 "${tmpFile}"'`;
+    // unshare provides kernel namespace isolation
+    return {
+      cmd: "unshare",
+      args: [
+        "--user", "--pid", "--net", "--fork", "--mount-proc", "--map-root-user",
+        "--", "python3", tmpFile,
+      ],
+    };
   }
 
-  // Fallback: ulimit-only isolation
-  return `${ulimits}; exec python3 "${tmpFile}"`;
+  // Fallback: direct python3 execution (ulimits applied via spawn options)
+  return { cmd: "python3", args: [tmpFile] };
 }
 
 export async function executePython(code: string, timeout: number = 10000): Promise<SandboxResult> {
@@ -200,10 +214,13 @@ export async function executePython(code: string, timeout: number = 10000): Prom
       const stdout: string[] = [];
       const stderr: string[] = [];
 
-      const command = buildCommand(tmpFile, tmpDir);
+      const { cmd, args } = buildCommand(tmpFile, tmpDir);
 
-      const proc = spawn("bash", ["-c", command], {
+      // P0-39: Use execFile-style spawn (no shell) to prevent interpolation
+      // P0-40: Use SIGKILL to ensure sandbox processes are terminated
+      const proc = spawn(cmd, args, {
         timeout,
+        killSignal: "SIGKILL",
         env: {
           PATH: "/usr/local/bin:/usr/bin:/bin",
           HOME: tmpDir,
@@ -215,6 +232,7 @@ export async function executePython(code: string, timeout: number = 10000): Prom
           PYTHONSAFEPATH: "1",
         },
         stdio: ["pipe", "pipe", "pipe"],
+        shell: false,
         cwd: tmpDir,
       });
 

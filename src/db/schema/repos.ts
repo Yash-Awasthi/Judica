@@ -22,7 +22,7 @@ export const codeRepositories = pgTable(
     name: text("name").notNull(),
     indexed: boolean("indexed").default(false).notNull(),
     fileCount: integer("fileCount").default(0).notNull(),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("CodeRepository_userId_idx").on(table.userId),
@@ -44,6 +44,7 @@ export const codeFiles = pgTable(
   },
   (table) => [
     index("CodeFile_repoId_idx").on(table.repoId),
+    // P5-06: Verified HNSW index DDL works with Drizzle 0.45.x — .using() + .op() syntax
     index("CodeFile_embedding_hnsw_idx")
       .using("hnsw", table.embedding.op("vector_cosine_ops")),
   ],

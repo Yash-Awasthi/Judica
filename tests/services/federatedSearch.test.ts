@@ -205,5 +205,52 @@ describe("federatedSearch.service", () => {
       expect(formatted).toContain("[COUNCIL FACTS]");
       expect(formatted).toContain("Earth is round");
     });
+
+    // P6-16: Mathematical verification of RRF scoring formula
+    it("should compute correct RRF scores with known inputs", async () => {
+      const K = 60; // RRF constant from federatedSearch.service.ts
+
+      // Set up: KB returns 2 results, conversation returns 1 overlapping result
+      mockHybridSearch.mockResolvedValue([
+        { id: "overlap", content: "Found in KB", sourceName: "doc.pdf", score: 0.95 },
+        { id: "kb-only", content: "Only in KB", sourceName: "kb.pdf", score: 0.8 },
+      ]);
+      mockDbExecute.mockResolvedValue({
+        rows: [
+          { id: "overlap", question: "Found in conv", verdict: "Yes", score: 0.9 },
+          { id: "conv-only", question: "Only in conv", verdict: "Maybe", score: 0.7 },
+        ],
+      });
+      mockPoolQuery.mockResolvedValue({ rows: [] });
+
+      const results = await federatedSearch({
+        userId: 1,
+        query: "test",
+        indexes: ["kb", "conversation"],
+      });
+
+      // "overlap" appears at rank 0 in KB and rank 0 in conversation
+      // Expected RRF = 1/(0+1+60) + 1/(0+1+60) = 2/61
+      const overlapResult = results.find(r => r.id === "overlap");
+      const expectedOverlap = 1 / (0 + 1 + K) + 1 / (0 + 1 + K);
+      expect(overlapResult).toBeDefined();
+      expect(overlapResult!.score).toBeCloseTo(expectedOverlap, 8);
+
+      // "kb-only" at rank 1 in KB only
+      // Expected RRF = 1/(1+1+60) = 1/62
+      const kbOnly = results.find(r => r.id === "kb-only");
+      const expectedKbOnly = 1 / (1 + 1 + K);
+      expect(kbOnly).toBeDefined();
+      expect(kbOnly!.score).toBeCloseTo(expectedKbOnly, 8);
+
+      // "conv-only" at rank 1 in conversation only
+      // Expected RRF = 1/(1+1+60) = 1/62
+      const convOnly = results.find(r => r.id === "conv-only");
+      expect(convOnly).toBeDefined();
+      expect(convOnly!.score).toBeCloseTo(expectedKbOnly, 8);
+
+      // overlap should rank highest
+      expect(overlapResult!.score).toBeGreaterThan(kbOnly!.score);
+    });
   });
 });

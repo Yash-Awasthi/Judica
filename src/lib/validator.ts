@@ -1,3 +1,6 @@
+// P2-18: This file provides AI-driven validation via askProvider.
+// Related: lib/validation.ts provides ValidationModule (local truth-awareness checks).
+// Future: merge both into a single validation/ directory.
 import { askProvider, Provider, Message } from "./providers.js";
 import { AgentOutput } from "./schemas.js";
 import logger from "./logger.js";

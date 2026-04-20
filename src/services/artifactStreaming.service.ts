@@ -4,11 +4,17 @@
  * Enables real-time SSE streaming of partial results during
  * long-running agent tasks. Consumers subscribe to a stream ID
  * and receive typed events as artifacts are produced.
+ *
+ * P4-14: Redis Streams support for multi-replica deployments.
+ * When Redis is available, artifacts are published to Redis Streams
+ * for cross-process delivery. Falls back to in-memory EventEmitter
+ * for single-process deployments.
  */
 
 import crypto from "crypto";
 import { EventEmitter } from "events";
 import logger from "../lib/logger.js";
+import redis from "../lib/redis.js";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -100,8 +106,17 @@ export function emitArtifact(
   artifacts.push(artifact);
   stream.artifactCount = artifacts.length;
 
-  // Emit to subscribers
+  // Emit to local subscribers
   emitter.emit(`artifact:${streamId}`, artifact);
+
+  // P4-14: Also publish to Redis Streams for multi-replica support
+  try {
+    await redis.xAdd(`artifact_stream:${streamId}`, "*", {
+      data: JSON.stringify(artifact),
+    });
+  } catch {
+    // Redis publish is best-effort; local EventEmitter is always the fallback
+  }
 
   return artifact;
 }
@@ -120,6 +135,17 @@ export function completeStream(streamId: string, summary?: string): boolean {
   stream.completedAt = new Date();
 
   emitter.emit(`complete:${streamId}`);
+
+  // P4-14: Publish completion to Redis and set TTL on the stream key
+  try {
+    await redis.xAdd(`artifact_stream:${streamId}`, "*", {
+      data: JSON.stringify({ type: "stream_complete" }),
+    });
+    // Auto-expire Redis stream after 24h
+    await redis.expire(`artifact_stream:${streamId}`, 86400);
+  } catch {
+    // Best-effort
+  }
 
   logger.info({ streamId, artifactCount: stream.artifactCount }, "Artifact stream completed");
   return true;

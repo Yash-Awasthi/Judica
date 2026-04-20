@@ -192,4 +192,28 @@ describe("contradictionResolution.service", () => {
       expect(formatted).toContain("2 resolution versions");
     });
   });
+
+  // P6-07: Performance test — detect contradictions at n=14 archetypes (max council size)
+  describe("performance at n=14 archetypes", () => {
+    it("should handle 14 opinions without timeout", async () => {
+      const opinions = Array.from({ length: 14 }, (_, i) => ({
+        name: `archetype-${i}`,
+        text: `Opinion ${i}: The answer is ${i % 2 === 0 ? "yes" : "no"} because of reason ${i}`,
+      }));
+
+      mockRouteAndCollect.mockResolvedValue({
+        text: JSON.stringify([
+          { claimA: "yes", sourceA: "archetype-0", claimB: "no", sourceB: "archetype-1" },
+        ]),
+      });
+
+      const start = Date.now();
+      const result = await detectContradictions(opinions);
+      const elapsed = Date.now() - start;
+
+      expect(result).toHaveLength(1);
+      // Should complete in under 5 seconds even with 14 archetypes (91 pairs)
+      expect(elapsed).toBeLessThan(5000);
+    });
+  });
 });

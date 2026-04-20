@@ -22,9 +22,9 @@ export const projects = pgTable(
     icon: text("icon"),
     defaultCouncilComposition: jsonb("defaultCouncilComposition"),
     defaultSystemPrompt: text("defaultSystemPrompt"),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt", { mode: "date" }).notNull(),
-    deletedAt: timestamp("deletedAt", { mode: "date" }),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull(),
+    deletedAt: timestamp("deletedAt", { mode: "date", withTimezone: true }),
   },
   (table) => [
     index("Project_userId_idx").on(table.userId),

@@ -1,6 +1,23 @@
 import logger from "./logger.js";
 import { calculateCost } from "./cost.js";
 
+// P9-73: WARNING — This tracker is entirely in-memory. In multi-replica deployments,
+// each replica maintains independent state. For production multi-instance deployments,
+// migrate to Redis-backed counters (INCRBYFLOAT with TTL).
+// P9-75: State is lost on process restart. The DB-backed dailyUsage table (lib/cost.ts)
+// is the authoritative cost record. This tracker provides real-time UX only.
+
+// P9-71: Use integer microcents ($1 = 100_000_000 microcents) to avoid
+// floating-point accumulation drift. Convert to dollars only on display.
+const MICROCENTS_PER_DOLLAR = 100_000_000;
+
+function dollarsToMicrocents(dollars: number): number {
+  return Math.round(dollars * MICROCENTS_PER_DOLLAR);
+}
+
+function microcentsToDollars(microcents: number): number {
+  return microcents / MICROCENTS_PER_DOLLAR;
+}
 export interface RealTimeCostEntry {
   sessionId: string;
   userId: number;
@@ -28,6 +45,12 @@ export interface CostLedger {
   };
   dailyTotal: number;
   monthlyTotal: number;
+  // P9-74: Track reset boundaries for daily/monthly counters
+  lastDailyReset: string; // ISO date string (YYYY-MM-DD)
+  lastMonthlyReset: string; // ISO month string (YYYY-MM)
+  // P9-72: Per-provider cost attribution
+  costByProvider: Map<string, number>;
+  costByModel: Map<string, number>;
   alerts: {
     dailyLimit: number;
     monthlyLimit: number;
@@ -49,13 +72,22 @@ class RealTimeCostTracker {
 
   startSession(userId: number, sessionId: string, _conversationId: string): void {
     this.lastAccessTime.set(userId, new Date());
-    
+
+    // P9-77: Prevent double-counting on reconnect — if session already exists, resume it
+    if (this.sessionCosts.has(sessionId)) {
+      logger.debug({ userId, sessionId }, "Session already tracked — resuming (reconnect)");
+      return;
+    }
+
     this.enforceUserBounds();
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+    const monthStr = now.toISOString().slice(0, 7);
     const ledger: CostLedger = {
       userId,
       currentSession: {
         sessionId,
-        startTime: new Date(),
+        startTime: now,
         totalCost: 0,
         totalTokens: 0,
         requestCount: 0,
@@ -63,6 +95,12 @@ class RealTimeCostTracker {
       },
       dailyTotal: 0,
       monthlyTotal: 0,
+      // P9-74: Initialize reset boundaries
+      lastDailyReset: todayStr,
+      lastMonthlyReset: monthStr,
+      // P9-72: Provider/model attribution
+      costByProvider: new Map(),
+      costByModel: new Map(),
       alerts: {
         dailyLimit: this.dailyLimits.get(userId) || 0,
         monthlyLimit: this.monthlyLimits.get(userId) || 0,
@@ -83,18 +121,30 @@ class RealTimeCostTracker {
     userAccess.sort((a, b) => a[1].getTime() - b[1].getTime());
 
     const usersToRemove = Math.ceil(this.maxUsers * 0.1);
-    for (let i = 0; i < usersToRemove && i < userAccess.length; i++) {
+    let removed = 0;
+    for (let i = 0; i < userAccess.length && removed < usersToRemove; i++) {
       const userId = userAccess[i][0];
+      // P9-76: Skip users with active sessions — evicting mid-session causes under-billing
+      const ledger = this.userLedgers.get(userId);
+      if (ledger && ledger.currentSession.requestCount > 0) {
+        const lastRequest = ledger.currentSession.requests[ledger.currentSession.requests.length - 1];
+        // Only protect if session had activity in last 5 minutes
+        if (lastRequest && (Date.now() - lastRequest.timestamp.getTime()) < 5 * 60 * 1000) {
+          continue;
+        }
+      }
       this.removeUserData(userId);
+      removed++;
     }
 
-    logger.warn({ removed: usersToRemove, reason: "max_users_bound" }, "Cleaned up oldest user cost data");
+    logger.warn({ removed, reason: "max_users_bound" }, "Cleaned up oldest user cost data");
   }
 
   private removeUserData(userId: number): void {
     this.userLedgers.delete(userId);
     this.dailyLimits.delete(userId);
     this.monthlyLimits.delete(userId);
+    // P9-79: Clean up alert callbacks to prevent memory leaks from stale references
     this.alertCallbacks.delete(userId);
     this.lastAccessTime.delete(userId);
 
@@ -105,6 +155,9 @@ class RealTimeCostTracker {
     }
   }
 
+  // P9-78: Ownership validation — callers MUST validate that the userId matches
+  // the authenticated user before calling this method. This class trusts its callers
+  // (internal service boundary). Route-level auth middleware enforces user identity.
   addCostEntry(
     sessionId: string,
     userId: number,
@@ -145,11 +198,20 @@ class RealTimeCostTracker {
 
     const ledger = this.userLedgers.get(userId);
     if (ledger) {
+      // P9-74: Check if daily/monthly counters need resetting
+      this.checkAndResetCounters(ledger);
+
       ledger.currentSession.totalCost += cost;
       ledger.currentSession.totalTokens += inputTokens + outputTokens;
       ledger.currentSession.requestCount += 1;
       ledger.currentSession.requests.push(entry);
-      
+
+      // P9-72: Track cost by provider and model
+      const prevProvider = ledger.costByProvider.get(provider) || 0;
+      ledger.costByProvider.set(provider, prevProvider + dollarsToMicrocents(cost));
+      const prevModel = ledger.costByModel.get(model) || 0;
+      ledger.costByModel.set(model, prevModel + dollarsToMicrocents(cost));
+
       this.checkLimits(userId);
     }
 
@@ -260,6 +322,27 @@ class RealTimeCostTracker {
     }
   }
 
+  // P9-74: Reset daily/monthly counters when time window changes
+  private checkAndResetCounters(ledger: CostLedger): void {
+    const now = new Date();
+    const todayStr = now.toISOString().slice(0, 10);
+    const monthStr = now.toISOString().slice(0, 7);
+
+    if (ledger.lastDailyReset !== todayStr) {
+      ledger.dailyTotal = 0;
+      ledger.lastDailyReset = todayStr;
+      logger.debug({ userId: ledger.userId }, "Daily cost counter reset");
+    }
+
+    if (ledger.lastMonthlyReset !== monthStr) {
+      ledger.monthlyTotal = 0;
+      ledger.lastMonthlyReset = monthStr;
+      ledger.costByProvider.clear();
+      ledger.costByModel.clear();
+      logger.debug({ userId: ledger.userId }, "Monthly cost counter reset");
+    }
+  }
+
   private checkLimits(userId: number): void {
     const ledger = this.userLedgers.get(userId);
     if (!ledger) return;
@@ -305,11 +388,17 @@ class RealTimeCostTracker {
     totalTokens: number;
     requestCount: number;
     averageCostPerRequest: number;
+    // P9-80: Include lifetime (daily/monthly) totals alongside session stats
+    dailyTotal: number;
+    monthlyTotal: number;
     topProviders: Array<{ provider: string; cost: number; requests: number }>;
     costTrend: Array<{ timestamp: Date; cost: number }>;
   } | null {
     const ledger = this.userLedgers.get(userId);
     if (!ledger) return null;
+
+    // P9-74: Ensure counters are fresh
+    this.checkAndResetCounters(ledger);
 
     const cutoffTime = new Date(Date.now() - hours * 60 * 60 * 1000);
     const recentEntries = ledger.currentSession.requests.filter(entry => entry.timestamp >= cutoffTime);
@@ -347,6 +436,9 @@ class RealTimeCostTracker {
       totalTokens,
       requestCount,
       averageCostPerRequest: requestCount > 0 ? totalCost / requestCount : 0,
+      // P9-80: Expose daily/monthly totals for lifetime view
+      dailyTotal: ledger.dailyTotal + ledger.currentSession.totalCost,
+      monthlyTotal: ledger.monthlyTotal + ledger.currentSession.totalCost,
       topProviders,
       costTrend: trend
     };
@@ -383,6 +475,8 @@ class RealTimeCostTracker {
 
 export const realTimeCostTracker = new RealTimeCostTracker();
 
+// P9-81: Interval lifecycle — must be cleared on app shutdown to prevent test pollution
+// and dangling timers. Call cleanupCostTrackerInterval() in your graceful shutdown handler.
 const costTrackerInterval = setInterval(() => {
   realTimeCostTracker.cleanup();
 }, 60 * 60 * 1000);

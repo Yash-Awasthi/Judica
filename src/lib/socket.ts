@@ -8,6 +8,10 @@ import redis from "./redis.js";
 import { findConversationById } from "../services/conversationService.js";
 
 let wss: WebSocketServer | null = null;
+// P8-06: Track per-user connection count to prevent FD exhaustion
+const MAX_CONNECTIONS_PER_USER = 10;
+const MAX_CONNECTIONS_GLOBAL = 5000;
+const userConnectionCount = new Map<number, number>();
 
 const jwtPayloadSchema = z.object({
   userId: z.number(),
@@ -71,6 +75,19 @@ export function initSocket(server: HttpServer): WebSocketServer {
       }
 
       wss!.handleUpgrade(req, socket, head, (ws: ClientSocket) => {
+        // P8-06: Enforce per-user and global connection limits
+        const currentGlobal = wss!.clients.size;
+        if (currentGlobal >= MAX_CONNECTIONS_GLOBAL) {
+          ws.close(1013, "Server at capacity");
+          return;
+        }
+        const userCount = userConnectionCount.get(payload.userId) || 0;
+        if (userCount >= MAX_CONNECTIONS_PER_USER) {
+          ws.close(1013, "Too many connections");
+          return;
+        }
+        userConnectionCount.set(payload.userId, userCount + 1);
+
         ws.userId = payload.userId;
         ws.username = payload.username;
         wss!.emit("connection", ws, req);
@@ -133,6 +150,12 @@ export function initSocket(server: HttpServer): WebSocketServer {
     });
 
     ws.on("close", () => {
+      // P8-06: Decrement per-user connection counter
+      if (ws.userId) {
+        const count = userConnectionCount.get(ws.userId) || 1;
+        if (count <= 1) userConnectionCount.delete(ws.userId);
+        else userConnectionCount.set(ws.userId, count - 1);
+      }
       logger.info({ userId: ws.userId }, "WebSocket client disconnected");
     });
 

@@ -12,7 +12,7 @@ const mockExportUserArchetypes = vi.fn();
 const mockImportArchetypes = vi.fn();
 const mockGetArchetypeUsage = vi.fn();
 
-vi.mock("../../src/lib/archetypes.js", () => ({
+vi.mock("../../src/lib/archetypeManager.js", () => ({
   getUserArchetypes: (...args: any[]) => mockGetUserArchetypes(...args),
   upsertUserArchetype: (...args: any[]) => mockUpsertUserArchetype(...args),
   deleteUserArchetype: (...args: any[]) => mockDeleteUserArchetype(...args),

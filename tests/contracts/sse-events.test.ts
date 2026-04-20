@@ -157,6 +157,24 @@ function parseSSELines(raw: string): unknown[] {
     .filter(Boolean);
 }
 
+// P6-13: Multi-line SSE parser — handles data split across multiple "data:" lines
+function parseSSELinesMultiline(raw: string): any[] {
+  return raw
+    .split("\n\n")
+    .filter(Boolean)
+    .map(block => {
+      const dataLines = block.split("\n").filter(l => l.startsWith("data: "));
+      if (dataLines.length === 0) return null;
+      const joined = dataLines.map(l => l.slice(6)).join("\n");
+      try {
+        return JSON.parse(joined);
+      } catch {
+        return null;
+      }
+    })
+    .filter(Boolean);
+}
+
 // ── Tests ──
 
 describe("SSE Contract: Deliberation Events", () => {
@@ -341,5 +359,49 @@ describe("SSE Wire Format", () => {
 
     const events = parseSSELines(raw);
     expect(events).toHaveLength(1);
+  });
+
+  // P6-13: Test split-chunk SSE messages — a single event spanning two TCP packets
+  it("handles a data field split across multiple data: lines (SSE multi-line spec)", () => {
+    // Per SSE spec: multiple "data:" lines in one block are joined with \n
+    const raw = [
+      'data: {"type":"member_chunk",',
+      'data: "name":"analyst",',
+      'data: "chunk":"hello world"}',
+      "",
+    ].join("\n");
+
+    const events = parseSSELinesMultiline(raw);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toEqual({ type: "member_chunk", name: "analyst", chunk: "hello world" });
+  });
+
+  it("handles interleaved keep-alive comments between split data lines", () => {
+    // Simulates TCP packet boundary in middle of an event
+    const chunk1 = 'data: {"type":"opinion","name":"empiricist",';
+    const chunk2 = 'data: "text":"The answer is yes","round":1}';
+
+    const raw = [chunk1, chunk2, ""].join("\n");
+    const events = parseSSELinesMultiline(raw);
+    expect(events).toHaveLength(1);
+    expect(events[0].type).toBe("opinion");
+    expect(events[0].name).toBe("empiricist");
+    expect(events[0].round).toBe(1);
+  });
+
+  it("correctly parses incomplete chunk followed by complete event", () => {
+    // Two events: first has multi-line data, second is normal
+    const raw = [
+      'data: {"type":"member_chunk",',
+      'data: "name":"analyst","chunk":"part1"}',
+      "",
+      'data: {"type":"status","round":2,"message":"Done"}',
+      "",
+    ].join("\n");
+
+    const events = parseSSELinesMultiline(raw);
+    expect(events).toHaveLength(2);
+    expect(events[0].type).toBe("member_chunk");
+    expect(events[1].type).toBe("status");
   });
 });

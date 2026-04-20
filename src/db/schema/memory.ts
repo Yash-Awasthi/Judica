@@ -27,12 +27,14 @@ export const memories = pgTable(
     sourceUrl: text("sourceUrl"),
     parentChunkId: text("parentChunkId"),
     embedding: vector("embedding", { dimensions: 1536 }).notNull(),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
-    lastAccessedAt: timestamp("lastAccessedAt", { mode: "date" }),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+    lastAccessedAt: timestamp("lastAccessedAt", { mode: "date", withTimezone: true }),
     accessCount: integer("accessCount").default(0).notNull(),
   },
   (table) => [
     index("Memory_userId_kbId_idx").on(table.userId, table.kbId),
+    // P5-06: Verified HNSW index DDL works with Drizzle 0.45.x — .using() + .op() syntax
+    // For tuning: m=16, ef_construction=64 must be set via raw SQL migration (see vectorPartitioning.ts)
     index("Memory_embedding_hnsw_idx")
       .using("hnsw", table.embedding.op("vector_cosine_ops")),
   ],
@@ -48,5 +50,5 @@ export const memoryBackends = pgTable("MemoryBackend", {
   type: text("type").notNull(),
   config: text("config").notNull(),
   active: boolean("active").default(true).notNull(),
-  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
 });

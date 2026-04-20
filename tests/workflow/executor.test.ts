@@ -257,4 +257,37 @@ describe("WorkflowExecutor", () => {
     const mergeOutput = mergeComplete!.output as Record<string, unknown>;
     expect(mergeOutput.combined).toBe(true);
   });
+
+  // P6-12: Timeout test — infinite-loop node should be terminated within configured budget
+  it("terminates a node that exceeds its timeout budget", async () => {
+    mockHandlers.set(NodeType.INPUT, async (ctx: NodeContext) => ({ ...ctx.inputs }));
+    mockHandlers.set(NodeType.LLM, async () => {
+      // Simulate an infinite loop — never resolves
+      await new Promise(() => {});
+    });
+
+    const definition: WorkflowDefinition = {
+      nodes: [
+        { id: "in1", type: NodeType.INPUT, position: { x: 0, y: 0 }, data: { name: "query" } },
+        { id: "slow", type: NodeType.LLM, position: { x: 200, y: 0 }, data: { timeout: 100 } }, // 100ms timeout
+      ],
+      edges: [
+        { id: "e1", source: "in1", target: "slow" },
+      ],
+    };
+
+    const executor = new WorkflowExecutor(definition, "run-timeout", 1);
+    const events = await collectEvents(executor.run({ query: "test" }));
+
+    // Should have a node_error event for the timed-out node
+    const errorEvent = events.find(
+      e => e.type === "node_error" && e.nodeId === "slow",
+    );
+    expect(errorEvent).toBeDefined();
+    expect(errorEvent!.error).toMatch(/timed out/i);
+
+    // Workflow should have failed
+    const workflowFailed = events.find(e => e.type === "workflow_error");
+    expect(workflowFailed).toBeDefined();
+  });
 });

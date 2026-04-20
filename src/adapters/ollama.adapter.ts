@@ -6,11 +6,13 @@ import type {
 } from "./types.js";
 import { createStreamResult } from "./types.js";
 import { getBreaker } from "../lib/breaker.js";
-import type { Provider } from "../lib/providers.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
 
+// P3-07: Configurable timeout for local model inference (default 120s)
+const OLLAMA_TIMEOUT_MS = parseInt(process.env.OLLAMA_TIMEOUT_MS || "120000", 10);
+
 interface OllamaChunk {
-  message?: { content?: string };
+  message?: { content?: string; tool_calls?: Array<{ function: { name: string; arguments: Record<string, unknown> } }> };
   response?: string;
   done: boolean;
   prompt_eval_count?: number;
@@ -29,29 +31,49 @@ export class OllamaAdapter implements IProviderAdapter {
   }
 
   async generate(req: AdapterRequest): Promise<AdapterStreamResult> {
-    // Validate base URL against SSRF (blocks private IPs, localhost, cloud metadata).
-    // NOTE: Ollama is typically on localhost which validateSafeUrl blocks.
-    // For local-only deployments, operators should set ALLOW_PRIVATE_URLS=1 or
-    // use the adapter only with explicitly trusted URLs.
-    const localhostPatterns = [
-      "http://localhost:",
-      "http://127.0.0.1",
-      "http://0.0.0.0",
-      "http://[::1]",
-      "http://::1",
-    ];
-    if (!localhostPatterns.some((p) => this.baseUrl.startsWith(p))) {
+    // P0-22: Proper localhost check via URL parsing instead of string prefix match
+    const parsedUrl = new URL(this.baseUrl);
+    const hostname = parsedUrl.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "0.0.0.0";
+
+    if (!isLocalhost) {
       await validateSafeUrl(this.baseUrl);
     }
 
     const model = req.model || "llama3.2";
 
+    // P7-34: Verify model is pulled locally before sending request
+    try {
+      const tagsRes = await fetch(`${this.baseUrl}/api/tags`, {
+        signal: AbortSignal.timeout(5000),
+      });
+      if (tagsRes.ok) {
+        const tagsData = await tagsRes.json() as { models?: Array<{ name: string }> };
+        const available = (tagsData.models || []).map((m) => m.name);
+        // Check both exact match and without :latest suffix
+        const modelFound = available.some((m) =>
+          m === model || m === `${model}:latest` || m.split(":")[0] === model
+        );
+        if (!modelFound && available.length > 0) {
+          throw new Error(
+            `Ollama model "${model}" not found locally. Available: ${available.slice(0, 5).join(", ")}. Pull it with: ollama pull ${model}`
+          );
+        }
+      }
+    } catch (err) {
+      // If it's our own error, rethrow; otherwise ignore (Ollama might be starting up)
+      if (err instanceof Error && err.message.includes("not found locally")) throw err;
+    }
+
     const messages: Record<string, unknown>[] = [];
     if (req.system_prompt) messages.push({ role: "system", content: req.system_prompt });
 
     for (const m of req.messages) {
+      // P7-33: Ollama only accepts "system", "user", "assistant" roles.
+      // Map "tool" to "user" (Ollama has no native tool-result role).
+      const role = m.role === "tool" ? "user" : m.role;
       messages.push({
-        role: m.role === "tool" ? "user" : m.role,
+        role,
         content: typeof m.content === "string" ? m.content : JSON.stringify(m.content),
       });
     }
@@ -62,6 +84,14 @@ export class OllamaAdapter implements IProviderAdapter {
       stream: true,
     };
 
+    // P1-03: Send tools in body for Ollama tool call support
+    if (req.tools?.length) {
+      body.tools = req.tools.map((t) => ({
+        type: "function",
+        function: { name: t.name, description: t.description, parameters: t.parameters },
+      }));
+    }
+
     if (req.temperature !== undefined) {
       body.options = { ...(body.options as object || {}), temperature: req.temperature };
     }
@@ -69,32 +99,26 @@ export class OllamaAdapter implements IProviderAdapter {
       body.options = { ...(body.options as object || {}), num_predict: req.max_tokens };
     }
 
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 120000);
+    // P7-32: Use AbortSignal.timeout() instead of manual AbortController + setTimeout.
+    // The previous approach conflicted with the circuit breaker's own timeout logic,
+    // causing premature aborts when the breaker retried.
+    const fetchChat = async () =>
+      fetch(`${this.baseUrl}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(OLLAMA_TIMEOUT_MS),
+        redirect: "error",
+      });
 
-    try {
-      const fetchChat = async () =>
-        fetch(`${this.baseUrl}/api/chat`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-          signal: controller.signal,
-        });
+    const breaker = getBreaker({ name: this.providerId } as { name: string }, fetchChat);
+    const res: Response = await breaker.fire();
 
-      const breaker = getBreaker({ name: this.providerId } as Provider, fetchChat);
-      const res: Response = await breaker.fire();
-
-      clearTimeout(timeout);
-
-      if (!res.ok) {
-        throw new Error(`Ollama error: ${res.status} ${res.statusText}`);
-      }
-
-      return createStreamResult(this.parseNDJSON(res));
-    } catch (err) {
-      clearTimeout(timeout);
-      throw err;
+    if (!res.ok) {
+      throw new Error(`Ollama error: ${res.status} ${res.statusText}`);
     }
+
+    return createStreamResult(this.parseNDJSON(res));
   }
 
   private async *parseNDJSON(res: Response): AsyncGenerator<AdapterChunk> {
@@ -124,6 +148,20 @@ export class OllamaAdapter implements IProviderAdapter {
             const content = parsed.message?.content || parsed.response;
             if (content) {
               yield { type: "text", text: content };
+            }
+
+            // P1-03: Parse tool calls from message.tool_calls
+            if (parsed.message?.tool_calls) {
+              for (const tc of parsed.message.tool_calls) {
+                yield {
+                  type: "tool_call",
+                  tool_call: {
+                    id: `ollama-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                    name: tc.function.name,
+                    arguments: tc.function.arguments || {},
+                  },
+                };
+              }
             }
 
             if (parsed.done) {

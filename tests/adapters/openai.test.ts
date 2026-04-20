@@ -356,6 +356,16 @@ describe("OpenAIAdapter", () => {
       expect(collected.tool_calls).toHaveLength(1);
       expect(collected.tool_calls[0].name).toBe("broken");
       expect(collected.tool_calls[0].arguments).toEqual({});
+
+      // P11-01: Verify that malformed tool-call JSON emits a logged error/warning
+      const loggerModule = await import("../../src/lib/logger.js");
+      const warnCalls = (loggerModule.default.warn as ReturnType<typeof vi.fn>).mock.calls;
+      const errorCalls = (loggerModule.default.error as ReturnType<typeof vi.fn>).mock.calls;
+      const allCalls = [...warnCalls, ...errorCalls];
+      const hasToolParseLog = allCalls.some(call =>
+        JSON.stringify(call).includes("tool") || JSON.stringify(call).includes("parse") || JSON.stringify(call).includes("JSON")
+      );
+      expect(hasToolParseLog).toBe(true);
     });
   });
 

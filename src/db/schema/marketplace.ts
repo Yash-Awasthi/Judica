@@ -28,8 +28,8 @@ export const marketplaceItems = pgTable(
     stars: integer("stars").default(0).notNull(),
     version: text("version").default("1.0.0").notNull(),
     published: boolean("published").default(false).notNull(),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt", { mode: "date" }).notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull(),
   },
   (table) => [
     index("MarketplaceItem_authorId_idx").on(table.authorId),
@@ -50,10 +50,12 @@ export const marketplaceReviews = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     rating: integer("rating").notNull(),
     comment: text("comment"),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
+  // P2-29: Composite indexes for common query patterns
   (table) => [
     index("MarketplaceReview_itemId_idx").on(table.itemId),
+    index("MarketplaceReview_userId_createdAt_idx").on(table.userId, table.createdAt),
   ],
 );
 
@@ -83,8 +85,12 @@ export const userSkills = pgTable(
     description: text("description").notNull(),
     code: text("code").notNull(),
     parameters: jsonb("parameters").notNull(),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
     active: boolean("active").default(true).notNull(),
   },
-  (table) => [index("UserSkill_userId_idx").on(table.userId)],
+  // P2-29: Composite index for user skill lookups ordered by creation
+  (table) => [
+    index("UserSkill_userId_idx").on(table.userId),
+    index("UserSkill_userId_createdAt_idx").on(table.userId, table.createdAt),
+  ],
 );

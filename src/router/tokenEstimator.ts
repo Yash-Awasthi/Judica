@@ -1,5 +1,10 @@
 import type { AdapterMessage } from "../adapters/types.js";
 
+// P9-66: Token estimation uses character-based heuristics (NOT actual provider billing).
+// Actual billed tokens come from provider API responses (`usage.prompt_tokens`, etc.).
+// This estimator is used PRE-FLIGHT for quota checks and routing decisions only.
+// Post-flight, always prefer the actual token counts from the provider response.
+//
 // Estimate token count before sending to avoid exceeding quotas.
 // Uses character-based heuristics with language-aware adjustments (PRV-11).
 

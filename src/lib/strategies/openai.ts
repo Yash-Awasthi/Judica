@@ -1,6 +1,12 @@
+// P2-05: DEPRECATED — Strictly inferior to src/adapters/openai.adapter.ts.
+// Has regressions vs adapter layer (no tool streaming, missing features).
+// Will be deleted once all callers migrate to adapter.generate().
 import type { Message, Provider } from "../providers.js";
 import { getToolDefinitions, callTool } from "../tools/index.js";
 import { validateSafeUrl } from "../ssrf.js";
+
+// P7-40: Maximum tool-call recursion depth to prevent stack overflow
+const MAX_TOOL_RECURSION_DEPTH = 5;
 
 interface ProviderResult {
   text: string;
@@ -18,7 +24,8 @@ export async function askOpenAI(
   maxTokens: number,
   signal: AbortSignal,
   isFallback: boolean,
-  askFn: (provider: Provider, messages: Message[], isFallback: boolean) => Promise<ProviderResult>
+  askFn: (provider: Provider, messages: Message[], isFallback: boolean, signal?: AbortSignal) => Promise<ProviderResult>,
+  _depth = 0
 ): Promise<ProviderResult> {
   const url = (resolvedBaseUrl ?? "https://api.openai.com/v1").replace(/\/$/, "");
   await validateSafeUrl(url);
@@ -51,13 +58,18 @@ export async function askOpenAI(
 
   const msg = data.choices?.[0]?.message;
   if (msg?.tool_calls?.length) {
+    // P7-40: Prevent infinite recursion
+    if (_depth >= MAX_TOOL_RECURSION_DEPTH) {
+      throw new Error(`Tool-call recursion limit (${MAX_TOOL_RECURSION_DEPTH}) exceeded`);
+    }
     const nextMessages: Message[] = [...normMessages, { role: 'assistant' as const, content: msg.content || '' }];
     for (const tc of msg.tool_calls) {
       const result = await callTool({ id: tc.id, name: tc.function.name, arguments: JSON.parse(tc.function.arguments) });
       const safeResult = `[UNTRUSTED TOOL OUTPUT]\n${result}\n[/UNTRUSTED TOOL OUTPUT]`;
       nextMessages.push({ role: "tool", tool_call_id: tc.id, name: tc.function.name, content: safeResult });
     }
-    return askFn(provider, nextMessages, isFallback);
+    // P1-12: Pass abort signal through to recursive tool call
+    return askFn(provider, nextMessages, isFallback, signal);
   }
 
   const raw = msg?.content || msg?.reasoning || JSON.stringify(data);
@@ -81,7 +93,8 @@ export async function streamOpenAI(
   signal: AbortSignal,
   isFallback: boolean,
   onChunk: (chunk: string) => void,
-  streamFn: (provider: Provider, messages: Message[], onChunk: (c: string) => void, isFallback: boolean) => Promise<ProviderResult>
+  streamFn: (provider: Provider, messages: Message[], onChunk: (c: string) => void, isFallback: boolean, signal?: AbortSignal) => Promise<ProviderResult>,
+  _depth = 0
 ): Promise<ProviderResult> {
   const url = (resolvedBaseUrl ?? "https://api.openai.com/v1").replace(/\/$/, "");
   await validateSafeUrl(url);
@@ -119,11 +132,17 @@ export async function streamOpenAI(
   let usage: ProviderResult["usage"];
   let inThink = false;
   const toolCalls: Array<{ id: string; name: string; args: string }> = [];
+  // P1-10: Buffer across reads and split on \n boundary properly
+  let buffer = "";
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    for (const line of decoder.decode(value).split("\n")) {
+    buffer += decoder.decode(value, { stream: true });
+    let idx: number;
+    while ((idx = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, idx).trim();
+      buffer = buffer.slice(idx + 1);
       if (line.startsWith("data: ") && line !== "data: [DONE]") {
         try {
           const json = JSON.parse(line.slice(6));
@@ -171,6 +190,10 @@ export async function streamOpenAI(
   }
 
   if (toolCalls.length > 0) {
+    // P7-40: Prevent infinite recursion
+    if (_depth >= MAX_TOOL_RECURSION_DEPTH) {
+      throw new Error(`Tool-call recursion limit (${MAX_TOOL_RECURSION_DEPTH}) exceeded`);
+    }
     const finalToolCalls = toolCalls.filter(Boolean);
     const nextMessages = [
       ...normMessages,
@@ -184,7 +207,8 @@ export async function streamOpenAI(
       const safeResult = `[UNTRUSTED TOOL OUTPUT]\n${result.result}\n[/UNTRUSTED TOOL OUTPUT]`;
       nextMessages.push({ role: "tool", tool_call_id: tc.id, name: tc.name, content: safeResult });
     }
-    return streamFn(provider, nextMessages, onChunk, isFallback);
+    // P1-12: Pass abort signal through to recursive tool call
+    return streamFn(provider, nextMessages, onChunk, isFallback, signal);
   }
 
   return { text: fullText, usage };

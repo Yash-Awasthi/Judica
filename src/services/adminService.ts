@@ -320,7 +320,13 @@ export class AdminService {
     const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
     if (!user) throw new Error("User not found");
 
-    await db.delete(users).where(eq(users.id, userId));
+    // P1-18: Soft-delete — deactivate and anonymize instead of hard delete
+    await db.update(users).set({
+      isActive: false,
+      email: `deleted_${userId}@removed.local`,
+      username: `deleted_${userId}`,
+      customInstructions: "",
+    }).where(eq(users.id, userId));
 
     await this.logAction({
       adminId,
@@ -332,6 +338,11 @@ export class AdminService {
   }
 
   static async updateUserRole(userId: number, role: string, adminId: number) {
+    // P1-17: Prevent admin self-demotion
+    if (userId === adminId && role !== "admin" && role !== "owner") {
+      throw new Error("Cannot demote yourself");
+    }
+
     const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
     if (!user) throw new Error("User not found");
 

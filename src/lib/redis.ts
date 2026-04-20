@@ -1,3 +1,33 @@
+// P2-24: This uses the `redis` (node-redis) package for application data.
+// @fastify/rate-limit requires `ioredis` — see middleware/rateLimit.ts.
+// Two Redis clients are intentional: rate-limit needs ioredis API compatibility.
+// Future: consider migrating app data to ioredis to unify into one client.
+//
+// P9-40: TODO — Single Redis client shared for all operations (rate limiting, cache, pub/sub).
+// Under high throughput, consider connection pooling or separate clients per concern:
+//   - Rate limiting: low-latency, high-frequency INCR/EXPIRE
+//   - Cache: larger payloads, less frequent
+//   - Pub/sub: long-lived subscriptions (MUST be a separate connection)
+//
+// P4-11: Redis Memory Cap Guidance
+// ─────────────────────────────────
+// Without a maxmemory policy, Redis will grow unbounded and OOM the host.
+// This is especially dangerous with long-running artifact streams and semantic cache.
+//
+// Recommended redis.conf settings for production:
+//   maxmemory 512mb                    # Adjust based on available RAM
+//   maxmemory-policy allkeys-lru       # Evict least-recently-used keys under pressure
+//
+// For Docker/Kubernetes deployments:
+//   docker run redis --maxmemory 512mb --maxmemory-policy allkeys-lru
+//
+// Key TTL guidelines:
+//   - Semantic cache entries: 24h TTL (set in cache.ts)
+//   - Rate limit keys: 60s TTL
+//   - Session keys: 7d TTL
+//   - Artifact streams: should be cleaned up after completion
+//
+// Monitor with: redis-cli INFO memory | grep used_memory_human
 import { createClient, RedisClientType } from "redis";
 import { env } from "../config/env.js";
 import logger from "./logger.js";
@@ -9,8 +39,10 @@ async function initRedis(): Promise<RedisClientType> {
       connectTimeout: 5000,
       reconnectStrategy: (retries) => {
         if (retries > 10) {
-          logger.error("Redis max reconnection attempts reached");
-          return new Error("Redis max reconnection attempts reached");
+          // P9-37: Log and allow process to continue (don't throw) —
+          // returning false stops reconnection; wrapper methods handle unavailability gracefully.
+          logger.error("Redis max reconnection attempts reached — operating in degraded mode");
+          return false as unknown as number;
         }
         return Math.min(retries * 100, 3000);
       },
@@ -60,14 +92,16 @@ const redisWrapper = {
     }
   },
 
+  // P9-38: Document precedence — PX takes priority over EX when both are provided
   async set(key: string, value: string, options?: { EX?: number; PX?: number }): Promise<string | null> {
     try {
       const client = await getRedis();
-      if (options?.EX) {
-        return await client.set(key, value, { EX: options.EX });
-      }
+      // P9-38: PX (milliseconds) takes precedence over EX (seconds) if both given
       if (options?.PX) {
         return await client.set(key, value, { PX: options.PX });
+      }
+      if (options?.EX) {
+        return await client.set(key, value, { EX: options.EX });
       }
       return await client.set(key, value);
     } catch {
@@ -103,10 +137,15 @@ const redisWrapper = {
     } catch { /* ignore */ }
   },
 
+  // P9-39: Replace O(n) KEYS with SCAN cursor to avoid blocking Redis event loop
   async keys(pattern: string): Promise<string[]> {
     try {
       const client = await getRedis();
-      return await client.keys(pattern);
+      const results: string[] = [];
+      for await (const key of client.scanIterator({ MATCH: pattern, COUNT: 100 })) {
+        results.push(key);
+      }
+      return results;
     } catch {
       return [];
     }
@@ -135,9 +174,15 @@ const redisWrapper = {
     }
   },
 
-  async flushAll(): Promise<string> {
+  // P9-36: flushAll requires explicit DANGER flag — prevents accidental production wipe
+  async flushAll(options?: { DANGER_CONFIRM: true }): Promise<string> {
+    if (!options?.DANGER_CONFIRM) {
+      logger.error("flushAll() called without DANGER_CONFIRM flag — refusing to execute");
+      throw new Error("flushAll() requires { DANGER_CONFIRM: true } to prevent accidental data loss");
+    }
     try {
       const client = await getRedis();
+      logger.warn("Executing Redis FLUSHALL — all data will be deleted");
       return await client.flushAll();
     } catch {
       return "OK";

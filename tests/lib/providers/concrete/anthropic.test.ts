@@ -74,7 +74,7 @@ describe("AnthropicProvider", () => {
         method: "POST",
         headers: expect.objectContaining({
           "x-api-key": "sk-test-key",
-          "anthropic-version": "2023-06-01",
+          "anthropic-version": "2023-10-01",
         }),
       })
     );

@@ -137,4 +137,42 @@ describe("webhooks.service", () => {
       expect(headers["X-Webhook-Signature"]).toMatch(/^sha256=/);
     });
   });
+
+  // P6-10: SSRF protection — verify private IP ranges are blocked before delivery
+  describe("SSRF protection", () => {
+    it("should reject localhost webhook URL", () => {
+      expect(() =>
+        registerWebhook({ url: "http://localhost/hook", events: ["verdict.reached"], enabled: true, retries: 0 })
+      ).toThrow(/restricted hostname/);
+    });
+
+    it("should reject 127.0.0.1 webhook URL", () => {
+      expect(() =>
+        registerWebhook({ url: "http://127.0.0.1/hook", events: ["verdict.reached"], enabled: true, retries: 0 })
+      ).toThrow(/restricted hostname/);
+    });
+
+    it("should reject .internal hostname", () => {
+      expect(() =>
+        registerWebhook({ url: "http://metadata.google.internal/compute", events: ["verdict.reached"], enabled: true, retries: 0 })
+      ).toThrow(/restricted hostname/);
+    });
+
+    it("should reject .local hostname", () => {
+      expect(() =>
+        registerWebhook({ url: "http://myservice.local/hook", events: ["verdict.reached"], enabled: true, retries: 0 })
+      ).toThrow(/restricted hostname/);
+    });
+
+    it("should reject [::1] IPv6 loopback", () => {
+      expect(() =>
+        registerWebhook({ url: "http://[::1]/hook", events: ["verdict.reached"], enabled: true, retries: 0 })
+      ).toThrow(/restricted hostname/);
+    });
+
+    it("should allow public URLs", () => {
+      const wh = registerWebhook({ url: "https://hooks.example.com/wh", events: ["verdict.reached"], enabled: true, retries: 0 });
+      expect(wh.id).toMatch(/^wh_/);
+    });
+  });
 });

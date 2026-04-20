@@ -1,3 +1,5 @@
+// P2-04: DEPRECATED — This config duplicates adapter registry metadata.
+// New code should use src/adapters/registry.ts for provider resolution.
 import logger from "../lib/logger.js";
 import { env } from "./env.js";
 

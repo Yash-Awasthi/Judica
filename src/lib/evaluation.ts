@@ -52,13 +52,14 @@ export async function evaluateCouncilSession(
     const efficiency = calculateEfficiency(totalTokens, agentOutputs.length, duration);
 
     const weights = { coherence: 0.25, consensus: 0.25, diversity: 0.2, quality: 0.2, efficiency: 0.1 };
-    const overallScore = (
+    // P10-52: All criteria normalized to [0,1]; overallScore is [0,100] (criteria * 100)
+    const overallScore = Math.max(0, Math.min(100, (
       coherence * weights.coherence +
       consensus * weights.consensus +
       diversity * weights.diversity +
       quality * weights.quality +
       efficiency * weights.efficiency
-    ) * 100;
+    ) * 100));
 
     const recommendations = generateRecommendations({
       coherence,
@@ -141,8 +142,11 @@ function calculateDiversity(outputs: AgentOutput[]): number {
   const meanLength = lengths.reduce((sum, l) => sum + l, 0) / lengths.length;
   const lengthVariance = lengths.reduce((sum, l) => sum + Math.pow(l - meanLength, 2), 0) / lengths.length;
 
-  const confidenceDiversity = Math.min(variance * 4, 1); // Scale variance to 0-1
-  const lengthDiversity = Math.min(lengthVariance / 10000, 1); // Scale length variance
+  // P10-49: Normalize diversity scores relative to council size
+  // Larger councils naturally have more variance; normalize to make scores comparable
+  const sizeFactor = Math.log2(outputs.length) / Math.log2(10); // Normalize to ~10 agents
+  const confidenceDiversity = Math.min(variance * 4 / Math.max(sizeFactor, 0.5), 1);
+  const lengthDiversity = Math.min(lengthVariance / (10000 * Math.max(sizeFactor, 0.5)), 1);
 
   const allKeywords = new Set<string>();
   outputs.forEach(o => {
@@ -150,7 +154,9 @@ function calculateDiversity(outputs: AgentOutput[]): number {
     keywords.forEach(k => allKeywords.add(k));
   });
 
-  const keywordDiversity = Math.min(allKeywords.size / (outputs.length * 10), 1);
+  // P10-49: Normalize keyword diversity by expected keywords per agent
+  const expectedKeywordsPerAgent = 8;
+  const keywordDiversity = Math.min(allKeywords.size / (outputs.length * expectedKeywordsPerAgent), 1);
 
   return (confidenceDiversity + lengthDiversity + keywordDiversity) / 3;
 }
@@ -161,26 +167,25 @@ function calculateQuality(outputs: AgentOutput[]): number {
   for (const output of outputs) {
     let quality = 0;
 
-    const answerLength = output.answer.length;
-    if (answerLength > 50 && answerLength < 1000) {
-      quality += 0.3;
-    } else if (answerLength >= 1000) {
-      quality += 0.2; // Penalize overly long answers
-    }
+    // P10-47: Use semantic quality metrics instead of pure length
+    // Structural completeness: has answer, reasoning, key points
+    const hasSubstantiveAnswer = output.answer.length >= 50;
+    const hasReasoning = output.reasoning.length >= 50;
+    const hasKeyPoints = output.key_points.length >= 2;
+    const hasAssumptions = output.assumptions.length > 0;
 
-    const reasoningLength = output.reasoning.length;
-    if (reasoningLength > 100 && reasoningLength < 2000) {
-      quality += 0.3;
-    } else if (reasoningLength >= 2000) {
-      quality += 0.2;
-    }
+    if (hasSubstantiveAnswer) quality += 0.25;
+    if (hasReasoning) quality += 0.25;
+    if (hasKeyPoints) quality += 0.2;
+    if (hasAssumptions) quality += 0.1;
 
-    if (output.key_points.length >= 2 && output.key_points.length <= 5) {
-      quality += 0.2;
-    }
-
+    // Confidence calibration: penalize extreme overconfidence or underconfidence
     if (output.confidence >= 0.3 && output.confidence <= 0.9) {
       quality += 0.2;
+    } else if (output.confidence > 0.95) {
+      quality += 0.05; // Overconfidence penalty
+    } else {
+      quality += 0.1;
     }
 
     totalQuality += quality;
@@ -189,24 +194,31 @@ function calculateQuality(outputs: AgentOutput[]): number {
   return outputs.length > 0 ? totalQuality / outputs.length : 0;
 }
 
+// P10-48: Configurable efficiency baselines via environment variables
+const OPTIMAL_DURATION_PER_AGENT_MS = parseInt(process.env.EVAL_OPTIMAL_DURATION_PER_AGENT_MS || "10000", 10);
+const OPTIMAL_TOKENS_PER_AGENT = parseInt(process.env.EVAL_OPTIMAL_TOKENS_PER_AGENT || "1000", 10);
+
 function calculateEfficiency(totalTokens: number, agentCount: number, duration: number): number {
   const tokensPerAgent = totalTokens / agentCount;
 
-  const optimalDuration = agentCount * 10000; // 10 seconds per agent
+  const optimalDuration = agentCount * OPTIMAL_DURATION_PER_AGENT_MS;
   const timeEfficiency = Math.max(0, 1 - Math.abs(duration - optimalDuration) / optimalDuration);
 
-  const optimalTokensPerAgent = 1000;
-  const tokenEfficiency = Math.max(0, 1 - Math.abs(tokensPerAgent - optimalTokensPerAgent) / optimalTokensPerAgent);
+  const tokenEfficiency = Math.max(0, 1 - Math.abs(tokensPerAgent - OPTIMAL_TOKENS_PER_AGENT) / OPTIMAL_TOKENS_PER_AGENT);
 
   return (timeEfficiency + tokenEfficiency) / 2;
 }
 
 function extractKeywords(text: string): string[] {
+  // P10-53: Improved keyword extraction — handle punctuation, multi-word terms, stopwords
   const words = text.toLowerCase()
-    .replace(/[^\w\s]/g, ' ')
-    .split(/\s+/)
+    .replace(/[^\w\s-]/g, ' ') // Keep hyphens for compound words
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
     .filter(word => word.length > 3)
-    .filter(word => !isStopWord(word));
+    .filter(word => !isStopWord(word))
+    .filter(word => !/^\d+$/.test(word)); // Filter pure numbers
 
   return [...new Set(words)].slice(0, 20);
 }
@@ -288,7 +300,14 @@ async function storeEvaluationResult(result: EvaluationResult): Promise<void> {
       timestamp: result.timestamp
     });
   } catch (err) {
-    logger.error({ err: (err as Error).message }, "Failed to store evaluation result");
+    // P10-55: Log at error level with structured context for alerting
+    logger.error({
+      err: (err as Error).message,
+      sessionId: result.sessionId,
+      userId: result.userId,
+      overallScore: result.overallScore,
+      alert: "evaluation_persistence_failure" // Structured field for log-based alerting
+    }, "CRITICAL: Failed to persist evaluation metrics — data loss");
   }
 }
 
@@ -319,11 +338,16 @@ export async function getUserEvaluationMetrics(userId: number, days: number = 30
     };
   }
 
+  // P10-54: Require minimum sample size for stable rolling averages
+  const MIN_SAMPLE_SIZE = 3;
+  const stableResults = results.length >= MIN_SAMPLE_SIZE;
+
   const averageConsensus = results.reduce((sum, e) => sum + e.consensus, 0) / results.length;
   const averageDiversity = results.reduce((sum, e) => sum + e.diversity, 0) / results.length;
   const averageQuality = results.reduce((sum, e) => sum + e.quality, 0) / results.length;
   const averageEfficiency = results.reduce((sum, e) => sum + e.efficiency, 0) / results.length;
 
+  // P10-54: Only compute trend when enough samples exist
   const midpoint = Math.floor(results.length / 2);
   const firstHalf = results.slice(0, midpoint);
   const secondHalf = results.slice(midpoint);
@@ -331,7 +355,7 @@ export async function getUserEvaluationMetrics(userId: number, days: number = 30
   const firstHalfAvg = firstHalf.length > 0 ? firstHalf.reduce((sum, e) => sum + e.overallScore, 0) / firstHalf.length : 0;
   const secondHalfAvg = secondHalf.length > 0 ? secondHalf.reduce((sum, e) => sum + e.overallScore, 0) / secondHalf.length : 0;
 
-  const improvementTrend = secondHalfAvg - firstHalfAvg;
+  const improvementTrend = stableResults ? (secondHalfAvg - firstHalfAvg) : 0; // P10-54: No trend from <3 samples
 
   return {
     averageConsensus,
@@ -340,6 +364,8 @@ export async function getUserEvaluationMetrics(userId: number, days: number = 30
     averageEfficiency,
     totalEvaluations: results.length,
     improvementTrend,
+    // P10-51: userSatisfaction requires user feedback integration (thumbs up/down)
+    // Currently returns 0 until feedback collection is wired up in the UI
     userSatisfaction: 0
   };
 }
@@ -368,7 +394,10 @@ export async function benchmarkCouncilPerformance(
   const userScore = metrics.averageConsensus * 25 + metrics.averageQuality * 25 + metrics.averageDiversity * 25 + metrics.averageEfficiency * 25;
   const benchmarkScore = (Number(benchmarks?.avgOverallScore) || 0) * 100;
 
-  const percentile = Math.max(0, Math.min(100, (userScore / benchmarkScore) * 100));
+  // P10-50: Fix percentile — use proper ratio with NaN guard
+  const percentile = benchmarkScore > 0
+    ? Math.max(0, Math.min(100, (userScore / benchmarkScore) * 50)) // 50 = at benchmark average
+    : (userScore > 0 ? 75 : 50); // No benchmark data: default to above-average if user has score
 
   let ranking: 'excellent' | 'good' | 'average' | 'below_average';
   if (percentile >= 90) ranking = 'excellent';

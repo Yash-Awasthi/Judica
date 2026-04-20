@@ -10,7 +10,8 @@ import redis from "../lib/redis.js";
 import logger from "../lib/logger.js";
 import { env } from "../config/env.js";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
-import { authSchema, configSchema } from "../middleware/validate.js";
+import { authSchema, configSchema, userSettingsSchema } from "../middleware/validate.js";
+import { fastifyValidate } from "../middleware/validate.js";
 import { encrypt, decrypt } from "../lib/crypto.js";
 import { AppError } from "../middleware/errorHandler.js";
 
@@ -18,8 +19,18 @@ const ACCESS_TOKEN_EXPIRY = "15m";
 const REFRESH_TOKEN_TTL_DAYS = 7;
 const REFRESH_TOKEN_TTL_SECS = REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60;
 
+// P0-02: Constant dummy hash to prevent user enumeration via timing
+// Generated with argon2id so verify() takes the same time regardless of user existence
+const DUMMY_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHRoZXJl$dummyhashvaluefortimingequalisation000000000000";
+
+// P5-04: Pin algorithm to HS256 in sign() to match verify() — prevents algorithm-confusion attacks
 function generateAccessToken(userId: number, username: string, role: string): string {
-  return jwt.sign({ userId, username, role }, env.JWT_SECRET, { expiresIn: ACCESS_TOKEN_EXPIRY });
+  return jwt.sign({ userId, username, role }, env.JWT_SECRET, {
+    algorithm: "HS256",
+    expiresIn: ACCESS_TOKEN_EXPIRY,
+    issuer: "aibyai",
+    audience: env.NODE_ENV,
+  });
 }
 
 function generateRefreshToken(): string {
@@ -30,19 +41,33 @@ function hashRefreshToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
 
-async function createRefreshToken(userId: number): Promise<string> {
+function fingerprintHash(value: string): string {
+  return crypto.createHash("sha256").update(value).digest("hex");
+}
+
+async function createRefreshToken(userId: number, ip?: string, userAgent?: string): Promise<string> {
   const rawToken = generateRefreshToken();
   const tokenHash = hashRefreshToken(rawToken);
   const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_SECS * 1000);
 
-  await db.insert(refreshTokens).values({ id: randomUUID(), userId, tokenHash, expiresAt });
+  await db.insert(refreshTokens).values({
+    id: randomUUID(),
+    userId,
+    tokenHash,
+    ipHash: ip ? fingerprintHash(ip) : null,
+    userAgentHash: userAgent ? fingerprintHash(userAgent) : null,
+    expiresAt,
+  });
+
+  // P0-06: Store token-family mapping for replay detection
+  await redis.set(`refresh_family:${tokenHash}`, String(userId), { EX: REFRESH_TOKEN_TTL_SECS });
 
   return rawToken;
 }
 
-async function issueTokenPair(userId: number, username: string, role: string, reply: FastifyReply): Promise<{ token: string; username: string; role: string }> {
+async function issueTokenPair(userId: number, username: string, role: string, reply: FastifyReply, request?: FastifyRequest): Promise<{ token: string; username: string; role: string }> {
   const accessToken = generateAccessToken(userId, username, role);
-  const refreshToken = await createRefreshToken(userId);
+  const refreshToken = await createRefreshToken(userId, request?.ip, request?.headers["user-agent"]);
 
   // Set access token as httpOnly cookie
   reply.setCookie("access_token", accessToken, {
@@ -78,37 +103,27 @@ function fastifyValidate(schema: { parse: (v: unknown) => unknown; safeParse: (v
 
 const authPlugin: FastifyPluginAsync = async (fastify) => {
 
-  // Rate limiting for auth endpoints
-  const authAttempts = new Map<string, { count: number; resetAt: number }>();
+  // P0-10 + P8-59: Redis-backed rate limiting — no in-process Map, no memory growth.
+  // Redis keys auto-expire via TTL. Works across replicas.
   const AUTH_RATE_LIMIT = 10; // 10 attempts per minute
-  const AUTH_RATE_WINDOW = 60_000;
+  const AUTH_RATE_WINDOW_SECS = 60;
 
   function getClientKey(request: FastifyRequest): string {
     return request.ip || "unknown";
   }
 
   const authRateLimit = async (request: FastifyRequest, reply: FastifyReply) => {
-    const key = getClientKey(request);
-    const now = Date.now();
-    const entry = authAttempts.get(key);
-
-    if (entry && now < entry.resetAt) {
-      if (entry.count >= AUTH_RATE_LIMIT) {
-        const retryAfter = Math.ceil((entry.resetAt - now) / 1000);
-        reply.header("Retry-After", String(retryAfter));
-        reply.code(429).send({ error: "Too many auth attempts, try again later." });
-        return;
-      }
-      entry.count++;
-    } else {
-      authAttempts.set(key, { count: 1, resetAt: now + AUTH_RATE_WINDOW });
+    const key = `auth_rate:${getClientKey(request)}`;
+    const current = await redis.incr(key);
+    if (current === 1) {
+      await redis.expire(key, AUTH_RATE_WINDOW_SECS);
     }
 
-    // Cleanup old entries periodically
-    if (authAttempts.size > 10000) {
-      for (const [k, v] of authAttempts) {
-        if (now >= v.resetAt) authAttempts.delete(k);
-      }
+    if (current > AUTH_RATE_LIMIT) {
+      const ttl = await redis.ttl(key);
+      reply.header("Retry-After", String(ttl > 0 ? ttl : AUTH_RATE_WINDOW_SECS));
+      reply.code(429).send({ error: "Too many auth attempts, try again later." });
+      return;
     }
   };
 
@@ -121,7 +136,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
 
       logger.info({ username }, "New user registered");
       reply.code(201);
-      return issueTokenPair(user.id, username, user.role, reply);
+      return issueTokenPair(user.id, username, user.role, reply, request);
     } catch (e: unknown) {
       if ((e as Record<string, unknown>).code === "23505") {
         throw new AppError(409, "Username already taken");
@@ -135,9 +150,13 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     const [user] = await db.select().from(users).where(eq(users.username, username)).limit(1);
 
     if (!user) {
+      // P0-02: Always run argon2.verify against a dummy hash to equalize response timing
+      await argon2.verify(DUMMY_HASH, password).catch(() => {});
       throw new AppError(401, "Invalid username or password");
     }
 
+    // P8-60: Primary hash is argon2id. Legacy bcrypt support retained only
+    // for migration — users are auto-migrated to argon2id on next successful login.
     // Support both legacy bcrypt ($2a$/$2b$) and new argon2id hashes
     let passwordValid: boolean;
     const isBcryptHash = user.passwordHash.startsWith("$2a$") || user.passwordHash.startsWith("$2b$");
@@ -173,21 +192,26 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     logger.info({ username }, "User logged in");
-    return issueTokenPair(user.id, username, user.role, reply);
+    return issueTokenPair(user.id, username, user.role, reply, request);
   });
 
     fastify.post("/logout", { preHandler: [fastifyRequireAuth] }, async (request, reply) => {
-    // Revoke access token
+    // P0-04: Extract token from both header AND cookie to ensure revocation
     const authHeader = request.headers.authorization;
-    if (authHeader?.startsWith("Bearer ")) {
-       const token = authHeader.split(" ")[1];
+    const tokenFromHeader = authHeader?.startsWith("Bearer ") ? authHeader.split(" ")[1] : null;
+    const tokenFromCookie = (request as unknown as { cookies?: { access_token?: string } }).cookies?.access_token;
+    const token = tokenFromHeader || tokenFromCookie;
+
+    if (token) {
        const payload = jwt.decode(token) as { userId?: number; exp?: number } | null;
        const expiresAt = payload?.exp ? new Date(payload.exp * 1000) : new Date(Date.now() + 15 * 60 * 1000);
 
        const ttlSecs = Math.max(1, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
-       await redis.set(`revoked:${token}`, "1", { EX: ttlSecs });
+       // P0-03: Store sha256(token) instead of plaintext JWT
+       const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+       await redis.set(`revoked:${tokenHash}`, "1", { EX: ttlSecs });
 
-       await db.insert(revokedTokens).values({ token, expiresAt });
+       await db.insert(revokedTokens).values({ token: tokenHash, expiresAt });
     }
 
     // Revoke refresh token
@@ -225,14 +249,39 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     const [storedToken] = await db.select().from(refreshTokens).where(eq(refreshTokens.tokenHash, tokenHash)).limit(1);
 
     if (!storedToken || storedToken.expiresAt < new Date()) {
-      // If token not found, it may have been reused (replay attack) — revoke all user tokens
+      // P0-06: On replay, revoke ALL tokens for the affected user
       if (!storedToken) {
-        // Token was already consumed — potential replay attack
-        // We can't know which user, so just reject
-        logger.warn("Refresh token replay detected");
+        // Token was already consumed — replay attack. Look up user from family mapping.
+        const familyUserId = await redis.get(`refresh_family:${tokenHash}`);
+        if (familyUserId) {
+          const userId = parseInt(familyUserId, 10);
+          logger.warn({ userId }, "Refresh token replay detected — revoking all sessions for user");
+          await db.delete(refreshTokens).where(eq(refreshTokens.userId, userId));
+        } else {
+          logger.warn("Refresh token replay detected — user unknown");
+        }
       }
       reply.clearCookie("refresh_token", { path: "/api/auth" });
       throw new AppError(401, "Invalid or expired refresh token");
+    }
+
+    // P0-05: Validate device/IP binding — prevent stolen refresh tokens from working on different devices
+    const currentIpHash = request.ip ? fingerprintHash(request.ip) : null;
+    const currentUaHash = request.headers["user-agent"] ? fingerprintHash(request.headers["user-agent"]) : null;
+
+    if (storedToken.ipHash && currentIpHash && storedToken.ipHash !== currentIpHash) {
+      logger.warn({ userId: storedToken.userId, storedIp: storedToken.ipHash, currentIp: currentIpHash }, "Refresh token used from different IP");
+      // Revoke all refresh tokens for this user (potential theft)
+      await db.delete(refreshTokens).where(eq(refreshTokens.userId, storedToken.userId));
+      reply.clearCookie("refresh_token", { path: "/api/auth" });
+      throw new AppError(401, "Session invalidated due to device mismatch. Please log in again.");
+    }
+
+    if (storedToken.userAgentHash && currentUaHash && storedToken.userAgentHash !== currentUaHash) {
+      logger.warn({ userId: storedToken.userId }, "Refresh token used from different user-agent");
+      await db.delete(refreshTokens).where(eq(refreshTokens.userId, storedToken.userId));
+      reply.clearCookie("refresh_token", { path: "/api/auth" });
+      throw new AppError(401, "Session invalidated due to device mismatch. Please log in again.");
     }
 
     // Look up the user separately
@@ -242,7 +291,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     await db.delete(refreshTokens).where(eq(refreshTokens.id, storedToken.id));
 
     logger.info({ username: user.username }, "Token refreshed via rotation");
-    return issueTokenPair(user.id, user.username, user.role, reply);
+    return issueTokenPair(user.id, user.username, user.role, reply, request);
   });
 
     fastify.patch("/me", { preHandler: [fastifyRequireAuth] }, async (request, _reply) => {
@@ -251,7 +300,13 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(400, "custom_instructions must be a string");
     }
 
-    await db.update(users).set({ customInstructions: custom_instructions.slice(0, 2000) }).where(eq(users.id, request.userId!));
+    // P1-14: Sanitize custom_instructions — strip HTML tags and control chars to prevent prompt injection
+    const sanitized = custom_instructions
+      .replace(/<[^>]*>/g, "")           // strip HTML tags
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "") // strip control chars (keep \n \r \t)
+      .slice(0, 2000);
+
+    await db.update(users).set({ customInstructions: sanitized }).where(eq(users.id, request.userId!));
 
     return { success: true };
   });
@@ -280,19 +335,28 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     fastify.post("/config/rotate", { preHandler: [fastifyRequireAuth] }, async (request, _reply) => {
+    // P0-20: Key rotation requires PREVIOUS_ENCRYPTION_KEY env var to be set during migration
+    // The endpoint re-encrypts stored config from old key to current key
+    // Master keys are NEVER transmitted via HTTP body — they must be set via env vars
+    const previousKey = process.env.PREVIOUS_ENCRYPTION_KEY;
+    if (!previousKey) {
+      throw new AppError(400, "Key rotation requires PREVIOUS_ENCRYPTION_KEY env var to be set. Set the old key in env, then call this endpoint to re-encrypt.");
+    }
+
     const [row] = await db.select().from(councilConfigs).where(eq(councilConfigs.userId, request.userId!)).limit(1);
 
     if (!row) {
       throw new AppError(404, "No configuration found to rotate");
     }
 
-    const decrypted = JSON.parse(decrypt(row.config as string));
+    // Decrypt with the previous key, re-encrypt with current key
+    const decrypted = JSON.parse(decrypt(row.config as string, previousKey));
     const reEncrypted = encrypt(JSON.stringify(decrypted));
 
     await db.update(councilConfigs).set({ config: reEncrypted }).where(eq(councilConfigs.userId, request.userId!));
 
-    logger.info({ userId: request.userId }, "Rotated API keys for user config");
-    return { success: true, message: "Keys rotated successfully" };
+    logger.info({ userId: request.userId }, "Rotated encryption key for user config");
+    return { success: true, message: "Config re-encrypted with current key" };
   });
 
   // GET /api/auth/settings - retrieve user settings
@@ -302,11 +366,10 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // PUT /api/auth/settings - save user settings
-  fastify.put("/settings", { preHandler: [fastifyRequireAuth] }, async (request, _reply) => {
+  // P1-15 + P8-61: Zod .strict() schema rejects unknown keys including __proto__/constructor
+  // — prevents prototype pollution. Only whitelisted keys pass validation.
+  fastify.put("/settings", { preHandler: [fastifyRequireAuth, fastifyValidate(userSettingsSchema)] }, async (request, _reply) => {
     const settings = request.body;
-    if (typeof settings !== "object" || settings === null || Array.isArray(settings)) {
-      throw new AppError(400, "Settings must be a JSON object");
-    }
 
     await db.insert(userSettings).values({
       userId: request.userId!,

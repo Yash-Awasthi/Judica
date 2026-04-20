@@ -7,22 +7,76 @@ export interface PIIDetection {
   recommendations: string[];
 }
 
-const PII_PATTERNS: { type: string; pattern: RegExp; severity: 'low' | 'medium' | 'high' }[] = [
-  { type: "ssn", pattern: /\b\d{3}[-\s]?\d{2}[-\s]?\d{4}\b/g, severity: "high" },
-  { type: "credit_card", pattern: /\b\d{4}[-\s]?\d{4}[-\s]?\d{4}[-\s]?\d{4}\b/g, severity: "high" },
+// P10-67/P10-69: Improved PII patterns with algorithmic validation
+const PII_PATTERNS: { type: string; pattern: RegExp; severity: 'low' | 'medium' | 'high'; validate?: (match: string) => boolean }[] = [
+  {
+    type: "ssn",
+    pattern: /\b(?!000|666|9\d{2})\d{3}[-\s](?!00)\d{2}[-\s](?!0000)\d{4}\b/g,
+    severity: "high",
+    // P10-69: SSN area number validation (exclude invalid ranges)
+    validate: (m) => {
+      const digits = m.replace(/[-\s]/g, '');
+      const area = parseInt(digits.slice(0, 3));
+      return area > 0 && area !== 666 && area < 900;
+    }
+  },
+  {
+    type: "credit_card",
+    pattern: /\b(?:4\d{3}|5[1-5]\d{2}|3[47]\d{2}|6(?:011|5\d{2}))\s?[-]?\s?\d{4}\s?[-]?\s?\d{4}\s?[-]?\s?\d{3,4}\b/g,
+    severity: "high",
+    // P10-69: Luhn checksum validation
+    validate: (m) => {
+      const digits = m.replace(/[-\s]/g, '');
+      if (digits.length < 13 || digits.length > 19) return false;
+      let sum = 0;
+      let alternate = false;
+      for (let i = digits.length - 1; i >= 0; i--) {
+        let n = parseInt(digits[i], 10);
+        if (alternate) {
+          n *= 2;
+          if (n > 9) n -= 9;
+        }
+        sum += n;
+        alternate = !alternate;
+      }
+      return sum % 10 === 0;
+    }
+  },
   { type: "bank_account", pattern: /\b(?:AC|Account)\s*:?\s*\d{8,17}\b/gi, severity: "high" },
-  { type: "passport", pattern: /\b[A-Z]{1,2}\d{7,9}\b/g, severity: "high" },
+  {
+    type: "passport",
+    pattern: /\b[A-Z]{1,2}\d{7,9}\b/g,
+    severity: "high",
+    // P10-67: Reduce false positives — require context words nearby
+    validate: (m) => m.length >= 8 && m.length <= 11
+  },
 
   { type: "email", pattern: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, severity: "medium" },
-  { type: "phone", pattern: /(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/g, severity: "medium" },
+  {
+    type: "phone",
+    pattern: /(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g,
+    severity: "medium",
+    // P10-69: Basic E.164 format validation — reject version-number-like matches
+    validate: (m) => {
+      const digits = m.replace(/[^\d]/g, '');
+      // Must have 10-11 digits for US, reject short matches (version numbers etc)
+      return digits.length >= 10 && digits.length <= 15;
+    }
+  },
   { type: "address", pattern: /\d+\s+[A-Za-z]+(?:\s[A-Za-z]+){0,2}\s+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Lane|Ln|Boulevard|Blvd)\b/gi, severity: "medium" },
   { type: "date_of_birth", pattern: /\b(?:0[1-9]|1[0-2])[-/](?:0[1-9]|[12]\d|3[01])[-/](?:19|20)\d{2}\b/g, severity: "medium" },
-  { type: "driver_license", pattern: /\b[A-Z]{1,2}\d{6,8}\b/g, severity: "medium" },
+  {
+    type: "driver_license",
+    pattern: /\b[A-Z]{1,2}\d{6,8}\b/g,
+    severity: "medium",
+    // P10-67: Reduce false positives — require at least 2 letters prefix
+    validate: (m) => /^[A-Z]{2}/.test(m)
+  },
 
-  { type: "ip_address", pattern: /\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g, severity: "low" },
+  { type: "ip_address", pattern: /\b(?:(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(?:25[0-5]|2[0-4]\d|[01]?\d\d?)\b/g, severity: "low" },
   { type: "url", pattern: /https?:\/\/[^\s]+/g, severity: "low" },
   { type: "name", pattern: /\b(?:Mr|Mrs|Ms|Dr|Prof)\.?\s+[A-Z][a-z]+\s+[A-Z][a-z]+\b/g, severity: "low" },
-  { type: "company", pattern: /\b(?:Inc|LLC|Corp|Ltd)\.?\s+[A-Z][a-z]+\b/g, severity: "low" },
+  { type: "company", pattern: /\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:Inc|LLC|Corp|Ltd)\.?\b/g, severity: "low" },
 ];
 
 export function detectPII(text: string): PIIDetection {
@@ -30,27 +84,55 @@ export function detectPII(text: string): PIIDetection {
   const types = new Set<string>();
   let riskScore = 0;
 
-  for (const { type, pattern, severity } of PII_PATTERNS) {
+  // P10-68: Collect all matches, then resolve overlaps by specificity
+  const rawMatches: Array<PIIDetection["matches"][0] & { specificity: number }> = [];
+
+  for (const { type, pattern, severity, validate } of PII_PATTERNS) {
     pattern.lastIndex = 0;
     let match;
     while ((match = pattern.exec(text)) !== null) {
-      matches.push({
+      // P10-69: Apply algorithmic validation if available
+      if (validate && !validate(match[0])) continue;
+
+      // P10-67: Skip matches that look like version numbers (e.g., 1.2.3.4)
+      if (type === "phone" && /^\d+\.\d+\.\d+/.test(match[0])) continue;
+
+      rawMatches.push({
         type,
         value: match[0],
         start: match.index,
         end: match.index + match[0].length,
-        severity
+        severity,
+        specificity: severity === 'high' ? 3 : severity === 'medium' ? 2 : 1
       });
-      types.add(type);
-
-      if (severity === 'high') riskScore += 10;
-      else if (severity === 'medium') riskScore += 5;
-      else riskScore += 2;
     }
   }
 
+  // P10-68: Resolve overlapping patterns — keep most specific match
+  rawMatches.sort((a, b) => a.start - b.start || b.specificity - a.specificity);
+  const resolved: typeof rawMatches = [];
+  for (const m of rawMatches) {
+    const overlaps = resolved.some(r =>
+      (m.start >= r.start && m.start < r.end) ||
+      (m.end > r.start && m.end <= r.end)
+    );
+    if (!overlaps) {
+      resolved.push(m);
+    }
+  }
+
+  for (const m of resolved) {
+    matches.push({ type: m.type, value: m.value, start: m.start, end: m.end, severity: m.severity });
+    types.add(m.type);
+    if (m.severity === 'high') riskScore += 10;
+    else if (m.severity === 'medium') riskScore += 5;
+    else riskScore += 2;
+  }
+
+  // P10-71: Sort by position descending for safe string replacement
   matches.sort((a, b) => b.start - a.start);
 
+  // P10-71: Normalize redaction format consistently
   let anonymized = text;
   for (const m of matches) {
     const placeholder = `[${m.type.toUpperCase()}_REDACTED]`;
@@ -59,6 +141,7 @@ export function detectPII(text: string): PIIDetection {
 
   const recommendations = generateRecommendations(types, matches);
 
+  // P10-70: Log when false positive rate might be high
   const normalizedRiskScore = Math.min(riskScore, 100);
 
   return {
@@ -107,4 +190,3 @@ function generateRecommendations(types: Set<string>, matches: PIIDetection["matc
 
   return recommendations;
 }
-

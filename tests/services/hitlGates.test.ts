@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("../../src/lib/logger.js", () => ({
   default: {
@@ -16,7 +16,16 @@ import {
   cleanupExpiredGates,
 } from "../../src/services/hitlGates.service.js";
 
+// P6-09: Use fake timers for timeout scenarios to avoid flakiness
 describe("hitlGates.service", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   describe("createGate", () => {
     it("creates a pending gate and returns a promise", () => {
       const promise = createGate("run-1", "node-1", 1, {
@@ -41,9 +50,12 @@ describe("hitlGates.service", () => {
       const promise = createGate("run-2", "node-1", 1, {
         type: "confirmation",
         description: "Continue?",
-        timeoutMs: 50,
+        timeoutMs: 5_000,
         autoApproveOnTimeout: false,
       });
+
+      // P6-09: Advance past timeout using fake timers
+      await vi.advanceTimersByTimeAsync(5_001);
 
       const result = await promise;
       expect(result.status).toBe("expired");
@@ -53,12 +65,34 @@ describe("hitlGates.service", () => {
       const promise = createGate("run-3", "node-1", 1, {
         type: "confirmation",
         description: "Auto-approve test",
-        timeoutMs: 50,
+        timeoutMs: 5_000,
         autoApproveOnTimeout: true,
       });
 
+      await vi.advanceTimersByTimeAsync(5_001);
+
       const result = await promise;
       expect(result.status).toBe("approved");
+    });
+
+    // P6-09: Explicit test for expiry → timeout branch transition
+    it("transitions from pending to expired after exact timeout boundary", async () => {
+      const promise = createGate("run-boundary", "node-1", 1, {
+        type: "approval",
+        description: "Boundary test",
+        timeoutMs: 10_000,
+        autoApproveOnTimeout: false,
+      });
+
+      // Just before timeout — still pending
+      await vi.advanceTimersByTimeAsync(9_999);
+      const gate = listGatesForRun("run-boundary")[0];
+      expect(gate?.status).toBe("pending");
+
+      // At timeout — should expire
+      await vi.advanceTimersByTimeAsync(2);
+      const result = await promise;
+      expect(result.status).toBe("expired");
     });
   });
 
@@ -67,7 +101,7 @@ describe("hitlGates.service", () => {
       const promise = createGate("run-4", "node-1", 1, {
         type: "approval",
         description: "Approve?",
-        timeoutMs: 5_000,
+        timeoutMs: 60_000,
       });
 
       const gate = listGatesForRun("run-4")[0];
@@ -84,7 +118,7 @@ describe("hitlGates.service", () => {
       const promise = createGate("run-5", "node-1", 1, {
         type: "review",
         description: "Review changes",
-        timeoutMs: 5_000,
+        timeoutMs: 60_000,
       });
 
       const gate = listGatesForRun("run-5")[0];
@@ -105,7 +139,7 @@ describe("hitlGates.service", () => {
       const promise = createGate("run-6", "node-1", 1, {
         type: "approval",
         description: "Test",
-        timeoutMs: 5_000,
+        timeoutMs: 60_000,
       });
 
       const gate = listGatesForRun("run-6")[0];
@@ -121,7 +155,7 @@ describe("hitlGates.service", () => {
       const promise = createGate("run-7", "node-1", 1, {
         type: "escalation",
         description: "Admin approval needed",
-        timeoutMs: 5_000,
+        timeoutMs: 60_000,
         requiredApprovers: [99],
       });
 
@@ -138,7 +172,7 @@ describe("hitlGates.service", () => {
       const promise = createGate("run-8", "node-1", 1, {
         type: "approval",
         description: "Need 2 approvals",
-        timeoutMs: 5_000,
+        timeoutMs: 60_000,
         minApprovals: 2,
       });
 
@@ -159,13 +193,11 @@ describe("hitlGates.service", () => {
 
   describe("listPendingGates", () => {
     it("returns pending gates sorted by priority", () => {
-      const ids: string[] = [];
-
       const p1 = createGate("run-list", "node-1", 1, {
-        type: "approval", description: "Low priority", priority: "low", timeoutMs: 5_000,
+        type: "approval", description: "Low priority", priority: "low", timeoutMs: 60_000,
       });
       const p2 = createGate("run-list", "node-2", 1, {
-        type: "approval", description: "Critical", priority: "critical", timeoutMs: 5_000,
+        type: "approval", description: "Critical", priority: "critical", timeoutMs: 60_000,
       });
 
       const pending = listPendingGates(1);
@@ -200,7 +232,6 @@ describe("hitlGates.service", () => {
 
   describe("cleanupExpiredGates", () => {
     it("removes old resolved gates", () => {
-      // This tests the cleanup function — resolved gates older than maxAge are removed
       const removed = cleanupExpiredGates(0);
       expect(typeof removed).toBe("number");
     });

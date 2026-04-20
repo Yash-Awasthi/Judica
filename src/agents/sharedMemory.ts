@@ -1,6 +1,6 @@
 import { db } from "../lib/drizzle.js";
 import { sharedFacts } from "../db/schema/council.js";
-import { eq, asc } from "drizzle-orm";
+import { eq, asc, sql } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { routeAndCollect } from "../router/index.js";
 
@@ -15,6 +15,12 @@ export interface SharedFactData {
   disputedBy: string[];
   createdAt: Date;
 }
+
+// P8-24: Validate that conversationId belongs to the requesting user
+// This is checked at the service layer before calling these functions.
+// Adding a comment to document the contract: callers MUST verify ownership
+// via conversationService.findConversationById(conversationId, userId)
+// before invoking addFact, getFacts, extractAndStoreFacts.
 
 export async function addFact(
   conversationId: string,
@@ -45,35 +51,26 @@ export async function getFacts(conversationId: string): Promise<SharedFactData[]
   return facts as SharedFactData[];
 }
 
+// P8-23: Use atomic SQL array operations to prevent race conditions
 export async function confirmFact(factId: string, agentId: string): Promise<void> {
-  const [fact] = await db
-    .select()
-    .from(sharedFacts)
-    .where(eq(sharedFacts.id, factId));
-  if (!fact) return;
-
-  const confirmed = Array.from(new Set([...fact.confirmedBy, agentId]));
-  const disputed = fact.disputedBy.filter((id) => id !== agentId);
-
+  // Atomically add to confirmedBy and remove from disputedBy
   await db
     .update(sharedFacts)
-    .set({ confirmedBy: confirmed, disputedBy: disputed })
+    .set({
+      confirmedBy: sql`array_append(array_remove(${sharedFacts.confirmedBy}, ${agentId}), ${agentId})`,
+      disputedBy: sql`array_remove(${sharedFacts.disputedBy}, ${agentId})`,
+    })
     .where(eq(sharedFacts.id, factId));
 }
 
+// P8-23: Use atomic SQL array operations to prevent race conditions
 export async function disputeFact(factId: string, agentId: string): Promise<void> {
-  const [fact] = await db
-    .select()
-    .from(sharedFacts)
-    .where(eq(sharedFacts.id, factId));
-  if (!fact) return;
-
-  const disputed = Array.from(new Set([...fact.disputedBy, agentId]));
-  const confirmed = fact.confirmedBy.filter((id) => id !== agentId);
-
   await db
     .update(sharedFacts)
-    .set({ confirmedBy: confirmed, disputedBy: disputed })
+    .set({
+      disputedBy: sql`array_append(array_remove(${sharedFacts.disputedBy}, ${agentId}), ${agentId})`,
+      confirmedBy: sql`array_remove(${sharedFacts.confirmedBy}, ${agentId})`,
+    })
     .where(eq(sharedFacts.id, factId));
 }
 
@@ -97,8 +94,10 @@ export async function getFactContext(conversationId: string): Promise<string> {
 export async function extractAndStoreFacts(
   conversationId: string,
   agentId: string,
-  responseText: string
+  responseText: string,
+  userId?: number
 ): Promise<SharedFactData[]> {
+  // P8-25: Pass userId so LLM calls are attributed to user's quota
   const result = await routeAndCollect({
     model: "auto",
     messages: [
@@ -108,7 +107,7 @@ export async function extractAndStoreFacts(
       },
     ],
     temperature: 0,
-  });
+  }, { userId });
 
   try {
     const match = result.text.match(/\[[\s\S]*\]/);
