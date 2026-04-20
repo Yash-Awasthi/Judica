@@ -2,6 +2,7 @@ import { test, expect } from "@playwright/test";
 import path from "path";
 import fs from "fs";
 import os from "os";
+import crypto from "node:crypto";
 
 /**
  * E2E: Knowledge Base upload flow
@@ -14,7 +15,7 @@ test.describe("Knowledge Base / Training Lab Flow", () => {
 
   test.beforeAll(async () => {
     // Create a synthetic test file with identifiable content
-    testFilePath = path.join(os.tmpdir(), `kb-test-${Date.now()}.txt`);
+    testFilePath = path.join(os.tmpdir(), `kb-test-${crypto.randomUUID()}.txt`);
     fs.writeFileSync(testFilePath, "The capital of Testland is Assertville. Population: 42.");
   });
 

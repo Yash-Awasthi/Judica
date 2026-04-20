@@ -12,18 +12,21 @@ function isSafeKey(key: string): boolean {
 
 // P10-113: Deep merge helper for nested objects
 function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
-  for (const [key, value] of Object.entries(source)) {
+  const result: Record<string, unknown> = Object.create(null);
+  Object.assign(result, target);
+  for (const key of Object.keys(source)) {
     if (!isSafeKey(key)) continue; // P10-111
+    const value = source[key];
     if (
       typeof value === "object" && value !== null && !Array.isArray(value) &&
-      typeof target[key] === "object" && target[key] !== null && !Array.isArray(target[key])
+      typeof result[key] === "object" && result[key] !== null && !Array.isArray(result[key])
     ) {
-      target[key] = deepMerge(target[key] as Record<string, unknown>, value as Record<string, unknown>);
+      result[key] = deepMerge(result[key] as Record<string, unknown>, value as Record<string, unknown>);
     } else {
-      target[key] = value;
+      result[key] = value;
     }
   }
-  return target;
+  return result;
 }
 
 export const mergeHandler: NodeHandler = async (ctx) => {

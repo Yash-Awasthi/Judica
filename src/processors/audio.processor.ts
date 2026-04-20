@@ -14,24 +14,28 @@ const WHISPER_MAX_BYTES = 25 * 1024 * 1024; // Whisper hard limit: 25 MB
 export async function processAudio(filePath: string, mimeType: string): Promise<ProcessedFile> {
   assertFileSizeLimit(filePath);
 
-  const stat = fs.statSync(filePath);
-  if (stat.size > WHISPER_MAX_BYTES) {
-    throw new Error(
-      `Audio file too large for Whisper (${(stat.size / (1024 * 1024)).toFixed(1)} MB > 25 MB limit)`
-    );
-  }
+  // Open file descriptor once to avoid TOCTOU race between stat and read
+  const fd = fs.openSync(filePath, "r");
+  try {
+    const stat = fs.fstatSync(fd);
+    if (stat.size > WHISPER_MAX_BYTES) {
+      throw new Error(
+        `Audio file too large for Whisper (${(stat.size / (1024 * 1024)).toFixed(1)} MB > 25 MB limit)`
+      );
+    }
 
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) {
-    logger.warn("OPENAI_API_KEY not set — audio transcription unavailable, returning placeholder");
-    return {
-      type: "text",
-      text: "[Audio transcription unavailable: OPENAI_API_KEY not configured]",
-      metadata: { mimeType, transcribed: false },
-    };
-  }
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) {
+      logger.warn("OPENAI_API_KEY not set — audio transcription unavailable, returning placeholder");
+      return {
+        type: "text",
+        text: "[Audio transcription unavailable: OPENAI_API_KEY not configured]",
+        metadata: { mimeType, transcribed: false },
+      };
+    }
 
-  const fileBuffer = fs.readFileSync(filePath);
+    const fileBuffer = Buffer.alloc(stat.size);
+    fs.readSync(fd, fileBuffer, 0, stat.size, 0);
   const ext = mimeType.split("/")[1]?.replace("mpeg", "mp3") || "mp3";
   const filename = `audio.${ext}`;
 
@@ -69,4 +73,7 @@ export async function processAudio(filePath: string, mimeType: string): Promise<
     text: data.text,
     metadata: { mimeType, transcribed: true, whisperModel: "whisper-1" },
   };
+  } finally {
+    fs.closeSync(fd);
+  }
 }

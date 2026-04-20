@@ -3,6 +3,7 @@
  * Consolidates the duplicate makeProvider() helpers that were scattered
  * across fallbacks.test.ts, anthropic.test.ts, google.test.ts, openai.test.ts.
  */
+import crypto from "node:crypto";
 
 export interface MockProviderConfig {
   name?: string;
@@ -23,7 +24,7 @@ export function makeProviderConfig(overrides: Partial<MockProviderConfig> = {}):
   return {
     name: "Test Provider",
     type: "api",
-    apiKey: "test-key-" + Math.random().toString(36).slice(2, 8),
+    apiKey: "test-key-" + crypto.randomUUID().slice(0, 8),
     model: "gpt-4",
     baseUrl: "https://api.test.example.com/v1",
     maxConcurrency: 5,

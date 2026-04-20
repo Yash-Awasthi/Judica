@@ -71,25 +71,25 @@ export function resetRegistry(): void {
 }
 
 // P7-02: Structured model → provider routing table (replaces error-prone substring heuristics)
-const MODEL_PROVIDER_RULES: Array<{ match: (m: string) => boolean; provider: string }> = [
+const MODEL_PROVIDER_RULES: Array<{ test: (m: string) => boolean; provider: string }> = [
   // OpenAI
-  { match: (m) => m.startsWith("gpt-") || m.startsWith("o1") || m.startsWith("o3") || m.startsWith("o4") || m.startsWith("chatgpt"), provider: "openai" },
+  { test: (m) => m.startsWith("gpt-") || m.startsWith("o1") || m.startsWith("o3") || m.startsWith("o4") || m.startsWith("chatgpt"), provider: "openai" },
   // Anthropic
-  { match: (m) => m.startsWith("claude"), provider: "anthropic" },
+  { test: (m) => m.startsWith("claude"), provider: "anthropic" },
   // Gemini
-  { match: (m) => m.startsWith("gemini"), provider: "gemini" },
+  { test: (m) => m.startsWith("gemini"), provider: "gemini" },
   // Groq-hosted models — check BEFORE Ollama since Groq uses explicit model IDs
-  { match: (m) => m.includes("groq/") || m.startsWith("llama-") || m.startsWith("llama3") || m.includes("-versatile") || m.includes("-specdec"), provider: "groq" },
+  { test: (m) => m.includes("groq/") || m.startsWith("llama-") || m.startsWith("llama3") || m.includes("-versatile") || m.includes("-specdec"), provider: "groq" },
   // P7-03: Mixtral — prefer Mistral adapter (native), fallback to Groq
-  { match: (m) => m.startsWith("mixtral-") || m.includes("mixtral"), provider: "mistral" },
-  { match: (m) => m.startsWith("mixtral-") || m.includes("mixtral"), provider: "groq" },
-  { match: (m) => m.startsWith("gemma-") || m.startsWith("gemma2-"), provider: "groq" },
+  { test: (m) => m.startsWith("mixtral-") || m.includes("mixtral"), provider: "mistral" },
+  { test: (m) => m.startsWith("mixtral-") || m.includes("mixtral"), provider: "groq" },
+  { test: (m) => m.startsWith("gemma-") || m.startsWith("gemma2-"), provider: "groq" },
   // Mistral direct (not via OpenRouter)
-  { match: (m) => m.startsWith("mistral-") || m.startsWith("codestral") || m.startsWith("pixtral"), provider: "mistral" },
+  { test: (m) => m.startsWith("mistral-") || m.startsWith("codestral") || m.startsWith("pixtral"), provider: "mistral" },
   // Ollama — only match generic model family names (user's local models)
-  { match: (m) => m.startsWith("ollama/") || m.includes(":") /* ollama tag format e.g. llama3:8b */, provider: "ollama" },
+  { test: (m) => m.startsWith("ollama/") || m.includes(":") /* ollama tag format e.g. llama3:8b */, provider: "ollama" },
   // OpenRouter — model IDs always contain a slash (org/model)
-  { match: (m) => m.includes("/"), provider: "openrouter" },
+  { test: (m) => m.includes("/"), provider: "openrouter" },
 ];
 
 /**
@@ -100,7 +100,7 @@ export function resolveProviderFromModel(model: string): string | null {
   const m = model.toLowerCase();
 
   for (const rule of MODEL_PROVIDER_RULES) {
-    if (rule.match(m) && hasAdapter(rule.provider)) {
+    if (rule.test(m) && hasAdapter(rule.provider)) {
       return rule.provider;
     }
   }
