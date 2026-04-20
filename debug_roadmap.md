@@ -2491,7 +2491,7 @@ TOTAL: 228 tasks
              causes a logged error; failures are invisible. Add negative tests
              asserting error is emitted on malformed tool JSON.
 
-[ ] [P11-02] Cost/billing tracking entirely mocked â€” no test verifies that
+[x] [P11-02] Cost/billing tracking entirely mocked â€” no test verifies that
              token counts and costs are correctly accumulated from real stream
              chunks; billing correctness is completely untested. Add tests
              with known token counts and assert accumulated cost.
