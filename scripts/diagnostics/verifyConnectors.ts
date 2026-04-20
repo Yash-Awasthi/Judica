@@ -1,5 +1,5 @@
 import { env } from "../src/config/env.js";
-import { getDefaultMembers, getDefaultMaster } from "../src/services/councilService.js";
+import { getDefaultMembers, getDefaultMaster } from "../src/services/council.service.js";
 
 console.log("Checking environment and default council configuration...");
 

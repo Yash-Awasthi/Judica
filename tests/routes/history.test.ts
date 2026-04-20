@@ -31,7 +31,7 @@ const mockDb: any = {
 
 vi.mock("../../src/lib/drizzle.js", () => ({ db: mockDb }));
 
-vi.mock("../../src/services/conversationService.js", () => ({
+vi.mock("../../src/services/conversation.service.js", () => ({
   getConversationList: vi.fn().mockResolvedValue({ data: [], total: 0 }),
   searchChats: vi.fn().mockResolvedValue([]),
   deleteConversation: vi.fn().mockResolvedValue(true),
@@ -132,7 +132,7 @@ import {
   deleteConversation,
   updateConversationTitle,
   searchChats,
-} from "../../src/services/conversationService.js";
+} from "../../src/services/conversation.service.js";
 
 describe("History Routes", () => {
   beforeEach(async () => {

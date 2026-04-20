@@ -31,7 +31,7 @@ vi.mock("../../src/lib/configResolver.js", () => ({
 
 vi.mock("../../src/types/userConfig.js", () => ({}));
 
-import { getDefaultMembers, CouncilServiceError } from "../../src/services/councilService.js";
+import { getDefaultMembers, CouncilServiceError } from "../../src/services/council.service.js";
 
 describe("P11-92: Unsafe env mutation in tests", () => {
   const originalEnv = { ...process.env };

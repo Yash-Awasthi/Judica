@@ -5,10 +5,10 @@
  * long-running agent tasks. Consumers subscribe to a stream ID
  * and receive typed events as artifacts are produced.
  *
- * P4-14: Redis Streams support for multi-replica deployments.
- * When Redis is available, artifacts are published to Redis Streams
- * for cross-process delivery. Falls back to in-memory EventEmitter
- * for single-process deployments.
+ * P4-14: Redis Streams for multi-replica deployments.
+ * Artifacts are published to Redis Streams for cross-process delivery.
+ * Local EventEmitter provides low-latency same-process fan-out.
+ * Falls back gracefully when Redis is unavailable.
  */
 
 import crypto from "crypto";
@@ -52,6 +52,27 @@ emitter.setMaxListeners(100);
 const streams = new Map<string, StreamInfo>();
 const artifactStore = new Map<string, Artifact[]>();
 
+// ─── Redis Stream Helpers ───────────────────────────────────────────────────
+
+const STREAM_PREFIX = "artifact_stream:";
+const STREAM_TTL_SECONDS = 86400; // 24h
+
+async function publishToRedis(streamId: string, data: Record<string, string>): Promise<void> {
+  try {
+    await redis.xadd(`${STREAM_PREFIX}${streamId}`, "*", "data", data.data);
+  } catch {
+    // Redis publish is best-effort; local EventEmitter is the fallback
+  }
+}
+
+async function setRedisExpiry(streamId: string): Promise<void> {
+  try {
+    await redis.expire(`${STREAM_PREFIX}${streamId}`, STREAM_TTL_SECONDS);
+  } catch {
+    // Best-effort
+  }
+}
+
 // ─── Core Functions ─────────────────────────────────────────────────────────
 
 /**
@@ -79,15 +100,15 @@ export function createStream(userId: number, title: string, agentId?: string): s
 
 /**
  * Emit an artifact to a stream.
- * Returns the created artifact with its sequence number.
+ * Publishes to both local EventEmitter and Redis Streams.
  */
-export function emitArtifact(
+export async function emitArtifact(
   streamId: string,
   type: ArtifactType,
   label: string,
   content: unknown,
   metadata?: Record<string, unknown>,
-): Artifact | null {
+): Promise<Artifact | null> {
   const stream = streams.get(streamId);
   if (!stream || stream.isComplete) return null;
 
@@ -106,17 +127,11 @@ export function emitArtifact(
   artifacts.push(artifact);
   stream.artifactCount = artifacts.length;
 
-  // Emit to local subscribers
+  // Emit to local subscribers (same-process, low-latency)
   emitter.emit(`artifact:${streamId}`, artifact);
 
-  // P4-14: Also publish to Redis Streams for multi-replica support
-  try {
-    await redis.xAdd(`artifact_stream:${streamId}`, "*", {
-      data: JSON.stringify(artifact),
-    });
-  } catch {
-    // Redis publish is best-effort; local EventEmitter is always the fallback
-  }
+  // Publish to Redis Streams for cross-replica delivery
+  await publishToRedis(streamId, { data: JSON.stringify(artifact) });
 
   return artifact;
 }
@@ -124,28 +139,21 @@ export function emitArtifact(
 /**
  * Mark a stream as complete. No more artifacts can be emitted.
  */
-export function completeStream(streamId: string, summary?: string): boolean {
+export async function completeStream(streamId: string, summary?: string): Promise<boolean> {
   const stream = streams.get(streamId);
   if (!stream || stream.isComplete) return false;
 
   // Emit a final "complete" artifact
-  emitArtifact(streamId, "complete", "Stream complete", summary ?? "All artifacts delivered");
+  await emitArtifact(streamId, "complete", "Stream complete", summary ?? "All artifacts delivered");
 
   stream.isComplete = true;
   stream.completedAt = new Date();
 
   emitter.emit(`complete:${streamId}`);
 
-  // P4-14: Publish completion to Redis and set TTL on the stream key
-  try {
-    await redis.xAdd(`artifact_stream:${streamId}`, "*", {
-      data: JSON.stringify({ type: "stream_complete" }),
-    });
-    // Auto-expire Redis stream after 24h
-    await redis.expire(`artifact_stream:${streamId}`, 86400);
-  } catch {
-    // Best-effort
-  }
+  // Publish completion to Redis and set TTL on the stream key
+  await publishToRedis(streamId, { data: JSON.stringify({ type: "stream_complete" }) });
+  await setRedisExpiry(streamId);
 
   logger.info({ streamId, artifactCount: stream.artifactCount }, "Artifact stream completed");
   return true;

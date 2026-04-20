@@ -17,8 +17,8 @@ import {
   getRecentHistory,
   retrieveRelevantContext,
   formatContextForInjection
-} from "../services/conversationService.js";
-import { updateDailyUsage } from "../services/usageService.js";
+} from "../services/conversation.service.js";
+import { updateDailyUsage } from "../services/usage.service.js";
 import { classifyQuery, formatRouterMetadata, getAutoArchetypes } from "../lib/router.js";
 import {
   getDefaultMembers,
@@ -27,7 +27,7 @@ import {
   CouncilServiceError,
   prepareCouncilMembers,
   type ApiKeyResolutionInput
-} from "../services/councilService.js";
+} from "../services/council.service.js";
 import { loadFileContext, loadRAGContext, buildEnrichedQuestion } from "../services/messageBuilder.service.js";
 import { detectArtifact, saveArtifact } from "../services/artifacts.service.js";
 import {

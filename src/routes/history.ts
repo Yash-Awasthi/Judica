@@ -7,7 +7,7 @@ import {
   generateConversationSummary,
   findConversationById,
   searchChats
-} from "../services/conversationService.js";
+} from "../services/conversation.service.js";
 import { db } from "../lib/drizzle.js";
 import { conversations, chats } from "../db/schema/conversations.js";
 import { eq, and, asc, count, lte, sql } from "drizzle-orm";

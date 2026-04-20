@@ -7,7 +7,7 @@ import {
   getProjectById,
   updateProject,
   deleteProject
-} from "../services/projectService.js";
+} from "../services/project.service.js";
 import { AppError } from "../middleware/errorHandler.js";
 
 const projectsPlugin: FastifyPluginAsync = async (fastify) => {

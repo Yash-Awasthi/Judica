@@ -111,7 +111,7 @@ const mockGetRecentHistory = vi.fn();
 const mockRetrieveRelevantContext = vi.fn();
 const mockFormatContextForInjection = vi.fn();
 
-vi.mock("../../src/services/conversationService.js", () => ({
+vi.mock("../../src/services/conversation.service.js", () => ({
   createConversation: mockCreateConversation,
   findConversationById: mockFindConversationById,
   createChat: mockCreateChat,
@@ -121,7 +121,7 @@ vi.mock("../../src/services/conversationService.js", () => ({
 }));
 
 const mockUpdateDailyUsage = vi.fn();
-vi.mock("../../src/services/usageService.js", () => ({
+vi.mock("../../src/services/usage.service.js", () => ({
   updateDailyUsage: mockUpdateDailyUsage,
 }));
 
@@ -147,7 +147,7 @@ class MockCouncilServiceError extends Error {
   }
 }
 
-vi.mock("../../src/services/councilService.js", () => ({
+vi.mock("../../src/services/council.service.js", () => ({
   getDefaultMembers: mockGetDefaultMembers,
   getDefaultMaster: mockGetDefaultMaster,
   resolveApiKey: mockResolveApiKey,

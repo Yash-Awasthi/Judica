@@ -57,7 +57,7 @@ vi.mock("../../src/lib/redis.js", () => ({
   },
 }));
 
-vi.mock("../../src/services/conversationService.js", () => ({
+vi.mock("../../src/services/conversation.service.js", () => ({
   findConversationById: vi.fn().mockResolvedValue({ id: "conv-1", userId: 1, isPublic: false }),
 }));
 

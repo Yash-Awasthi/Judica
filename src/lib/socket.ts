@@ -5,7 +5,7 @@ import { z } from "zod";
 import logger from "./logger.js";
 import { env } from "../config/env.js";
 import redis from "./redis.js";
-import { findConversationById } from "../services/conversationService.js";
+import { findConversationById } from "../services/conversation.service.js";
 
 let wss: WebSocketServer | null = null;
 // P8-06: Track per-user connection count to prevent FD exhaustion

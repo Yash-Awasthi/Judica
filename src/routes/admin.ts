@@ -6,7 +6,7 @@ import { customProviders } from "../db/schema/council.js";
 import { auditLogs } from "../db/schema/conversations.js";
 import { desc, sql, gte, lte } from "drizzle-orm";
 import { fastifyRequireAdmin } from "../middleware/fastifyAuth.js";
-import { AdminService } from "../services/adminService.js";
+import { AdminService } from "../services/admin.service.js";
 import { AppError } from "../middleware/errorHandler.js";
 import redis from "../lib/redis.js";
 

@@ -9,7 +9,7 @@ import {
   updateConversationTitle,
   retrieveRelevantContext,
   formatContextForInjection
-} from "../../src/services/conversationService.js";
+} from "../../src/services/conversation.service.js";
 import { db } from "../../src/lib/drizzle.js";
 import { getEmbeddingWithLock } from "../../src/lib/cache.js";
 
