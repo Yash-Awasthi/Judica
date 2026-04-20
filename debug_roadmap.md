@@ -2786,26 +2786,26 @@ TOTAL: 228 tasks
 
 ### Global Service Test Issues (pt8)
 --------------------------------------------------------------------------------
-[ ] [P11-67] Service logic not actually tested â€” heavy mock usage means
+[x] [P11-67] Service logic not actually tested â€” heavy mock usage means
              tests verify that mocks were called, not that business logic
              is correct. Add at least one real-path integration test per
              service.
 
-[ ] [P11-68] No large-scale / performance tests â€” no service test exercises
+[x] [P11-68] No large-scale / performance tests â€” no service test exercises
              inputs of realistic production size (large documents, many users,
              long conversations); performance regressions invisible.
 
-[ ] [P11-69] No concurrency tests across services â€” no test exercises two
+[x] [P11-69] No concurrency tests across services â€” no test exercises two
              concurrent operations on the same resource (same user, same
              conversation, same workflow); race conditions untested.
 
-[ ] [P11-70] No failure cascade tests â€” no test verifies behavior when a
+[x] [P11-70] No failure cascade tests â€” no test verifies behavior when a
              downstream dependency (DB, Redis, LLM) fails mid-operation;
              partial failure behavior completely untested.
 
 ### agentSpecialization.test.ts
 --------------------------------------------------------------------------------
-[ ] [P11-71] Keyword-based domain detection not stress-tested â€” tests use
+[x] [P11-71] Keyword-based domain detection not stress-tested â€” tests use
              single clean keywords; ambiguous inputs, multi-domain inputs,
              and contradictory signals not covered.
 
