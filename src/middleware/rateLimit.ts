@@ -3,24 +3,39 @@ import logger from "../lib/logger.js";
 import IORedisDefault from "ioredis";
 const IORedis = IORedisDefault.default || IORedisDefault;
 
-// Redis client used for rate limit state — needs cleanup on shutdown
+// P1-19: Redis client for @fastify/rate-limit — properly tracks connection state
 let rateLimitRedisClient: InstanceType<typeof IORedis> | undefined;
+let redisReady = false;
+
 try {
   rateLimitRedisClient = new (IORedis as typeof IORedis)(env.REDIS_URL || "redis://localhost:6379", {
     maxRetriesPerRequest: null,
     enableOfflineQueue: false,
     lazyConnect: true,
   });
+
+  rateLimitRedisClient.on("ready", () => { redisReady = true; });
+  rateLimitRedisClient.on("error", () => { redisReady = false; });
+  rateLimitRedisClient.on("close", () => { redisReady = false; });
+
   rateLimitRedisClient.connect().catch(() => {
     logger.warn("Rate limit Redis connection failed — falling back to in-memory store");
+    rateLimitRedisClient = undefined;
   });
 } catch {
   logger.warn("Redis store for rate limiter unavailable");
+  rateLimitRedisClient = undefined;
 }
 
-/** The ioredis client for @fastify/rate-limit Redis store. May be undefined if Redis is unavailable. */
+/** The ioredis client for @fastify/rate-limit Redis store. Returns undefined if Redis is unavailable. */
 export function getRateLimitRedis(): InstanceType<typeof IORedis> | undefined {
-  return rateLimitRedisClient;
+  // P1-19: Only return client if it's actually connected and ready
+  return redisReady ? rateLimitRedisClient : undefined;
+}
+
+/** P1-20: Check if rate-limit Redis is healthy */
+export function isRateLimitRedisHealthy(): boolean {
+  return redisReady && rateLimitRedisClient !== undefined;
 }
 
 export async function cleanupRateLimitRedis(): Promise<void> {

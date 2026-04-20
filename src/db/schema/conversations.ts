@@ -17,14 +17,16 @@ export const conversations = pgTable(
   "Conversation",
   {
     id: text("id").primaryKey(),
-    userId: integer("userId").references(() => users.id, { onDelete: "cascade" }),
+    // P8-35: userId must be NOT NULL — prevents orphaned conversations
+    userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
     title: text("title").default("New Conversation").notNull(),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt", { mode: "date" }).notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull(),
     isPublic: boolean("isPublic").default(false).notNull(),
     sessionSummary: text("sessionSummary"),
     projectId: text("projectId").references(() => projects.id, { onDelete: "set null" }),
     activeTab: text("activeTab").default("discussion").notNull(),
+    // P8-42: TODO — summaryData is a large JSON blob stored inline; move to ConversationSummary side table
     summaryData: jsonb("summaryData"),
   },
   (table) => [
@@ -42,7 +44,7 @@ export const chats = pgTable(
     question: text("question").notNull(),
     verdict: text("verdict").notNull(),
     opinions: jsonb("opinions").notNull(),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
     cacheHit: boolean("cacheHit").default(false).notNull(),
     conversationId: text("conversationId").references(() => conversations.id, {
       onDelete: "cascade",
@@ -72,7 +74,7 @@ export const contextSummaries = pgTable(
       .references(() => conversations.id, { onDelete: "cascade" }),
     summary: text("summary").notNull(),
     messageCount: integer("messageCount").default(0).notNull(),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("ContextSummary_conversationId_createdAt_idx").on(
@@ -91,6 +93,8 @@ export const auditLogs = pgTable(
     conversationId: text("conversationId").references(() => conversations.id, {
       onDelete: "cascade",
     }),
+    // P9-07: sessionId as first-class indexed column (was only in metadata JSON)
+    sessionId: text("sessionId"),
     modelName: text("modelName").notNull(),
     prompt: text("prompt").notNull(),
     response: text("response").notNull(),
@@ -98,7 +102,7 @@ export const auditLogs = pgTable(
     tokensOut: integer("tokensOut").default(0).notNull(),
     latencyMs: integer("latencyMs").default(0).notNull(),
     metadata: jsonb("metadata"),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("AuditLog_conversationId_createdAt_idx").on(
@@ -106,6 +110,10 @@ export const auditLogs = pgTable(
       table.createdAt,
     ),
     index("AuditLog_userId_createdAt_idx").on(table.userId, table.createdAt),
+    // P9-06: GIN index on metadata JSONB to avoid full-table scans on audit queries
+    index("AuditLog_metadata_gin_idx").using("gin", table.metadata),
+    // P9-07: Index on sessionId for direct lookups
+    index("AuditLog_sessionId_idx").on(table.sessionId),
   ],
 );
 
@@ -114,8 +122,8 @@ export const semanticCache = pgTable(
   "SemanticCache",
   {
     id: serial("id").primaryKey(),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
-    expiresAt: timestamp("expiresAt", { mode: "date" }).notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+    expiresAt: timestamp("expiresAt", { mode: "date", withTimezone: true }).notNull(),
     keyHash: text("keyHash").notNull().unique(),
     opinions: jsonb("opinions").notNull(),
     prompt: text("prompt").notNull(),
@@ -142,9 +150,11 @@ export const topicNodes = pgTable(
     summary: text("summary"),
     embedding: vector("embedding", { dimensions: 1536 }),
     conversationIds: jsonb("conversationIds").$type<string[]>().default([]).notNull(),
+    // P8-43: Denormalized counter — should use DB trigger or atomic increment
+    // to prevent concurrent race drift. See migration script.
     strength: integer("strength").default(1).notNull(),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt", { mode: "date" }).defaultNow().notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("TopicNode_userId_idx").on(table.userId),
@@ -166,7 +176,7 @@ export const topicEdges = pgTable(
       .notNull()
       .references(() => topicNodes.id, { onDelete: "cascade" }),
     weight: integer("weight").default(1).notNull(),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("TopicEdge_source_idx").on(table.sourceTopicId),

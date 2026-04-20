@@ -86,11 +86,26 @@ export async function scoreOpinions(
       .reduce((sum, r) => sum + r.confidence_adjustment, 0));
     finalScore += vPenalty;
 
+    // P10-37: If validation finds critical failures, quarantine the response
+    const criticalFailures = validationResults.filter(r => !r.valid && r.confidence_adjustment <= -0.2);
+    if (criticalFailures.length > 0) {
+      finalScore = Math.min(finalScore, 0.1); // Cap at 0.1 — effectively quarantined
+    }
+
     let adversarialPenalty = 0;
     if (op.adversarial) {
       if (op.adversarial.stress_score > 0.4) {
         adversarialPenalty = -(op.adversarial.stress_score * 0.2);
       }
+      // P10-126: If adversarial parse failed (is_robust defaults to true on failure),
+      // apply penalty instead of rewarding the failure
+      if (!op.adversarial.is_robust && op.adversarial.failures.length === 0) {
+        // Suspicious: marked not robust but no failures identified — likely parse error
+        adversarialPenalty = -0.1;
+      }
+    } else {
+      // P10-126: Missing adversarial result = could not validate = penalize, not reward
+      adversarialPenalty = -0.05;
     }
     finalScore += adversarialPenalty;
 
@@ -99,6 +114,9 @@ export async function scoreOpinions(
       if (!op.grounding.grounded || op.grounding.unsupported_claims.length > 0) {
         groundingPenalty = -(op.grounding.unsupported_claims.length * 0.05);
       }
+    } else {
+      // P10-126: Missing grounding result = could not verify = penalize, not assume grounded
+      groundingPenalty = -0.05;
     }
     finalScore += groundingPenalty;
 
@@ -111,13 +129,14 @@ export async function scoreOpinions(
       opinion: op.opinion,
       structured: op.structured,
       scores: {
-        confidence: op.structured.confidence,
-        agreement: Math.min(agreement, 1.0),
-        peerRanking: Math.min(peerRanking, 1.0),
+        // P10-42: Clamp confidence to [0, 1] to prevent out-of-range arithmetic
+        confidence: Math.max(0, Math.min(1, op.structured.confidence)),
+        agreement: Math.max(0, Math.min(1, agreement)),
+        peerRanking: Math.max(0, Math.min(1, peerRanking)),
         validationPenalty: vPenalty,
         adversarialPenalty: adversarialPenalty,
         groundingPenalty: groundingPenalty,
-        final: Math.max(0, Math.round(finalScore * 1000) / 1000)
+        final: Math.max(0, Math.min(1, Math.round(finalScore * 1000) / 1000))
       },
       validation: validationResults,
       adversarial: op.adversarial,

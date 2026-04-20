@@ -1,5 +1,10 @@
+// P2-05: DEPRECATED — Strictly inferior to src/adapters/gemini.adapter.ts.
 import type { Message, Provider } from "../providers.js";
 import { getToolDefinitions, callTool } from "../tools/index.js";
+import { validateSafeUrl } from "../ssrf.js";
+
+// P7-40: Maximum tool-call recursion depth to prevent stack overflow
+const MAX_TOOL_RECURSION_DEPTH = 5;
 
 interface ProviderResult {
   text: string;
@@ -14,19 +19,28 @@ export async function askGoogle(
   provider: Provider,
   normMessages: Message[],
   maxTokens: number,
-  signal: AbortSignal
+  signal: AbortSignal,
+  _depth = 0
 ): Promise<ProviderResult> {
   const googleContents = normMessages.map((m) => ({
     role: m.role === "assistant" ? "model" : "user",
     parts: [{ text: m.content }],
   }));
 
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${provider.model || "gemini-2.5-flash-preview-05-20"}:generateContent`;
+  // P7-41: SSRF validation on strategy-level fetch
+  await validateSafeUrl(apiUrl);
+
+  // P1-05: Move API key from URL query parameter to x-goog-api-key header
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${provider.model || "gemini-2.5-flash"}:generateContent?key=${provider.apiKey}`,
+    apiUrl,
     {
       method: "POST",
       signal,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": provider.apiKey,
+      },
       body: JSON.stringify({
         ...(provider.systemPrompt
           ? { systemInstruction: { parts: [{ text: provider.systemPrompt }] } }
@@ -50,6 +64,10 @@ export async function askGoogle(
   const part = candidate?.content?.parts?.[0];
 
   if (part?.functionCall) {
+    // P7-40: Prevent infinite recursion
+    if (_depth >= MAX_TOOL_RECURSION_DEPTH) {
+      throw new Error(`Tool-call recursion limit (${MAX_TOOL_RECURSION_DEPTH}) exceeded`);
+    }
     const { name, args } = part.functionCall;
     const result = await callTool({ id: `google-${Date.now()}`, name, arguments: args });
     const safeResult = `[UNTRUSTED TOOL OUTPUT]\n${result}\n[/UNTRUSTED TOOL OUTPUT]`;
@@ -58,7 +76,7 @@ export async function askGoogle(
       { role: "assistant" as const, content: JSON.stringify(part) },
       { role: "tool" as const, name, content: safeResult }
     ];
-    return askGoogle(provider, nextMessages, maxTokens, signal);
+    return askGoogle(provider, nextMessages, maxTokens, signal, _depth + 1);
   }
 
   return {
@@ -78,12 +96,16 @@ export async function streamGoogle(
   signal: AbortSignal,
   onChunk: (chunk: string) => void
 ): Promise<ProviderResult> {
+  // P1-05: Move API key from URL query parameter to x-goog-api-key header
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${provider.model || "gemini-2.5-flash"}:streamGenerateContent?key=${provider.apiKey}&alt=sse`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${provider.model || "gemini-2.5-flash-preview-05-20"}:streamGenerateContent?alt=sse`,
     {
       method: "POST",
       signal,
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "x-goog-api-key": provider.apiKey,
+      },
       body: JSON.stringify({
         ...(provider.systemPrompt ? { systemInstruction: { parts: [{ text: provider.systemPrompt }] } } : {}),
         contents: normMessages.map(m => ({ role: m.role === "assistant" ? "model" : "user", parts: [{ text: m.content }] })),
@@ -98,11 +120,17 @@ export async function streamGoogle(
   const decoder = new TextDecoder();
   let fullText = "";
   let usage: ProviderResult["usage"];
+  // P1-10: Buffer across reads and split on \n boundary properly
+  let buffer = "";
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    for (const line of decoder.decode(value).split("\n")) {
+    buffer += decoder.decode(value, { stream: true });
+    let idx: number;
+    while ((idx = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, idx).trim();
+      buffer = buffer.slice(idx + 1);
       if (line.startsWith("data: ")) {
         try {
           const json = JSON.parse(line.slice(6));

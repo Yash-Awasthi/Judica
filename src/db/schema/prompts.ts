@@ -19,7 +19,7 @@ export const prompts = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     description: text("description"),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("Prompt_userId_createdAt_idx").on(table.userId, table.createdAt),
@@ -39,7 +39,7 @@ export const promptVersions = pgTable(
     model: text("model"),
     temperature: real("temperature"),
     notes: text("notes"),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     uniqueIndex("PromptVersion_promptId_versionNum_key").on(

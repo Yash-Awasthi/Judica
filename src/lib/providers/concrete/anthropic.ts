@@ -39,7 +39,8 @@ export class AnthropicProvider extends BaseProvider {
         headers: {
           "Content-Type": "application/json",
           "x-api-key": this.config.apiKey,
-          "anthropic-version": "2023-06-01",
+          // P1-07: Updated to 2023-10-01 for parallel tools and cache_control support
+          "anthropic-version": "2023-10-01",
         },
         body: JSON.stringify({
           model: this.config.model || "claude-3-5-sonnet-20241022",
@@ -72,6 +73,9 @@ export class AnthropicProvider extends BaseProvider {
         let buffer = "";
         let streamInputTokens = 0;
         let streamOutputTokens = 0;
+        // P1-04: Track tool calls during streaming so they aren't dropped
+        const pendingTools = new Map<number, { id: string; name: string; args: string }>();
+        let currentBlockIndex = 0;
 
         while (true) {
           const { done, value } = await reader.read();
@@ -89,10 +93,30 @@ export class AnthropicProvider extends BaseProvider {
 
               try {
                 const parsed = JSON.parse(dataStr);
-                if (parsed.type === "content_block_delta" && parsed.delta?.text) {
-                  const content = parsed.delta.text;
-                  text += content;
-                  onChunk(content);
+                if (parsed.type === "content_block_start") {
+                  currentBlockIndex = parsed.index ?? currentBlockIndex;
+                  if (parsed.content_block?.type === "tool_use") {
+                    pendingTools.set(currentBlockIndex, {
+                      id: parsed.content_block.id,
+                      name: parsed.content_block.name,
+                      args: "",
+                    });
+                  }
+                }
+                if (parsed.type === "content_block_delta") {
+                  currentBlockIndex = parsed.index ?? currentBlockIndex;
+                  if (parsed.delta?.text) {
+                    text += parsed.delta.text;
+                    onChunk(parsed.delta.text);
+                  }
+                  if (parsed.delta?.type === "input_json_delta" && parsed.delta.partial_json) {
+                    const tool = pendingTools.get(currentBlockIndex);
+                    if (tool) tool.args += parsed.delta.partial_json;
+                  }
+                }
+                if (parsed.type === "content_block_stop") {
+                  // Tool call completed — will be handled after stream ends
+                  currentBlockIndex = parsed.index ?? currentBlockIndex;
                 }
                 // Capture usage from message_start and message_delta events
                 if (parsed.type === "message_start" && parsed.message?.usage) {
@@ -104,6 +128,31 @@ export class AnthropicProvider extends BaseProvider {
               } catch { /* ignore unparseable SSE chunk */ }
             }
           }
+        }
+
+        // P1-04: If tool calls were found in the stream, process them recursively
+        if (pendingTools.size > 0) {
+          const assistantContent: Record<string, unknown>[] = [];
+          if (text) assistantContent.push({ type: "text", text });
+          for (const [, tc] of pendingTools) {
+            let args: Record<string, unknown> = {};
+            try { args = JSON.parse(tc.args); } catch { /* empty */ }
+            assistantContent.push({ type: "tool_use", id: tc.id, name: tc.name, input: args });
+          }
+
+          const nextMessages: Message[] = [...messages, { role: "assistant", content: assistantContent }];
+          for (const [, tc] of pendingTools) {
+            let args: Record<string, unknown> = {};
+            try { args = JSON.parse(tc.args); } catch { /* empty */ }
+            const result = await callTool({ id: tc.id, name: tc.name, arguments: args });
+            const safeResult = `[UNTRUSTED TOOL OUTPUT]\n${result.result || result}\n[/UNTRUSTED TOOL OUTPUT]`;
+            nextMessages.push({
+              role: "user",
+              content: [{ type: "tool_result", tool_use_id: tc.id, content: safeResult }]
+            } as Message);
+          }
+
+          return this.call({ messages: nextMessages, signal, maxTokens, isFallback, onChunk, _depth: _depth + 1 });
         }
 
         const estimatedCompletion = Math.ceil(text.length / 4);

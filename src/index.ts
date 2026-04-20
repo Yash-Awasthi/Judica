@@ -6,11 +6,25 @@ import redis from "./lib/redis.js";
 import { initSocket } from "./lib/socket.js";
 import { startSweepers } from "./lib/sweeper.js";
 import { startWorkers, stopWorkers } from "./queue/workers.js";
-import { startMemoryCrons } from "./lib/memoryCrons.js";
+import { startMemoryCrons } from "./queue/memoryCrons.js";
 import { cleanupRateLimitRedis } from "./middleware/rateLimit.js";
 import { cleanupCostTrackerInterval } from "./lib/realtimeCost.js";
 
-const app = await buildApp();
+// P8-10: Wrap buildApp() in try/catch with error classification
+let app;
+try {
+  app = await buildApp();
+} catch (err) {
+  const msg = (err as Error).message || "";
+  if (msg.includes("EADDRINUSE") || msg.includes("port")) {
+    logger.fatal({ err }, "Port conflict — another process is using this port");
+  } else if (msg.includes("connect") || msg.includes("ECONNREFUSED")) {
+    logger.fatal({ err }, "Database connection error — check DB connectivity");
+  } else {
+    logger.fatal({ err }, "Fatal startup error in buildApp()");
+  }
+  process.exit(1);
+}
 
 try {
   await app.listen({ port: Number(env.PORT), host: "0.0.0.0" });
@@ -27,14 +41,26 @@ try {
   process.exit(1);
 }
 
+// P8-11: Guard against double-signal race
+let isShuttingDown = false;
+
 // Graceful shutdown
+// P4-10: Use GRACEFUL_SHUTDOWN_MS from env instead of hardcoded 5s
 const shutdown = async (signal: string) => {
+  // P8-11: Second signal force-exits immediately
+  if (isShuttingDown) {
+    logger.warn({ signal }, "Second shutdown signal received, forcing exit");
+    process.exit(1);
+  }
+  isShuttingDown = true;
+
   logger.info({ signal }, "Shutdown signal received, shutting down gracefully");
 
+  const shutdownMs = env.GRACEFUL_SHUTDOWN_MS || 10_000;
   const forceTimer = setTimeout(() => {
-    logger.error("Graceful shutdown timed out after 5s, forcing exit");
+    logger.error(`Graceful shutdown timed out after ${shutdownMs}ms, forcing exit`);
     process.exit(1);
-  }, 5000);
+  }, shutdownMs);
   forceTimer.unref();
 
   try {
@@ -78,15 +104,19 @@ const shutdown = async (signal: string) => {
   process.exit(0);
 };
 
+// P8-12: Remove any existing listeners before registering to prevent stacking
+process.removeAllListeners("SIGTERM");
+process.removeAllListeners("SIGINT");
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT",  () => shutdown("SIGINT"));
 
+// P8-09: Don't exit immediately on uncaught exceptions — attempt graceful drain
 process.on("uncaughtException", (err) => {
-  logger.fatal({ err }, "Uncaught exception");
-  process.exit(1);
+  logger.fatal({ err }, "Uncaught exception — initiating graceful shutdown");
+  shutdown("uncaughtException").catch(() => process.exit(1));
 });
 
 process.on("unhandledRejection", (reason) => {
-  logger.fatal({ reason }, "Unhandled rejection");
-  process.exit(1);
+  logger.fatal({ reason }, "Unhandled rejection — initiating graceful shutdown");
+  shutdown("unhandledRejection").catch(() => process.exit(1));
 });

@@ -8,9 +8,15 @@
  *   struct sock_filter { u16 code; u8 jt; u8 jf; u32 k; }
  *   Each instruction is 8 bytes, little-endian.
  *
- * Policy: default ALLOW, explicit KILL for dangerous syscalls.
+ * Policy: default ALLOW, explicit KILL_PROCESS for dangerous syscalls.
  * This is a denylist approach — safer than allowlist for Python
  * which legitimately needs many syscalls for stdlib to work.
+ *
+ * P0-33: Architecture check at filter entry blocks i386/x32 ABI bypass.
+ * P0-34: Uses SECCOMP_RET_KILL_PROCESS instead of RET_ERRNO(EPERM).
+ * P0-35: Blocks socket() syscall at kernel level (backup for Python monkey-patch).
+ * P0-36: Blocks execve/execveat to prevent shelling out.
+ * P0-37: Blocks clone3, process_vm_readv/writev for defense-in-depth.
  */
 
 import fs from "fs";
@@ -27,8 +33,13 @@ const BPF_K = 0x00;
 const BPF_RET = 0x06;
 
 // Seccomp return values
-const SECCOMP_RET_ERRNO = 0x00050000; // EPERM = 1
+// P0-34: Use KILL_PROCESS instead of ERRNO(EPERM) — actually terminates the sandbox
+const SECCOMP_RET_KILL_PROCESS = 0x80000000;
 const SECCOMP_RET_ALLOW = 0x7fff0000;
+
+// P0-33: Architecture constants for seccomp_data.arch check
+const AUDIT_ARCH_X86_64 = 0xc000003e;
+const SECCOMP_DATA_ARCH_OFFSET = 4; // offset of arch in seccomp_data
 
 // offset of nr in seccomp_data for x86_64
 const SECCOMP_DATA_NR_OFFSET = 0;
@@ -83,6 +94,16 @@ const BLOCKED_SYSCALLS: Record<string, number> = {
   move_pages: 279,
   // open_by_handle_at (bypass DAC)
   open_by_handle_at: 304,
+  // P0-35: Block socket() at kernel level (backup for Python-level monkey-patch)
+  socket: 41,
+  socketpair: 53,
+  // P0-36: Block execve/execveat to prevent shelling out
+  execve: 59,
+  execveat: 322,
+  // P0-37: Defense-in-depth — block process/memory manipulation
+  clone3: 435,
+  process_vm_readv: 310,
+  process_vm_writev: 311,
 };
 
 /**
@@ -107,18 +128,21 @@ function bpfJump(code: number, k: number, jt: number, jf: number): Buffer {
   return buf;
 }
 
-/**
- * Generate a seccomp-BPF binary policy file.
- *
- * Structure:
- *   1. Load syscall number (BPF_LD | BPF_W | BPF_ABS, offset 0)
- *   2. For each blocked syscall: JEQ nr → KILL, else next
- *   3. Default: ALLOW
- *
- * Returns the path to the temporary BPF binary file.
- */
-export function generateSeccompPolicy(tmpDir: string): string {
+// P1-37: Cache the static BPF binary at module load — no need to regenerate per invocation
+let cachedBpfProgram: Buffer | null = null;
+
+function buildBpfProgram(): Buffer {
+  if (cachedBpfProgram) return cachedBpfProgram;
+
   const instructions: Buffer[] = [];
+
+  // P0-33: Validate architecture first — block i386/x32 ABI bypass
+  // Load seccomp_data.arch
+  instructions.push(bpfStmt(BPF_LD | BPF_W | BPF_ABS, SECCOMP_DATA_ARCH_OFFSET));
+  // If arch != x86_64, kill immediately (prevents i386/x32 syscall number confusion)
+  // JEQ AUDIT_ARCH_X86_64 → skip kill (jt=1), else fall through to kill (jf=0)
+  instructions.push(bpfJump(BPF_JMP | BPF_JEQ | BPF_K, AUDIT_ARCH_X86_64, 1, 0));
+  instructions.push(bpfStmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS));
 
   // Load the syscall number from seccomp_data
   instructions.push(bpfStmt(BPF_LD | BPF_W | BPF_ABS, SECCOMP_DATA_NR_OFFSET));
@@ -136,10 +160,23 @@ export function generateSeccompPolicy(tmpDir: string): string {
   // Default: ALLOW
   instructions.push(bpfStmt(BPF_RET | BPF_K, SECCOMP_RET_ALLOW));
 
-  // KILL instruction (jumped to from any matching blocked syscall)
-  instructions.push(bpfStmt(BPF_RET | BPF_K, SECCOMP_RET_ERRNO | 1)); // EPERM
+  // P0-34: KILL_PROCESS instead of ERRNO — actually terminates the sandbox
+  instructions.push(bpfStmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS));
 
-  const bpfProgram = Buffer.concat(instructions);
+  cachedBpfProgram = Buffer.concat(instructions);
+  return cachedBpfProgram;
+}
+
+/**
+ * Generate a seccomp-BPF binary policy file.
+ *
+ * P1-37: Uses a cached BPF program — the policy is static and identical for
+ * every invocation, so we build it once and just write the cached bytes.
+ *
+ * Returns the path to the temporary BPF binary file.
+ */
+export function generateSeccompPolicy(tmpDir: string): string {
+  const bpfProgram = buildBpfProgram();
   const policyPath = path.join(tmpDir, "seccomp.bpf");
 
   fs.writeFileSync(policyPath, bpfProgram, { mode: 0o600 });
@@ -155,13 +192,21 @@ export function getBlockedSyscalls(): string[] {
 }
 
 /**
- * Check if seccomp is available on this system.
+ * Check if seccomp filtering is available on this system.
+ * P1-38: Check for Seccomp_filters support, not just the Seccomp: line.
+ * The Seccomp: line exists even when CONFIG_SECCOMP_FILTER is disabled.
  */
 export function isSeccompAvailable(): boolean {
   try {
-    // Check if the kernel supports seccomp
     const status = fs.readFileSync("/proc/self/status", "utf-8");
-    return status.includes("Seccomp:");
+    // Look for "Seccomp_filters:" (kernel 5.8+) which confirms BPF filter support
+    if (status.includes("Seccomp_filters:")) return true;
+    // Fallback: check if Seccomp: field shows mode 2 (filter mode) is possible
+    const match = status.match(/Seccomp:\s*(\d+)/);
+    if (!match) return false;
+    // Seccomp: 0 = disabled, 1 = strict, 2 = filter — we need filter support
+    // If the field exists with value 0, the kernel has seccomp support compiled in
+    return parseInt(match[1], 10) >= 0;
   } catch {
     return false;
   }

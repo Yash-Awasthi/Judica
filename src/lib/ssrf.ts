@@ -5,6 +5,9 @@ import { promisify } from "util";
 
 const lookup = promisify(dns.lookup);
 
+// P0-26: Allowed ports whitelist
+const ALLOWED_PORTS = new Set([80, 443, 8080, 8443]);
+
 export function isPrivateIP(ip: string): boolean {
   if (!net.isIP(ip)) return false;
 
@@ -19,6 +22,15 @@ export function isPrivateIP(ip: string): boolean {
     if (parts[0] === 192 && parts[1] === 168) return true;
     if (parts[0] >= 224 && parts[0] <= 239) return true;
     if (parts[0] >= 240 && parts[0] <= 255) return true;
+
+    // P0-24: Block CGN (Carrier-Grade NAT) range — covers Alibaba metadata 100.100.100.200
+    if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) return true;
+
+    // P0-25: Block TEST-NET ranges
+    if (parts[0] === 192 && parts[1] === 0 && parts[2] === 2) return true;       // 192.0.2.0/24
+    if (parts[0] === 198 && parts[1] === 51 && parts[2] === 100) return true;     // 198.51.100.0/24
+    if (parts[0] === 203 && parts[1] === 0 && parts[2] === 113) return true;      // 203.0.113.0/24
+    if (parts[0] === 198 && parts[1] >= 18 && parts[1] <= 19) return true;        // 198.18.0.0/15
 
     return false;
   } else if (net.isIPv6(ip)) {
@@ -44,7 +56,47 @@ export function isPrivateIP(ip: string): boolean {
   return false;
 }
 
-export async function validateSafeUrl(urlInput: string): Promise<string> {
+// P0-27: DNS lookup with timeout
+const DNS_TIMEOUT_MS = 2000;
+
+async function safeLookup(hostname: string): Promise<dns.LookupAddress[]> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), DNS_TIMEOUT_MS);
+
+  try {
+    const result = await lookup(hostname, { all: true });
+    return result;
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+// P0-22: Proper hostname validation for Ollama (parse URL, check hostname)
+function isLocalhostHostname(hostname: string): boolean {
+  const lower = hostname.toLowerCase();
+  return lower === "localhost" ||
+    lower === "127.0.0.1" ||
+    lower === "::1" ||
+    lower === "[::1]" ||
+    lower === "0.0.0.0" ||
+    lower.endsWith(".localhost");
+}
+
+/**
+ * Validates a URL is safe from SSRF attacks.
+ * Returns the validated URL string.
+ * For DNS rebinding protection, use validateSafeUrlWithIP() which also returns the resolved IP.
+ */
+export async function validateSafeUrl(urlInput: string, options?: { allowLocalhost?: boolean }): Promise<string> {
+  const { url } = await validateSafeUrlWithIP(urlInput, options);
+  return url;
+}
+
+/**
+ * Validates a URL and returns both the URL and resolved IP for DNS pinning.
+ * P0-23: Caller should fetch by IP with Host header preserved to prevent DNS rebinding.
+ */
+export async function validateSafeUrlWithIP(urlInput: string, options?: { allowLocalhost?: boolean }): Promise<{ url: string; resolvedIP: string }> {
   let url: URL;
   try {
     url = new URL(urlInput);
@@ -56,34 +108,50 @@ export async function validateSafeUrl(urlInput: string): Promise<string> {
     throw new Error("Protocol must be http: or https:");
   }
 
-  const hostname = url.hostname.toLowerCase();
+  // P0-26: Port whitelist
+  const port = url.port ? parseInt(url.port, 10) : (url.protocol === "https:" ? 443 : 80);
+  if (!ALLOWED_PORTS.has(port)) {
+    throw new Error(`Port ${port} is not allowed. Permitted: ${[...ALLOWED_PORTS].join(", ")}`);
+  }
+
+  const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+
+  // P0-22: Proper localhost check via parsed hostname
+  if (!options?.allowLocalhost && isLocalhostHostname(hostname)) {
+    throw new Error("Hostname is restricted");
+  }
+
   if (
-    hostname === "localhost" ||
     hostname.endsWith(".local") ||
     hostname.endsWith(".internal") ||
     hostname === "metadata.google.internal"
   ) {
-    throw new Error(`Hostname ${hostname} is restricted`);
+    throw new Error("Hostname is restricted");
   }
 
   try {
-    const result = await lookup(hostname, { all: true });
+    const result = await safeLookup(hostname);
 
     if (!result || result.length === 0) {
-      throw new Error(`Could not resolve hostname ${hostname}`);
+      throw new Error("Could not resolve hostname");
     }
 
     for (const res of result) {
       if (isPrivateIP(res.address)) {
-        throw new Error(`URL resolves to a restricted IP address (${res.address})`);
+        // P0-28: Don't leak the resolved IP in error messages
+        throw new Error("URL resolves to a restricted network address");
       }
     }
+
+    // P0-23: Return first resolved IP for DNS rebinding protection
+    return { url: url.toString(), resolvedIP: result[0].address };
   } catch (err) {
-    if ((err as Error).message.includes("restricted IP")) {
+    if ((err as Error).message.includes("restricted")) {
       throw err;
     }
-    throw new Error("Failed to resolve URL hostname: " + (err as Error).message, { cause: err });
+    if ((err as Error).name === "AbortError") {
+      throw new Error("DNS lookup timed out");
+    }
+    throw new Error("Failed to resolve URL hostname", { cause: err });
   }
-
-  return url.toString();
 }

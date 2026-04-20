@@ -62,8 +62,7 @@ test.describe("Workflow Editor Flow", () => {
     // ── Should have a "create new" action available ──
     const createBtn = page.getByRole("link", { name: /new|create/i })
       .or(page.getByRole("button", { name: /new|create/i }));
-    const hasCreate = await createBtn.first().isVisible({ timeout: 3_000 }).catch(() => false);
-    // Create button should exist (either as link or button)
-    expect(hasCreate || true).toBeTruthy(); // Soft assertion — layout may vary
+    // P6-06: Strict assertion — create button must exist
+    await expect(createBtn.first()).toBeVisible({ timeout: 5_000 });
   });
 });

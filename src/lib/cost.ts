@@ -1,7 +1,16 @@
+// P2-22: Cost/usage logic is scattered across 5 places:
+// 1. lib/cost.ts (this file) — cost calculation
+// 2. lib/realtimeCost.ts — per-session cost tracking
+// 3. services/usageService.ts — daily usage recording
+// 4. routes/costs.ts — cost API endpoint
+// 5. routes/usage.ts — usage API endpoint
+// Future: consolidate into services/usage.service.ts as single source of truth.
 import { db } from "./drizzle.js";
 import { eq, and, gte, sql } from "drizzle-orm";
 import { dailyUsage } from "../db/schema/users.js";
 import logger from "./logger.js";
+import { readFileSync, existsSync } from "fs";
+import { resolve } from "path";
 
 export interface CostConfig {
   provider: string;
@@ -29,7 +38,25 @@ export interface CostBreakdown {
   byTimeframe: Record<string, { cost: number; tokens: number; requests: number }>;
 }
 
-export const DEFAULT_COST_CONFIG: CostConfig[] = [
+// P9-65: Externalized pricing table — loaded from config/pricing.json if available,
+// falling back to compiled defaults. Update pricing without redeploying by editing the JSON file.
+const PRICING_CONFIG_PATH = resolve(process.cwd(), "config/pricing.json");
+
+function loadPricingConfig(): CostConfig[] {
+  try {
+    if (existsSync(PRICING_CONFIG_PATH)) {
+      const raw = readFileSync(PRICING_CONFIG_PATH, "utf-8");
+      const parsed = JSON.parse(raw) as CostConfig[];
+      logger.info({ count: parsed.length, path: PRICING_CONFIG_PATH }, "Loaded external pricing config");
+      return parsed;
+    }
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, "Failed to load external pricing config — using defaults");
+  }
+  return BUILTIN_COST_CONFIG;
+}
+
+const BUILTIN_COST_CONFIG: CostConfig[] = [
   // OpenAI — current models (prices per 1K tokens)
   { provider: "openai", model: "gpt-4o", inputTokenPrice: 0.0025, outputTokenPrice: 0.01, currency: "USD" },
   { provider: "openai", model: "gpt-4o-2024-11-20", inputTokenPrice: 0.0025, outputTokenPrice: 0.01, currency: "USD" },
@@ -74,8 +101,11 @@ export const DEFAULT_COST_CONFIG: CostConfig[] = [
 
   // Mistral (via OpenRouter)
   { provider: "openrouter", model: "mistral/mistral-large-latest", inputTokenPrice: 0.002, outputTokenPrice: 0.006, currency: "USD" },
-  { provider: "openrouter", model: "mistral/mistral-small-latest", inputTokenPrice: 0.0001, outputTokenPrice: 0.0003, currency: "USD" },
+  { provider: "openrouter", model: "mistral/mistral-small-2501", inputTokenPrice: 0.0001, outputTokenPrice: 0.0003, currency: "USD" },
 ];
+
+// P9-65: Load from external config file, fall back to built-in defaults
+export const DEFAULT_COST_CONFIG: CostConfig[] = loadPricingConfig();
 
 export function calculateCost(
   provider: string,
@@ -88,8 +118,18 @@ export function calculateCost(
   const pricing = config.find(c => c.provider === provider && c.model === model);
 
   if (!pricing) {
-    logger.warn({ provider, model }, "No pricing config found, using default rates");
-    return (inputTokens * 0.001 + outputTokens * 0.002) / 1000;
+    // P9-69: Unknown model — use conservative estimate based on pricing table median
+    // instead of near-zero fallback that lets usage go unaccounted.
+    logger.warn({ provider, model }, "No pricing config found — using conservative estimate");
+    // Use median of known models' prices as a reasonable upper bound
+    const sorted = [...config].sort((a, b) =>
+      (a.inputTokenPrice + a.outputTokenPrice) - (b.inputTokenPrice + b.outputTokenPrice)
+    );
+    const median = sorted[Math.floor(sorted.length / 2)];
+    if (median) {
+      return (inputTokens * median.inputTokenPrice + outputTokens * median.outputTokenPrice) / 1000;
+    }
+    return (inputTokens * 0.003 + outputTokens * 0.015) / 1000; // fallback to mid-tier pricing
   }
 
   const inputCost = (inputTokens * pricing.inputTokenPrice) / 1000;
@@ -98,6 +138,9 @@ export function calculateCost(
   return inputCost + outputCost;
 }
 
+// P9-67: Cost is persisted via dailyUsage table (aggregated per user per day).
+// Individual request costs are logged but not stored in a per-request ledger.
+// TODO: Add a `usage_ledger` table for per-request cost records if audit trail needed.
 export async function trackTokenUsage(
   userId: number,
   conversationId: string,
@@ -149,6 +192,9 @@ export async function trackTokenUsage(
   }
 }
 
+// P9-68: Note — byProvider and byModel are not populated here because dailyUsage
+// table stores only aggregate tokens/requests per day (no provider/model breakdown).
+// These fields exist for future use when per-request ledger (P9-67) is implemented.
 export async function getUserCostBreakdown(
   userId: number,
   days: number = 30
@@ -194,9 +240,17 @@ export async function getUserCostBreakdown(
   return breakdown;
 }
 
+// P9-66: Use actual weighted average from pricing table instead of a magic constant.
+// This tracks closer to real costs as the model mix changes.
 function estimateCostFromTokens(tokens: number): number {
-  const avgCostPerToken = 0.00002; // ~$0.02 per 1K tokens
-  return tokens * avgCostPerToken;
+  if (DEFAULT_COST_CONFIG.length === 0) {
+    return tokens * 0.00002; // fallback: ~$0.02 per 1K tokens
+  }
+  // Weighted average across all models (assumes ~60% input, 40% output distribution)
+  const avgPricePerToken = DEFAULT_COST_CONFIG.reduce((sum, c) => {
+    return sum + (c.inputTokenPrice * 0.6 + c.outputTokenPrice * 0.4);
+  }, 0) / DEFAULT_COST_CONFIG.length / 1000;
+  return tokens * avgPricePerToken;
 }
 
 export async function getOrganizationCostSummary(days: number = 30): Promise<{
@@ -348,10 +402,14 @@ export async function getCostEfficiencyMetrics(userId: number, days: number = 30
   const avgCostPerRequest = breakdown.totalCost / totalRequests;
   const avgTokensPerRequest = breakdown.totalTokens / totalRequests;
 
-  const costScore = Math.max(0, 100 - (avgCostPerRequest * 100)); // Penalize high cost
-  const tokenScore = Math.min(100, (avgTokensPerRequest / 1000) * 10); // Reward reasonable token usage
+  // P9-70: Fixed efficiency formula — clamp to [0, 100] range.
+  // Lower cost per request = better efficiency.
+  // Score inversely proportional to cost, normalized to $1 as "expensive".
+  const costScore = Math.max(0, Math.min(100, 100 * (1 - Math.min(avgCostPerRequest, 1))));
+  // Token efficiency: penalize excessive token usage (>10K tokens/request is wasteful)
+  const tokenScore = Math.max(0, Math.min(100, 100 * (1 - Math.min(avgTokensPerRequest / 10000, 1))));
 
-  const costEfficiencyScore = (costScore + tokenScore) / 2;
+  const costEfficiencyScore = Math.round((costScore * 0.6 + tokenScore * 0.4));
 
   const recommendations: string[] = [];
 

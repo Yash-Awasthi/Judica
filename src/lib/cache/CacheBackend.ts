@@ -1,5 +1,5 @@
 
-
+// P9-20: Single source of truth for opinions type — import from here, don't duplicate
 export interface CacheEntry {
   verdict: string;
   opinions: Array<{ name: string; opinion: string; [key: string]: unknown }>;
@@ -13,17 +13,25 @@ export interface SemanticSearchResult {
   distance: number;
 }
 
+/**
+ * P9-21: TTL contract:
+ * - `ttlMs` is REQUIRED for set/setSemantic — backends must not store entries without expiry.
+ * - A value of 0 or negative is invalid and should be treated as an error.
+ * - Backends should store the absolute expiry time (Date.now() + ttlMs) for cleanup.
+ */
 export interface CacheBackend {
 
   get(key: string): Promise<CacheEntry | null>;
 
-  set(key: string, value: CacheEntry, ttlMs?: number): Promise<void>;
+  /** @param ttlMs - Time-to-live in milliseconds. REQUIRED; must be > 0. */
+  set(key: string, value: CacheEntry, ttlMs: number): Promise<void>;
 
   delete(key: string): Promise<void>;
 
   searchSemantic?(embedding: number[], threshold?: number): Promise<SemanticSearchResult | null>;
 
-  setSemantic?(key: string, prompt: string, value: CacheEntry, embedding: number[] | null, ttlMs?: number): Promise<void>;
+  /** @param ttlMs - Time-to-live in milliseconds. REQUIRED; must be > 0. */
+  setSemantic?(key: string, prompt: string, value: CacheEntry, embedding: number[] | null, ttlMs: number): Promise<void>;
 
   cleanup?(): Promise<void>;
 }

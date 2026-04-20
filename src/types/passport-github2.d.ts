@@ -1,31 +1,6 @@
-declare module "passport-github2" {
-  import { Strategy as PassportStrategy } from "passport";
-
-  interface GitHubProfile {
-    id: string;
-    displayName: string;
-    username?: string;
-    emails?: Array<{ value: string }>;
-    photos?: Array<{ value: string }>;
-    _json?: Record<string, unknown>;
-  }
-
-  interface StrategyOptions {
-    clientID: string;
-    clientSecret: string;
-    callbackURL: string;
-    scope?: string[];
-  }
-
-  type VerifyCallback = (err: Error | null, user?: Record<string, unknown> | false) => void;
-  type VerifyFunction = (
-    accessToken: string,
-    refreshToken: string,
-    profile: GitHubProfile,
-    done: VerifyCallback,
-  ) => void | Promise<void>;
-
-  export class Strategy extends PassportStrategy {
-    constructor(options: StrategyOptions, verify: VerifyFunction);
-  }
-}
+/**
+ * P5-05: passport-github2 type declarations removed.
+ * GitHub OAuth now uses @fastify/oauth2 (see src/auth/github.strategy.ts).
+ * This file is kept as a placeholder to avoid breaking any stale imports.
+ */
+export {};

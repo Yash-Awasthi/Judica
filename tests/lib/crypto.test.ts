@@ -52,9 +52,9 @@ describe("Crypto Utils", () => {
   });
 
   describe("mask", () => {
-    it("should mask long strings keeping 4 letters at start and end", () => {
+    it("should mask long strings keeping only last 4 chars", () => {
       const masked = mask("sk-ant-api03-verylongsecretkey12345");
-      expect(masked).toBe("sk-a****2345");
+      expect(masked).toBe("****2345");
     });
 
     it("should just return '****' for strings 8 chars or less", () => {

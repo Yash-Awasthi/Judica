@@ -203,8 +203,51 @@ export async function findRelatedConversations(
 }
 
 /**
- * Get the full topic graph for a user (for visualization).
+ * P5-10: Garbage-collect stale topic nodes.
+ *
+ * Removes topic nodes that haven't been updated in `ttlDays` days
+ * and have low strength (fewer than `minStrength` connections).
+ * This prevents unbounded growth of the topic graph.
+ *
+ * @returns Number of pruned nodes.
  */
+export async function pruneStaleTopics(
+  userId: number,
+  ttlDays: number = 90,
+  minStrength: number = 2,
+): Promise<number> {
+  const cutoff = new Date(Date.now() - ttlDays * 24 * 60 * 60 * 1000);
+
+  // Delete edges referencing stale nodes first
+  const staleNodeIds = await db.execute(sql`
+    SELECT "id" FROM "TopicNode"
+    WHERE "userId" = ${userId}
+      AND "updatedAt" < ${cutoff.toISOString()}::timestamp
+      AND "strength" < ${minStrength}
+  `);
+
+  const ids = (staleNodeIds.rows as Array<{ id: string }>).map((r) => r.id);
+  if (ids.length === 0) return 0;
+
+  await db.execute(sql`
+    DELETE FROM "TopicEdge"
+    WHERE "sourceTopicId" = ANY(${ids}::text[])
+       OR "targetTopicId" = ANY(${ids}::text[])
+  `);
+
+  const result = await db.execute(sql`
+    DELETE FROM "TopicNode"
+    WHERE "userId" = ${userId}
+      AND "updatedAt" < ${cutoff.toISOString()}::timestamp
+      AND "strength" < ${minStrength}
+  `);
+
+  const pruned = result.rowCount ?? 0;
+  if (pruned > 0) {
+    logger.info({ userId, pruned, ttlDays, minStrength }, "Pruned stale topic nodes");
+  }
+  return pruned;
+}
 export async function getTopicGraph(userId: number): Promise<TopicGraph> {
   const nodes = await db
     .select({

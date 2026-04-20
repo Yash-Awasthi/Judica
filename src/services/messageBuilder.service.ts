@@ -132,14 +132,20 @@ export function buildEnrichedQuestion(
 
   const textContent = parts.join("\n\n");
 
+  // P1-25: Cap post-enrichment prompt size to prevent oversized prompts
+  const MAX_ENRICHED_SIZE = 200_000; // ~200KB after enrichment
+  const cappedContent = textContent.length > MAX_ENRICHED_SIZE
+    ? textContent.slice(0, MAX_ENRICHED_SIZE) + "\n\n[Context truncated due to size limits]"
+    : textContent;
+
   // If no images, return plain string
   if (fileContext.image_blocks.length === 0) {
-    return textContent;
+    return cappedContent;
   }
 
   // With images: return content blocks array for multimodal messages
   const blocks: AdapterContentBlock[] = [
-    { type: "text", text: textContent },
+    { type: "text", text: cappedContent },
   ];
 
   for (const img of fileContext.image_blocks) {

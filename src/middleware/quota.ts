@@ -1,7 +1,9 @@
+// P0-44: Single source of truth for quota checking.
+// P0-41: Atomic INSERT ... ON CONFLICT DO UPDATE RETURNING — no TOCTOU race.
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { db } from "../lib/drizzle.js";
 import { dailyUsage } from "../db/schema/users.js";
-import { eq, and, sql } from "drizzle-orm";
+import { and, sql } from "drizzle-orm";
 import logger from "../lib/logger.js";
 import { DAILY_REQUEST_LIMIT, DAILY_TOKEN_LIMIT } from "../config/quotas.js";
 
@@ -15,32 +17,9 @@ export async function fastifyCheckQuota(request: FastifyRequest, reply: FastifyR
   const today = new Date();
   today.setUTCHours(0, 0, 0, 0);
 
-  const existing = await db
-    .select()
-    .from(dailyUsage)
-    .where(and(eq(dailyUsage.userId, userId), eq(dailyUsage.date, today)))
-    .limit(1);
-
-  const currentRequests = existing[0]?.requests ?? 0;
-  const currentTokens = existing[0]?.tokens ?? 0;
-
-  if (currentRequests >= MAX_DAILY_REQUESTS || currentTokens >= MAX_DAILY_TOKENS) {
-    logger.warn({
-      userId,
-      requests: currentRequests,
-      tokens: currentTokens,
-      requestId: (request as unknown as { requestId?: string }).requestId
-    }, "User exceeded daily quota limit");
-    reply.header("X-Quota-Limit", MAX_DAILY_REQUESTS.toString());
-    reply.header("X-Quota-Used", currentRequests.toString());
-    reply.header("X-Token-Limit", MAX_DAILY_TOKENS.toString());
-    reply.header("X-Token-Used", currentTokens.toString());
-    reply.header("Retry-After", "86400");
-    reply.code(429).send({ error: "Daily request or token quota exceeded. Please try again tomorrow." });
-    return;
-  }
-
-  const [updatedUsage] = await db
+  // Atomic upsert: insert with requests=1 or increment, returning new totals.
+  // Single round-trip — no TOCTOU window.
+  const [usage] = await db
     .insert(dailyUsage)
     .values({
       userId,
@@ -58,11 +37,42 @@ export async function fastifyCheckQuota(request: FastifyRequest, reply: FastifyR
     })
     .returning();
 
-  reply.header("X-Quota-Limit", MAX_DAILY_REQUESTS.toString());
-  reply.header("X-Quota-Used", updatedUsage.requests.toString());
-  reply.header("X-Quota-Remaining", Math.max(0, MAX_DAILY_REQUESTS - updatedUsage.requests).toString());
+  // Reject if post-increment value exceeds limits
+  if (usage.requests > MAX_DAILY_REQUESTS || usage.tokens > MAX_DAILY_TOKENS) {
+    // Roll back the optimistic increment so a rejected request isn't counted
+    await db
+      .update(dailyUsage)
+      .set({ requests: sql`GREATEST(${dailyUsage.requests} - 1, 0)` })
+      .where(and(
+        sql`${dailyUsage.userId} = ${userId}`,
+        sql`${dailyUsage.date} = ${today}`
+      ));
 
-  reply.header("X-Token-Limit", MAX_DAILY_TOKENS.toString());
-  reply.header("X-Token-Used", updatedUsage.tokens.toString());
-  reply.header("X-Token-Remaining", Math.max(0, MAX_DAILY_TOKENS - updatedUsage.tokens).toString());
+    logger.warn({
+      userId,
+      requests: usage.requests,
+      tokens: usage.tokens,
+    }, "User exceeded daily quota limit");
+    // P8-48: Use post-rollback values in 429 headers — request was decremented
+    const rolledBackRequests = Math.max(0, usage.requests - 1);
+    reply
+      .header("X-Quota-Limit", MAX_DAILY_REQUESTS.toString())
+      .header("X-Quota-Used", rolledBackRequests.toString())
+      .header("X-Quota-Remaining", Math.max(0, MAX_DAILY_REQUESTS - rolledBackRequests).toString())
+      .header("X-Token-Limit", MAX_DAILY_TOKENS.toString())
+      .header("X-Token-Used", usage.tokens.toString())
+      .header("X-Token-Remaining", Math.max(0, MAX_DAILY_TOKENS - usage.tokens).toString())
+      .header("Retry-After", "86400")
+      .code(429)
+      .send({ error: "Daily request or token quota exceeded. Please try again tomorrow." });
+    return;
+  }
+
+  reply
+    .header("X-Quota-Limit", MAX_DAILY_REQUESTS.toString())
+    .header("X-Quota-Used", usage.requests.toString())
+    .header("X-Quota-Remaining", Math.max(0, MAX_DAILY_REQUESTS - usage.requests).toString())
+    .header("X-Token-Limit", MAX_DAILY_TOKENS.toString())
+    .header("X-Token-Used", usage.tokens.toString())
+    .header("X-Token-Remaining", Math.max(0, MAX_DAILY_TOKENS - usage.tokens).toString());
 }

@@ -14,6 +14,11 @@
  * If persistent tracking is needed (e.g. multi-instance deployments, strict
  * budgeting), replace the `quotas` Map below with a Redis-backed store using
  * INCRBY + TTL-based daily expiry.
+ *
+ * P2-14: Known TOCTOU race — canUse() reads then recordUsage() writes,
+ * creating a window where concurrent requests may both pass the check.
+ * This is acceptable because upstream providers enforce hard limits,
+ * and the in-memory map doesn't survive restarts anyway.
  */
 
 interface QuotaEntry {
@@ -49,17 +54,25 @@ function getOrReset(provider: string): QuotaEntry {
   return entry;
 }
 
+/**
+ * Check if a provider/user combo can still make requests today.
+ * P3-15: Supports optional userId for per-user quota tracking.
+ * Without userId, falls back to global per-provider quotas (backward compatible).
+ */
 export function canUse(
   provider: string,
   maxDailyRequests = Infinity,
-  maxDailyTokens = Infinity
+  maxDailyTokens = Infinity,
+  userId?: string
 ): boolean {
-  const entry = getOrReset(provider);
+  const key = userId ? `${provider}:${userId}` : provider;
+  const entry = getOrReset(key);
   return entry.requests_used < maxDailyRequests && entry.tokens_used < maxDailyTokens;
 }
 
-export function recordUsage(provider: string, tokens: number): void {
-  const entry = getOrReset(provider);
+export function recordUsage(provider: string, tokens: number, userId?: string): void {
+  const key = userId ? `${provider}:${userId}` : provider;
+  const entry = getOrReset(key);
   entry.requests_used++;
   entry.tokens_used += tokens;
 }
@@ -67,9 +80,11 @@ export function recordUsage(provider: string, tokens: number): void {
 export function getRemainingQuota(
   provider: string,
   maxDailyRequests = Infinity,
-  maxDailyTokens = Infinity
+  maxDailyTokens = Infinity,
+  userId?: string
 ): QuotaStatus {
-  const entry = getOrReset(provider);
+  const key = userId ? `${provider}:${userId}` : provider;
+  const entry = getOrReset(key);
   return {
     requests_used: entry.requests_used,
     tokens_used: entry.tokens_used,
@@ -78,8 +93,17 @@ export function getRemainingQuota(
   };
 }
 
-export function resetQuota(provider: string): void {
-  quotas.delete(provider);
+/**
+ * P3-16: Reset quota — admin-only operation.
+ * @param adminVerified - Caller MUST pass `true` to confirm admin authorization
+ *   has been checked. Throws if not explicitly set to `true`.
+ */
+export function resetQuota(provider: string, userId?: string, adminVerified = false): void {
+  if (!adminVerified) {
+    throw new Error("resetQuota requires admin authorization — pass adminVerified: true after checking caller role");
+  }
+  const key = userId ? `${provider}:${userId}` : provider;
+  quotas.delete(key);
 }
 
 export function getAllQuotas(): Record<string, QuotaEntry> {

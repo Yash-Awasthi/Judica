@@ -137,10 +137,11 @@ async function pingOpenAICompat(m: ModelTest): Promise<string> {
 }
 
 async function pingGoogle(m: ModelTest): Promise<string> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${m.model}:generateContent?key=${m.apiKey}`;
+  // P1-05: Move API key from URL to header
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${m.model}:generateContent`;
   const res = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json", "x-goog-api-key": m.apiKey },
     body: JSON.stringify({
       contents: [{ role: "user", parts: [{ text: "Ping. Reply with exactly 'pong'." }] }],
       generationConfig: { maxOutputTokens: 10 },

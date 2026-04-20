@@ -76,6 +76,8 @@ export class GoogleProvider extends BaseProvider {
         let text = "";
         let buffer = "";
         let streamUsage: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number } | null = null;
+        // P1-04: Track tool calls (functionCall parts) during streaming
+        const pendingToolCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
 
         while (true) {
           const { done, value } = await reader.read();
@@ -94,10 +96,20 @@ export class GoogleProvider extends BaseProvider {
               try {
                 const parsed = JSON.parse(dataStr);
                 const candidate = parsed.candidates?.[0];
-                const content = candidate?.content?.parts?.[0]?.text;
-                if (content) {
-                  text += content;
-                  onChunk(content);
+                if (candidate?.content?.parts) {
+                  for (const part of candidate.content.parts) {
+                    if (part.text) {
+                      text += part.text;
+                      onChunk(part.text);
+                    }
+                    // P1-04: Capture function calls from streaming response
+                    if (part.functionCall) {
+                      pendingToolCalls.push({
+                        name: part.functionCall.name,
+                        args: part.functionCall.args || {},
+                      });
+                    }
+                  }
                 }
                 // Capture usage metadata from Gemini response
                 if (parsed.usageMetadata) {
@@ -105,6 +117,24 @@ export class GoogleProvider extends BaseProvider {
                 }
               } catch { /* ignore unparseable SSE chunk */ }
             }
+          }
+        }
+
+        // P1-04: If tool calls were found in the stream, process them recursively
+        if (pendingToolCalls.length > 0) {
+          for (const tc of pendingToolCalls) {
+            const result = await callTool({
+              id: `google-${Date.now()}`,
+              name: tc.name,
+              arguments: tc.args,
+            });
+            const safeResult = `[UNTRUSTED TOOL OUTPUT]\n${result.result || result}\n[/UNTRUSTED TOOL OUTPUT]`;
+            const nextMessages: Message[] = [
+              ...messages,
+              { role: "assistant", content: JSON.stringify({ functionCall: tc }) },
+              { role: "tool", name: tc.name, content: safeResult } as Message,
+            ];
+            return this.call({ messages: nextMessages, signal, maxTokens, isFallback, onChunk, _depth: _depth + 1 });
           }
         }
 

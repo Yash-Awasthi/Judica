@@ -1,3 +1,8 @@
+// P9-46: Schema barrel re-exports are synchronous but safe — these are just
+// Drizzle table/column definitions (no DB calls or I/O at import time).
+// The actual DB connection is deferred via lazy initialization in lib/drizzle.ts (P9-45).
+// Circular import risk is mitigated by keeping schema files as pure declarations
+// with no cross-imports of runtime modules (lib/, routes/, middleware/).
 export * from "./users.js";
 export * from "./conversations.js";
 export * from "./auth.js";

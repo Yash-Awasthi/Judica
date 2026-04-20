@@ -28,25 +28,25 @@ export interface CustomProviderConfig {
 export class CustomAdapter implements IProviderAdapter {
   readonly providerId: string;
   private config: CustomProviderConfig;
-  private decryptedKey: string | null = null;
 
   constructor(config: CustomProviderConfig) {
     this.providerId = `custom_${config.id}`;
     this.config = config;
   }
 
+  // P7-37: Wrap decrypt in try/catch to avoid leaking internal state
   private getApiKey(): string {
-    if (!this.decryptedKey) {
-      this.decryptedKey = this.config.auth_key_encrypted
-        ? decrypt(this.config.auth_key_encrypted)
-        : "";
+    if (!this.config.auth_key_encrypted) return "";
+    try {
+      return decrypt(this.config.auth_key_encrypted);
+    } catch {
+      throw new Error(`Failed to decrypt API key for custom adapter "${this.config.name}"`);
     }
-    return this.decryptedKey;
   }
 
   async generate(req: AdapterRequest): Promise<AdapterStreamResult> {
     const baseUrl = this.config.base_url.replace(/\/$/, "");
-    // Validate base URL against SSRF (blocks private IPs, localhost, cloud metadata)
+    // P7-39: Validate base URL against SSRF in all paths (streaming & non-streaming)
     await validateSafeUrl(baseUrl);
     const apiKey = this.getApiKey();
 
@@ -59,19 +59,23 @@ export class CustomAdapter implements IProviderAdapter {
       case "api_key_header":
         headers[this.config.auth_header_name || "X-API-Key"] = apiKey;
         break;
-      case "basic":
-        headers["Authorization"] = `Basic ${Buffer.from(apiKey).toString("base64")}`;
+      case "api_key_query":
+        // P7-35: Move API key to header instead of query string to avoid log exposure
+        headers["X-API-Key"] = apiKey;
         break;
-      // api_key_query and none don't need headers
+      case "basic": {
+        // P7-38: Validate basic auth credentials are non-empty before encoding
+        const [username, password] = apiKey.includes(":") ? [apiKey.split(":")[0], apiKey.split(":").slice(1).join(":")] : [apiKey, ""];
+        if (!username) {
+          throw new Error(`Basic auth for "${this.config.name}" requires a non-empty username`);
+        }
+        headers["Authorization"] = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
+        break;
+      }
+      // "none" doesn't need headers
     }
 
-    // Build URL
-    let url = `${baseUrl}/chat/completions`;
-    if (this.config.auth_type === "api_key_query") {
-      const urlObj = new URL(url);
-      urlObj.searchParams.set("api_key", apiKey);
-      url = urlObj.toString();
-    }
+    const url = `${baseUrl}/chat/completions`;
 
     // Build OpenAI-compatible request body
     const body: Record<string, unknown> = {
@@ -97,6 +101,7 @@ export class CustomAdapter implements IProviderAdapter {
         method: "POST",
         headers,
         body: JSON.stringify(body),
+        redirect: "error",
         signal: AbortSignal.timeout(60000),
       });
 
@@ -148,6 +153,8 @@ export class CustomAdapter implements IProviderAdapter {
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
+    // P7-36: Track tool calls across streaming chunks
+    const pendingToolCalls = new Map<number, { id: string; name: string; args: string }>();
 
     try {
       while (true) {
@@ -162,12 +169,35 @@ export class CustomAdapter implements IProviderAdapter {
 
           if (!line.startsWith("data: ")) continue;
           const dataStr = line.slice(6).trim();
-          if (dataStr === "[DONE]") continue;
+          if (dataStr === "[DONE]") {
+            // Emit accumulated tool calls
+            for (const [, tc] of pendingToolCalls) {
+              let args: string | Record<string, unknown> = tc.args;
+              try { args = JSON.parse(tc.args); } catch { /* keep as string */ }
+              yield { type: "tool_call", tool_call: { id: tc.id, name: tc.name, arguments: args } };
+            }
+            continue;
+          }
 
           try {
             const parsed = JSON.parse(dataStr);
-            const content = parsed.choices?.[0]?.delta?.content;
+            const delta = parsed.choices?.[0]?.delta;
+            const content = delta?.content;
             if (content) yield { type: "text", text: content };
+
+            // P7-36: Parse tool calls from delta
+            if (delta?.tool_calls) {
+              for (const tc of delta.tool_calls) {
+                const i = tc.index ?? pendingToolCalls.size;
+                if (!pendingToolCalls.has(i)) {
+                  pendingToolCalls.set(i, { id: tc.id || "", name: tc.function?.name || "", args: "" });
+                }
+                const p = pendingToolCalls.get(i)!;
+                if (tc.id) p.id = tc.id;
+                if (tc.function?.name) p.name = tc.function.name;
+                if (tc.function?.arguments) p.args += tc.function.arguments;
+              }
+            }
 
             if (parsed.usage) {
               yield {
@@ -217,7 +247,7 @@ export class CustomAdapter implements IProviderAdapter {
       const apiKey = this.getApiKey();
       const headers: Record<string, string> = {};
 
-      // Apply auth based on auth_type (not just bearer)
+      // Apply auth based on auth_type
       switch (this.config.auth_type) {
         case "bearer":
           headers["Authorization"] = `Bearer ${apiKey}`;
@@ -225,19 +255,23 @@ export class CustomAdapter implements IProviderAdapter {
         case "api_key_header":
           headers[this.config.auth_header_name || "X-API-Key"] = apiKey;
           break;
-        case "basic":
-          headers["Authorization"] = `Basic ${Buffer.from(apiKey).toString("base64")}`;
+        case "api_key_query":
+          // P7-35: Use header instead of query param
+          headers["X-API-Key"] = apiKey;
           break;
-        // api_key_query handled below
+        case "basic": {
+          const [username, password] = apiKey.includes(":") ? [apiKey.split(":")[0], apiKey.split(":").slice(1).join(":")] : [apiKey, ""];
+          if (username) {
+            headers["Authorization"] = `Basic ${Buffer.from(`${username}:${password}`).toString("base64")}`;
+          }
+          break;
+        }
       }
 
       // SSRF validation
       await validateSafeUrl(`${baseUrl}/models`);
 
       const url = new URL(`${baseUrl}/models`);
-      if (this.config.auth_type === "api_key_query") {
-        url.searchParams.set("api_key", apiKey);
-      }
 
       const res = await fetch(url.toString(), {
         headers,

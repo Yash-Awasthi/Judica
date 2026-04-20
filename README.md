@@ -18,7 +18,7 @@
 
 **Instead of trusting one model's best guess, AIBYAI runs a council — 4+ agents argue, critique each other's claims, and produce a scored consensus with a confidence number you can actually trust.**
 
-[Quick Start](#quick-start) · [Architecture](#architecture) · [Features](#features) · [Documentation](./DOCUMENTATION.md) · [Roadmap](./ROADMAP.md)
+[Quick Start](#quick-start) · [Architecture](#architecture) · [Features](#features) · [Demo](#demo) · [Documentation](./DOCUMENTATION.md) · [Roadmap](./ROADMAP.md)
 
 </div>
 
@@ -38,7 +38,7 @@ AIBYAI fixes this by making AI models **debate each other**.
 | **Contradictions** | Invisible | Detected, debated, resolved |
 | **Confidence** | Unknown | Numeric score with penalty breakdown |
 | **Memory** | Stateless | Cross-conversation topic graph, temporal decay, adaptive recall |
-| **Provider Lock-in** | One vendor | 7 providers, automatic failover |
+| **Provider Lock-in** | One vendor | 12+ providers, automatic failover |
 | **Cost Visibility** | Bill at the end | Per-query cost tracking |
 
 ---
@@ -127,7 +127,7 @@ flowchart LR
 ## Features
 
 ### Multi-Agent Deliberation
-The core of AIBYAI. An orchestrator dispatches your query to 4+ agents running on different LLMs — each with a distinct archetype (Empiricist, Strategist, Historian, Architect, Skeptic). Agents don't just generate answers in parallel — they **extract claims, detect contradictions pairwise, and argue through structured debate rounds**. Concessions are tracked and fed back into per-model reliability scores that persist across sessions.
+The core of AIBYAI. An orchestrator dispatches your query to 4+ agents running on different LLMs — each with a distinct archetype (14 built-in: Architect, Contrarian, Empiricist, Ethicist, Futurist, Pragmatist, Historian, Empath, Outsider, Strategist, Minimalist, Creator, Judge, Devil's Advocate). Agents don't just generate answers in parallel — they **extract claims, detect contradictions pairwise, and argue through structured debate rounds**. Concessions are tracked and fed back into per-model reliability scores that persist across sessions.
 
 ### Advanced RAG Pipeline
 Five-stage retrieval: **HyDE** generates hypothetical answers to improve recall, **parent-child chunking** (1536/512 chars) retrieves child chunks and enriches with parent context, **federated search** queries KBs + repos + conversations + council facts in parallel, **adaptive k selection** picks result count by query complexity (simple k=3, moderate k=7, complex k=12), and optional **Cohere reranking** reorders results post-retrieval. All stages merge via Reciprocal Rank Fusion.
@@ -205,9 +205,26 @@ Publish and install prompts, workflows, personas, and custom tools. Star ratings
 | Groq | LLaMA 3.x, LLaMA 4, Mixtral | 30 RPM free tier |
 | Ollama | Any local model | Unlimited, self-hosted |
 | OpenRouter | Multi-model gateway | 20 RPM free tier |
+| Mistral | Mistral Small, Large | 60 RPM paid tier |
+| Cerebras | LLaMA 3.3 70B | 30 RPM free tier |
+| NVIDIA | NIM models | OpenAI-compatible |
+| Perplexity | Sonar models | Online search-augmented |
+| Fireworks | Fast inference | OpenAI-compatible |
+| Together | Open-source models | OpenAI-compatible |
+| DeepInfra | Open-source models | OpenAI-compatible |
+| Azure OpenAI | GPT-4o (Azure-hosted) | OpenAI-compatible |
 | Custom | Any OpenAI-compatible API | Configurable via UI |
 
 All adapters include circuit breaker protection, request timeouts, SSRF validation, and tool-call depth limiting.
+
+---
+
+## Demo
+
+> **Live demo coming soon.** To see AIBYAI in action, clone the repo and run locally with `npm run dev`. A hosted demo and video walkthrough are planned — star the repo to get notified.
+
+<!-- TODO: Replace with actual demo URL and video embed when available -->
+<!-- [Live Demo](https://demo.aibyai.dev) · [Video Walkthrough](https://youtube.com/watch?v=...) -->
 
 ---
 
@@ -261,7 +278,7 @@ Returns an SSE stream: `status` → `opinion` → `peer_review` → `scored` →
 ```
 aibyai/
 ├── src/
-│   ├── adapters/           # 7 LLM provider adapters + registry
+│   ├── adapters/           # 12+ LLM provider adapters + registry
 │   ├── agents/             # Orchestrator, conflict detector, shared memory
 │   ├── auth/               # OAuth strategies (Google, GitHub)
 │   ├── config/             # Zod-validated environment config

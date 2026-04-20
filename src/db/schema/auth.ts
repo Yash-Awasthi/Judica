@@ -13,8 +13,8 @@ import { users } from "./users.js";
 export const revokedTokens = pgTable("RevokedToken", {
   id: serial("id").primaryKey(),
   token: text("token").notNull().unique(),
-  expiresAt: timestamp("expiresAt", { mode: "date" }).notNull(),
-  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  expiresAt: timestamp("expiresAt", { mode: "date", withTimezone: true }).notNull(),
+  createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
 });
 
 // ─── RefreshToken ────────────────────────────────────────────────────────────
@@ -26,8 +26,10 @@ export const refreshTokens = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     tokenHash: text("tokenHash").notNull().unique(),
-    expiresAt: timestamp("expiresAt", { mode: "date" }).notNull(),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+    ipHash: text("ipHash"),
+    userAgentHash: text("userAgentHash"),
+    expiresAt: timestamp("expiresAt", { mode: "date", withTimezone: true }).notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [index("RefreshToken_userId_idx").on(table.userId)],
 );
@@ -40,5 +42,5 @@ export const councilConfigs = pgTable("CouncilConfig", {
     .unique()
     .references(() => users.id, { onDelete: "cascade" }),
   config: jsonb("config").notNull(),
-  updatedAt: timestamp("updatedAt", { mode: "date" }).notNull(),
+  updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull(),
 });

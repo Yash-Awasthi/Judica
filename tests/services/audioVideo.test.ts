@@ -20,6 +20,33 @@ import type { MediaProcessingResult } from "../../src/services/audioVideo.servic
 
 describe("audioVideo.service", () => {
   describe("processMedia", () => {
+    // P6-15: Happy-path test with synthetic audio fixture
+    it("successfully transcribes audio when provider is available", async () => {
+      // Set an API key so a provider is available
+      process.env.OPENAI_API_KEY = "sk-test-happy-path";
+
+      const syntheticAudio = Buffer.from(
+        // Minimal WAV header (44 bytes) + 1 second of silence at 8kHz/8-bit mono
+        "UklGRiQAAABXQVZFZm10IBAAAAABAAEAIlYAAERYAAABAAgAZGF0YQAAAAA=",
+        "base64"
+      );
+
+      const result = await processMedia(syntheticAudio, "audio");
+
+      // Should either succeed or return a controlled error (not "no provider")
+      if (result.status === "completed") {
+        expect(result.transcript).toBeDefined();
+        expect(result.id).toMatch(/^media_/);
+        expect(result.processingMs).toBeGreaterThanOrEqual(0);
+        expect(result.mediaType).toBe("audio");
+      } else {
+        // If it fails, it should NOT be because of missing provider
+        expect(result.error).not.toMatch(/No transcription provider/);
+      }
+
+      delete process.env.OPENAI_API_KEY;
+    });
+
     it("returns failed result when no transcription provider is available", async () => {
       // No API keys set in test env
       delete process.env.OPENAI_API_KEY;

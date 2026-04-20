@@ -1,10 +1,16 @@
 // @ts-check
+// P5-02: Verified ESLint 10.x flat config compatibility.
+// ESLint 10 requires flat config (eslint.config.js) — no .eslintrc support.
+// typescript-eslint v8 is compatible with ESLint 10.
 import js from "@eslint/js";
 import tsPlugin from "@typescript-eslint/eslint-plugin";
 import tsParser from "@typescript-eslint/parser";
 import globals from "globals";
 
 export default [
+  {
+    ignores: ["dist/**", "node_modules/**"],
+  },
   js.configs.recommended,
   {
     files: ["src/**/*.ts"],
@@ -40,8 +46,5 @@ export default [
       "no-unused-vars": "off",
       "no-undef": "off",
     },
-  },
-  {
-    ignores: ["dist/**", "node_modules/**"],
   },
 ];

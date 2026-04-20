@@ -27,7 +27,7 @@ describe("Archetypes Utility", () => {
   });
 
   it("should merge system and user archetypes", async () => {
-    const { getUserArchetypes } = await import("../../src/lib/archetypes.js");
+    const { getUserArchetypes } = await import("../../src/lib/archetypeManager.js");
     const { db } = await import("../../src/lib/drizzle.js");
 
     (db.select as any).mockReturnValue({
@@ -45,7 +45,7 @@ describe("Archetypes Utility", () => {
   });
 
   it("should upsert user archetype", async () => {
-    const { upsertUserArchetype } = await import("../../src/lib/archetypes.js");
+    const { upsertUserArchetype } = await import("../../src/lib/archetypeManager.js");
     const { db } = await import("../../src/lib/drizzle.js");
 
     const mockResult = { archetypeId: "new-aid", name: "New", thinkingStyle: "T", asks: "A", blindSpot: "B", systemPrompt: "S", tools: [] };
@@ -62,7 +62,7 @@ describe("Archetypes Utility", () => {
   });
 
   it("should validate archetypes strictly", async () => {
-    const { validateArchetype } = await import("../../src/lib/archetypes.js");
+    const { validateArchetype } = await import("../../src/lib/archetypeManager.js");
     
     expect(validateArchetype({} as any).valid).toBe(false);
     
@@ -79,7 +79,7 @@ describe("Archetypes Utility", () => {
   });
 
   it("should toggle status", async () => {
-    const { toggleArchetypeStatus } = await import("../../src/lib/archetypes.js");
+    const { toggleArchetypeStatus } = await import("../../src/lib/archetypeManager.js");
     const { db } = await import("../../src/lib/drizzle.js");
 
     (db.select as any).mockReturnValue({
@@ -99,7 +99,7 @@ describe("Archetypes Utility", () => {
   });
 
   it("should calculate usage stats", async () => {
-    const { getArchetypeUsage } = await import("../../src/lib/archetypes.js");
+    const { getArchetypeUsage } = await import("../../src/lib/archetypeManager.js");
     const { db } = await import("../../src/lib/drizzle.js");
 
     (db.select as any).mockReturnValue({
@@ -116,7 +116,7 @@ describe("Archetypes Utility", () => {
   });
 
   it("should import valid archetypes and skip invalid ones", async () => {
-    const { importArchetypes } = await import("../../src/lib/archetypes.js");
+    const { importArchetypes } = await import("../../src/lib/archetypeManager.js");
     const { db } = await import("../../src/lib/drizzle.js");
 
     const data = JSON.stringify([

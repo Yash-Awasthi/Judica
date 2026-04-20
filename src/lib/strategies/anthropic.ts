@@ -1,5 +1,10 @@
+// P2-05: DEPRECATED — Strictly inferior to src/adapters/anthropic.adapter.ts.
 import type { Message, Provider } from "../providers.js";
 import { getToolDefinitions, callTool } from "../tools/index.js";
+import { validateSafeUrl } from "../ssrf.js";
+
+// P7-40: Maximum tool-call recursion depth to prevent stack overflow
+const MAX_TOOL_RECURSION_DEPTH = 5;
 
 interface ProviderResult {
   text: string;
@@ -14,15 +19,19 @@ export async function askAnthropic(
   provider: Provider,
   normMessages: Message[],
   maxTokens: number,
-  signal: AbortSignal
+  signal: AbortSignal,
+  _depth = 0
 ): Promise<ProviderResult> {
+  // P7-41: SSRF validation on strategy-level fetch
+  await validateSafeUrl("https://api.anthropic.com/v1/messages");
+
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     signal,
     headers: {
       "Content-Type": "application/json",
       "x-api-key": provider.apiKey,
-      "anthropic-version": "2023-06-01",
+      "anthropic-version": "2023-10-01",
     },
     body: JSON.stringify({
       model: provider.model || "claude-3-5-haiku-20241022",
@@ -43,6 +52,10 @@ export async function askAnthropic(
   const toolCalls = content.filter(c => c.type === "tool_use");
 
   if (toolCalls.length > 0) {
+    // P7-40: Prevent infinite recursion
+    if (_depth >= MAX_TOOL_RECURSION_DEPTH) {
+      throw new Error(`Tool-call recursion limit (${MAX_TOOL_RECURSION_DEPTH}) exceeded`);
+    }
     const nextMessages: Message[] = [...normMessages, { role: "assistant" as const, content }];
     for (const tc of toolCalls) {
       const result = await callTool({ id: tc.id!, name: tc.name!, arguments: tc.input ?? {} });
@@ -58,7 +71,7 @@ export async function askAnthropic(
         ]
       });
     }
-    return askAnthropic(provider, nextMessages, maxTokens, signal);
+    return askAnthropic(provider, nextMessages, maxTokens, signal, _depth + 1);
   }
 
   const usageData = data.usage;
@@ -85,7 +98,7 @@ export async function streamAnthropic(
     headers: {
       "Content-Type": "application/json",
       "x-api-key": provider.apiKey,
-      "anthropic-version": "2023-06-01",
+      "anthropic-version": "2023-10-01",
     },
     body: JSON.stringify({
       model: provider.model || "claude-3-5-haiku-20241022",
@@ -102,11 +115,17 @@ export async function streamAnthropic(
   const decoder = new TextDecoder();
   let fullText = "";
   const usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
+  // P1-10: Buffer across reads and split on \n boundary properly
+  let buffer = "";
 
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    for (const line of decoder.decode(value).split("\n")) {
+    buffer += decoder.decode(value, { stream: true });
+    let idx: number;
+    while ((idx = buffer.indexOf("\n")) >= 0) {
+      const line = buffer.slice(0, idx).trim();
+      buffer = buffer.slice(idx + 1);
       if (line.startsWith("data: ")) {
         try {
           const json = JSON.parse(line.slice(6));

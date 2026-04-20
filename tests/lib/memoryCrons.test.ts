@@ -56,7 +56,7 @@ describe("Memory Crons", () => {
   });
 
   it("should start and stop crons", async () => {
-    const { startMemoryCrons, stopMemoryCrons } = await import("../../src/lib/memoryCrons.js");
+    const { startMemoryCrons, stopMemoryCrons } = await import("../../src/queue/memoryCrons.js");
     const spy = vi.spyOn(global, "setInterval");
     const clearSpy = vi.spyOn(global, "clearInterval");
 
@@ -68,7 +68,7 @@ describe("Memory Crons", () => {
   });
 
   it("should run summarization on interval and call summarizeSession for active convos", async () => {
-    const { startMemoryCrons } = await import("../../src/lib/memoryCrons.js");
+    const { startMemoryCrons } = await import("../../src/queue/memoryCrons.js");
     const { db } = await import("../../src/lib/drizzle.js");
     const { summarizeSession } = await import("../../src/services/sessionSummary.service.js");
 
@@ -87,7 +87,7 @@ describe("Memory Crons", () => {
   });
 
   it("should run compaction on interval and call compact for users with many memories", async () => {
-    const { startMemoryCrons } = await import("../../src/lib/memoryCrons.js");
+    const { startMemoryCrons } = await import("../../src/queue/memoryCrons.js");
     const { db } = await import("../../src/lib/drizzle.js");
     const { compact } = await import("../../src/services/memoryCompaction.service.js");
 

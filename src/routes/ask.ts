@@ -3,8 +3,10 @@ import { askCouncil } from "../lib/council.js";
 import { Message, Provider } from "../lib/providers.js";
 import logger from "../lib/logger.js";
 import { fastifyOptionalAuth } from "../middleware/fastifyAuth.js";
+import { fastifyCheckQuota } from "../middleware/quota.js";
 import { askSchema } from "../middleware/validate.js";
 import { AppError } from "../middleware/errorHandler.js";
+import redis from "../lib/redis.js";
 import { getCachedResponse, setCachedResponse } from "../lib/cache.js";
 import { prepareCouncilMembers as prepareCouncilWithArchetypes, streamCouncil, type CouncilMemberInput } from "../lib/council.js";
 import { z } from "zod";
@@ -40,14 +42,48 @@ import { searchRepo } from "../services/repoSearch.service.js";
 import { db } from "../lib/drizzle.js";
 import { codeRepositories } from "../db/schema/repos.js";
 import { and, eq } from "drizzle-orm";
-import { dailyUsage } from "../db/schema/users.js";
-import { sql } from "drizzle-orm";
-import { DAILY_REQUEST_LIMIT, DAILY_TOKEN_LIMIT } from "../config/quotas.js";
+import { anonymousRequests } from "../lib/prometheusMetrics.js";
 
 type AskBody = z.infer<typeof askSchema>;
 
-const MAX_DAILY_REQUESTS = DAILY_REQUEST_LIMIT;
-const MAX_DAILY_TOKENS = DAILY_TOKEN_LIMIT;
+// P0-01: Anonymous rate limiting — 5 requests per minute per IP, direct mode only
+// P0-43: Anonymous requests are now tracked in Prometheus metrics
+const ANON_RATE_LIMIT = 5;
+const ANON_RATE_WINDOW_SECS = 60;
+
+async function fastifyAnonGuard(request: FastifyRequest, reply: FastifyReply) {
+  // If user is authenticated (set by fastifyOptionalAuth before this), allow through
+  if (request.userId) return;
+
+  const body = request.body as AskBody | undefined;
+  const mode = body?.mode || "direct";
+
+  // Anonymous users are restricted to "direct" mode only
+  if (body && body.mode !== "direct") {
+    anonymousRequests.inc({ mode, status: "rejected_mode" });
+    reply.code(401).send({ error: "Authentication required for council/auto mode. Anonymous access is limited to direct mode." });
+    return;
+  }
+
+  // IP-scoped rate limit via Redis
+  const ip = request.ip || "unknown";
+  const key = `anon_rate:${ip}`;
+  const current = await redis.incr(key);
+  if (current === 1) {
+    await redis.expire(key, ANON_RATE_WINDOW_SECS);
+  }
+
+  if (current > ANON_RATE_LIMIT) {
+    const ttl = await redis.ttl(key);
+    anonymousRequests.inc({ mode, status: "rate_limited" });
+    reply.header("Retry-After", String(ttl > 0 ? ttl : ANON_RATE_WINDOW_SECS));
+    reply.code(429).send({ error: "Anonymous rate limit exceeded. Please authenticate or wait." });
+    return;
+  }
+
+  // P0-43: Track successful anonymous request
+  anonymousRequests.inc({ mode, status: "allowed" });
+}
 
 function handleCouncilError(err: unknown): never {
   if (err instanceof CouncilServiceError) {
@@ -56,59 +92,10 @@ function handleCouncilError(err: unknown): never {
   throw err;
 }
 
-async function fastifyCheckQuota(request: FastifyRequest, reply: FastifyReply) {
-  if (!request.userId) {
-    return;
-  }
+// P0-44: Removed inline fastifyCheckQuota — now imported from middleware/quota.ts
 
-  const today = new Date();
-  today.setUTCHours(0, 0, 0, 0);
-
-  const [updatedUsage] = await db
-    .insert(dailyUsage)
-    .values({
-      userId: request.userId,
-      date: today,
-      requests: 1,
-      tokens: 0,
-      updatedAt: new Date(),
-    })
-    .onConflictDoUpdate({
-      target: [dailyUsage.userId, dailyUsage.date],
-      set: {
-        requests: sql`${dailyUsage.requests} + 1`,
-        updatedAt: new Date(),
-      },
-    })
-    .returning();
-
-  if (updatedUsage.requests > MAX_DAILY_REQUESTS || updatedUsage.tokens > MAX_DAILY_TOKENS) {
-    logger.warn({
-      userId: request.userId,
-      requests: updatedUsage.requests,
-      tokens: updatedUsage.tokens,
-    }, "User exceeded daily quota limit");
-    reply
-      .header("X-Quota-Limit", MAX_DAILY_REQUESTS.toString())
-      .header("X-Quota-Used", updatedUsage.requests.toString())
-      .header("X-Token-Limit", MAX_DAILY_TOKENS.toString())
-      .header("X-Token-Used", updatedUsage.tokens.toString())
-      .header("Retry-After", "86400")
-      .code(429)
-      .send({ error: "Daily request or token quota exceeded. Please try again tomorrow." });
-    return;
-  }
-
-  reply
-    .header("X-Quota-Limit", MAX_DAILY_REQUESTS.toString())
-    .header("X-Quota-Used", updatedUsage.requests.toString())
-    .header("X-Quota-Remaining", Math.max(0, MAX_DAILY_REQUESTS - updatedUsage.requests).toString())
-    .header("X-Token-Limit", MAX_DAILY_TOKENS.toString())
-    .header("X-Token-Used", updatedUsage.tokens.toString())
-    .header("X-Token-Remaining", Math.max(0, MAX_DAILY_TOKENS - updatedUsage.tokens).toString());
-}
-
-function validateAskBody(request: FastifyRequest, reply: FastifyReply) {
+// P3-19: Fastify preHandler expects async functions — make validateAskBody async.
+async function validateAskBody(request: FastifyRequest, reply: FastifyReply) {
   const result = askSchema.safeParse(request.body);
   if (!result.success) {
     reply.code(400).send({
@@ -131,7 +118,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // POST / - Ask the council (non-streaming)
-  fastify.post("/", { preHandler: [fastifyOptionalAuth, fastifyCheckQuota, validateAskBody] }, async (request, _reply) => {
+  fastify.post("/", { preHandler: [fastifyOptionalAuth, fastifyAnonGuard, fastifyCheckQuota, validateAskBody] }, async (request, _reply) => {
     const startTime = Date.now();
 
     const { question, conversationId, summon, maxTokens, rounds = 1, context, mode, userConfig } = request.body as AskBody;
@@ -159,7 +146,9 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       }, "Auto-router: strict mode - ignoring user members/summon");
     } else if (mode === "direct") {
       logger.info({ question: question.slice(0, 50) }, "Baseline Mode: Skipping council deliberation");
-      effectiveMembers = []; // Empty members list
+      // P3-18: Use undefined instead of [] — empty array is truthy and
+      // would bypass the `effectiveMembers || getDefaultMembers()` fallback.
+      effectiveMembers = undefined;
       effectiveRounds = 0; // Skip rounds
     }
 
@@ -189,9 +178,14 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     let messages: Message[] = [];
 
     if (effectiveConversationId) {
+      // P8-64: Verify requesting user owns the conversation — prevents IDOR
       const convo = await findConversationById(effectiveConversationId, userId ?? undefined);
       if (!convo) {
         throw new AppError(404, "Conversation not found or does not belong to you");
+      }
+      // P8-64: Double-check userId match for authenticated users
+      if (userId && convo.userId !== userId) {
+        throw new AppError(403, "Access denied: conversation belongs to another user");
       }
       messages = await getRecentHistory(effectiveConversationId);
     }
@@ -204,8 +198,9 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       memoryContext = formatContextForInjection(relevantChats);
     }
 
-    // Load file attachments and RAG context
-    const fileContext = await loadFileContext(upload_ids || [], userId || 0);
+    // P3-20: Reject anonymous users for file loading instead of falling back to user 0.
+    // userId 0 could access another user's data. Skip file loading for unauthenticated users.
+    const fileContext = userId ? await loadFileContext(upload_ids || [], userId) : "";
     let ragContext = "";
     let ragCitations: { source: string; score: number }[] = [];
     if (kb_id && userId) {
@@ -254,7 +249,10 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       ? startTrace(userId, "chat", { conversationId: effectiveConversationId || undefined })
       : null;
 
-    const cached = await getCachedResponse(question, councilMembers, master, messages);
+    // P3-21: Pass userId to scope cache per tenant
+    // P8-66: Quota is already decremented by fastifyCheckQuota preHandler —
+    // cache hits DO count against quota (request was counted before reaching this code).
+    const cached = await getCachedResponse(question, councilMembers, master, messages, userId);
 
     let verdict;
     let finalOpinions: { name: string; opinion: string; [key: string]: unknown }[];
@@ -285,6 +283,8 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       } else if (deliberation_mode === "red_blue") {
         const result = await runRedBlueDebate(question, councilMembers);
         verdict = result.judgeVerdict;
+        // P8-65: Track tokens for all deliberation paths
+        tokensUsed = (result as { totalTokens?: number }).totalTokens ?? 0;
         finalOpinions = [
           { name: "Red Team (FOR)", opinion: result.redArguments },
           { name: "Blue Team (AGAINST)", opinion: result.blueArguments },
@@ -293,12 +293,16 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       } else if (deliberation_mode === "hypothesis") {
         const result = await runHypothesisRefinement(question, councilMembers);
         verdict = result.finalSynthesis;
+        // P8-65: Track tokens for all deliberation paths
+        tokensUsed = (result as { totalTokens?: number }).totalTokens ?? 0;
         finalOpinions = result.rounds.flatMap((r) =>
           r.hypotheses.map((h) => ({ name: `${h.agent} [${r.phase} R${r.round}]`, opinion: h.text }))
         );
       } else if (deliberation_mode === "confidence") {
         const result = await runConfidenceCalibration(question, councilMembers);
         verdict = result.weightedSynthesis;
+        // P8-65: Track tokens for all deliberation paths
+        tokensUsed = (result as { totalTokens?: number }).totalTokens ?? 0;
         finalOpinions = result.opinions.map((o) => ({
           name: o.agent,
           opinion: o.opinion,
@@ -319,7 +323,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         addStep(traceCtx, { name: "synthesis", type: "synthesis", input: question.slice(0, 500), output: verdict.slice(0, 500), tokens: tokensUsed, latencyMs: Date.now() - councilStart });
       }
 
-      await setCachedResponse(question, councilMembers, master, messages, verdict, finalOpinions);
+      await setCachedResponse(question, councilMembers, master, messages, verdict, finalOpinions, userId);
     }
 
     // End trace
@@ -375,7 +379,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // POST /stream - SSE streaming endpoint
-  fastify.post("/stream", { preHandler: [fastifyOptionalAuth, fastifyCheckQuota, validateAskBody] }, async (request, reply) => {
+  fastify.post("/stream", { preHandler: [fastifyOptionalAuth, fastifyAnonGuard, fastifyCheckQuota, validateAskBody] }, async (request, reply) => {
     const startTime = Date.now();
 
     reply.raw.writeHead(200, {
@@ -410,7 +414,8 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         }, "Stream auto-router: strict mode - ignoring user members/summon");
       } else if (mode === "direct") {
         logger.info({ question: question.slice(0, 50) }, "Stream Baseline Mode: Skipping council deliberation");
-        effectiveMembers = []; // Empty members list
+        // P3-18: Use undefined instead of [] — empty array is truthy
+        effectiveMembers = undefined;
         effectiveRounds = 0; // Skip rounds
       }
 
@@ -454,8 +459,8 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         memoryContext = formatContextForInjection(relevantChats);
       }
 
-      // Load file attachments and RAG context
-      const fileContext = await loadFileContext(upload_ids || [], userId || 0);
+      // P3-20: Use userId check instead of 0 to prevent anonymous access to user 0's files
+      const fileContext = userId ? await loadFileContext(upload_ids || [], userId) : "";
       let ragContext = "";
       if (kb_id && userId) {
         const rag = await loadRAGContext(userId, question, kb_id);
@@ -483,11 +488,21 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       let finalOpinions: { name: string; opinion: string; [key: string]: unknown }[] = [];
       let tokensUsed = 0;
 
-      const cached = await getCachedResponse(question, councilMembers, master, messages);
+      const cached = await getCachedResponse(question, councilMembers, master, messages, userId);
       if (cached) {
         isCacheHit = true;
         finalVerdict = cached.verdict;
         finalOpinions = cached.opinions;
+
+        // P8-63: Detect and save artifacts from cached verdict (was previously discarded)
+        let cachedArtifactId: string | undefined;
+        if (cached.verdict && userId) {
+          const detected = detectArtifact(cached.verdict);
+          if (detected) {
+            cachedArtifactId = await saveArtifact(userId, effectiveConversationId || null, detected);
+          }
+        }
+
         reply.raw.write(`data: ${JSON.stringify({
           type: "done",
           cached: true,
@@ -495,6 +510,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
           opinions: cached.opinions,
           conversationId: effectiveConversationId ?? null,
           router: routerDecision ? formatRouterMetadata(routerDecision) : undefined,
+          artifact_id: cachedArtifactId,
         })}\n\n`);
         reply.raw.end();
       } else {
@@ -578,7 +594,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
           reply.raw.end();
         }
 
-        await setCachedResponse(question, councilMembers, master, messages, finalVerdict, finalOpinions);
+        await setCachedResponse(question, councilMembers, master, messages, finalVerdict, finalOpinions, userId);
 
         if (effectiveConversationId && userId && finalVerdict) {
           await createChat({
@@ -606,9 +622,13 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       }
 
     } catch (e: unknown) {
+      // P8-62: Send properly formatted SSE error event then close — prevents client from hanging
       const message = e instanceof Error ? e.message : "Internal error";
-      reply.raw.write(`data: ${JSON.stringify({ type: "error", message })}\n\n`);
-      reply.raw.end();
+      logger.error({ err: e }, "SSE stream error");
+      if (!reply.raw.writableEnded) {
+        reply.raw.write(`event: error\ndata: ${JSON.stringify({ type: "error", message })}\n\n`);
+        reply.raw.end();
+      }
     }
   });
 };

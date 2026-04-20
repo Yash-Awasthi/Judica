@@ -1,5 +1,6 @@
 import { FastifyRequest, FastifyReply } from "fastify";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 import { z } from "zod";
 import { env } from "../config/env.js";
 import { db } from "../lib/drizzle.js";
@@ -8,10 +9,25 @@ import { eq } from "drizzle-orm";
 import redis from "../lib/redis.js";
 import logger from "../lib/logger.js";
 
+// P8-46: Sanitize URLs for logging — strip tokens, keys, PII from query strings
+function sanitizeUrlForLog(url: string): string {
+  try {
+    const parsed = new URL(url, "http://localhost");
+    for (const key of parsed.searchParams.keys()) {
+      if (/token|key|secret|password|auth|session/i.test(key)) {
+        parsed.searchParams.set(key, "[REDACTED]");
+      }
+    }
+    return parsed.pathname + parsed.search;
+  } catch {
+    return url.split("?")[0]; // fallback: strip entire query string
+  }
+}
+
 const jwtPayloadSchema = z.object({
   userId: z.number(),
   username: z.string(),
-  role: z.string().default("member"),
+  role: z.string().min(1),
 });
 
 declare module "fastify" {
@@ -22,11 +38,17 @@ declare module "fastify" {
   }
 }
 
+// P0-03: Hash tokens before storage/lookup to avoid storing plaintext JWTs
+function hashToken(token: string): string {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
 async function isTokenRevoked(token: string): Promise<boolean> {
-  const revokedInRedis = await redis.get(`revoked:${token}`);
+  const tokenHash = hashToken(token);
+  const revokedInRedis = await redis.get(`revoked:${tokenHash}`);
   if (revokedInRedis) return true;
 
-  const [revokedInDB] = await db.select().from(revokedTokens).where(eq(revokedTokens.token, token)).limit(1);
+  const [revokedInDB] = await db.select().from(revokedTokens).where(eq(revokedTokens.token, tokenHash)).limit(1);
   return !!revokedInDB;
 }
 
@@ -39,10 +61,14 @@ export async function fastifyOptionalAuth(request: FastifyRequest, _reply: Fasti
   if (!token) return;
 
   try {
-    const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] });
+    const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'], issuer: "aibyai", audience: env.NODE_ENV, clockTolerance: 30 });
     const payload = jwtPayloadSchema.parse(decoded);
 
     if (await isTokenRevoked(token)) return;
+
+    // P0-12: Check suspension status in optionalAuth too
+    const userStatus = await redis.get(`user:status:${payload.userId}`);
+    if (userStatus === "suspended") return;
 
     request.userId = payload.userId;
     request.username = payload.username;
@@ -64,12 +90,13 @@ export async function fastifyRequireAuth(request: FastifyRequest, reply: Fastify
   }
 
   try {
-    const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'] });
+    const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'], issuer: "aibyai", audience: env.NODE_ENV, clockTolerance: 30 });
     const payload = jwtPayloadSchema.parse(decoded);
 
-    // Pipeline both Redis checks into a single round-trip
+    // P1-23: Unified revocation check — always use hashed token
+    const tokenHash = hashToken(token);
     const pipeline = redis.pipeline();
-    pipeline.get(`revoked:${token}`);
+    pipeline.get(`revoked:${tokenHash}`);
     pipeline.get(`user:status:${payload.userId}`);
     const results = await pipeline.exec();
 
@@ -92,7 +119,8 @@ export async function fastifyRequireAuth(request: FastifyRequest, reply: Fastify
     request.role = payload.role;
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e);
-    logger.debug({ error: message, url: request.url }, "JWT Verification failed");
+    // P8-46: Sanitize URL before logging to prevent leaking tokens/keys
+    logger.debug({ error: message, url: sanitizeUrlForLog(request.url) }, "JWT Verification failed");
     reply.code(401).send({ error: "Invalid or expired token" });
   }
 }

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("../../src/lib/logger.js", () => ({
   default: {
@@ -16,7 +16,16 @@ import {
   cleanupAgents,
 } from "../../src/services/backgroundAgents.service.js";
 
+// P6-08: Use fake timers instead of real setTimeout to avoid flakiness
 describe("backgroundAgents.service", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it("creates and runs agent to completion", async () => {
     const progressUpdates: number[] = [];
 
@@ -32,8 +41,7 @@ describe("backgroundAgents.service", () => {
       onProgress: (a) => progressUpdates.push(a.progress),
     });
 
-    // Wait for async completion
-    await new Promise((r) => setTimeout(r, 100));
+    await vi.advanceTimersByTimeAsync(200);
 
     const completed = getAgent(agent.id);
     expect(completed?.status).toBe("completed");
@@ -54,7 +62,7 @@ describe("backgroundAgents.service", () => {
       ],
     });
 
-    await new Promise((r) => setTimeout(r, 100));
+    await vi.advanceTimersByTimeAsync(200);
 
     const failed = getAgent(agent.id);
     expect(failed?.status).toBe("failed");
@@ -89,7 +97,7 @@ describe("backgroundAgents.service", () => {
       ],
     });
 
-    await new Promise((r) => setTimeout(r, 100));
+    await vi.advanceTimersByTimeAsync(200);
 
     expect(savedData).toEqual({ progress: 50, items: ["a", "b"] });
   });
@@ -114,7 +122,7 @@ describe("backgroundAgents.service", () => {
       ],
     });
 
-    await new Promise((r) => setTimeout(r, 100));
+    await vi.advanceTimersByTimeAsync(200);
     expect(receivedResults.slice(0, 2)).toEqual([42, "hello"]);
   });
 
@@ -129,11 +137,11 @@ describe("backgroundAgents.service", () => {
       ],
     });
 
-    // Cancel while step 1 is running or between steps
-    await new Promise((r) => setTimeout(r, 30));
+    // Advance past step 1 start but before step 2 completes
+    await vi.advanceTimersByTimeAsync(60);
     cancelAgent(agent.id);
 
-    await new Promise((r) => setTimeout(r, 100));
+    await vi.advanceTimersByTimeAsync(200);
 
     const cancelled = getAgent(agent.id);
     expect(cancelled?.status).toBe("cancelled");
@@ -147,7 +155,7 @@ describe("backgroundAgents.service", () => {
       steps: [{ name: "Step 1", handler: async () => "ok" }],
     });
 
-    await new Promise((r) => setTimeout(r, 100));
+    await vi.advanceTimersByTimeAsync(200);
 
     const all = listAgents(99);
     expect(all.length).toBeGreaterThanOrEqual(1);
@@ -162,7 +170,7 @@ describe("backgroundAgents.service", () => {
       steps: [{ name: "Step 1", handler: async () => "ok" }],
     });
 
-    await new Promise((r) => setTimeout(r, 100));
+    await vi.advanceTimersByTimeAsync(200);
 
     const completed = listAgents(100, "completed");
     expect(completed.every((a) => a.status === "completed")).toBe(true);

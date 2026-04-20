@@ -103,15 +103,42 @@ describe("Sweeper", () => {
     it("should handle sweep errors gracefully", async () => {
         const { db } = await import("../../src/lib/drizzle.js");
         const redis = (await import("../../src/lib/redis.js")).default;
-        
+
         (db.where as any).mockRejectedValueOnce(new Error("DB Error"));
         (redis.keys as any).mockRejectedValueOnce(new Error("Redis Error"));
-        
+
         const { runManualSweep } = await import("../../src/lib/sweeper.js");
-        
+
         await expect(runManualSweep()).resolves.not.toThrow();
-        
+
         const logger = (await import("../../src/lib/logger.js")).default;
         expect(logger.error).toHaveBeenCalled();
+    });
+
+    // P5-12: Additional sweeper coverage
+    it("should skip Redis keys with positive TTL", async () => {
+        const redis = (await import("../../src/lib/redis.js")).default;
+        // Both keys have positive TTL — neither should be deleted
+        (redis.pttl as any).mockResolvedValue(5000);
+
+        const { runManualSweep } = await import("../../src/lib/sweeper.js");
+        (redis.del as any).mockClear();
+
+        await runManualSweep();
+
+        expect(redis.del).not.toHaveBeenCalled();
+    });
+
+    it("should log sweep duration", async () => {
+        const logger = (await import("../../src/lib/logger.js")).default;
+        const { runManualSweep } = await import("../../src/lib/sweeper.js");
+
+        await runManualSweep();
+
+        const durationCall = (logger.info as any).mock.calls.find(
+            (call: any[]) => call[0]?.duration !== undefined
+        );
+        expect(durationCall).toBeTruthy();
+        expect(durationCall[0].totalSwept).toBeGreaterThanOrEqual(0);
     });
 });

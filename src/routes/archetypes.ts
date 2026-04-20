@@ -10,7 +10,7 @@ import {
   importArchetypes,
   getArchetypeUsage,
   type UserArchetypeInput
-} from "../lib/archetypes.js";
+} from "../lib/archetypeManager.js";
 import { fastifyOptionalAuth } from "../middleware/fastifyAuth.js";
 import { AppError } from "../middleware/errorHandler.js";
 

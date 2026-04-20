@@ -22,8 +22,8 @@ export const workflows = pgTable(
     definition: jsonb("definition").notNull(),
     version: integer("version").default(1).notNull(),
     published: boolean("published").default(false).notNull(),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt", { mode: "date" }).notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull(),
   },
   (table) => [
     index("Workflow_userId_createdAt_idx").on(table.userId, table.createdAt),
@@ -45,8 +45,8 @@ export const workflowRuns = pgTable(
     inputs: jsonb("inputs").notNull(),
     outputs: jsonb("outputs"),
     error: text("error"),
-    startedAt: timestamp("startedAt", { mode: "date" }).defaultNow().notNull(),
-    endedAt: timestamp("endedAt", { mode: "date" }),
+    startedAt: timestamp("startedAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+    endedAt: timestamp("endedAt", { mode: "date", withTimezone: true }),
   },
   (table) => [
     index("WorkflowRun_workflowId_startedAt_idx").on(

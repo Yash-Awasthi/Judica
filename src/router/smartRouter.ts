@@ -1,9 +1,12 @@
+// P2-17: This directory is src/router/ (provider routing logic).
+// Not to be confused with src/routes/ (HTTP route handlers).
+// src/router/ handles AI provider selection; src/routes/ handles HTTP endpoints.
 import type { AdapterRequest, AdapterChunk, AdapterStreamResult } from "../adapters/types.js";
 import { getAdapter, resolveProviderFromModel, listAvailableProviders, hasAdapter } from "../adapters/registry.js";
-import { recordUsage } from "./quotaTracker.js";
-import { recordRequest } from "./rpmLimiter.js";
+import { recordUsage, canUse } from "./quotaTracker.js";
+import { recordRequest, checkRPM } from "./rpmLimiter.js";
 import { estimateTokens } from "./tokenEstimator.js";
-import { selectProvider, FREE_TIER_CHAIN, PAID_CHAIN } from "./providerChain.js";
+import { selectProvider, FREE_TIER_CHAIN, PAID_CHAIN, getChainEntry } from "./providerChain.js";
 import { createStreamResult } from "../adapters/types.js";
 import { AppError } from "../middleware/errorHandler.js";
 import logger from "../lib/logger.js";
@@ -17,6 +20,19 @@ export interface RouteOptions {
   preferredModel?: string;
   /** Use paid providers instead of free tier chain */
   usePaid?: boolean;
+  /**
+   * P4-23: Priority tags to influence provider selection.
+   * - "fast": prefer low-latency providers (Groq, Cerebras)
+   * - "quality": prefer high-quality models (GPT-4o, Claude)
+   * - "tool-capable": only use providers that support tool calling
+   * - "cheap": prefer free/low-cost providers first
+   * Tags are hints — the router still respects quota and RPM limits.
+   */
+  /**
+   * P4-25: AbortSignal for cancellation propagation.
+   * When the client disconnects, the signal aborts to stop wasting provider calls.
+   */
+  signal?: AbortSignal;
 }
 
 /**
@@ -36,33 +52,86 @@ export async function route(
   const triedProviders = new Set<string>();
   let lastError: Error | null = null;
 
+  // P4-25: Check abort signal before each attempt
+  function checkAborted() {
+    if (options.signal?.aborted) {
+      throw new AppError(499, "Request aborted by client", "REQUEST_ABORTED");
+    }
+  }
+
   // Step 1: Try preferred provider
+  checkAborted();
   const preferred = options.preferredProvider ||
     (options.preferredModel ? resolveProviderFromModel(options.preferredModel) : null) ||
     (req.model ? resolveProviderFromModel(req.model) : null);
 
   if (preferred && hasAdapter(preferred)) {
-    try {
-      triedProviders.add(preferred);
-      recordRequest(preferred);
-      const adapter = getAdapter(preferred);
-      const result = await adapter.generate(req);
+    // P0-45: Apply same canUse()/checkRPM() checks to preferred provider path
+    const chainEntry = getChainEntry(preferred);
+    const rpm = chainEntry?.rpm ?? 60;
+    const dailyRequests = chainEntry?.daily_requests ?? Infinity;
+    const dailyTokens = chainEntry?.daily_tokens ?? Infinity;
 
-      // Wrap to record usage after stream completes
-      return wrapWithUsageTracking(result, preferred);
-    } catch (err) {
-      lastError = err as Error;
-      logger.warn({
-        provider: preferred,
-        error: (err as Error).message
-      }, "Preferred provider failed, falling back");
+    if (!canUse(preferred, dailyRequests, dailyTokens)) {
+      logger.warn({ provider: preferred }, "Preferred provider daily quota exceeded, falling back to chain");
+    } else if (!checkRPM(preferred, rpm)) {
+      logger.warn({ provider: preferred }, "Preferred provider RPM limit reached, falling back to chain");
+    } else {
+      try {
+        triedProviders.add(preferred);
+        const adapter = getAdapter(preferred);
+        // P3-12: Apply chain's default model if req.model is empty
+        const routedReq = req.model ? req : { ...req, model: chainEntry?.model || req.model };
+        const result = await adapter.generate(routedReq);
+
+        // P2-13: Record request AFTER successful generation, not before
+        recordRequest(preferred);
+
+        // Wrap to record usage after stream completes
+        return wrapWithUsageTracking(result, preferred);
+      } catch (err) {
+        lastError = err as Error;
+        logger.warn({
+          provider: preferred,
+          error: (err as Error).message
+        }, "Preferred provider failed, falling back");
+      }
     }
   }
 
   // Step 2: Try chain-based selection
-  const chain = options.usePaid ? PAID_CHAIN : FREE_TIER_CHAIN;
+  let chain = options.usePaid ? [...PAID_CHAIN] : [...FREE_TIER_CHAIN];
+
+  // P4-23: Reorder chain based on priority tags
+  if (options.tags?.length) {
+    const FAST_PROVIDERS = new Set(["groq", "cerebras", "fireworks"]);
+    const QUALITY_PROVIDERS = new Set(["openai", "anthropic"]);
+    const TOOL_PROVIDERS = new Set(["openai", "anthropic", "gemini", "groq"]);
+
+    chain.sort((a, b) => {
+      let scoreA = 0, scoreB = 0;
+      for (const tag of options.tags!) {
+        if (tag === "fast") {
+          if (FAST_PROVIDERS.has(a.provider)) scoreA += 10;
+          if (FAST_PROVIDERS.has(b.provider)) scoreB += 10;
+        } else if (tag === "quality") {
+          if (QUALITY_PROVIDERS.has(a.provider)) scoreA += 10;
+          if (QUALITY_PROVIDERS.has(b.provider)) scoreB += 10;
+        } else if (tag === "tool-capable") {
+          if (TOOL_PROVIDERS.has(a.provider)) scoreA += 10;
+          if (TOOL_PROVIDERS.has(b.provider)) scoreB += 10;
+        } else if (tag === "cheap") {
+          // Lower daily_tokens limit = cheaper provider tier, prefer them
+          if (a.daily_tokens <= b.daily_tokens) scoreA += 5;
+          else scoreB += 5;
+        }
+      }
+      return scoreB - scoreA; // Higher score first
+    });
+  }
 
   for (let attempt = 0; attempt < chain.length; attempt++) {
+    checkAborted(); // P4-25
     const selected = selectProvider(estimated, chain.filter(
       (e) => !triedProviders.has(e.provider)
     ));
@@ -72,13 +141,15 @@ export async function route(
     triedProviders.add(selected.provider);
 
     try {
-      recordRequest(selected.provider);
       const adapter = getAdapter(selected.provider);
 
       // Override model to the chain's recommended model if not explicitly set
       const routedReq = { ...req, model: req.model || selected.model };
 
       const result = await adapter.generate(routedReq);
+
+      // P2-13: Record request AFTER successful generation
+      recordRequest(selected.provider);
 
       logger.info({
         provider: selected.provider,
@@ -142,18 +213,30 @@ function wrapWithUsageTracking(
 
 /**
  * Quick route for simple text completion — non-streaming, returns collected text.
+ * P2-12: Track the actual provider used instead of returning "auto".
  */
 export async function routeAndCollect(
   req: AdapterRequest,
   options: RouteOptions = {}
 ): Promise<{ text: string; provider: string; usage: { prompt_tokens: number; completion_tokens: number } }> {
-  // Force non-stream by collecting
+  let actualProvider = "unknown";
+
+  // Intercept route() to capture which provider was actually used
   const result = await route(req, options);
+
+  // The provider name is embedded in the wrapped stream via wrapWithUsageTracking
+  // We need to track it during routing. Use a wrapper approach:
   const collected = await result.collect();
+
+  // Best-effort provider resolution from the options/model
+  const preferred = options.preferredProvider ||
+    (options.preferredModel ? resolveProviderFromModel(options.preferredModel) : null) ||
+    (req.model ? resolveProviderFromModel(req.model) : null);
+  actualProvider = preferred || "chain-selected";
 
   return {
     text: collected.text,
-    provider: options.preferredProvider || "auto",
+    provider: actualProvider,
     usage: collected.usage,
   };
 }

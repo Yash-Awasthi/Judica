@@ -1,3 +1,6 @@
+// P2-18: This file provides ValidationModule (truth-awareness checks).
+// Related: lib/validator.ts provides AI-driven validation via askProvider.
+// Both share types from lib/schemas.ts. Future: merge into a single validation/ directory.
 import { AgentOutput, ValidationResult } from "./schemas.js";
 import logger from "./logger.js";
 

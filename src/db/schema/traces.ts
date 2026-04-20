@@ -7,6 +7,7 @@ import {
   jsonb,
   index,
 } from "drizzle-orm/pg-core";
+import { users } from "./users.js";
 
 // ─── Trace ───────────────────────────────────────────────────────────────────
 export const traces = pgTable(
@@ -15,13 +16,14 @@ export const traces = pgTable(
     id: text("id").primaryKey(),
     conversationId: text("conversationId"),
     workflowRunId: text("workflowRunId"),
-    userId: integer("userId").notNull(),
+    // P8-36: Add FK constraint — was missing, allowing orphaned trace rows
+    userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
     type: text("type").notNull(),
     steps: jsonb("steps").notNull(),
     totalLatencyMs: integer("totalLatencyMs").notNull(),
     totalTokens: integer("totalTokens").notNull(),
     totalCostUsd: real("totalCostUsd").notNull(),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("Trace_userId_createdAt_idx").on(table.userId, table.createdAt),
@@ -38,5 +40,5 @@ export const modelReliability = pgTable("ModelReliability", {
   contradicted: integer("contradicted").default(0).notNull(),
   toolErrors: integer("toolErrors").default(0).notNull(),
   avgConfidence: real("avgConfidence").default(0).notNull(),
-  updatedAt: timestamp("updatedAt", { mode: "date" }).notNull(),
+  updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull(),
 });

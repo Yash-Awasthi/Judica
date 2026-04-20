@@ -3,6 +3,25 @@ import { userArchetypes } from "../db/schema/users.js";
 import { chats } from "../db/schema/conversations.js";
 import { eq, and, asc } from "drizzle-orm";
 import { ARCHETYPES, Archetype } from "../config/archetypes.js";
+import { randomUUID } from "crypto";
+
+// P10-06: Import size limits to prevent OOM and DB bloat
+const MAX_IMPORT_COUNT = 50;
+const MAX_IMPORT_PAYLOAD_BYTES = 512 * 1024; // 512KB
+
+// P10-11: Externalized tool registry — add new tools here without modifying archetype defs.
+// Each archetype's `tools` array references IDs from this registry.
+export const TOOL_REGISTRY: Record<string, { id: string; name: string; description: string }> = {
+  web_search: { id: "web_search", name: "Web Search", description: "Search the internet for real-time information" },
+  execute_code: { id: "execute_code", name: "Code Execution", description: "Execute code snippets in a sandbox" },
+  read_webpage: { id: "read_webpage", name: "Read Webpage", description: "Fetch and read webpage content" },
+  file_upload: { id: "file_upload", name: "File Upload", description: "Process uploaded files" },
+  image_gen: { id: "image_gen", name: "Image Generation", description: "Generate images from text prompts" },
+};
+
+export function getValidTools(): string[] {
+  return Object.keys(TOOL_REGISTRY);
+}
 
 export interface UserArchetypeInput {
   archetypeId?: string;
@@ -46,7 +65,8 @@ export async function upsertUserArchetype(
   archetype: UserArchetypeInput,
   archetypeId?: string
 ): Promise<Archetype> {
-  const aid = archetypeId || `custom_${Date.now()}`;
+  // P10-10: Use UUID instead of Date.now() to prevent ID collision on concurrent imports
+  const aid = archetypeId || `custom_${randomUUID()}`;
   const data = {
     userId,
     archetypeId: aid,
@@ -134,10 +154,11 @@ export function validateArchetype(data: UserArchetypeInput): { valid: boolean; e
   }
 
   if (data.tools && Array.isArray(data.tools)) {
-    const validTools = ["web_search", "execute_code", "read_webpage"];
+    // P10-11: Validate against externalized tool registry instead of hardcoded list
+    const validTools = getValidTools();
     const invalidTools = data.tools.filter(tool => !validTools.includes(tool));
     if (invalidTools.length > 0) {
-      errors.push(`Invalid tools: ${invalidTools.join(", ")}`);
+      errors.push(`Invalid tools: ${invalidTools.join(", ")}. Valid: ${validTools.join(", ")}`);
     }
   }
 
@@ -148,9 +169,12 @@ export function validateArchetype(data: UserArchetypeInput): { valid: boolean; e
 }
 
 export async function getArchetypeUsage(userId: number): Promise<Record<string, number>> {
+  // P10-07: Add LIMIT to prevent full table scan for users with extensive chat history
   const rows = await db.select({ opinions: chats.opinions, createdAt: chats.createdAt })
     .from(chats)
-    .where(eq(chats.userId, userId));
+    .where(eq(chats.userId, userId))
+    .orderBy(asc(chats.createdAt))
+    .limit(500);
 
   const usage: Record<string, number> = {};
 
@@ -180,11 +204,16 @@ export async function getArchetypeUsage(userId: number): Promise<Record<string, 
 /**
  * Recommend archetypes for a user based on their engagement patterns.
  * Returns archetype IDs sorted by weighted usage (most engaged first).
+ * P10-09: Includes both built-in AND custom archetypes in ranking.
  */
 export function rankArchetypesByEngagement(
   usage: Record<string, number>,
+  customArchetypes?: Record<string, Archetype>,
 ): { id: string; name: string; score: number }[] {
-  return Object.entries(ARCHETYPES)
+  // Merge built-in and custom archetypes for ranking
+  const allArchetypes = { ...ARCHETYPES, ...(customArchetypes || {}) };
+
+  return Object.entries(allArchetypes)
     .map(([id, arch]) => ({
       id,
       name: arch.name,
@@ -211,17 +240,38 @@ export function cloneDefaultArchetype(archetypeId: string): UserArchetypeInput {
   };
 }
 
+// P10-08: Sanitize export to public DTO — exclude internal fields (IDs, timestamps, userId)
 export async function exportUserArchetypes(userId: number): Promise<string> {
   const archetypes = await db.select().from(userArchetypes)
     .where(eq(userArchetypes.userId, userId))
     .orderBy(asc(userArchetypes.createdAt));
 
-  return JSON.stringify(archetypes, null, 2);
+  // Return only public-facing fields
+  const sanitized = archetypes.map(a => ({
+    archetypeId: a.archetypeId,
+    name: a.name,
+    thinkingStyle: a.thinkingStyle,
+    asks: a.asks,
+    blindSpot: a.blindSpot,
+    systemPrompt: a.systemPrompt,
+    tools: a.tools,
+    icon: a.icon,
+    colorBg: a.colorBg,
+    isActive: a.isActive,
+  }));
+
+  return JSON.stringify(sanitized, null, 2);
 }
 
 export async function importArchetypes(userId: number, jsonData: string): Promise<{ imported: number; errors: string[] }> {
   const errors: string[] = [];
   let imported = 0;
+
+  // P10-06: Reject oversized payloads before parsing
+  if (jsonData.length > MAX_IMPORT_PAYLOAD_BYTES) {
+    errors.push(`Payload too large: ${jsonData.length} bytes exceeds ${MAX_IMPORT_PAYLOAD_BYTES} byte limit`);
+    return { imported, errors };
+  }
 
   try {
     const data = JSON.parse(jsonData);
@@ -231,20 +281,51 @@ export async function importArchetypes(userId: number, jsonData: string): Promis
       return { imported, errors };
     }
 
-    for (const item of data) {
-      try {
-        const validation = validateArchetype(item);
-        if (!validation.valid) {
-          errors.push(`Archetype "${item.name || 'unknown'}": ${validation.errors.join(", ")}`);
-          continue;
-        }
-
-        await upsertUserArchetype(userId, item, item.archetypeId);
-        imported++;
-      } catch (err) {
-        errors.push(`Failed to import archetype "${item.name || 'unknown'}": ${(err as Error).message}`);
-      }
+    // P10-06: Enforce maximum import count
+    if (data.length > MAX_IMPORT_COUNT) {
+      errors.push(`Too many archetypes: ${data.length} exceeds maximum of ${MAX_IMPORT_COUNT}`);
+      return { imported, errors };
     }
+
+    // P10-12: Wrap bulk import in a transaction — all-or-nothing semantics
+    await db.transaction(async (tx) => {
+      for (const item of data) {
+        try {
+          const validation = validateArchetype(item);
+          if (!validation.valid) {
+            errors.push(`Archetype "${item.name || 'unknown'}": ${validation.errors.join(", ")}`);
+            continue;
+          }
+
+          const aid = item.archetypeId || `custom_${randomUUID()}`;
+          const insertData = {
+            userId,
+            archetypeId: aid,
+            name: item.name,
+            thinkingStyle: item.thinkingStyle,
+            asks: item.asks,
+            blindSpot: item.blindSpot,
+            systemPrompt: item.systemPrompt,
+            tools: item.tools || [],
+            icon: item.icon,
+            colorBg: item.colorBg,
+            isActive: item.isActive !== false,
+            updatedAt: new Date(),
+            createdAt: new Date(),
+          };
+
+          await tx.insert(userArchetypes)
+            .values(insertData)
+            .onConflictDoUpdate({
+              target: [userArchetypes.userId, userArchetypes.archetypeId],
+              set: { ...insertData },
+            });
+          imported++;
+        } catch (err) {
+          errors.push(`Failed to import archetype "${item.name || 'unknown'}": ${(err as Error).message}`);
+        }
+      }
+    });
   } catch (err) {
     errors.push(`Failed to parse JSON: ${(err as Error).message}`);
   }

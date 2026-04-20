@@ -20,8 +20,8 @@ export const researchJobs = pgTable(
     status: text("status").default("pending").notNull(),
     steps: jsonb("steps").default([]).notNull(),
     report: text("report"),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt", { mode: "date" }).notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull(),
   },
   (table) => [
     index("ResearchJob_userId_createdAt_idx").on(
@@ -44,8 +44,8 @@ export const artifacts = pgTable(
     type: text("type").notNull(),
     content: text("content").notNull(),
     language: text("language"),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt", { mode: "date" }).notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull(),
   },
   (table) => [
     index("Artifact_userId_createdAt_idx").on(table.userId, table.createdAt),

@@ -37,6 +37,7 @@ import {
   hybridSearch,
   deleteKBChunks,
   deleteDocChunks,
+  safeVectorLiteral,
 } from "../../src/services/vectorStore.service.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -416,6 +417,41 @@ describe("vectorStore.service", () => {
       mockExecute.mockRejectedValue(new Error("connection lost"));
 
       await expect(deleteDocChunks("kb-1", "x.pdf")).rejects.toThrow("connection lost");
+    });
+  });
+
+  // P6-11: safeVectorLiteral injection tests — malformed embeddings should be rejected
+  describe("safeVectorLiteral", () => {
+    it("accepts valid finite number arrays", () => {
+      expect(safeVectorLiteral([0.1, -0.5, 0.9])).toBe("[0.1,-0.5,0.9]");
+    });
+
+    it("rejects NaN values", () => {
+      expect(() => safeVectorLiteral([0.1, NaN, 0.3])).toThrow(/Invalid vector component at index 1/);
+    });
+
+    it("rejects Infinity values", () => {
+      expect(() => safeVectorLiteral([Infinity, 0.1, 0.2])).toThrow(/Invalid vector component at index 0/);
+    });
+
+    it("rejects -Infinity values", () => {
+      expect(() => safeVectorLiteral([0.1, -Infinity, 0.2])).toThrow(/Invalid vector component at index 1/);
+    });
+
+    it("rejects non-number values in array", () => {
+      expect(() => safeVectorLiteral([0.1, "0.2" as any, 0.3])).toThrow(/Invalid vector component/);
+    });
+
+    it("handles empty arrays", () => {
+      expect(safeVectorLiteral([])).toBe("[]");
+    });
+
+    it("produces valid SQL-safe vector string (no injection)", () => {
+      const vec = [0.1, 0.2, 0.3, 0.4, 0.5];
+      const result = safeVectorLiteral(vec);
+      // Should not contain any SQL-injectable characters
+      expect(result).not.toMatch(/[;'"\\]/);
+      expect(result).toMatch(/^\[[\d.,-]+\]$/);
     });
   });
 });

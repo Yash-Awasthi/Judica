@@ -10,6 +10,7 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
+import { conversations } from "./conversations.js";
 
 // ─── CustomProvider ──────────────────────────────────────────────────────────
 export const customProviders = pgTable(
@@ -26,8 +27,8 @@ export const customProviders = pgTable(
     authHeaderName: text("authHeaderName"),
     capabilities: jsonb("capabilities").notNull(),
     models: text("models").array().notNull(),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt", { mode: "date" }).notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull(),
   },
   (table) => [
     uniqueIndex("CustomProvider_userId_name_key").on(table.userId, table.name),
@@ -39,14 +40,15 @@ export const sharedFacts = pgTable(
   "SharedFact",
   {
     id: text("id").primaryKey(),
-    conversationId: text("conversationId").notNull(),
+    // P8-36: Add FK constraint — was missing, orphaned rows could accumulate
+    conversationId: text("conversationId").notNull().references(() => conversations.id, { onDelete: "cascade" }),
     content: text("content").notNull(),
     sourceAgent: text("sourceAgent").notNull(),
     type: text("type").notNull(),
     confidence: real("confidence").notNull(),
     confirmedBy: text("confirmedBy").array().notNull(),
     disputedBy: text("disputedBy").array().notNull(),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("SharedFact_conversationId_idx").on(table.conversationId),
@@ -67,9 +69,13 @@ export const customPersonas = pgTable(
     critiqueStyle: text("critiqueStyle"),
     domain: text("domain"),
     aggressiveness: integer("aggressiveness").default(5).notNull(),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
-  (table) => [index("CustomPersona_userId_idx").on(table.userId)],
+  (table) => [
+    index("CustomPersona_userId_idx").on(table.userId),
+    // P8-40: Add unique constraint — one persona per name per user
+    uniqueIndex("CustomPersona_userId_name_key").on(table.userId, table.name),
+  ],
 );
 
 // ─── PromptDNA ───────────────────────────────────────────────────────────────
@@ -85,7 +91,7 @@ export const promptDnas = pgTable(
     steeringRules: text("steeringRules").notNull(),
     consensusBias: text("consensusBias").notNull(),
     critiqueStyle: text("critiqueStyle").notNull(),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [index("PromptDNA_userId_idx").on(table.userId)],
 );
@@ -110,8 +116,8 @@ export const contradictionRecords = pgTable(
     status: text("status").notNull().default("open"),
     confidence: real("confidence"),
     versions: jsonb("versions").$type<ContradictionVersion[]>().default([]).notNull(),
-    createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
-    resolvedAt: timestamp("resolvedAt", { mode: "date" }),
+    createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+    resolvedAt: timestamp("resolvedAt", { mode: "date", withTimezone: true }),
   },
   (table) => [
     index("ContradictionRecord_conversationId_idx").on(table.conversationId),

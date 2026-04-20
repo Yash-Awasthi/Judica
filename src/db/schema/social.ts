@@ -11,7 +11,7 @@ import { users } from "./users.js";
 export const userGroups = pgTable("UserGroup", {
   id: text("id").primaryKey(),
   name: text("name").notNull(),
-  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
 });
 
 // ─── GroupMembership ─────────────────────────────────────────────────────────
@@ -37,8 +37,8 @@ export const sharedConversations = pgTable("SharedConversation", {
     .references(() => users.id, { onDelete: "cascade" }),
   shareToken: text("shareToken").notNull().unique(),
   access: text("access").default("read").notNull(),
-  expiresAt: timestamp("expiresAt", { mode: "date" }),
-  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  expiresAt: timestamp("expiresAt", { mode: "date", withTimezone: true }),
+  createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
 });
 
 // ─── SharedWorkflow ──────────────────────────────────────────────────────────
@@ -50,8 +50,8 @@ export const sharedWorkflows = pgTable("SharedWorkflow", {
     .references(() => users.id, { onDelete: "cascade" }),
   shareToken: text("shareToken").notNull().unique(),
   access: text("access").default("read").notNull(),
-  expiresAt: timestamp("expiresAt", { mode: "date" }),
-  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  expiresAt: timestamp("expiresAt", { mode: "date", withTimezone: true }),
+  createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
 });
 
 // ─── SharedPrompt ────────────────────────────────────────────────────────────
@@ -63,6 +63,6 @@ export const sharedPrompts = pgTable("SharedPrompt", {
     .references(() => users.id, { onDelete: "cascade" }),
   shareToken: text("shareToken").notNull().unique(),
   access: text("access").default("read").notNull(),
-  expiresAt: timestamp("expiresAt", { mode: "date" }),
-  createdAt: timestamp("createdAt", { mode: "date" }).defaultNow().notNull(),
+  expiresAt: timestamp("expiresAt", { mode: "date", withTimezone: true }),
+  createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
 });

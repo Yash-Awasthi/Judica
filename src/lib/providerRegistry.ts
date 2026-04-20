@@ -1,10 +1,11 @@
+// P2-03: DEPRECATED — This registry duplicates src/adapters/registry.ts.
+// New code should use the adapter registry instead.
 import { loadProviderConfig, ProviderConfig } from "../config/providerConfig.js";
 import logger from "./logger.js";
 import { fileURLToPath } from "url";
-import { dirname, join } from "path";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
+// P7-10: Use import.meta.url for ESM-safe path resolution (works under bundlers)
+const CONFIG_URL = new URL("../config/providers.json", import.meta.url);
 
 export type ProviderType = "api" | "local" | "rpa";
 export type ApiType = "openai-compat" | "anthropic" | "google";
@@ -87,7 +88,44 @@ const DEFAULT_REGISTRY: ProviderRegistry = {
   }
 };
 
-async function getProviderConfig(): Promise<ProviderConfig[]> {
+/**
+ * P7-11: Derive provider list from adapter registry instead of hardcoded defaults.
+ * Falls back to DEFAULT_REGISTRY if adapters module is unavailable.
+ */
+export async function getDerivedRegistry(): Promise<ProviderRegistry> {
+  try {
+    const { listAvailableProviders } = await import("../adapters/registry.js");
+    const adapterProviders = listAvailableProviders();
+
+    // Merge: start with static registry, ensure all adapter providers are present
+    const base = await loadProviderRegistry();
+    const existingNames = new Set(base.providers.map(p => p.name));
+
+    for (const id of adapterProviders) {
+      if (!existingNames.has(id)) {
+        base.providers.push({
+          name: id,
+          type: "api",
+          baseUrl: "",
+          models: [],
+          priority: 50,
+          enabled: true,
+        });
+      }
+    }
+    return base;
+  } catch {
+    return loadProviderRegistry();
+  }
+}
+
+/**
+ * P7-12: Invalidate cached registry — call after config file changes or hot-reload.
+ */
+export function invalidateRegistryCache(): void {
+  cachedConfig = null;
+  cachedRegistry = null;
+}
   if (!cachedConfig) {
     const config = await loadProviderConfig();
     cachedConfig = config.providers
@@ -137,7 +175,7 @@ export async function loadProviderRegistry(): Promise<ProviderRegistry> {
   }
 
   try {
-    const configPath = join(__dirname, "../config/providers.json");
+    const configPath = fileURLToPath(CONFIG_URL);
     const fs = await import("fs/promises");
     const data = await fs.readFile(configPath, "utf-8");
     const parsed = JSON.parse(data) as ProviderRegistry;

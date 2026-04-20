@@ -1,4 +1,5 @@
 import logger from "../lib/logger.js";
+import { validateSafeUrl } from "../lib/ssrf.js";
 
 /**
  * Webhook Triggers: fire HTTP callbacks on deliberation events.
@@ -50,6 +51,22 @@ const deliveryLog: WebhookDelivery[] = [];
  * Register a webhook.
  */
 export function registerWebhook(config: Omit<WebhookConfig, "id" | "createdAt">): WebhookConfig {
+  // P6-10: Validate webhook URL against SSRF before registration
+  const url = new URL(config.url);
+  const hostname = url.hostname.toLowerCase();
+  if (
+    hostname === "localhost" ||
+    hostname === "127.0.0.1" ||
+    hostname === "::1" ||
+    hostname === "[::1]" ||
+    hostname === "0.0.0.0" ||
+    hostname.endsWith(".local") ||
+    hostname.endsWith(".internal") ||
+    hostname === "metadata.google.internal"
+  ) {
+    throw new Error(`Webhook URL targets a restricted hostname: ${hostname}`);
+  }
+
   const webhook: WebhookConfig = {
     ...config,
     id: `wh_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
@@ -94,6 +111,38 @@ export function clearWebhooks(): void {
  */
 export function getDeliveryLog(limit: number = 50): WebhookDelivery[] {
   return deliveryLog.slice(-limit);
+}
+
+/**
+ * P4-31: Get failed deliveries (dead-letter queue) for inspection and retry.
+ */
+export function getFailedDeliveries(limit: number = 50): WebhookDelivery[] {
+  return deliveryLog
+    .filter((d) => !d.success)
+    .slice(-limit);
+}
+
+/**
+ * P4-31: Retry a specific failed delivery by webhookId + event.
+ * Re-fires the event to the webhook with the original data.
+ */
+export async function retryFailedDelivery(
+  webhookId: string,
+  event: WebhookEvent,
+  data: Record<string, unknown>,
+): Promise<WebhookDelivery | null> {
+  const wh = webhooks.get(webhookId);
+  if (!wh || !wh.enabled) return null;
+
+  const payload: WebhookPayload = {
+    event,
+    timestamp: new Date().toISOString(),
+    data,
+  };
+
+  const delivery = await deliverWebhook(wh, payload, fetch as unknown as (url: string, init: RequestInit) => Promise<{ status: number }>);
+  deliveryLog.push(delivery);
+  return delivery;
 }
 
 // ─── Webhook Signing ────────────────────────────────────────────────────────

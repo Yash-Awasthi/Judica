@@ -54,6 +54,36 @@ const costsPlugin: FastifyPluginAsync = async (fastify) => {
     });
   });
 
+  /**
+   * P4-28: Per-provider cost ledger — detailed breakdown by provider.
+   * GET /api/costs/per-provider?days=30
+   */
+  fastify.get("/per-provider", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    const { days = "30" } = request.query as { days?: string };
+    const breakdown = await getUserCostBreakdown(request.userId!, parseInt(days as string));
+
+    const providerLedger = Object.entries(breakdown.byProvider || {}).map(
+      ([provider, data]) => {
+        const d = data as { cost: number; tokens: number; requests: number; models?: Record<string, unknown> };
+        return {
+          provider,
+          totalCost: d.cost ?? 0,
+          totalTokens: d.tokens ?? 0,
+          requestCount: d.requests ?? 0,
+          models: d.models ?? {},
+          avgCostPerRequest: d.requests ? (d.cost ?? 0) / d.requests : 0,
+        };
+      }
+    ).sort((a, b) => b.totalCost - a.totalCost);
+
+    return reply.send({
+      providers: providerLedger,
+      period: `${days} days`,
+      currency: "USD",
+      grandTotal: providerLedger.reduce((sum, p) => sum + p.totalCost, 0),
+    });
+  });
+
   fastify.get("/organization", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const [user] = await db
       .select({ role: users.role })

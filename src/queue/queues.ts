@@ -11,6 +11,16 @@ const defaultJobOptions = {
   removeOnFail: false,
 };
 
+// P4-17: Queue priority constants — lower number = higher priority.
+// Deliberation/real-time tasks use PRIORITY_HIGH; background batch jobs use PRIORITY_LOW.
+// BullMQ processes higher-priority jobs first when multiple are waiting.
+export const QUEUE_PRIORITY = {
+  CRITICAL: 1,   // User-facing deliberation, real-time synthesis
+  HIGH: 2,       // Interactive research, user-triggered ingestion
+  NORMAL: 5,     // Background ingestion, scheduled tasks
+  LOW: 10,       // Memory compaction, cleanup, analytics
+} as const;
+
 export const ingestionQueue = new Queue("ingestion", { connection, defaultJobOptions });
 export const researchQueue = new Queue("research", { connection, defaultJobOptions });
 export const repoQueue = new Queue("repo-ingestion", { connection, defaultJobOptions });
