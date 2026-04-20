@@ -2649,70 +2649,70 @@ TOTAL: 228 tasks
              message content and does not assert it reaches the API; likely
              JSON.stringify flattens it silently.
 
-[ ] [P11-37] Double JSON stringify risk untested â€” tool arguments already
+[x] [P11-37] Double JSON stringify risk untested â€” tool arguments already
              serialized as JSON string, then stringified again by the adapter;
              no test detects double-encoding.
 
-[ ] [P11-38] Weak error response parsing â€” OpenRouter error format differs
+[x] [P11-38] Weak error response parsing â€” OpenRouter error format differs
              from OpenAI; test uses OpenAI error structure and doesn't cover
              OpenRouter-specific error shapes.
 
 ### perplexity.test.ts
 --------------------------------------------------------------------------------
-[ ] [P11-39] Citations field dropped and untested â€” Perplexity returns a
+[x] [P11-39] Citations field dropped and untested â€” Perplexity returns a
              `citations` array in responses; no test verifies it is preserved
              or surfaced to callers.
 
-[ ] [P11-40] Search parameters not forwarded â€” Perplexity-specific params
+[x] [P11-40] Search parameters not forwarded â€” Perplexity-specific params
              (search_domain_filter, search_recency_filter) not tested.
 
-[ ] [P11-41] Tools incorrectly enabled â€” test doesn't assert that tool
+[x] [P11-41] Tools incorrectly enabled â€” test doesn't assert that tool
              definitions are rejected (Perplexity doesn't support function
              calling); sending tools causes API error in production.
 
 ### registry.test.ts
 --------------------------------------------------------------------------------
-[ ] [P11-42] Empty API keys accepted by registry â€” registry test does not
+[x] [P11-42] Empty API keys accepted by registry â€” registry test does not
              verify that registering an adapter with an empty or whitespace
              API key is rejected.
 
-[ ] [P11-43] No OpenRouter prefix routing test â€” OpenRouter uses model
+[x] [P11-43] No OpenRouter prefix routing test â€” OpenRouter uses model
              names with provider prefixes (e.g., "anthropic/claude-3");
              no test verifies prefix-aware routing works correctly.
 
-[ ] [P11-44] Global mutable singleton not isolated between tests â€” registry
+[x] [P11-44] Global mutable singleton not isolated between tests â€” registry
              is a module-level singleton; tests that register adapters pollute
              state for subsequent tests. No reset/isolation between tests.
 
-[ ] [P11-45] No concurrency safety test â€” no test verifies that concurrent
+[x] [P11-45] No concurrency safety test â€” no test verifies that concurrent
              adapter registration and lookup don't produce race conditions.
 
 ### Global E2E Issues (pt7)
 --------------------------------------------------------------------------------
-[ ] [P11-46] Conditional UI flows mean tests may execute zero assertions â€”
+[x] [P11-46] Conditional UI flows mean tests may execute zero assertions â€”
              `if (await element.isVisible())` pattern means tests silently
              pass when UI elements don't exist; zero assertions = vacuously
              passing test.
 
-[ ] [P11-47] Weak CSS selectors cause false positives â€” tests use generic
+[x] [P11-47] Weak CSS selectors cause false positives â€” tests use generic
              selectors (e.g., `button`, `.submit`) that match multiple
              elements; clicks/assertions land on wrong elements silently.
 
-[ ] [P11-48] No backend state validation in E2E tests â€” E2E tests assert
+[x] [P11-48] No backend state validation in E2E tests â€” E2E tests assert
              UI state only; no test queries the DB or API to verify backend
              state matches what the UI shows.
 
-[ ] [P11-49] Real LLM calls in E2E tests â€” deliberation E2E tests make
+[x] [P11-49] Real LLM calls in E2E tests â€” deliberation E2E tests make
              real LLM API calls; tests are slow, flaky on rate limits, and
              incur cost. Mock LLM at the network level.
 
 ### auth.spec.ts (additional E2E gaps)
 --------------------------------------------------------------------------------
-[ ] [P11-50] Conditional logout may skip entire test â€” logout flow wrapped
+[x] [P11-50] Conditional logout may skip entire test â€” logout flow wrapped
              in `if (isLoggedIn)` check; if auth state is unexpected, entire
              logout test body is silently skipped.
 
-[ ] [P11-51] Conditional clicks throughout â€” most interactions use
+[x] [P11-51] Conditional clicks throughout â€” most interactions use
              `if (await btn.isVisible()) btn.click()` pattern; test passes
              whether or not the button was actually clicked.
 
