@@ -17,11 +17,12 @@ const COMPACTION_BATCH_SIZE = parseInt(process.env.MEMORY_COMPACTION_BATCH_SIZE 
 
 let summarizationTimer: ReturnType<typeof setTimeout> | null = null;
 let compactionTimer: ReturnType<typeof setTimeout> | null = null;
+let jitterTimer: ReturnType<typeof setTimeout> | null = null;
 // P10-65: Track whether a job is currently running to prevent stacking
 let summarizationRunning = false;
 let compactionRunning = false;
 // P10-63: Track last summarized conversation to avoid re-processing
-const summarizedSessions = new Set<number>();
+const summarizedSessions = new Set<string>();
 
 async function runAutoSummarization(): Promise<void> {
   // P10-65: Prevent overlapping invocations
@@ -135,7 +136,7 @@ export function startMemoryCrons(): void {
   // P10-66: Add random startup jitter (0-30s) to prevent thundering herd
   const jitter = Math.floor(Math.random() * 30000);
 
-  setTimeout(() => {
+  jitterTimer = setTimeout(() => {
     scheduleSummarization();
     scheduleCompaction();
     logger.info({ jitterMs: jitter }, "Memory jobs started with jitter (sequential scheduling, no stacking)");
@@ -143,8 +144,10 @@ export function startMemoryCrons(): void {
 }
 
 export function stopMemoryCrons(): void {
+  if (jitterTimer) clearTimeout(jitterTimer);
   if (summarizationTimer) clearTimeout(summarizationTimer);
   if (compactionTimer) clearTimeout(compactionTimer);
+  jitterTimer = null;
   summarizationTimer = null;
   compactionTimer = null;
   logger.info("Memory jobs stopped");

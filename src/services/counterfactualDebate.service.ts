@@ -5,7 +5,6 @@
  * then measures how robust the original verdict is to counterarguments.
  */
 
-import logger from "../lib/logger.js";
 
 export interface CounterfactualResult {
   originalVerdict: string;

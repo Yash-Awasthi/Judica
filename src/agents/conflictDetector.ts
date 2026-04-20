@@ -167,5 +167,5 @@ function hasTopicOverlap(claimsA: Claim[], claimsB: Claim[]): boolean {
   for (const w of wordsA) {
     if (wordsB.has(w)) overlap++;
   }
-  return overlap >= 2;
+  return overlap >= 1;
 }

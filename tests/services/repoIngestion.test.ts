@@ -48,6 +48,11 @@ vi.mock("drizzle-orm", () => ({
   eq: vi.fn((...args: unknown[]) => ({ type: "eq", args })),
 }));
 
+// Mock vectorStore to avoid transitive prometheusMetrics import
+vi.mock("../../src/services/vectorStore.service.js", () => ({
+  safeVectorLiteral: vi.fn((v: number[]) => `[${v.join(",")}]`),
+}));
+
 // Mock embed
 const mockEmbed = vi.fn();
 vi.mock("../../src/services/embeddings.service.js", () => ({

@@ -60,8 +60,7 @@ export class CustomAdapter implements IProviderAdapter {
         headers[this.config.auth_header_name || "X-API-Key"] = apiKey;
         break;
       case "api_key_query":
-        // P7-35: Move API key to header instead of query string to avoid log exposure
-        headers["X-API-Key"] = apiKey;
+        // API key will be appended as a query parameter to the URL
         break;
       case "basic": {
         // P7-38: Validate basic auth credentials are non-empty before encoding
@@ -75,7 +74,13 @@ export class CustomAdapter implements IProviderAdapter {
       // "none" doesn't need headers
     }
 
-    const url = `${baseUrl}/chat/completions`;
+    let url = `${baseUrl}/chat/completions`;
+
+    // Append API key as query parameter for api_key_query auth type
+    if (this.config.auth_type === "api_key_query") {
+      const separator = url.includes("?") ? "&" : "?";
+      url = `${url}${separator}api_key=${apiKey}`;
+    }
 
     // Build OpenAI-compatible request body
     const body: Record<string, unknown> = {

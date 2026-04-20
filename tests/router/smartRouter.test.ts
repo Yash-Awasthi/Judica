@@ -18,10 +18,13 @@ vi.mock("../../src/adapters/registry.js", () => ({
 
 vi.mock("../../src/router/quotaTracker.js", () => ({
   recordUsage: vi.fn(),
+  canUse: vi.fn(() => true),
+  getRemainingQuota: vi.fn(() => ({ tokens_remaining: Infinity, requests_remaining: Infinity })),
 }));
 
 vi.mock("../../src/router/rpmLimiter.js", () => ({
   recordRequest: vi.fn(),
+  checkRPM: vi.fn(() => true),
 }));
 
 vi.mock("../../src/router/tokenEstimator.js", () => ({
@@ -30,6 +33,7 @@ vi.mock("../../src/router/tokenEstimator.js", () => ({
 
 vi.mock("../../src/router/providerChain.js", () => ({
   selectProvider: vi.fn(),
+  getChainEntry: vi.fn(),
   FREE_TIER_CHAIN: [
     { provider: "gemini", model: "gemini-2.0-flash", rpm: 15, daily_tokens: 1000000, daily_requests: 1500 },
     { provider: "groq", model: "llama-3.3-70b-versatile", rpm: 30, daily_tokens: 500000, daily_requests: 14400 },
@@ -45,7 +49,7 @@ import { route, routeAndCollect } from "../../src/router/smartRouter.js";
 import { getAdapter, resolveProviderFromModel, hasAdapter, listAvailableProviders } from "../../src/adapters/registry.js";
 import { recordUsage } from "../../src/router/quotaTracker.js";
 import { recordRequest } from "../../src/router/rpmLimiter.js";
-import { selectProvider } from "../../src/router/providerChain.js";
+import { selectProvider, getChainEntry } from "../../src/router/providerChain.js";
 import type { AdapterRequest, AdapterStreamResult, AdapterChunk } from "../../src/adapters/types.js";
 import { createStreamResult } from "../../src/adapters/types.js";
 
@@ -53,6 +57,7 @@ const mockedGetAdapter = vi.mocked(getAdapter);
 const mockedResolveProvider = vi.mocked(resolveProviderFromModel);
 const mockedHasAdapter = vi.mocked(hasAdapter);
 const mockedSelectProvider = vi.mocked(selectProvider);
+const mockedGetChainEntry = vi.mocked(getChainEntry);
 const mockedListAvailable = vi.mocked(listAvailableProviders);
 const mockedRecordRequest = vi.mocked(recordRequest);
 
@@ -235,6 +240,6 @@ describe("smartRouter — routeAndCollect()", () => {
     mockedGetAdapter.mockReturnValue(adapter);
 
     const result = await routeAndCollect(baseReq);
-    expect(result.provider).toBe("auto");
+    expect(result.provider).toBe("chain-selected");
   });
 });

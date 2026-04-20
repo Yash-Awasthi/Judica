@@ -16,6 +16,7 @@ import type {
 import { createStreamResult } from "./types.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
 import { getBreaker } from "../lib/breaker.js";
+import logger from "../lib/logger.js";
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 
@@ -44,6 +45,11 @@ export abstract class OpenAICompatibleAdapter implements IProviderAdapter {
         `API key leak prevented: adapter ${this.providerId} configured for ${this._originHost} but request targets ${requestHost}`
       );
     }
+  }
+
+  /** Override to customize the display name in error messages. Defaults to providerId. */
+  protected getDisplayName(): string {
+    return this.providerId;
   }
 
   /** Override to add extra headers (e.g. OpenRouter's HTTP-Referer). */
@@ -121,7 +127,7 @@ export abstract class OpenAICompatibleAdapter implements IProviderAdapter {
     if (!res.ok) {
       const err = await res.json().catch(() => ({})) as Record<string, unknown>;
       const errObj = err as { error?: { message?: string } };
-      throw new Error(errObj?.error?.message ?? `${this.providerId} API error: ${res.status}`);
+      throw new Error(errObj?.error?.message ?? `${this.getDisplayName()} API error: ${res.status}`);
     }
 
     return createStreamResult(this.parseSSEStream(res));
@@ -198,8 +204,8 @@ export abstract class OpenAICompatibleAdapter implements IProviderAdapter {
           const dataStr = line.slice(6).trim();
           if (dataStr === "[DONE]") {
             for (const [, tc] of pendingToolCalls) {
-              let args: string | Record<string, unknown> = tc.args;
-              try { args = JSON.parse(tc.args); } catch { /* keep as string */ }
+              let args: Record<string, unknown> = {};
+              try { args = JSON.parse(tc.args); } catch { logger.warn({ toolName: tc.name }, "Failed to parse tool call JSON arguments"); }
               yield { type: "tool_call", tool_call: { id: tc.id, name: tc.name, arguments: args } };
             }
             // P7-24: Emit usage exactly once at stream end (not per-chunk)

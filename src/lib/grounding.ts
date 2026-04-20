@@ -1,5 +1,5 @@
-import { AgentOutput, GroundingResult } from "./schemas.js";
-import { Provider } from "./providers.js";
+import type { AgentOutput, GroundingResult } from "./schemas.js";
+import type { Provider } from "./providers.js";
 import { askProvider } from "./providers.js";
 import logger from "./logger.js";
 import { createHash } from "crypto";

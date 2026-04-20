@@ -1,4 +1,4 @@
-import { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { detectPII } from "../lib/pii.js";
 import logger from "../lib/logger.js";

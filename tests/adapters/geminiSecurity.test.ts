@@ -47,15 +47,13 @@ describe("P11-17: image_url→text degradation", () => {
       'data: {"candidates":[{"content":{"parts":[{"text":"I see an image"}]}}]}',
     ]);
 
-    // First call: image URL fetch (fails) → triggers fallback to text placeholder
-    const imgErrorResponse = new Response(null, { status: 404 });
-    // Second call: actual API call (succeeds with SSE body)
+    // The adapter no longer fetches image URLs — it directly converts to a text placeholder.
+    // Only one fetch call happens: the Gemini API call itself.
     const apiResponse = new Response(null, { status: 200 });
     Object.defineProperty(apiResponse, "ok", { value: true });
     Object.defineProperty(apiResponse, "body", { value: sseBody });
 
     (globalThis.fetch as ReturnType<typeof vi.fn>)
-      .mockResolvedValueOnce(imgErrorResponse)
       .mockResolvedValueOnce(apiResponse);
 
     await adapter.generate({
@@ -69,11 +67,11 @@ describe("P11-17: image_url→text degradation", () => {
       }],
     });
 
-    // API call is the second fetch (index 1)
-    const body = JSON.parse((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[1][1].body);
-    // P11-17: Document that image_url is degraded to text placeholder when fetch fails
+    // API call is the first (and only) fetch
+    const body = JSON.parse((globalThis.fetch as ReturnType<typeof vi.fn>).mock.calls[0][1].body);
+    // P11-17: Document that image_url is degraded to text placeholder directly (no fetch attempt)
     const parts = body.contents[0].parts;
-    expect(parts).toContainEqual({ text: "[Image could not be loaded: https://example.com/img.png]" });
+    expect(parts).toContainEqual({ text: "[Image: https://example.com/img.png]" });
   });
 
   it("should preserve image_base64 as inlineData (no degradation)", async () => {

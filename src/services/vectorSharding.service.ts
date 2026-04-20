@@ -6,7 +6,6 @@
  * maintenance operations.
  */
 
-import logger from "../lib/logger.js";
 
 export interface ShardConfig {
   strategy: "by_user" | "by_workspace" | "by_kb";

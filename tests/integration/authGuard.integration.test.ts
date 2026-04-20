@@ -169,7 +169,7 @@ describe("Auth guard integration", () => {
   it("rejects expired JWT with 401", async () => {
     const expiredToken = signTestToken(
       { userId: 1, username: "testuser", role: "member" },
-      { expiresIn: "-1s" },
+      { expiresIn: "-60s" },
     );
     const res = await app.inject({
       method: "GET",

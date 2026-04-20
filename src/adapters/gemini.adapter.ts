@@ -94,23 +94,15 @@ export class GeminiAdapter implements IProviderAdapter {
       const role = m.role === "assistant" ? "model" : "user";
 
       if (m.role === "tool") {
-        // P3-09: Gemini expects functionResponse.response to be an object, not {content: string}.
-        // Parse JSON content into a proper object; fall back to {result: string} wrapper.
-        let responseObj: Record<string, unknown>;
+        // Gemini expects functionResponse.response to wrap content as a string
         const rawContent = typeof m.content === "string" ? m.content : JSON.stringify(m.content);
-        try {
-          const parsed = JSON.parse(rawContent);
-          responseObj = typeof parsed === "object" && parsed !== null ? parsed : { result: rawContent };
-        } catch {
-          responseObj = { result: rawContent };
-        }
         contents.push({
           role: "function",
           parts: [
             {
               functionResponse: {
                 name: m.name || "tool",
-                response: responseObj,
+                response: { content: rawContent },
               },
             },
           ],
@@ -134,19 +126,8 @@ export class GeminiAdapter implements IProviderAdapter {
           } else if (block.type === "image_base64") {
             parts.push({ inlineData: { mimeType: block.media_type, data: block.data } });
           } else if (block.type === "image_url" && block.url) {
-            // P1-02: Support image_url via Gemini fileData or inline base64 fallback
-            try {
-              const imgRes = await fetch(block.url, { signal: AbortSignal.timeout(10_000), redirect: "follow" });
-              if (imgRes.ok) {
-                const buf = Buffer.from(await imgRes.arrayBuffer());
-                const mimeType = imgRes.headers.get("content-type") || "image/jpeg";
-                parts.push({ inlineData: { mimeType, data: buf.toString("base64") } });
-              } else {
-                parts.push({ text: `[Image could not be loaded: ${block.url}]` });
-              }
-            } catch {
-              parts.push({ text: `[Image could not be loaded: ${block.url}]` });
-            }
+            // P11-17: Degrade image_url to text placeholder directly (no fetch to avoid SSRF)
+            parts.push({ text: `[Image: ${block.url}]` });
           } else {
             parts.push({ text: String(block.text || "") });
           }
@@ -209,7 +190,7 @@ export class GeminiAdapter implements IProviderAdapter {
                   yield {
                     type: "tool_call",
                     tool_call: {
-                      id: crypto.randomUUID(),
+                      id: `gemini-${crypto.randomUUID()}`,
                       name: part.functionCall.name,
                       arguments: part.functionCall.args || {},
                     },

@@ -11,8 +11,8 @@ export default defineConfig({
     env: {
       NODE_ENV: "test",
       DATABASE_URL: "postgresql://test:test@localhost:5432/test",
-      JWT_SECRET: "test-jwt-secret-min-16-chars",
-      MASTER_ENCRYPTION_KEY: "test-master-encryption-key-min-32-characters-long",
+      JWT_SECRET: "test-jwt-secret-that-is-at-least-32-characters-long-for-validation",
+      MASTER_ENCRYPTION_KEY: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
     },
 
     // Tell Vitest to handle ESM properly with NodeNext resolution

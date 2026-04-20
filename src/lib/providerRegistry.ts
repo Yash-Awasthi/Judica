@@ -1,6 +1,7 @@
 // P2-03: DEPRECATED — This registry duplicates src/adapters/registry.ts.
 // New code should use the adapter registry instead.
-import { loadProviderConfig, ProviderConfig } from "../config/providerConfig.js";
+import { loadProviderConfig } from "../config/providerConfig.js";
+import type { ProviderConfig } from "../config/providerConfig.js";
 import logger from "./logger.js";
 import { fileURLToPath } from "url";
 
@@ -126,6 +127,8 @@ export function invalidateRegistryCache(): void {
   cachedConfig = null;
   cachedRegistry = null;
 }
+
+export async function getProviderConfig(): Promise<ProviderConfig[]> {
   if (!cachedConfig) {
     const config = await loadProviderConfig();
     cachedConfig = config.providers

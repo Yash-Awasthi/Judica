@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock dependencies
-vi.mock("./logger.js", () => ({
+vi.mock("../../src/lib/logger.js", () => ({
   default: {
     debug: vi.fn(),
     info: vi.fn(),
@@ -48,7 +48,10 @@ describe("Scoring", () => {
             reasoning: "Because it is.",
             key_points: ["Point 1"],
             confidence: 1.0
-          }
+          },
+          // Provide adversarial and grounding to avoid missing-data penalties
+          adversarial: { stress_score: 0, is_robust: true, failures: [] },
+          grounding: { grounded: true, unsupported_claims: [] }
         },
         {
           name: "agent2",
@@ -58,7 +61,9 @@ describe("Scoring", () => {
             reasoning: "Indeed.",
             key_points: ["Point A"],
             confidence: 0.9
-          }
+          },
+          adversarial: { stress_score: 0, is_robust: true, failures: [] },
+          grounding: { grounded: true, unsupported_claims: [] }
         }
       ] as any;
 
@@ -91,7 +96,7 @@ describe("Scoring", () => {
               key_points: ["K"],
               confidence: 1.0
             },
-            adversarial: { stress_score: 0.5 }, // Penalty = 0.5 * 0.2 = 0.1
+            adversarial: { stress_score: 0.5, is_robust: true, failures: [] }, // Penalty = 0.5 * 0.2 = 0.1
             grounding: { grounded: false, unsupported_claims: ["Claim 1", "Claim 2"] } // Penalty = 2 * 0.05 = 0.1
           }
         ] as any;
@@ -99,6 +104,7 @@ describe("Scoring", () => {
         const anonymizedLabels = new Map([["agent1", "LabelA"]]);
         const scored = await scoreOpinions(opinions, [], anonymizedLabels);
 
+        // agreement = 1.0 (single opinion)
         // peerRanking = 0.5 (default for no reviews)
         // final = (0.6 * 1.0) + (0.4 * 0.5) - 0.1 (adv) - 0.1 (ground) = 0.6 + 0.2 - 0.2 = 0.6
         expect(scored[0].scores.final).toBeCloseTo(0.6, 2);
@@ -110,15 +116,29 @@ describe("Scoring", () => {
         (mlWorker.computeSimilarity as any).mockResolvedValue(0.2); // Low agreement
 
         const opinions = [
-          { name: "a1", opinion: "o1", structured: { answer: "X", confidence: 1.0, reasoning: "R", key_points: ["K"] } },
-          { name: "a2", opinion: "o2", structured: { answer: "Y", confidence: 1.0, reasoning: "R", key_points: ["K"] } }
+          {
+            name: "a1",
+            opinion: "o1",
+            structured: { answer: "X", confidence: 1.0, reasoning: "R", key_points: ["K"] },
+            adversarial: { stress_score: 0, is_robust: true, failures: [] },
+            grounding: { grounded: true, unsupported_claims: [] }
+          },
+          {
+            name: "a2",
+            opinion: "o2",
+            structured: { answer: "Y", confidence: 1.0, reasoning: "R", key_points: ["K"] },
+            adversarial: { stress_score: 0, is_robust: true, failures: [] },
+            grounding: { grounded: true, unsupported_claims: [] }
+          }
         ] as any;
 
         const scored = await scoreOpinions(opinions, [], new Map());
         // agreement = 0.2
         // peerRanking = 0.0 (no labels)
-        // final = 0.32 * 0.1 = 0.032
-        expect(scored[0].scores.final).toBeCloseTo(0.032, 3);
+        // base = (0.6 * 0.2) + (0.4 * 0.0) = 0.12
+        // agreement < 0.5 => final *= 0.1 => 0.012
+        // Rounded: Math.round(0.012 * 1000) / 1000 = 0.012
+        expect(scored[0].scores.final).toBeCloseTo(0.012, 3);
     });
   });
 

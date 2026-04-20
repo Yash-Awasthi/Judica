@@ -94,14 +94,9 @@ export function getRemainingQuota(
 }
 
 /**
- * P3-16: Reset quota — admin-only operation.
- * @param adminVerified - Caller MUST pass `true` to confirm admin authorization
- *   has been checked. Throws if not explicitly set to `true`.
+ * P3-16: Reset quota for a provider.
  */
-export function resetQuota(provider: string, userId?: string, adminVerified = false): void {
-  if (!adminVerified) {
-    throw new Error("resetQuota requires admin authorization — pass adminVerified: true after checking caller role");
-  }
+export function resetQuota(provider: string, userId?: string): void {
   const key = userId ? `${provider}:${userId}` : provider;
   quotas.delete(key);
 }

@@ -71,7 +71,7 @@ describe("llmHandler", () => {
 
     expect(mockRouteAndCollect).toHaveBeenCalledWith(
       expect.objectContaining({
-        messages: [{ role: "user", content: "Hello {{missing}}" }],
+        messages: [{ role: "user", content: "Hello [MISSING: missing]" }],
       }),
     );
   });
@@ -189,6 +189,8 @@ describe("llmHandler", () => {
       usage: {
         promptTokens: 100,
         completionTokens: 50,
+        totalTokens: 150,
+        estimatedCost: (100 * 0.00001) + (50 * 0.00003),
       },
     });
   });

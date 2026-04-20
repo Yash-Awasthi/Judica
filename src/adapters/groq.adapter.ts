@@ -1,5 +1,5 @@
 // P1-09: Groq adapter now extends the shared OpenAICompatibleAdapter base class.
-import type { AdapterRequest } from "./types.js";
+
 import { OpenAICompatibleAdapter } from "./openaiCompatible.adapter.js";
 
 export class GroqAdapter extends OpenAICompatibleAdapter {

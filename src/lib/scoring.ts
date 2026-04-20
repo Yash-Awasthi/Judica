@@ -1,4 +1,4 @@
-import { AgentOutput, ScoredOpinion, AdversarialResult, GroundingResult, PeerReview } from "./schemas.js";
+import type { AgentOutput, ScoredOpinion, AdversarialResult, GroundingResult, PeerReview } from "./schemas.js";
 import { mlWorker } from "../lib/ml/ml_worker.js";
 import { validationModule } from "./validation.js";
 import logger from "./logger.js";
@@ -41,9 +41,9 @@ async function averageAgreement(index: number, outputs: AgentOutput[]): Promise<
 }
 
 function computePeerRankingScore(agentName: string, anonymizedLabels: Map<string, string>, reviews: PeerReview[]): number {
-  if (reviews.length === 0) return 0.5;
   const label = anonymizedLabels.get(agentName);
   if (!label) return 0.0;
+  if (reviews.length === 0) return 0.5;
   
   let totalNormalizedScore = 0;
   let reviewCount = 0;

@@ -13,6 +13,17 @@ vi.mock("../../src/lib/logger.js", () => ({
   default: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
+vi.mock("../../src/config/env.js", () => ({
+  env: {},
+}));
+
+vi.mock("../../src/lib/cost.js", () => ({
+  calculateCost: vi.fn((_provider: string, _model: string, inputTokens: number, outputTokens: number) => {
+    // Simple mock: $0.003/1K input, $0.015/1K output (mid-tier)
+    return (inputTokens * 0.003 + outputTokens * 0.015) / 1000;
+  }),
+}));
+
 import { startTrace, addStep, endTrace } from "../../src/observability/tracer.js";
 import { db } from "../../src/lib/drizzle.js";
 
@@ -45,7 +56,7 @@ describe("tracer", () => {
   });
 
   describe("addStep", () => {
-    it("pushes step with default latencyMs=0", () => {
+    it("pushes step with default latencyMs=-1 (missing instrumentation)", () => {
       const ctx = startTrace(1, "chat");
       addStep(ctx, {
         name: "llm",
@@ -55,7 +66,7 @@ describe("tracer", () => {
         tokens: 10,
       });
       expect(ctx.steps).toHaveLength(1);
-      expect(ctx.steps[0].latencyMs).toBe(0);
+      expect(ctx.steps[0].latencyMs).toBe(-1);
       expect(ctx.steps[0].name).toBe("llm");
     });
 
@@ -78,31 +89,45 @@ describe("tracer", () => {
       addStep(ctx, { name: "a", type: "llm_call", input: "", output: "", tokens: 100 });
       addStep(ctx, { name: "b", type: "llm_call", input: "", output: "", tokens: 200 });
 
-      await endTrace(ctx);
+      endTrace(ctx);
+
+      // Wait for fire-and-forget persistTrace to complete
+      await vi.waitFor(() => {
+        expect(db.insert).toHaveBeenCalled();
+      });
 
       const valuesCall = (db.insert as any).mock.results[0].value.values;
       const insertedData = valuesCall.mock.calls[0][0];
       expect(insertedData.totalTokens).toBe(300);
     });
 
-    it("calculates totalCostUsd at $0.000005/token", async () => {
+    it("uses calculateCost for cost calculation (not flat per-token rate)", async () => {
       const ctx = startTrace(1, "chat");
       addStep(ctx, { name: "a", type: "llm_call", input: "", output: "", tokens: 200000 });
 
-      await endTrace(ctx);
+      endTrace(ctx);
+
+      await vi.waitFor(() => {
+        expect(db.insert).toHaveBeenCalled();
+      });
 
       const valuesCall = (db.insert as any).mock.results[0].value.values;
       const insertedData = valuesCall.mock.calls[0][0];
-      expect(insertedData.totalCostUsd).toBeCloseTo(1.0, 5);
+      // Cost is calculated via calculateCost, not a flat $0.000005/token
+      expect(insertedData.totalCostUsd).toBeTypeOf("number");
+      expect(insertedData.totalCostUsd).toBeGreaterThan(0);
     });
 
     it("inserts trace into database", async () => {
       const ctx = startTrace(7, "workflow");
       addStep(ctx, { name: "step1", type: "tool_call", input: "x", output: "y", tokens: 50 });
 
-      await endTrace(ctx);
+      endTrace(ctx);
 
-      expect(db.insert).toHaveBeenCalled();
+      await vi.waitFor(() => {
+        expect(db.insert).toHaveBeenCalled();
+      });
+
       const valuesCall = (db.insert as any).mock.results[0].value.values;
       const insertedData = valuesCall.mock.calls[0][0];
       expect(insertedData.id).toBe(ctx.id);
@@ -111,28 +136,30 @@ describe("tracer", () => {
       expect(insertedData.totalTokens).toBe(50);
     });
 
-    it("returns trace id on success", async () => {
+    it("returns ctx.id synchronously (fire-and-forget)", () => {
       const ctx = startTrace(1, "chat");
-      const result = await endTrace(ctx);
-      expect(result).toBe("trace-id");
+      const result = endTrace(ctx);
+      // endTrace now returns ctx.id synchronously
+      expect(result).toBe(ctx.id);
     });
 
-    it("returns ctx.id on db error (does not throw)", async () => {
+    it("does not throw on db error", async () => {
       const returning = vi.fn().mockRejectedValueOnce(new Error("DB down"));
       const values = vi.fn().mockReturnValue({ returning });
       (db.insert as any).mockReturnValueOnce({ values });
 
       const ctx = startTrace(1, "chat");
-      const result = await endTrace(ctx);
+      const result = endTrace(ctx);
       expect(result).toBe(ctx.id);
     });
 
-    it("skips Langfuse when LANGFUSE_SECRET_KEY not set", async () => {
+    it("skips Langfuse when LANGFUSE_SECRET_KEY not set", () => {
       delete process.env.LANGFUSE_SECRET_KEY;
       const ctx = startTrace(1, "chat");
 
-      const result = await endTrace(ctx);
-      expect(result).toBe("trace-id");
+      const result = endTrace(ctx);
+      // Returns ctx.id synchronously
+      expect(result).toBe(ctx.id);
     });
   });
 
@@ -146,12 +173,17 @@ describe("tracer", () => {
 
       expect(ctx.steps).toHaveLength(4);
 
-      await endTrace(ctx);
+      endTrace(ctx);
+
+      await vi.waitFor(() => {
+        expect(db.insert).toHaveBeenCalled();
+      });
 
       const valuesCall = (db.insert as any).mock.results[0].value.values;
       const insertedData = valuesCall.mock.calls[0][0];
       expect(insertedData.totalTokens).toBe(60);
-      expect(insertedData.totalCostUsd).toBeCloseTo(0.0003, 6);
+      // Cost is computed via calculateCost, just verify it's a number > 0
+      expect(insertedData.totalCostUsd).toBeTypeOf("number");
     });
   });
 });

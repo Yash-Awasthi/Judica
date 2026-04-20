@@ -59,7 +59,7 @@ describe("Adversarial Module", () => {
     expect(result.stress_score).toBe(0.2);
   });
 
-  it("should return neutral defaults on JSON parse failure", async () => {
+  it("should fail closed on JSON parse failure", async () => {
     const { askProvider } = await import("../../src/lib/providers.js");
     const { adversarialModule } = await import("../../src/lib/adversarial.js");
 
@@ -68,12 +68,12 @@ describe("Adversarial Module", () => {
     });
 
     const result = await adversarialModule.challenge(mockOutput, mockProvider);
-    expect(result.is_robust).toBe(true);
-    expect(result.stress_score).toBe(0.1);
-    expect(result.failures).toEqual([]);
+    expect(result.is_robust).toBe(false);
+    expect(result.stress_score).toBe(0.5);
+    expect(result.failures.length).toBeGreaterThan(0);
   });
 
-  it("should handle provider errors gracefully", async () => {
+  it("should fail closed on provider errors", async () => {
     const { askProvider } = await import("../../src/lib/providers.js");
     const { adversarialModule } = await import("../../src/lib/adversarial.js");
     const { default: logger } = await import("../../src/lib/logger.js");
@@ -81,7 +81,8 @@ describe("Adversarial Module", () => {
     (askProvider as any).mockRejectedValue(new Error("Network fail"));
 
     const result = await adversarialModule.challenge(mockOutput, mockProvider);
-    expect(result.is_robust).toBe(true);
+    expect(result.is_robust).toBe(false);
+    expect(result.stress_score).toBe(0.5);
     expect(logger.warn).toHaveBeenCalled();
   });
 });

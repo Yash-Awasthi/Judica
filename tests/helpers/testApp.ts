@@ -59,7 +59,15 @@ export function signTestToken(
   payload: { userId: number; username: string; role: string } = TEST_USER,
   options: jwt.SignOptions = { expiresIn: "15m" },
 ): string {
-  return jwt.sign(payload, TEST_JWT_SECRET, options);
+  // Auth middleware verifies issuer and audience, so include them
+  const defaultOptions: jwt.SignOptions = {
+    expiresIn: "15m",
+    algorithm: "HS256",
+    issuer: "aibyai",
+    audience: process.env.NODE_ENV || "test",
+  };
+  const mergedOptions = { ...defaultOptions, ...options };
+  return jwt.sign(payload, TEST_JWT_SECRET, mergedOptions);
 }
 
 /**

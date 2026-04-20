@@ -99,6 +99,31 @@ vi.mock("../../src/lib/redis.js", () => ({
   },
 }));
 
+const mockAdminService: any = {
+  getUsers: vi.fn().mockResolvedValue({ users: [], total: 0 }),
+  getUserDetail: vi.fn().mockResolvedValue({ id: 1, role: "member" }),
+  getUserApiKeys: vi.fn().mockResolvedValue([]),
+  updateUserRole: vi.fn().mockResolvedValue(undefined),
+  setUserStatus: vi.fn().mockResolvedValue(undefined),
+  deleteUser: vi.fn().mockResolvedValue(undefined),
+  getGroups: vi.fn().mockResolvedValue([]),
+  createGroup: vi.fn().mockResolvedValue({ id: "uuid-1", name: "Engineering" }),
+  addMemberToGroup: vi.fn().mockResolvedValue(undefined),
+  removeMemberFromGroup: vi.fn().mockResolvedValue(undefined),
+  getConfig: vi.fn().mockResolvedValue({}),
+  updateConfig: vi.fn().mockResolvedValue(undefined),
+  setProviderDefault: vi.fn().mockResolvedValue(undefined),
+  getSystemStats: vi.fn().mockResolvedValue({}),
+  getUsageAnalytics: vi.fn().mockResolvedValue([]),
+  getProviderBreakdown: vi.fn().mockResolvedValue([]),
+  getAuditLogs: vi.fn().mockResolvedValue({ logs: [], total: 0 }),
+  rotateEncryptionKeys: vi.fn().mockResolvedValue({ success: true, rotatedCount: 2, failedCount: 0 }),
+};
+
+vi.mock("../../src/services/admin.service.js", () => ({
+  AdminService: mockAdminService,
+}));
+
 // ---- helpers to capture registered route handlers ----
 
 const registeredRoutes: Record<string, { handler: Function; preHandler?: Function }> = {};
@@ -181,7 +206,7 @@ describe("GET /users", () => {
       { id: 2, email: "c@d.com", username: "bob", role: "member", createdAt: new Date() },
     ];
 
-    mockDb.select.mockReturnValue(chainable(mockUsers));
+    mockAdminService.getUsers.mockResolvedValueOnce({ users: mockUsers, total: 2 });
 
     const { handler } = registeredRoutes["GET /users"];
     const result = await handler(createRequest(), createReply());
@@ -190,9 +215,7 @@ describe("GET /users", () => {
   });
 
   it("propagates db errors", async () => {
-      mockDb.select.mockImplementation(() => {
-      throw new Error("db down");
-    });
+    mockAdminService.getUsers.mockRejectedValueOnce(new Error("db down"));
 
     const { handler } = registeredRoutes["GET /users"];
     await expect(handler(createRequest(), createReply())).rejects.toThrow("db down");
@@ -204,9 +227,8 @@ describe("GET /users", () => {
 // ================================================================
 describe("PUT /users/:id/role", () => {
   it("updates role successfully", async () => {
-    const updatedUser = { id: 5, email: "u@v.com", role: "viewer" };
-    mockDb.select.mockReturnValue(chainable([{ id: 5, email: "u@v.com", role: "viewer" }]));
-    mockDb.update.mockReturnValue(chainable([{ id: 5, role: "viewer" }]));
+    mockAdminService.getUserDetail.mockResolvedValueOnce({ id: 5, email: "u@v.com", role: "viewer" });
+    mockAdminService.updateUserRole.mockResolvedValueOnce(undefined);
 
     const { handler } = registeredRoutes["PUT /users/:id/role"];
     const request = createRequest({ body: { role: "viewer" }, params: { id: "5" } });
@@ -218,7 +240,7 @@ describe("PUT /users/:id/role", () => {
     const { handler } = registeredRoutes["PUT /users/:id/role"];
     const request = createRequest({ body: { role: "superuser" }, params: { id: "1" } });
 
-    await expect(handler(request, createReply())).rejects.toThrow("Role must be: admin, member, viewer");
+    await expect(handler(request, createReply())).rejects.toThrow("Role must be: owner, admin, member, viewer");
   });
 });
 
@@ -228,7 +250,7 @@ describe("PUT /users/:id/role", () => {
 describe("POST /groups", () => {
   it("creates group successfully and returns 201", async () => {
     const createdGroup = { id: "uuid-1", name: "Engineering" };
-    mockDb.insert.mockReturnValue(chainable([createdGroup]));
+    mockAdminService.createGroup.mockResolvedValueOnce(createdGroup);
 
     const { handler } = registeredRoutes["POST /groups"];
     const reply = createReply();
@@ -245,10 +267,10 @@ describe("POST /groups", () => {
 // ================================================================
 describe("GET /groups", () => {
   it("returns list of groups", async () => {
-    mockDb.select.mockReturnValue(chainable([
+    mockAdminService.getGroups.mockResolvedValueOnce([
       { id: "g1", name: "Group 1", description: "Desc 1", createdAt: new Date(), memberCount: 2 },
       { id: "g2", name: "Group 2", description: "Desc 2", createdAt: new Date(), memberCount: 1 },
-    ]));
+    ]);
 
     const { handler } = registeredRoutes["GET /groups"];
     const result = await handler(createRequest(), createReply());
@@ -264,28 +286,7 @@ describe("POST /rotate-keys", () => {
   const validNewKey = "b".repeat(32);
 
   it("rotates keys for providers and backends successfully", async () => {
-    const { randomBytes, createCipheriv, createHash } = await import("crypto");
-    const ALGO = "aes-256-gcm";
-
-    function encryptWithKey(text: string, keyStr: string): string {
-      const iv = randomBytes(12);
-      const key = createHash("sha256").update(keyStr).digest();
-      const cipher = createCipheriv(ALGO, key, iv);
-      let encrypted = cipher.update(text, "utf8", "hex");
-      encrypted += cipher.final("hex");
-      const tag = cipher.getAuthTag().toString("hex");
-      return `${iv.toString("hex")}:${tag}:${encrypted}`;
-    }
-
-    const encryptedProvider = encryptWithKey("provider-secret", validOldKey);
-    const encryptedBackend = encryptWithKey("backend-secret", validOldKey);
-
-    mockDb.select
-      .mockReturnValueOnce(chainable([{ id: "p1", authKey: encryptedProvider }])) // providers
-      .mockReturnValueOnce(chainable([{ id: "b1", config: encryptedBackend }]))  // backends
-      .mockReturnValueOnce(chainable([{ value: "1" }])); // config version
-
-    mockDb.update.mockReturnValue(chainable());
+    mockAdminService.rotateEncryptionKeys.mockResolvedValueOnce({ success: true, rotatedCount: 2, failedCount: 0 });
 
     const { handler } = registeredRoutes["POST /security/key-rotation"];
     const request = createRequest({
@@ -299,26 +300,7 @@ describe("POST /rotate-keys", () => {
   });
 
   it("continues rotation when individual record fails", async () => {
-    const { randomBytes, createCipheriv, createHash } = await import("crypto");
-    const ALGO = "aes-256-gcm";
-    function encryptWithKey(text: string, keyStr: string): string {
-      const iv = randomBytes(12);
-      const key = createHash("sha256").update(keyStr).digest();
-      const cipher = createCipheriv(ALGO, key, iv);
-      let encrypted = cipher.update(text, "utf8", "hex");
-      encrypted += cipher.final("hex");
-      const tag = cipher.getAuthTag().toString("hex");
-      return `${iv.toString("hex")}:${tag}:${encrypted}`;
-    }
-    const goodEncrypted = encryptWithKey("secret", validOldKey);
-
-    mockDb.select
-      .mockReturnValueOnce(chainable([
-        { id: "p1", authKey: "corrupt-data" },
-        { id: "p2", authKey: goodEncrypted }
-      ])) // 1 fail, 1 success
-      .mockReturnValueOnce(chainable([])) // 0 backends
-      .mockReturnValueOnce(chainable([{ value: "1" }]));
+    mockAdminService.rotateEncryptionKeys.mockResolvedValueOnce({ success: true, rotatedCount: 1, failedCount: 1 });
 
     const { handler } = registeredRoutes["POST /security/key-rotation"];
     const request = createRequest({

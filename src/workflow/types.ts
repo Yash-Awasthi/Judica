@@ -151,7 +151,7 @@ const WorkflowNodeSchema = z.object({
   id: z.string().min(1),
   type: z.nativeEnum(NodeType),
   position: z.object({ x: z.number(), y: z.number() }),
-  data: z.record(z.unknown()),
+  data: z.record(z.string(), z.unknown()),
 });
 
 const WorkflowEdgeSchema = z.object({

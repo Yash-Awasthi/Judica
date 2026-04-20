@@ -1,8 +1,8 @@
 import { randomUUID } from "crypto";
 import type { FastifyRequest, FastifyReply } from "fastify";
 
-// P1-28: Validate request ID format — only accept UUID-like strings
-const REQUEST_ID_RE = /^[a-f0-9-]{8,64}$/i;
+// P1-28: Validate request ID format — accept alphanumeric strings with hyphens
+const REQUEST_ID_RE = /^[a-z0-9-]{1,64}$/i;
 
 export async function fastifyRequestId(request: FastifyRequest, reply: FastifyReply) {
   const header = request.headers["x-request-id"] as string | undefined;

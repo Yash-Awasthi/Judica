@@ -6,16 +6,16 @@ vi.mock("../../src/lib/drizzle.js", () => {
   const mockOnConflictDoUpdate = vi.fn(() => ({ returning: mockReturning }));
   const mockValues = vi.fn(() => ({ onConflictDoUpdate: mockOnConflictDoUpdate }));
   const mockInsert = vi.fn(() => ({ values: mockValues }));
-  const mockLimit = vi.fn().mockResolvedValue([]);
-  const mockWhere = vi.fn(() => ({ limit: mockLimit }));
-  const mockFrom = vi.fn(() => ({ where: mockWhere }));
-  const mockSelect = vi.fn(() => ({ from: mockFrom }));
+  // For the rollback update path
+  const mockUpdateWhere = vi.fn().mockResolvedValue(undefined);
+  const mockUpdateSet = vi.fn(() => ({ where: mockUpdateWhere }));
+  const mockUpdate = vi.fn(() => ({ set: mockUpdateSet }));
 
   return {
     db: {
-      select: mockSelect,
       insert: mockInsert,
-      __mocks: { mockSelect, mockFrom, mockWhere, mockLimit, mockInsert, mockValues, mockOnConflictDoUpdate, mockReturning },
+      update: mockUpdate,
+      __mocks: { mockInsert, mockValues, mockOnConflictDoUpdate, mockReturning, mockUpdate, mockUpdateSet, mockUpdateWhere },
     },
   };
 });
@@ -82,7 +82,6 @@ describe("fastifyCheckQuota middleware", () => {
 
   it("increments usage when under quota", async () => {
     const mocks = await getDbMocks();
-    mocks.mockLimit.mockResolvedValueOnce([{ requests: 5, tokens: 100 }]);
     mocks.mockReturning.mockResolvedValueOnce([{ requests: 6, tokens: 100 }]);
 
     const { request, reply } = createMocks(1);
@@ -93,7 +92,8 @@ describe("fastifyCheckQuota middleware", () => {
 
   it("returns 429 when daily requests are exceeded", async () => {
     const mocks = await getDbMocks();
-    mocks.mockLimit.mockResolvedValueOnce([{ requests: 100, tokens: 500 }]);
+    // Upsert returns count exceeding limit (101 > 100)
+    mocks.mockReturning.mockResolvedValueOnce([{ requests: 101, tokens: 500 }]);
 
     const { request, reply } = createMocks(1);
     await fastifyCheckQuota(request, reply);
@@ -106,7 +106,8 @@ describe("fastifyCheckQuota middleware", () => {
 
   it("returns 429 when daily tokens are exceeded", async () => {
     const mocks = await getDbMocks();
-    mocks.mockLimit.mockResolvedValueOnce([{ requests: 10, tokens: 1_000_000 }]);
+    // Upsert returns token count exceeding limit
+    mocks.mockReturning.mockResolvedValueOnce([{ requests: 10, tokens: 1_000_001 }]);
 
     const { request, reply } = createMocks(1);
     await fastifyCheckQuota(request, reply);
@@ -119,7 +120,6 @@ describe("fastifyCheckQuota middleware", () => {
 
   it("sets X-Quota headers on success", async () => {
     const mocks = await getDbMocks();
-    mocks.mockLimit.mockResolvedValueOnce([{ requests: 10, tokens: 200 }]);
     mocks.mockReturning.mockResolvedValueOnce([{ requests: 11, tokens: 200 }]);
 
     const { request, reply } = createMocks(1);
@@ -135,12 +135,14 @@ describe("fastifyCheckQuota middleware", () => {
 
   it("sets X-Quota headers on 429 response", async () => {
     const mocks = await getDbMocks();
-    mocks.mockLimit.mockResolvedValueOnce([{ requests: 100, tokens: 500 }]);
+    // Upsert returns count exceeding limit (101 > 100) — then rolled back to 100
+    mocks.mockReturning.mockResolvedValueOnce([{ requests: 101, tokens: 500 }]);
 
     const { request, reply } = createMocks(1);
     await fastifyCheckQuota(request, reply);
 
     expect(reply.header).toHaveBeenCalledWith("X-Quota-Limit", "100");
+    // P8-48: rolled-back value is 101-1 = 100
     expect(reply.header).toHaveBeenCalledWith("X-Quota-Used", "100");
     expect(reply.header).toHaveBeenCalledWith("Retry-After", "86400");
   });

@@ -109,7 +109,7 @@ describe("fastifyOptionalAuth", () => {
   });
 
   it("sets userId and username with a valid token", async () => {
-    const mockPayload = { userId: 42, username: "testuser" };
+    const mockPayload = { userId: 42, username: "testuser", role: "member" };
     vi.mocked(jwt.verify).mockReturnValue(mockPayload as any);
 
     const request = createFastifyRequest({ authorization: "Bearer valid-token" });
@@ -137,7 +137,7 @@ describe("fastifyOptionalAuth", () => {
   });
 
   it("ignores revoked tokens", async () => {
-    const mockPayload = { userId: 42, username: "testuser" };
+    const mockPayload = { userId: 42, username: "testuser", role: "member" };
     vi.mocked(jwt.verify).mockReturnValue(mockPayload as any);
 
     const redis = await import("../../src/lib/redis.js");
@@ -183,7 +183,7 @@ describe("fastifyRequireAuth", () => {
   });
 
   it("returns 401 for a revoked token", async () => {
-    const mockPayload = { userId: 42, username: "testuser" };
+    const mockPayload = { userId: 42, username: "testuser", role: "member" };
     vi.mocked(jwt.verify).mockReturnValue(mockPayload as any);
 
     // Pipeline returns: [revokedResult, statusResult] — revoked is truthy
@@ -199,7 +199,7 @@ describe("fastifyRequireAuth", () => {
   });
 
   it("sets userId and username for a valid token", async () => {
-    const mockPayload = { userId: 99, username: "admin" };
+    const mockPayload = { userId: 99, username: "admin", role: "admin" };
     vi.mocked(jwt.verify).mockReturnValue(mockPayload as any);
 
     // Pipeline returns: both null (not revoked, not suspended)
@@ -216,7 +216,7 @@ describe("fastifyRequireAuth", () => {
   });
 
   it("returns 403 for a suspended user", async () => {
-    const mockPayload = { userId: 42, username: "suspended-user" };
+    const mockPayload = { userId: 42, username: "suspended-user", role: "member" };
     vi.mocked(jwt.verify).mockReturnValue(mockPayload as any);
 
     // Pipeline returns: not revoked, but suspended

@@ -1,6 +1,8 @@
-import { Message, Provider, askProvider, askProviderStream } from "./providers.js";
+import { askProvider, askProviderStream } from "./providers.js";
+import type { Message, Provider } from "./providers.js";
 import logger from "./logger.js";
-import { parseAgentOutput, AgentOutput, PeerReview, PeerReviewFlaw, ValidatorResult, ScoredOpinion, AdversarialResult, GroundingResult } from "./schemas.js";
+import { parseAgentOutput } from "./schemas.js";
+import type { AgentOutput, PeerReview, PeerReviewFlaw, ValidatorResult, ScoredOpinion, AdversarialResult, GroundingResult } from "./schemas.js";
 import { adversarialModule } from "./adversarial.js";
 import { groundingModule } from "./grounding.js";
 import { computeConsensus } from "./metrics.js";
@@ -9,7 +11,7 @@ import { getFallbackProvider } from "../config/fallbacks.js";
 // P10-43: Configurable phase timeouts (ms) via environment variables
 const OPINION_TIMEOUT_MS = parseInt(process.env.OPINION_TIMEOUT_MS || "60000", 10);
 const DEBATE_TIMEOUT_MS = parseInt(process.env.DEBATE_TIMEOUT_MS || "60000", 10);
-const REVIEW_TIMEOUT_MS = parseInt(process.env.REVIEW_TIMEOUT_MS || "60000", 10);
+const _REVIEW_TIMEOUT_MS = parseInt(process.env.REVIEW_TIMEOUT_MS || "60000", 10);
 
 let scoreOpinions: typeof import('./scoring.js').scoreOpinions | null = null;
 async function lazyScoreOpinions(...args: Parameters<typeof import('./scoring.js').scoreOpinions>) {

@@ -53,7 +53,7 @@ function renderTemplate(template: string, vars: Record<string, unknown>): string
   // P10-122: Process {{variable|filter}} interpolation
   text = text.replace(/\{\{(\w[\w.]*?)(?:\|(\w+))?\}\}/g, (match, key, filter) => {
     const val = resolveVariable(key, vars);
-    if (val === undefined || val === null) return "";
+    if (val === undefined || val === null) return match;
     let strVal = typeof val === "object" ? JSON.stringify(val) : String(val);
     if (filter && FILTERS[filter]) {
       strVal = FILTERS[filter](strVal);

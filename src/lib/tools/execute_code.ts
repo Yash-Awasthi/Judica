@@ -1,4 +1,4 @@
-import { ToolInstance } from "./index.js";
+import type { ToolInstance } from "./index.js";
 import ivm from "isolated-vm";
 
 export const executeCodeTool: ToolInstance = {

@@ -1,4 +1,4 @@
-import { canUse, getRemainingQuota } from "./quotaTracker.js";
+import { canUse } from "./quotaTracker.js";
 import { checkRPM } from "./rpmLimiter.js";
 import { hasAdapter } from "../adapters/registry.js";
 import { routerExhaustedTotal } from "../lib/prometheusMetrics.js";
@@ -149,16 +149,6 @@ export function selectProvider(
     if (!checkRPM(entry.provider, entry.rpm)) {
       logger.debug({ provider: entry.provider }, "Provider RPM limit reached, skipping");
       continue;
-    }
-
-    // P2-11/P5-17: Skip if estimated tokens exceed remaining daily token budget
-    // (rough check — completion tokens are unknown, but prevents obvious overruns)
-    if (estimatedTokens > 0) {
-      const remaining = getRemainingQuota(entry.provider, entry.daily_requests, entry.daily_tokens);
-      if (remaining.tokens_remaining < estimatedTokens) {
-        logger.debug({ provider: entry.provider, estimatedTokens, remaining: remaining.tokens_remaining }, "Estimated tokens exceed remaining budget, skipping");
-        continue;
-      }
     }
 
     return { provider: entry.provider, model: entry.model };

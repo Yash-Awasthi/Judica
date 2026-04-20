@@ -53,6 +53,13 @@ export async function getFacts(conversationId: string): Promise<SharedFactData[]
 
 // P8-23: Use atomic SQL array operations to prevent race conditions
 export async function confirmFact(factId: string, agentId: string): Promise<void> {
+  // Check if fact exists first
+  const [existing] = await db
+    .select()
+    .from(sharedFacts)
+    .where(eq(sharedFacts.id, factId));
+  if (!existing) return;
+
   // Atomically add to confirmedBy and remove from disputedBy
   await db
     .update(sharedFacts)
@@ -65,6 +72,13 @@ export async function confirmFact(factId: string, agentId: string): Promise<void
 
 // P8-23: Use atomic SQL array operations to prevent race conditions
 export async function disputeFact(factId: string, agentId: string): Promise<void> {
+  // Check if fact exists first
+  const [existing] = await db
+    .select()
+    .from(sharedFacts)
+    .where(eq(sharedFacts.id, factId));
+  if (!existing) return;
+
   await db
     .update(sharedFacts)
     .set({

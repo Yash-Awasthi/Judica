@@ -33,7 +33,7 @@ describe("codeHandler", () => {
     const ctx = makeCtx({}, { code: "1 + 1" });
     const result = await codeHandler(ctx);
 
-    expect(mockExecuteJS).toHaveBeenCalledWith("1 + 1");
+    expect(mockExecuteJS).toHaveBeenCalledWith("const __inputs__ = {};\n1 + 1");
     expect(mockExecutePython).not.toHaveBeenCalled();
     expect(result).toEqual({ output: "42", error: "" });
   });
@@ -44,7 +44,7 @@ describe("codeHandler", () => {
     const ctx = makeCtx({}, { code: "console.log('hello')", language: "javascript" });
     const result = await codeHandler(ctx);
 
-    expect(mockExecuteJS).toHaveBeenCalledWith("console.log('hello')");
+    expect(mockExecuteJS).toHaveBeenCalledWith("const __inputs__ = {};\nconsole.log('hello')");
     expect(result).toEqual({ output: "hello", error: "" });
   });
 
@@ -54,7 +54,7 @@ describe("codeHandler", () => {
     const ctx = makeCtx({}, { code: "print(3.14)", language: "python" });
     const result = await codeHandler(ctx);
 
-    expect(mockExecutePython).toHaveBeenCalledWith("print(3.14)");
+    expect(mockExecutePython).toHaveBeenCalledWith("import json\n__inputs__ = json.loads('{}')\nprint(3.14)");
     expect(mockExecuteJS).not.toHaveBeenCalled();
     expect(result).toEqual({ output: "3.14", error: "" });
   });

@@ -1,11 +1,11 @@
-import { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import {
   evaluateCouncilSession,
   getUserEvaluationMetrics,
   benchmarkCouncilPerformance
 } from "../lib/evaluation.js";
-import { AgentOutput } from "../lib/schemas.js";
+import type { AgentOutput } from "../lib/schemas.js";
 import { AppError } from "../middleware/errorHandler.js";
 
 // ─── Plugin ─────────────────────────────────────────────────────────────────

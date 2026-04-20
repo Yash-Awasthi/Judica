@@ -1,4 +1,4 @@
-import { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
+import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { ingestionQueue, researchQueue, repoQueue, compactionQueue } from "../queue/queues.js";
 import { db } from "../lib/drizzle.js";

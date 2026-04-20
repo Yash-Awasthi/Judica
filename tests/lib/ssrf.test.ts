@@ -1,21 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock DNS lookup
+// Mock DNS lookup - use promisify-compatible format
 vi.mock("dns", () => ({
   default: {
-    lookup: vi.fn((hostname, options, callback) => {
+    lookup: vi.fn((hostname: string, options: any, callback?: Function) => {
+        // Handle both (hostname, options, callback) and (hostname, callback) signatures
+        const cb = callback || options;
         if (hostname === "example.com") {
-            callback(null, [{ address: "93.184.216.34", family: 4 }]);
+            cb(null, [{ address: "93.184.216.34", family: 4 }]);
         } else if (hostname === "internal.server") {
-            callback(null, [{ address: "192.168.1.100", family: 4 }]);
+            cb(null, [{ address: "192.168.1.100", family: 4 }]);
         } else if (hostname === "localhost") {
-            callback(null, [{ address: "127.0.0.1", family: 4 }]);
+            cb(null, [{ address: "127.0.0.1", family: 4 }]);
         } else if (hostname === "unresolvable") {
-            callback(new Error("ENOTFOUND"), null);
+            cb(new Error("ENOTFOUND"), null);
         } else if (hostname === "ipv6-test.com") {
-            callback(null, [{ address: "::1", family: 6 }]);
+            cb(null, [{ address: "::1", family: 6 }]);
         } else {
-            callback(null, [{ address: "8.8.8.8", family: 4 }]);
+            cb(null, [{ address: "8.8.8.8", family: 4 }]);
         }
     }),
   },
@@ -76,20 +78,23 @@ describe("SSRF", () => {
 
         it("should reject restricted hostnames directly", async () => {
             const { validateSafeUrl } = await import("../../src/lib/ssrf.js");
-            await expect(validateSafeUrl("http://localhost/api")).rejects.toThrow("Hostname localhost is restricted");
-            await expect(validateSafeUrl("http://my.local/api")).rejects.toThrow("Hostname my.local is restricted");
-            await expect(validateSafeUrl("http://metadata.google.internal/api")).rejects.toThrow("Hostname metadata.google.internal is restricted");
+            // Source now throws "Hostname is restricted" (without the specific hostname)
+            await expect(validateSafeUrl("http://localhost/api")).rejects.toThrow("Hostname is restricted");
+            await expect(validateSafeUrl("http://my.local/api")).rejects.toThrow("Hostname is restricted");
+            await expect(validateSafeUrl("http://metadata.google.internal/api")).rejects.toThrow("Hostname is restricted");
         });
 
         it("should reject hostnames that resolve to private IPs", async () => {
             const { validateSafeUrl } = await import("../../src/lib/ssrf.js");
-            await expect(validateSafeUrl("http://internal.server/api")).rejects.toThrow("URL resolves to a restricted IP address (192.168.1.100)");
-            await expect(validateSafeUrl("http://ipv6-test.com/api")).rejects.toThrow("URL resolves to a restricted IP address (::1)");
+            // Source now throws "URL resolves to a restricted network address" (no IP leaked)
+            await expect(validateSafeUrl("http://internal.server/api")).rejects.toThrow("URL resolves to a restricted network address");
+            await expect(validateSafeUrl("http://ipv6-test.com/api")).rejects.toThrow("URL resolves to a restricted network address");
         });
 
         it("should handle unresolvable hostnames", async () => {
             const { validateSafeUrl } = await import("../../src/lib/ssrf.js");
-            await expect(validateSafeUrl("http://unresolvable")).rejects.toThrow("Failed to resolve URL hostname: ENOTFOUND");
+            // Source now throws "Failed to resolve URL hostname" (cause is wrapped, not in message)
+            await expect(validateSafeUrl("http://unresolvable")).rejects.toThrow("Failed to resolve URL hostname");
         });
     });
 });

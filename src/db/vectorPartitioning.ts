@@ -34,7 +34,7 @@ export function generatePartitionMigration(
   tableName: string,
   partitionCount: number = 16,
   vectorColumn: string = "embedding",
-  vectorDimensions: number = 1536,
+  _vectorDimensions: number = 1536,
 ): string {
   const lines: string[] = [
     `-- P4-50: Partition ${tableName} by userId for HNSW index sharding`,

@@ -1,4 +1,4 @@
-import { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import { db } from "../lib/drizzle.js";
 import { traces } from "../db/schema/traces.js";
 import { eq, and, gte, lte, count, desc, type SQL } from "drizzle-orm";

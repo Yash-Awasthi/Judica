@@ -56,6 +56,5 @@ export const splitHandler: NodeHandler = async (ctx) => {
     }
   }
 
-  // P10-115: Return flat result directly (executor spreads output into contextMap)
-  return result;
+  return { outputs: result };
 };

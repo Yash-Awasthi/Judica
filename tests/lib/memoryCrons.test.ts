@@ -6,8 +6,8 @@ const chats = { conversationId: "conversationId" };
 const memories = { id: "id", userId: "userId" };
 
 // Mock schema
-vi.mock("../db/schema/conversations.js", () => ({ conversations, chats }));
-vi.mock("../db/schema/memory.js", () => ({ memories }));
+vi.mock("../../src/db/schema/conversations.js", () => ({ conversations, chats }));
+vi.mock("../../src/db/schema/memory.js", () => ({ memories }));
 
 // Mock drizzle
 vi.mock("../../src/lib/drizzle.js", () => {
@@ -33,90 +33,106 @@ vi.mock("../../src/lib/logger.js", () => ({
   },
 }));
 
-vi.mock("drizzle-orm", () => ({
-  isNull: vi.fn(), lt: vi.fn(), or: vi.fn(), eq: vi.fn(), count: vi.fn(), sql: vi.fn(),
-}));
+vi.mock("drizzle-orm", async (importOriginal) => {
+  const actual = await importOriginal() as Record<string, unknown>;
+  return {
+    ...actual,
+    isNull: vi.fn(),
+    lt: vi.fn(),
+    or: vi.fn(),
+    eq: vi.fn(),
+    count: vi.fn(),
+    sql: vi.fn(),
+  };
+});
 
 describe("Memory Crons", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     vi.clearAllMocks();
+    // Stub Math.random to eliminate jitter
+    vi.spyOn(Math, "random").mockReturnValue(0);
   });
 
   afterEach(() => {
     vi.useRealTimers();
   });
 
-  const createQueryMock = (results: any[]) => ({
+  const createChainMock = (results: any[]) => ({
     from: vi.fn().mockReturnThis(),
     where: vi.fn().mockReturnThis(),
     groupBy: vi.fn().mockReturnThis(),
     having: vi.fn().mockReturnThis(),
-    then: vi.fn((resolve) => Promise.resolve(results).then(resolve)),
+    limit: vi.fn().mockResolvedValue(results),
+    then: vi.fn((resolve: any) => Promise.resolve(results).then(resolve)),
   });
 
   it("should start and stop crons", async () => {
     const { startMemoryCrons, stopMemoryCrons } = await import("../../src/queue/memoryCrons.js");
-    const spy = vi.spyOn(global, "setInterval");
-    const clearSpy = vi.spyOn(global, "clearInterval");
+    const setTimeoutSpy = vi.spyOn(global, "setTimeout");
+    const clearTimeoutSpy = vi.spyOn(global, "clearTimeout");
 
     startMemoryCrons();
-    expect(spy).toHaveBeenCalledTimes(2);
+    // startMemoryCrons uses setTimeout for jitter, then schedules two more setTimeouts
+    // With jitter=0, the first setTimeout fires immediately
+    expect(setTimeoutSpy).toHaveBeenCalled();
 
     stopMemoryCrons();
-    expect(clearSpy).toHaveBeenCalledTimes(2);
+    expect(clearTimeoutSpy).toHaveBeenCalled();
   });
 
   it("should run summarization on interval and call summarizeSession for active convos", async () => {
-    const { startMemoryCrons } = await import("../../src/queue/memoryCrons.js");
+    const { startMemoryCrons, stopMemoryCrons } = await import("../../src/queue/memoryCrons.js");
     const { db } = await import("../../src/lib/drizzle.js");
     const { summarizeSession } = await import("../../src/services/sessionSummary.service.js");
 
-    // Sequence of select() calls in runAutoSummarization:
-    // 1. db.select().from(conversations)...
-    // 2. For each convo: db.select().from(chats)...
-    
+    // select().from(conversations).where(...).limit(...) returns convos
+    // select({count}).from(chats).where(...) returns count
     vi.mocked(db.select)
-      .mockReturnValueOnce(createQueryMock([{ id: "conv1", userId: 1 }]) as any) // Convos
-      .mockReturnValueOnce(createQueryMock([{ count: 31 }]) as any); // Chat count for conv1
+      .mockReturnValueOnce(createChainMock([{ id: "conv1", userId: 1 }]) as any) // Convos query (uses .limit())
+      .mockReturnValueOnce(createChainMock([{ count: 31 }]) as any); // Chat count for conv1
 
     startMemoryCrons();
-    await vi.advanceTimersByTimeAsync(60 * 60 * 1000); // 1 hour
+    // Advance past jitter (0ms) then past the summarization interval (1 hour)
+    await vi.advanceTimersByTimeAsync(0); // jitter fires
+    await vi.advanceTimersByTimeAsync(60 * 60 * 1000); // summarization timer fires
 
     expect(summarizeSession).toHaveBeenCalledWith("conv1", 1);
+    stopMemoryCrons();
   });
 
   it("should run compaction on interval and call compact for users with many memories", async () => {
-    const { startMemoryCrons } = await import("../../src/queue/memoryCrons.js");
+    const { startMemoryCrons, stopMemoryCrons } = await import("../../src/queue/memoryCrons.js");
     const { db } = await import("../../src/lib/drizzle.js");
     const { compact } = await import("../../src/services/memoryCompaction.service.js");
 
-    // We advance 1 week. Hourly job runs 168 times. We need to clear those mocks or handle them.
-    // Let's just mock select to return empty arrays by default, and return our compaction result once.
-    
-    vi.mocked(db.select).mockReturnValue(createQueryMock([]) as any); // Default empty
-    
-    // We want the compaction job to find something.
-    // Compaction job calls select() ONCE per weekly run (at the start of the interval).
-    // Actually, it runs AFTER the hourly jobs that were triggered at the same time?
-    // Intervals are independent.
-    
-    const userCountsQuery = createQueryMock([{ userId: 1, count: 51 }]);
-    
-    // We need to identify the compaction call. It's the only one that uses groupBy or is from 'memories'.
-    // Or we can just use mockReturnValueOnce for the 169th call? No.
-    
-    vi.mocked(db.select).mockImplementation((arg) => {
-        // If arg (the selected columns) contains count(memories.id) or userId
-        if (arg && (arg.userId || arg.count)) {
-            return userCountsQuery as any;
-        }
-        return createQueryMock([]) as any;
+    // Default: return empty for summarization queries, return compaction data for groupBy queries
+    vi.mocked(db.select).mockImplementation((_arg?: any) => {
+      const chain = createChainMock([]);
+      // Override limit to check if this is a compaction query (has groupBy/having)
+      let isGroupBy = false;
+      const mock: any = {
+        from: vi.fn().mockReturnThis(),
+        where: vi.fn().mockReturnThis(),
+        groupBy: vi.fn(() => { isGroupBy = true; return mock; }),
+        having: vi.fn().mockReturnThis(),
+        limit: vi.fn(function() {
+          if (isGroupBy) {
+            return Promise.resolve([{ userId: 1, count: 51 }]);
+          }
+          return Promise.resolve([]);
+        }),
+        then: vi.fn((resolve: any) => Promise.resolve([]).then(resolve)),
+      };
+      return mock as any;
     });
 
     startMemoryCrons();
-    await vi.advanceTimersByTimeAsync(7 * 24 * 60 * 60 * 1000); // 1 week
+    // Advance past jitter (0ms) then past the compaction interval (1 week)
+    await vi.advanceTimersByTimeAsync(0); // jitter fires
+    await vi.advanceTimersByTimeAsync(7 * 24 * 60 * 60 * 1000); // compaction timer fires
 
     expect(compact).toHaveBeenCalledWith(1);
+    stopMemoryCrons();
   });
 });

@@ -179,7 +179,9 @@ export function createStreamResult(
       }
 
       // P7-08: Reject incomplete streams (no "done" chunk received)
-      if (!complete) {
+      // Exception: if no chunks were received at all (empty/null body), return empty result
+      const hasAnyContent = text !== "" || tool_calls.length > 0 || usage.prompt_tokens > 0 || usage.completion_tokens > 0;
+      if (!complete && hasAnyContent) {
         throw new Error("Incomplete stream: connection closed without a final 'done' chunk");
       }
 

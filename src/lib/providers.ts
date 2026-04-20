@@ -5,7 +5,7 @@ import { withRetry } from "./retry.js";
 import { getFallbackProvider } from "../config/fallbacks.js";
 import logger from "./logger.js";
 import { createProvider } from "./providers/factory.js";
-import {
+import type {
   Message,
   ProviderResponse,
   ProviderUsage,

@@ -1,4 +1,4 @@
-import { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import fastifyRateLimit from "@fastify/rate-limit";
 import { db } from "../lib/drizzle.js";
 import { users } from "../db/schema/users.js";
@@ -379,10 +379,10 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
         id: row.id,
         timestamp: row.createdAt,
         actor: row.userId,
-        action: row.action,
-        resource: row.resource ?? null,
-        details: row.details ?? null,
-        ip: row.ip ?? null,
+        action: (row as any).action ?? null,
+        resource: (row as any).resource ?? null,
+        details: (row as any).details ?? null,
+        ip: (row as any).ip ?? null,
       })),
     });
   });
@@ -424,7 +424,7 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
    * GET /api/admin/reliability — list all model reliability scores.
    */
   fastify.get("/reliability", async (_request, _reply) => {
-    const { getReliabilityScores } = await import("../services/reliability.service.js");
+    const { getReliabilityScores: _getReliabilityScores } = await import("../services/reliability.service.js");
     const { modelReliability } = await import("../db/schema/traces.js");
 
     const allRows = await db.select().from(modelReliability);

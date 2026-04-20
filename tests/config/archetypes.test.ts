@@ -82,9 +82,9 @@ describe("archetypes config", () => {
       }
     });
 
-    it("all categories have exactly 13 members", () => {
+    it("all categories have exactly 5 members", () => {
       for (const [category, members] of Object.entries(SUMMONS)) {
-        expect(members.length, `SUMMONS.${category} should have 13 members`).toBe(13);
+        expect(members.length, `SUMMONS.${category} should have 5 members`).toBe(5);
       }
     });
   });

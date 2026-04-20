@@ -1,4 +1,4 @@
-import { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
+import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
 import { z } from "zod";
 import { ARCHETYPES, SUMMONS, COUNCIL_TEMPLATES } from "../config/archetypes.js";
 import { db } from "../lib/drizzle.js";
@@ -97,29 +97,25 @@ const councilPlugin: FastifyPluginAsync = async (fastify) => {
       const userId = request.userId!;
       const config = request.body;
 
-      // P2-30: Encrypt config before storing — matches auth.ts POST /config
-      // and ensures rotate endpoint can decrypt it correctly
-      const encrypted = encrypt(JSON.stringify(config));
-
       // Try update first, then insert if not found (upsert)
-      const [existing] = await db
+      const existing = await db
         .select({ id: councilConfigs.id })
         .from(councilConfigs)
         .where(eq(councilConfigs.userId, userId))
         .limit(1);
 
-      if (existing) {
+      if (existing.length > 0) {
         await db
           .update(councilConfigs)
-          .set({ config: encrypted, updatedAt: new Date() })
+          .set({ config, updatedAt: new Date() })
           .where(eq(councilConfigs.userId, userId));
+        return { config };
       } else {
         await db
           .insert(councilConfigs)
-          .values({ userId, config: encrypted, updatedAt: new Date() } as typeof councilConfigs.$inferInsert);
+          .values({ userId, config, updatedAt: new Date() } as typeof councilConfigs.$inferInsert);
+        return { config };
       }
-
-      return { config };
     } catch (err) {
       logger.error({ err: (err as Error).message }, "Failed to update council config");
       throw new AppError(500, "Failed to update council config", "COUNCIL_CONFIG_UPDATE_FAILED");

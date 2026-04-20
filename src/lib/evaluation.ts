@@ -3,7 +3,7 @@ import { evaluations } from "../db/schema/users.js";
 import { eq, gte, and, avg, count, asc } from "drizzle-orm";
 import logger from "./logger.js";
 import { computeConsensus, pairwiseSimilarity } from "./metrics.js";
-import { AgentOutput } from "./schemas.js";
+import type { AgentOutput } from "./schemas.js";
 
 export interface EvaluationCriteria {
   coherence: number; // 0-1: How well responses align

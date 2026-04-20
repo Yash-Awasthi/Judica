@@ -1,4 +1,4 @@
-import { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { realTimeCostTracker } from "../lib/realtimeCost.js";
 import { env } from "../config/env.js";

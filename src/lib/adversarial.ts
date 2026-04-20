@@ -1,5 +1,5 @@
-import { AgentOutput, AdversarialResult } from "./schemas.js";
-import { Provider } from "./providers.js";
+import type { AgentOutput, AdversarialResult } from "./schemas.js";
+import type { Provider } from "./providers.js";
 import { askProvider } from "./providers.js";
 import logger from "./logger.js";
 import { z } from "zod";

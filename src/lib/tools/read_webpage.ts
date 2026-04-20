@@ -1,4 +1,4 @@
-import { ToolInstance } from "./index.js";
+import type { ToolInstance } from "./index.js";
 import { validateSafeUrl } from "../ssrf.js";
 
 export const readWebpageTool: ToolInstance = {

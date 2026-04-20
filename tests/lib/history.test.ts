@@ -21,16 +21,25 @@ vi.mock("../../src/lib/drizzle.js", () => {
   };
 });
 
-vi.mock("../db/schema/conversations.js", () => ({
-  chats: { conversationId: "conversationId", createdAt: "createdAt", question: "question", verdict: "verdict", opinions: "opinions" },
+vi.mock("../../src/router/tokenEstimator.js", () => ({
+  estimateStringTokens: vi.fn(() => 10),
+}));
+
+vi.mock("../../src/db/schema/conversations.js", () => ({
+  chats: { conversationId: "conversationId", createdAt: "createdAt", question: "question", verdict: "verdict", opinions: "opinions", userId: "userId" },
   contextSummaries: { conversationId: "conversationId", createdAt: "createdAt", summary: "summary", messageCount: "messageCount" },
 }));
 
-vi.mock("drizzle-orm", () => ({
-  eq: vi.fn(),
-  desc: vi.fn(),
-  asc: vi.fn(),
-}));
+vi.mock("drizzle-orm", async (importOriginal) => {
+  const actual = await importOriginal() as any;
+  return {
+    ...actual,
+    eq: vi.fn(),
+    desc: vi.fn(),
+    asc: vi.fn(),
+    and: vi.fn(),
+  };
+});
 
 describe("History Utility", () => {
   beforeEach(() => {

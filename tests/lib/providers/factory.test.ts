@@ -47,6 +47,7 @@ vi.mock("../../../src/lib/providers/concrete/rpa.js", () => {
 
 vi.mock("../../../src/lib/crypto.js", () => ({
   decrypt: vi.fn((val: string) => val),
+  isEncrypted: vi.fn(() => false),
 }));
 
 vi.mock("../../../src/lib/logger.js", () => ({

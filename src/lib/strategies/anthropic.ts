@@ -56,7 +56,7 @@ export async function askAnthropic(
     if (_depth >= MAX_TOOL_RECURSION_DEPTH) {
       throw new Error(`Tool-call recursion limit (${MAX_TOOL_RECURSION_DEPTH}) exceeded`);
     }
-    const nextMessages: Message[] = [...normMessages, { role: "assistant" as const, content }];
+    const nextMessages: Message[] = [...normMessages, { role: "assistant" as const, content } as unknown as Message];
     for (const tc of toolCalls) {
       const result = await callTool({ id: tc.id!, name: tc.name!, arguments: tc.input ?? {} });
       const safeResult = `[UNTRUSTED TOOL OUTPUT]\n${result}\n[/UNTRUSTED TOOL OUTPUT]`;
@@ -65,7 +65,7 @@ export async function askAnthropic(
         content: [
           {
             type: "tool_result",
-            tool_use_id: tc.id,
+            tool_use_id: tc.id!,
             content: safeResult
           }
         ]

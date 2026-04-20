@@ -1,4 +1,4 @@
-import { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import multipart from "@fastify/multipart";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { env } from "../config/env.js";

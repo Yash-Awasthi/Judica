@@ -3,17 +3,19 @@
 // lib/grounding.ts, lib/reasoningModes.ts, services/councilService.ts,
 // services/contradictionResolution.service.ts
 // Future: consolidate into a council/ directory to avoid circular import risk.
-import { ARCHETYPES, SUMMONS, UNIVERSAL_PROMPT, Archetype } from "../config/archetypes.js";
+import { ARCHETYPES, SUMMONS, UNIVERSAL_PROMPT } from "../config/archetypes.js";
+import type { Archetype } from "../config/archetypes.js";
 import { db } from "./drizzle.js";
 import { councilConfigs } from "../db/schema/auth.js";
 import { eq } from "drizzle-orm";
 import { decrypt } from "./crypto.js";
 import { mapProviderError } from "./errorMapper.js";
-import { Message, Provider } from "./providers.js";
+import type { Message, Provider } from "./providers.js";
 import logger from "./logger.js";
-import { ScoredOpinion } from "./schemas.js";
-import { gatherOpinions, conductPeerReview, evaluateConsensus, synthesizeVerdict, conductDebateRound, OpinionResult } from "./deliberationPhases.js";
-import { PeerReview, ValidatorResult } from "./schemas.js";
+import type { ScoredOpinion } from "./schemas.js";
+import { gatherOpinions, conductPeerReview, evaluateConsensus, synthesizeVerdict, conductDebateRound } from "./deliberationPhases.js";
+import type { OpinionResult } from "./deliberationPhases.js";
+import type { PeerReview, ValidatorResult } from "./schemas.js";
 import { createController } from "./controller.js";
 import { updateReliability, getReliabilityScores } from "../services/reliability.service.js";
 import { createHash } from "crypto";

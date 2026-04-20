@@ -1,5 +1,6 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
-import { z, ZodSchema } from "zod";
+import { z } from "zod";
+import type { ZodSchema } from "zod";
 
 /**
  * Fastify-compatible validation preHandler hook.

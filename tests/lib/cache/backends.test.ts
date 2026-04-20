@@ -90,11 +90,11 @@ describe("RedisBackend", () => {
     expect(result).toBeNull();
   });
 
-  it("set stores serialized entry without TTL", async () => {
+  it("set stores serialized entry with default TTL when none provided", async () => {
     const entry = { verdict: "ok", opinions: [] };
     await backend.set("key1", entry);
 
-    expect(mockRedisSet).toHaveBeenCalledWith("test:key1", JSON.stringify(entry));
+    expect(mockRedisSet).toHaveBeenCalledWith("test:key1", JSON.stringify(entry), { PX: 86400000 });
   });
 
   it("set stores serialized entry with TTL", async () => {
@@ -158,16 +158,8 @@ describe("PostgresBackend", () => {
     expect(result).toBeNull();
   });
 
-  it("get returns null when entry is expired", async () => {
-    const hit = {
-      keyHash: "key1",
-      prompt: "test",
-      verdict: "old",
-      opinions: [],
-      expiresAt: new Date(Date.now() - 100000),
-      createdAt: new Date(),
-    };
-    mockDbLimit.mockResolvedValue([hit]);
+  it("get returns null when entry is expired (filtered in SQL)", async () => {
+    mockDbLimit.mockResolvedValue([]);
 
     const result = await backend.get("key1");
     expect(result).toBeNull();

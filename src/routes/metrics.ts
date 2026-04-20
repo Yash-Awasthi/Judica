@@ -1,4 +1,4 @@
-import { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
+import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
 import { db } from "../lib/drizzle.js";
 import { dailyUsage, users } from "../db/schema/users.js";
 import { conversations, chats } from "../db/schema/conversations.js";
