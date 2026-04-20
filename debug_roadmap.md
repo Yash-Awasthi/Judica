@@ -654,21 +654,21 @@ TOTAL: 228 tasks
 
 [x] [P4-45]  Add bench script â€” autocannon installed but no wired benchmark.
 
-[ ] [P4-46]  Add demo URL / video â€” Zero stars because nobody can see it
+[x] [P4-46]  Add demo URL / video â€” Zero stars because nobody can see it
              work.
 
 ### Research-Grade
 --------------------------------------------------------------------------------
-[ ] [P4-47]  Add calibration curves and Brier score tracking â€” Current
+[x] [P4-47]  Add calibration curves and Brier score tracking â€” Current
              confidence formula is heuristic with no ground truth.
 
-[ ] [P4-48]  Add counterfactual debate mode â€” Force agent to argue opposite;
+[x] [P4-48]  Add counterfactual debate mode â€” Force agent to argue opposite;
              measure robustness.
 
-[ ] [P4-49]  Add ensemble distillation â€” Use council to generate training
+[x] [P4-49]  Add ensemble distillation â€” Use council to generate training
              dataset for small local model.
 
-[ ] [P4-50]  Shard pgvector HNSW indexes â€” HNSW doesn't rebuild cheaply;
+[x] [P4-50]  Shard pgvector HNSW indexes â€” HNSW doesn't rebuild cheaply;
              partition by user/workspace.
 
 ================================================================================
