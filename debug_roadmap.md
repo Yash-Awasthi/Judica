@@ -2879,24 +2879,24 @@ TOTAL: 228 tasks
              with ASCII; multi-byte UTF-8 (CJK, emoji, RTL text) may produce
              incorrect chunk boundaries.
 
-[ ] [P11-87] Code block handling untested â€” chunker may split code blocks
+[x] [P11-87] Code block handling untested â€” chunker may split code blocks
              at arbitrary positions; no test verifies code blocks are kept
              intact or split at logical boundaries.
 
-[ ] [P11-88] Chunk overlap correctness not precisely validated â€” test
+[x] [P11-88] Chunk overlap correctness not precisely validated â€” test
              asserts overlap "exists" but doesn't verify the exact overlapping
              tokens match the end of the previous chunk.
 
 ### conversationService.test.ts
 --------------------------------------------------------------------------------
-[ ] [P11-89] No user isolation / access control test â€” no test verifies
+[x] [P11-89] No user isolation / access control test â€” no test verifies
              that user A cannot read or modify user B's conversation; IDOR
              risk untested.
 
-[ ] [P11-90] Orphaned test block â€” one `it()` block is defined outside any
+[x] [P11-90] Orphaned test block â€” one `it()` block is defined outside any
              `describe()` scope; may not run in all test configurations.
 
-[ ] [P11-91] Weak semantic threshold validation â€” test asserts a semantic
+[x] [P11-91] Weak semantic threshold validation â€” test asserts a semantic
              similarity score is "high" but uses arbitrary threshold; same
              assertion passes with very different model quality.
 
