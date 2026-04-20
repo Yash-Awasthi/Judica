@@ -2855,27 +2855,27 @@ TOTAL: 228 tasks
 
 ### audioVideo.test.ts (additional)
 --------------------------------------------------------------------------------
-[ ] [P11-82] Weak output assertions â€” success path (if added) should assert
+[x] [P11-82] Weak output assertions â€” success path (if added) should assert
              transcription text is non-empty, language detected, timestamps
              present; current assertions only check status code.
 
-[ ] [P11-83] No large media input tests â€” no test with a file near or at
+[x] [P11-83] No large media input tests â€” no test with a file near or at
              the size limit; OOM and timeout behavior on large inputs
              untested.
 
 ### backgroundAgents.test.ts (additional)
 --------------------------------------------------------------------------------
-[ ] [P11-84] No pause/resume lifecycle test â€” no test verifies that a
+[x] [P11-84] No pause/resume lifecycle test â€” no test verifies that a
              running agent can be paused, its state preserved, and execution
              resumed correctly from the same point.
 
-[ ] [P11-85] Cleanup verification weak â€” `stopAgent()` asserts no error
+[x] [P11-85] Cleanup verification weak â€” `stopAgent()` asserts no error
              but doesn't verify the agent is actually removed from memory or
              that its resources (timers, DB connections) are released.
 
 ### chunker.test.ts
 --------------------------------------------------------------------------------
-[ ] [P11-86] No Unicode/multi-byte character tests â€” chunker tested only
+[x] [P11-86] No Unicode/multi-byte character tests â€” chunker tested only
              with ASCII; multi-byte UTF-8 (CJK, emoji, RTL text) may produce
              incorrect chunk boundaries.
 
