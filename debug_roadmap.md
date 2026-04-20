@@ -2831,25 +2831,25 @@ TOTAL: 228 tasks
              on success path; DB constraint violations and connection errors
              not covered.
 
-[ ] [P11-77] JSON artifact validity not checked â€” test asserts artifact type
+[x] [P11-77] JSON artifact validity not checked â€” test asserts artifact type
              is "json" but never calls `JSON.parse()` on the stored content
              to verify it's actually valid JSON.
 
 ### artifactStreaming.test.ts
 --------------------------------------------------------------------------------
-[ ] [P11-78] No stream timeout test â€” no test verifies that a stream that
+[x] [P11-78] No stream timeout test â€” no test verifies that a stream that
              never completes (producer hangs) times out and releases
              resources; timeout path untested.
 
-[ ] [P11-79] No multi-subscriber concurrency test â€” no test subscribes
+[x] [P11-79] No multi-subscriber concurrency test â€” no test subscribes
              multiple consumers to the same artifact stream; race conditions
              in fan-out logic untested.
 
-[ ] [P11-80] Cleanup verification is a no-op â€” test calls cleanup() and
+[x] [P11-80] Cleanup verification is a no-op â€” test calls cleanup() and
              asserts no error thrown; doesn't verify that the stream is
              actually removed from memory or that subsequent reads fail.
 
-[ ] [P11-81] No backpressure test â€” no test verifies behavior when a
+[x] [P11-81] No backpressure test â€” no test verifies behavior when a
              subscriber is slow to consume; unbounded buffer growth not
              detected.
 
