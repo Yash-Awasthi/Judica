@@ -171,22 +171,33 @@ function getHostname(urlStr: string): string {
   }
 }
 
+// Allowlist of known provider domains mapped to their env key getter
+const PROVIDER_DOMAINS: Record<string, () => string> = {
+  "api.siliconflow.cn": () => env.XIAOMI_MIMO_API_KEY || env.OPENAI_API_KEY || "",
+  "api.siliconflow.com": () => env.XIAOMI_MIMO_API_KEY || env.OPENAI_API_KEY || "",
+  "openrouter.ai": () => env.OPENROUTER_API_KEY || env.OPENAI_API_KEY || "",
+  "api.groq.com": () => env.GROQ_API_KEY || env.OPENAI_API_KEY || "",
+  "api.mistral.ai": () => env.MISTRAL_API_KEY || env.OPENAI_API_KEY || "",
+  "api.cerebras.ai": () => env.CEREBRAS_API_KEY || env.OPENAI_API_KEY || "",
+  "integrate.api.nvidia.com": () => env.NVIDIA_API_KEY || env.OPENAI_API_KEY || "",
+};
+
+function matchProviderDomain(hostname: string): string | null {
+  // Exact match or subdomain match (hostname === domain || hostname ends with .domain)
+  for (const [domain, getKey] of Object.entries(PROVIDER_DOMAINS)) {
+    if (hostname === domain || hostname.endsWith(`.${domain}`)) {
+      return getKey();
+    }
+  }
+  return null;
+}
+
 export function resolveApiKey(member: ApiKeyResolutionInput): string {
   const hostname = getHostname(member.baseUrl || "");
   const model = (member.model || "").toLowerCase();
 
-  if (hostname.endsWith("siliconflow.cn") || hostname.endsWith("siliconflow.com"))
-    return env.XIAOMI_MIMO_API_KEY || env.OPENAI_API_KEY || "";
-  if (hostname.endsWith("openrouter.ai"))
-    return env.OPENROUTER_API_KEY || env.OPENAI_API_KEY || "";
-  if (hostname.endsWith("groq.com"))
-    return env.GROQ_API_KEY || env.OPENAI_API_KEY || "";
-  if (hostname.endsWith("mistral.ai"))
-    return env.MISTRAL_API_KEY || env.OPENAI_API_KEY || "";
-  if (hostname.endsWith("cerebras.ai"))
-    return env.CEREBRAS_API_KEY || env.OPENAI_API_KEY || "";
-  if (hostname.endsWith("nvidia.com"))
-    return env.NVIDIA_API_KEY || env.OPENAI_API_KEY || "";
+  const domainKey = matchProviderDomain(hostname);
+  if (domainKey !== null) return domainKey;
 
   if (model.includes("xiaomi") || model.includes("mimo")) return env.XIAOMI_MIMO_API_KEY || env.OPENAI_API_KEY || "";
   if (model.includes("mistral"))      return env.MISTRAL_API_KEY || env.OPENAI_API_KEY || "";

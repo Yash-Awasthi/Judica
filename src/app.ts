@@ -218,7 +218,9 @@ export async function buildApp() {
   });
 
   // P8-07: Liveness probe — always 200 if process is up (no dependency checks)
-  fastify.get("/live", async (_request, reply) => {
+  fastify.get("/live", {
+    config: { rateLimit: { max: 60, timeWindow: "1 minute" } },
+  }, async (_request, reply) => {
     reply.code(200);
     return { live: true };
   });
