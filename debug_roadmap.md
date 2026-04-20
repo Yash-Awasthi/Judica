@@ -2902,25 +2902,25 @@ TOTAL: 228 tasks
 
 ### councilService.test.ts
 --------------------------------------------------------------------------------
-[ ] [P11-92] Unsafe env mutation in tests â€” tests set `process.env.*`
+[x] [P11-92] Unsafe env mutation in tests â€” tests set `process.env.*`
              directly without restoring after test; pollutes environment for
              subsequent tests in the same process.
 
-[ ] [P11-93] Wrong key mapping assumption â€” test assumes council config
+[x] [P11-93] Wrong key mapping assumption â€” test assumes council config
              keys follow a specific naming convention that may not hold
              for custom providers; brittle.
 
-[ ] [P11-94] Missing function coverage â€” several councilService methods
+[x] [P11-94] Missing function coverage â€” several councilService methods
              have no corresponding tests (e.g., updateConfig, deleteCouncil,
              listArchetypes).
 
 ### embeddings.test.ts
 --------------------------------------------------------------------------------
-[ ] [P11-95] No performance regression test â€” embedding generation time
+[x] [P11-95] No performance regression test â€” embedding generation time
              not measured; a 10Ã— slowdown from a dependency upgrade would
              not be caught.
 
-[ ] [P11-96] Batch embedding inefficiency untested â€” test sends items
+[x] [P11-96] Batch embedding inefficiency untested â€” test sends items
              one-by-one; no test verifies that batch embedding actually
              reduces API calls vs individual requests.
 
