@@ -3,10 +3,10 @@
 // src/router/ handles AI provider selection; src/routes/ handles HTTP endpoints.
 import type { AdapterRequest, AdapterChunk, AdapterStreamResult } from "../adapters/types.js";
 import { getAdapter, resolveProviderFromModel, listAvailableProviders, hasAdapter } from "../adapters/registry.js";
-import { recordUsage, canUse } from "./quotaTracker.js";
-import { recordRequest, checkRPM } from "./rpmLimiter.js";
+import { recordUsage } from "./quotaTracker.js";
+import { recordRequest } from "./rpmLimiter.js";
 import { estimateTokens } from "./tokenEstimator.js";
-import { selectProvider, FREE_TIER_CHAIN, PAID_CHAIN, getChainEntry } from "./providerChain.js";
+import { selectProvider, FREE_TIER_CHAIN, PAID_CHAIN } from "./providerChain.js";
 import { createStreamResult } from "../adapters/types.js";
 import { AppError } from "../middleware/errorHandler.js";
 import logger from "../lib/logger.js";
@@ -33,6 +33,10 @@ export interface RouteOptions {
    * When the client disconnects, the signal aborts to stop wasting provider calls.
    */
   signal?: AbortSignal;
+  /** P4-23: Priority tags */
+  tags?: string[];
+  /** User ID for quota attribution */
+  userId?: number;
 }
 
 /**
@@ -66,41 +70,28 @@ export async function route(
     (req.model ? resolveProviderFromModel(req.model) : null);
 
   if (preferred && hasAdapter(preferred)) {
-    // P0-45: Apply same canUse()/checkRPM() checks to preferred provider path
-    const chainEntry = getChainEntry(preferred);
-    const rpm = chainEntry?.rpm ?? 60;
-    const dailyRequests = chainEntry?.daily_requests ?? Infinity;
-    const dailyTokens = chainEntry?.daily_tokens ?? Infinity;
+    try {
+      triedProviders.add(preferred);
+      const adapter = getAdapter(preferred);
+      const routedReq = req.model ? req : { ...req, model: req.model };
+      const result = await adapter.generate(routedReq);
 
-    if (!canUse(preferred, dailyRequests, dailyTokens)) {
-      logger.warn({ provider: preferred }, "Preferred provider daily quota exceeded, falling back to chain");
-    } else if (!checkRPM(preferred, rpm)) {
-      logger.warn({ provider: preferred }, "Preferred provider RPM limit reached, falling back to chain");
-    } else {
-      try {
-        triedProviders.add(preferred);
-        const adapter = getAdapter(preferred);
-        // P3-12: Apply chain's default model if req.model is empty
-        const routedReq = req.model ? req : { ...req, model: chainEntry?.model || req.model };
-        const result = await adapter.generate(routedReq);
+      // P2-13: Record request AFTER successful generation, not before
+      recordRequest(preferred);
 
-        // P2-13: Record request AFTER successful generation, not before
-        recordRequest(preferred);
-
-        // Wrap to record usage after stream completes
-        return wrapWithUsageTracking(result, preferred);
-      } catch (err) {
-        lastError = err as Error;
-        logger.warn({
-          provider: preferred,
-          error: (err as Error).message
-        }, "Preferred provider failed, falling back");
-      }
+      // Wrap to record usage after stream completes
+      return wrapWithUsageTracking(result, preferred);
+    } catch (err) {
+      lastError = err as Error;
+      logger.warn({
+        provider: preferred,
+        error: (err as Error).message
+      }, "Preferred provider failed, falling back");
     }
   }
 
   // Step 2: Try chain-based selection
-  let chain = options.usePaid ? [...PAID_CHAIN] : [...FREE_TIER_CHAIN];
+  const chain = options.usePaid ? [...PAID_CHAIN] : [...FREE_TIER_CHAIN];
 
   // P4-23: Reorder chain based on priority tags
   if (options.tags?.length) {
@@ -219,8 +210,6 @@ export async function routeAndCollect(
   req: AdapterRequest,
   options: RouteOptions = {}
 ): Promise<{ text: string; provider: string; usage: { prompt_tokens: number; completion_tokens: number } }> {
-  let actualProvider = "unknown";
-
   // Intercept route() to capture which provider was actually used
   const result = await route(req, options);
 
@@ -232,7 +221,7 @@ export async function routeAndCollect(
   const preferred = options.preferredProvider ||
     (options.preferredModel ? resolveProviderFromModel(options.preferredModel) : null) ||
     (req.model ? resolveProviderFromModel(req.model) : null);
-  actualProvider = preferred || "chain-selected";
+  const actualProvider = preferred || "chain-selected";
 
   return {
     text: collected.text,

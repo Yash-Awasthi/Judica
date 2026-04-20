@@ -11,6 +11,7 @@ vi.mock("../../src/lib/logger.js", () => ({
 
 vi.mock("../../src/router/quotaTracker.js", () => ({
   canUse: vi.fn(),
+  getRemainingQuota: vi.fn(() => ({ tokens_remaining: Infinity, requests_remaining: Infinity })),
 }));
 
 vi.mock("../../src/router/rpmLimiter.js", () => ({
@@ -19,6 +20,10 @@ vi.mock("../../src/router/rpmLimiter.js", () => ({
 
 vi.mock("../../src/adapters/registry.js", () => ({
   hasAdapter: vi.fn(),
+}));
+
+vi.mock("../../src/lib/prometheusMetrics.js", () => ({
+  routerExhaustedTotal: { inc: vi.fn() },
 }));
 
 import { selectProvider, getChainEntry, FREE_TIER_CHAIN, PAID_CHAIN, type ChainEntry } from "../../src/router/providerChain.js";

@@ -229,7 +229,7 @@ describe("forkSchema", () => {
 
 describe("authSchema", () => {
   it("should accept valid credentials", () => {
-    const result = authSchema.safeParse({ username: "alice", password: "secret123" });
+    const result = authSchema.safeParse({ username: "alice", password: "secret12345!" });
     expect(result.success).toBe(true);
   });
 

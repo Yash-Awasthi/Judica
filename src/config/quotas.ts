@@ -1,4 +1,3 @@
-import { env } from "./env.js";
 
 // P2-28: Quota limits are now configurable via env vars with sensible defaults.
 // Supports tiered overrides per user role in the future.

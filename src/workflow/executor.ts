@@ -85,7 +85,7 @@ class InMemoryLock implements DistributedLock {
   }
 }
 
-const nodeLock: DistributedLock = new InMemoryLock();
+const _nodeLock: DistributedLock = new InMemoryLock();
 
 export class WorkflowExecutor {
   private definition: WorkflowDefinition;
@@ -392,7 +392,7 @@ export class WorkflowExecutor {
       if (reachableFromInputs.has(current)) continue;
       reachableFromInputs.add(current);
       for (const neighbor of adjacency.get(current) || []) {
-        queue.push(neighbor);
+        queue.push(neighbor.target);
       }
     }
     const unreachable = nodes.filter(n => n.type !== NodeType.INPUT && !reachableFromInputs.has(n.id));

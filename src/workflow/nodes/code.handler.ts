@@ -31,10 +31,12 @@ export const codeHandler: NodeHandler = async (ctx) => {
   let result: { output: string; error?: string };
 
   if (language === "python") {
-    result = await executePython(fullCode);
+    const pyResult = await executePython(fullCode);
+    result = { output: Array.isArray(pyResult.output) ? pyResult.output.join("\n") : String(pyResult.output), error: pyResult.error ?? undefined };
   } else {
     // javascript or typescript (both use JS sandbox)
-    result = await executeJS(fullCode);
+    const jsResult = await executeJS(fullCode);
+    result = { output: Array.isArray(jsResult.output) ? jsResult.output.join("\n") : String(jsResult.output), error: jsResult.error ?? undefined };
   }
 
   // P10-98: Cap output size to prevent heap exhaustion

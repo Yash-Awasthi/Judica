@@ -5,7 +5,7 @@ import {
   composeCouncil,
   validateUserConfig
 } from "../lib/configResolver.js";
-import {
+import type {
   UserCouncilConfig,
   CouncilComposition,
 } from "../types/userConfig.js";

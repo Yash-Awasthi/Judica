@@ -270,7 +270,7 @@ function setupDefaultMocks() {
     metrics: { totalTokens: 100 },
   });
   mockCreateConversation.mockResolvedValue({ id: "new-conv-id" });
-  mockFindConversationById.mockResolvedValue({ id: "existing-conv-id" });
+  mockFindConversationById.mockImplementation(async (id: string, userId?: number) => ({ id, userId: userId ?? 1 }));
   mockCreateChat.mockResolvedValue({});
   mockGetRecentHistory.mockResolvedValue([]);
   mockRetrieveRelevantContext.mockResolvedValue([]);
@@ -336,10 +336,10 @@ describe("route registration", () => {
     expect(registeredRoutes["POST /stream"].preHandler).toBeDefined();
   });
 
-  it("POST / has three preHandlers", () => {
+  it("POST / has four preHandlers", () => {
     const pre = registeredRoutes["POST /"].preHandler;
     expect(Array.isArray(pre)).toBe(true);
-    expect((pre as Function[]).length).toBe(3);
+    expect((pre as Function[]).length).toBe(4);
   });
 });
 
@@ -962,7 +962,9 @@ describe("POST /stream", () => {
     await handler(req, reply);
 
     const written = reply.raw.write.mock.calls[0][0];
-    const parsed = JSON.parse(written.replace("data: ", "").trim());
+    // SSE format: "event: error\ndata: {...}\n\n"
+    const dataLine = written.split("\n").find((line: string) => line.startsWith("data: "));
+    const parsed = JSON.parse(dataLine.replace("data: ", ""));
     expect(parsed.type).toBe("error");
     expect(parsed.message).toBe("Stream failure");
     expect(reply.raw.end).toHaveBeenCalled();
@@ -1093,10 +1095,10 @@ describe("POST /stream", () => {
 // validateAskBody (tested indirectly via preHandler)
 // ================================================================
 describe("validateAskBody preHandler", () => {
-  it("is registered as third preHandler on POST /", () => {
+  it("is registered as fourth preHandler on POST /", () => {
     const pre = registeredRoutes["POST /"].preHandler as Function[];
-    // The third preHandler is validateAskBody
-    expect(pre.length).toBe(3);
+    // preHandlers: [fastifyOptionalAuth, fastifyAnonGuard, fastifyCheckQuota, validateAskBody]
+    expect(pre.length).toBe(4);
   });
 });
 

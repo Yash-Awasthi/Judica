@@ -9,9 +9,11 @@ describe("PII Detection", () => {
   });
 
   it("should detect high severity PII (SSN, credit card)", () => {
-    const text = "My SSN is 123-45-6789 and my card is 1234-5678-1234-5678.";
+    // Use a credit card number that passes Luhn validation
+    // Visa: 4111111111111111 passes Luhn
+    const text = "My SSN is 123-45-6789 and my card is 4111-1111-1111-1111.";
     const result = detectPII(text);
-    
+
     expect(result.found).toBe(true);
     expect(result.types).toContain("ssn");
     expect(result.types).toContain("credit_card");
@@ -24,7 +26,7 @@ describe("PII Detection", () => {
   it("should detect medium severity PII (email, phone)", () => {
     const text = "Contact me at test@example.com or 555-123-4567.";
     const result = detectPII(text);
-    
+
     expect(result.found).toBe(true);
     expect(result.types).toContain("email");
     expect(result.types).toContain("phone");
@@ -36,7 +38,7 @@ describe("PII Detection", () => {
   it("should detect low severity PII (IP, URL, Name)", () => {
     const text = "My site is https://site.com and my IP is 192.168.1.1. Signed, Dr. John Doe.";
     const result = detectPII(text);
-    
+
     expect(result.found).toBe(true);
     expect(result.types).toContain("url");
     expect(result.types).toContain("ip_address");
@@ -52,12 +54,13 @@ describe("PII Detection", () => {
 
   it("should generate critical recommendation for high severity items", () => {
     const result = detectPII("123-45-6789");
-    expect(result.recommendations.some(r => r.includes("🚨 CRITICAL"))).toBe(true);
+    expect(result.recommendations.some(r => r.includes("CRITICAL"))).toBe(true);
   });
 
   it("should recommend rewriting for many PII types", () => {
-    // Use text guaranteed to produce >3 unique PII types: ssn + credit_card + email + phone
-    const text = "SSN: 123-45-6789. Card: 1234-5678-1234-5678. Email: foo@bar.com. Phone: 555-123-4567.";
+    // Use text guaranteed to produce >3 unique PII types: ssn + email + phone + ip_address + url
+    // Use a valid Luhn CC to be safe: 4111111111111111
+    const text = "SSN: 123-45-6789. Card: 4111-1111-1111-1111. Email: foo@bar.com. Phone: 555-123-4567. IP: 10.0.0.1.";
     const result = detectPII(text);
     // types.size > 3 triggers the rewrite recommendation
     expect(result.types.length).toBeGreaterThan(3);

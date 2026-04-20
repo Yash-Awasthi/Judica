@@ -22,6 +22,7 @@ vi.mock("prom-client", () => {
       register: {
         metrics: vi.fn().mockResolvedValue("mock metrics data"),
         getSingleMetric: vi.fn(),
+        clear: vi.fn(),
       }
     }
   };

@@ -108,7 +108,7 @@ describe("P11-38: OpenRouter-specific error format", () => {
         model: "openai/gpt-4o",
         messages: [{ role: "user", content: "test" }],
       })
-    ).rejects.toThrow("openrouter API error: 503");
+    ).rejects.toThrow("OpenRouter API error: 503");
   });
 
   it("should handle OpenRouter model-not-found format", async () => {

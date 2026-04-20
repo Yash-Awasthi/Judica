@@ -25,16 +25,14 @@ function makeProvider(overrides: Partial<Provider> = {}): Provider {
 }
 
 describe("FALLBACK_MAP", () => {
-  it("should have entries for api, local, and rpa", () => {
+  it("should have entry for api only", () => {
     expect(FALLBACK_MAP).toHaveProperty("api");
-    expect(FALLBACK_MAP).toHaveProperty("local");
-    expect(FALLBACK_MAP).toHaveProperty("rpa");
+    expect(FALLBACK_MAP).not.toHaveProperty("local");
+    expect(FALLBACK_MAP).not.toHaveProperty("rpa");
   });
 
-  it("should use gemini-2.5-flash as the fallback model", () => {
-    expect(FALLBACK_MAP["api"]!.model).toBe("gemini-2.5-flash");
-    expect(FALLBACK_MAP["local"]!.model).toBe("gemini-2.5-flash");
-    expect(FALLBACK_MAP["rpa"]!.model).toBe("gemini-2.5-flash");
+  it("should use gemini-2.5-flash-preview-05-20 as the fallback model", () => {
+    expect(FALLBACK_MAP["api"]!.model).toBe("gemini-2.5-flash-preview-05-20");
   });
 });
 
@@ -55,29 +53,28 @@ describe("getFallbackProvider", () => {
     const result = getFallbackProvider(provider);
 
     expect(result).not.toBeNull();
-    expect(result!.name).toBe("My Provider (Fallback: gemini-2.5-flash)");
+    expect(result!.name).toBe("My Provider (Emergency Fallback: gemini-2.5-flash-preview-05-20)");
   });
 
   it("should merge original provider fields into the fallback", () => {
-    FALLBACK_MAP["local"]!.apiKey = "fake-google-key";
+    FALLBACK_MAP["api"]!.apiKey = "fake-google-key";
 
     const provider = makeProvider({
       name: "Local Model",
-      type: "local",
-      model: "llama-3",
+      type: "api",
+      model: "gpt-4",
       baseUrl: "http://localhost:11434",
     });
     const result = getFallbackProvider(provider);
 
     expect(result).not.toBeNull();
-    // baseUrl from original should be present (spread of original first)
-    // but overridden by fallback fields (type, model, apiKey)
-    expect(result!.model).toBe("gemini-2.5-flash");
+    // model overridden by fallback fields
+    expect(result!.model).toBe("gemini-2.5-flash-preview-05-20");
     expect(result!.type).toBe("api");
   });
 
-  it("should return null for an unknown provider type", () => {
-    const provider = makeProvider({ type: "unknown" as any });
+  it("should return null for a local provider type", () => {
+    const provider = makeProvider({ type: "local" as any });
     const result = getFallbackProvider(provider);
     expect(result).toBeNull();
   });

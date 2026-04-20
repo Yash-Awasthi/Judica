@@ -93,7 +93,7 @@ describe("createGoogleStrategy", () => {
   });
 
   it("returns existing OAuth user", async () => {
-    const existingUser = { id: 1, email: "test@example.com", passwordHash: "", role: "member" };
+    const existingUser = { id: 1, email: "test@example.com", authMethod: "google", role: "member" };
     mockLimit.mockResolvedValueOnce([existingUser]);
 
     const strategy = createGoogleStrategy() as any;
@@ -108,7 +108,7 @@ describe("createGoogleStrategy", () => {
   });
 
   it("rejects login when existing user has password (different method)", async () => {
-    const existingUser = { id: 1, email: "test@example.com", passwordHash: "bcrypt-hash", role: "member" };
+    const existingUser = { id: 1, email: "test@example.com", authMethod: "password", role: "member" };
     mockLimit.mockResolvedValueOnce([existingUser]);
 
     const strategy = createGoogleStrategy() as any;
@@ -150,7 +150,7 @@ describe("createGoogleStrategy", () => {
     const done = vi.fn();
 
     await verify("token", "refresh", {
-      emails: [{ value: "user@example.com" }],
+      emails: [{ value: "user@example.com", verified: true }],
     }, done);
 
     expect(done).toHaveBeenCalledWith(null, newUser);

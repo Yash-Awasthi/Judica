@@ -1,4 +1,4 @@
-import { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import { db } from "../lib/drizzle.js";
 import { conversations, chats } from "../db/schema/conversations.js";
 import { eq, and, desc, asc } from "drizzle-orm";

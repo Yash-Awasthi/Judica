@@ -1,7 +1,7 @@
 // P2-19: This file provides TEXT SIMILARITY metrics (tokenSimilarity, semanticSimilarity).
 // NOT to be confused with lib/prometheusMetrics.ts which provides Prometheus counters/histograms.
 // Despite the naming collision, these serve different purposes and should remain separate.
-import { AgentOutput } from "./schemas.js";
+import type { AgentOutput } from "./schemas.js";
 import { mlWorker } from "../lib/ml/ml_worker.js";
 import logger from "./logger.js";
 
@@ -12,6 +12,11 @@ const CONSENSUS_THRESHOLD = parseFloat(process.env.CONSENSUS_THRESHOLD || "0.85"
 // Keyed by sorted pair hash. Bounded to prevent unbounded growth.
 const MAX_CACHE_SIZE = 500;
 const similarityCache = new Map<string, number>();
+
+/** Clear the similarity cache (for testing). */
+export function clearSimilarityCache(): void {
+  similarityCache.clear();
+}
 
 function getCacheKey(a: string, b: string): string {
   // Sort to ensure (a,b) and (b,a) hit the same cache entry

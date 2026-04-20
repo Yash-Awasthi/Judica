@@ -8,7 +8,7 @@
  * GET /api/deliberations/:id/scoring → { members: [...], consensus: {...} }
  */
 
-import { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { db } from "../lib/drizzle.js";
 import { traces } from "../db/schema/traces.js";
@@ -38,7 +38,7 @@ const deliberationsPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(404, "Deliberation not found");
     }
 
-    const payload = trace.payload as Record<string, unknown> | null;
+    const payload = (trace as any).payload as Record<string, unknown> | null;
     const scoredOpinions = (payload?.scoredOpinions ?? payload?.scored ?? []) as Array<{
       name: string;
       scores?: {
@@ -101,7 +101,7 @@ const deliberationsPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(404, "Deliberation not found");
     }
 
-    const payload = trace.payload as Record<string, unknown> | null;
+    const payload = (trace as any).payload as Record<string, unknown> | null;
 
     // Reconstruct the deliberation timeline from the stored trace
     const timeline: Array<{

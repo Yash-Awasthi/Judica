@@ -49,7 +49,7 @@ describe("jsSandbox – executeJS", () => {
 
     expect(result.error).toBeNull();
     expect(result.elapsedMs).toBeGreaterThanOrEqual(0);
-    expect(Array.isArray(result.output)).toBe(true);
+    expect(typeof result.output).toBe("string");
   });
 
   it("captures console output via the log callback", async () => {

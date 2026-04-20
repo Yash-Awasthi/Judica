@@ -1,7 +1,7 @@
 // P2-07: Emergency-last-resort fallback ONLY.
 // This is NOT the primary fallback chain — that's in src/router/providerChain.ts.
 // This file only activates when the legacy askProvider() path fails AND chain is exhausted.
-import { Provider } from "../lib/providers.js";
+import type { Provider } from "../lib/providers.js";
 import { env } from "./env.js";
 import logger from "../lib/logger.js";
 

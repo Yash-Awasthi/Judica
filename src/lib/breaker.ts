@@ -1,6 +1,6 @@
 import CircuitBreaker from "opossum";
 import logger from "./logger.js";
-import { Provider } from "./providers.js";
+import type { Provider } from "./providers.js";
 
 /**
  * Circuit breaker utility for provider adapters.
@@ -50,7 +50,7 @@ const BREAKER_OPTIONS = {
 };
 
 export function getBreaker<T extends (...args: unknown[]) => Promise<unknown>>(
-  provider: Provider,
+  provider: Pick<Provider, "name">,
   action: T
 ): CircuitBreaker<Parameters<T>, ReturnType<T>> {
   const key = `${provider.name}:${action.name}`;
@@ -103,7 +103,7 @@ export function getBreaker<T extends (...args: unknown[]) => Promise<unknown>>(
 }
 
 // P9-11 + P1-11: Runtime guard on fire() return value
-function wrapBreaker(breaker: CircuitBreaker, provider: Provider): CircuitBreaker {
+function wrapBreaker(breaker: CircuitBreaker, provider: Pick<Provider, "name">): CircuitBreaker {
   const originalFire = breaker.fire.bind(breaker);
   const guardedBreaker = Object.create(breaker);
   guardedBreaker.fire = async function (...args: unknown[]) {

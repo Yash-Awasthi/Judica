@@ -1,4 +1,4 @@
-import { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import { randomUUID } from "crypto";
 import { db } from "../lib/drizzle.js";
 import {

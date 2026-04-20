@@ -65,7 +65,7 @@ describe("RedisBackend", () => {
       );
     });
 
-    it("sets value without TTL", async () => {
+    it("sets value with default 24h TTL when no TTL provided", async () => {
       const value = { data: "persistent" };
       mockRedis.set.mockResolvedValue("OK");
 
@@ -73,7 +73,8 @@ describe("RedisBackend", () => {
 
       expect(mockRedis.set).toHaveBeenCalledWith(
         "cache:no-ttl-key",
-        JSON.stringify(value)
+        JSON.stringify(value),
+        { PX: 86400000 }
       );
     });
   });

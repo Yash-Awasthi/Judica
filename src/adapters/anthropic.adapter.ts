@@ -123,22 +123,8 @@ export class AnthropicAdapter implements IProviderAdapter {
               source: { type: "base64", media_type: block.media_type, data: block.data },
             });
           } else if (block.type === "image_url" && block.url) {
-            // P1-02: Fetch the image URL and convert to base64 for proper Anthropic support
-            try {
-              const imgRes = await fetch(block.url, { signal: AbortSignal.timeout(10_000), redirect: "follow" });
-              if (imgRes.ok) {
-                const buf = Buffer.from(await imgRes.arrayBuffer());
-                const mediaType = imgRes.headers.get("content-type") || "image/jpeg";
-                content.push({
-                  type: "image",
-                  source: { type: "base64", media_type: mediaType, data: buf.toString("base64") },
-                });
-              } else {
-                content.push({ type: "text", text: `[Image could not be loaded: ${block.url}]` });
-              }
-            } catch {
-              content.push({ type: "text", text: `[Image could not be loaded: ${block.url}]` });
-            }
+            // P1-02: Anthropic doesn't natively support image URLs; use text placeholder
+            content.push({ type: "text", text: `[Image: ${block.url}]` });
           } else {
             content.push({ type: "text", text: String(block.text || "") });
           }
@@ -278,7 +264,6 @@ export class AnthropicAdapter implements IProviderAdapter {
     return [
       "claude-opus-4-20250514",
       "claude-sonnet-4-20250514",
-      "claude-3-7-sonnet-20250219",
       "claude-3-5-sonnet-20241022",
       "claude-3-5-haiku-20241022",
       "claude-3-opus-20240229",
@@ -286,12 +271,11 @@ export class AnthropicAdapter implements IProviderAdapter {
     ];
   }
 
-  // P7-25: Validate key format more thoroughly — check prefix AND minimum length
+  // P7-25: Validate key format — check prefix
   async isAvailable(): Promise<boolean> {
     if (typeof this.apiKey !== "string") return false;
     if (!this.apiKey.startsWith("sk-ant-")) return false;
-    // Anthropic keys are typically 108+ chars; reject obviously truncated keys
-    if (this.apiKey.length < 20) return false;
+    if (this.apiKey.length < 10) return false;
     return true;
   }
 }

@@ -79,8 +79,8 @@ export const loopHandler: NodeHandler = async (ctx) => {
           const keep = await safeEvalExpr(isolate, filterExpr, item, i, items);
           if (!keep) continue;
         } catch (err) {
-          // P10-109: Record filter failures instead of silently including the item
-          errors.push({ index: i, error: `filter: ${err instanceof Error ? err.message : String(err)}` });
+          // On filter failure, exclude the item and track the error
+          errors.push({ index: i, error: `filter: ${(err as Error).message}` });
           continue;
         }
       }
@@ -91,9 +91,9 @@ export const loopHandler: NodeHandler = async (ctx) => {
           const transformed = await safeEvalExpr(isolate, bodyExpr, item, i, items);
           results.push(transformed);
         } catch (err) {
-          // P10-109: Record body failures with per-iteration error tracking
-          errors.push({ index: i, error: `body: ${err instanceof Error ? err.message : String(err)}` });
-          results.push(null); // Placeholder to maintain index alignment
+          // On body failure, push null and track the error
+          results.push(null);
+          errors.push({ index: i, error: `body: ${(err as Error).message}` });
         }
       } else {
         results.push(item);

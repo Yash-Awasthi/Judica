@@ -1,4 +1,4 @@
-import { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import { db } from "../lib/drizzle.js";
 import { codeRepositories } from "../db/schema/repos.js";
 import { eq, and, desc } from "drizzle-orm";

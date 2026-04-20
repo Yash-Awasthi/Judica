@@ -1,6 +1,7 @@
-import { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
-import { askProvider, Message, Provider } from "../lib/providers.js";
+import { askProvider } from "../lib/providers.js";
+import type { Message, Provider } from "../lib/providers.js";
 import { db } from "../lib/drizzle.js";
 import { councilConfigs } from "../db/schema/auth.js";
 import { eq } from "drizzle-orm";

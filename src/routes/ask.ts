@@ -1,6 +1,6 @@
-import { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
+import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
 import { askCouncil } from "../lib/council.js";
-import { Message, Provider } from "../lib/providers.js";
+import type { Message, Provider } from "../lib/providers.js";
 import logger from "../lib/logger.js";
 import { fastifyOptionalAuth } from "../middleware/fastifyAuth.js";
 import { fastifyCheckQuota } from "../middleware/quota.js";
@@ -28,7 +28,7 @@ import {
   prepareCouncilMembers,
   type ApiKeyResolutionInput
 } from "../services/council.service.js";
-import { loadFileContext, loadRAGContext, buildEnrichedQuestion } from "../services/messageBuilder.service.js";
+import { loadFileContext, loadRAGContext, buildEnrichedQuestion, type FileContext } from "../services/messageBuilder.service.js";
 import { detectArtifact, saveArtifact } from "../services/artifacts.service.js";
 import {
   runSocraticPrelude,
@@ -184,7 +184,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         throw new AppError(404, "Conversation not found or does not belong to you");
       }
       // P8-64: Double-check userId match for authenticated users
-      if (userId && convo.userId !== userId) {
+      if (userId && convo.userId && convo.userId !== userId) {
         throw new AppError(403, "Access denied: conversation belongs to another user");
       }
       messages = await getRecentHistory(effectiveConversationId);
@@ -200,7 +200,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
 
     // P3-20: Reject anonymous users for file loading instead of falling back to user 0.
     // userId 0 could access another user's data. Skip file loading for unauthenticated users.
-    const fileContext = userId ? await loadFileContext(upload_ids || [], userId) : "";
+    const fileContext = userId ? await loadFileContext(upload_ids || [], userId) : { text_documents: [], image_blocks: [] } as FileContext;
     let ragContext = "";
     let ragCitations: { source: string; score: number }[] = [];
     if (kb_id && userId) {
@@ -329,7 +329,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     // End trace
     if (traceCtx) {
       traceCtx.conversationId = effectiveConversationId || undefined;
-      endTrace(traceCtx).catch((err) => logger.warn({ err }, "Failed to save trace"));
+      try { endTrace(traceCtx); } catch (err) { logger.warn({ err }, "Failed to save trace"); }
     }
 
     if (userId) {
@@ -460,7 +460,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       }
 
       // P3-20: Use userId check instead of 0 to prevent anonymous access to user 0's files
-      const fileContext = userId ? await loadFileContext(upload_ids || [], userId) : "";
+      const fileContext = userId ? await loadFileContext(upload_ids || [], userId) : { text_documents: [], image_blocks: [] } as FileContext;
       let ragContext = "";
       if (kb_id && userId) {
         const rag = await loadRAGContext(userId, question, kb_id);
@@ -626,7 +626,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       const message = e instanceof Error ? e.message : "Internal error";
       logger.error({ err: e }, "SSE stream error");
       if (!reply.raw.writableEnded) {
-        reply.raw.write(`event: error\ndata: ${JSON.stringify({ type: "error", message })}\n\n`);
+        reply.raw.write(`data: ${JSON.stringify({ type: "error", message })}\n\n`);
         reply.raw.end();
       }
     }

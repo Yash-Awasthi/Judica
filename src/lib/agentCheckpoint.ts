@@ -85,8 +85,8 @@ export async function clearCheckpoint(jobId: string): Promise<void> {
  */
 export async function hasCheckpoint(jobId: string): Promise<boolean> {
   try {
-    const exists = await redis.exists(`${CHECKPOINT_PREFIX}${jobId}`);
-    return exists === 1;
+    const val = await redis.get(`${CHECKPOINT_PREFIX}${jobId}`);
+    return val !== null;
   } catch {
     return false;
   }

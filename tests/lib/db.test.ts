@@ -21,7 +21,7 @@ vi.mock("drizzle-orm/node-postgres", () => ({
 
 // Mock logger
 vi.mock("../../src/lib/logger.js", () => ({
-  default: { error: vi.fn(), debug: vi.fn() }
+  default: { error: vi.fn(), debug: vi.fn(), trace: vi.fn() }
 }));
 
 describe("Database Utilities", () => {
@@ -44,14 +44,10 @@ describe("Database Utilities", () => {
     expect(pool.on).toHaveBeenCalledWith("acquire", expect.any(Function));
   });
 
-  it("should initialize drizzle db with pool", async () => {
-    const { pool } = await import("../../src/lib/db.js");
+  it("should expose drizzle db that delegates to pool", async () => {
     const { db } = await import("../../src/lib/drizzle.js");
-    const { drizzle } = await import("drizzle-orm/node-postgres");
-    
-    expect(drizzle).toHaveBeenCalledWith(pool, expect.objectContaining({
-      schema: expect.any(Object)
-    }));
+
+    // db is a lazy Proxy — it should be defined and usable
     expect(db).toBeDefined();
   });
 
@@ -67,7 +63,7 @@ describe("Database Utilities", () => {
     const errorCb = callbacks.find((c: any) => c[0] === "error")?.[1];
     
     if (acquireCb) acquireCb();
-    expect(logger.debug).toHaveBeenCalled();
+    expect(logger.trace).toHaveBeenCalled();
     
     if (errorCb) errorCb(new Error("Pool error"));
     expect(logger.error).toHaveBeenCalled();

@@ -1,4 +1,4 @@
-import { ScoredOpinion } from "./schemas.js";
+import type { ScoredOpinion } from "./schemas.js";
 import logger from "./logger.js";
 
 export interface ControllerDecision {

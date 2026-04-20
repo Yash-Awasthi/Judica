@@ -42,7 +42,7 @@ describe("Config Resolver", () => {
         ]
       } as any);
       expect(result.valid).toBe(false);
-      expect(result.errors[0]).toContain("Duplicate provider names");
+      expect(result.errors[0]).toContain("Duplicate provider configurations");
     });
 
     it("should warn about multiple masters", () => {
@@ -60,7 +60,8 @@ describe("Config Resolver", () => {
     it("should include providers based on env keys", () => {
       const providers = loadSystemProviders();
       expect(providers.some(p => p.name === "openai")).toBe(true);
-      expect(providers.some(p => p.name === "ollama")).toBe(true);
+      // Ollama is opt-in (requires OLLAMA_ENABLED=true), so it may not be present
+      expect(providers.some(p => p.name === "google")).toBe(true);
     });
   });
 

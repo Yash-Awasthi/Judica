@@ -195,8 +195,11 @@ function buildCommand(tmpFile: string, tmpDir: string): SandboxCommand {
     };
   }
 
-  // Fallback: direct python3 execution (ulimits applied via spawn options)
-  return { cmd: "python3", args: [tmpFile] };
+  // Fallback: spawn python3 directly (ulimit constraints applied via spawn options)
+  return {
+    cmd: "python3",
+    args: [tmpFile],
+  };
 }
 
 export async function executePython(code: string, timeout: number = 10000): Promise<SandboxResult> {

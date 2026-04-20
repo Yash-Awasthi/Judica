@@ -9,6 +9,10 @@ export class OpenAIAdapter extends OpenAICompatibleAdapter {
     this.providerId = providerId;
   }
 
+  protected override getDisplayName(): string {
+    return "OpenAI";
+  }
+
   protected override getStreamOptions(): Record<string, unknown> {
     return { stream_options: { include_usage: true } };
   }

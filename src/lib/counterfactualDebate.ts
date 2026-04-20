@@ -11,7 +11,8 @@
  *   // result.robustnessScore — 0 to 1 (1 = original held up perfectly)
  */
 
-import { Message, askProviderStream, Provider } from "./providers.js";
+import { askProviderStream } from "./providers.js";
+import type { Message, Provider } from "./providers.js";
 import logger from "./logger.js";
 
 export interface CounterfactualResult {

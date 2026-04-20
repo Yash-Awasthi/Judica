@@ -20,7 +20,7 @@ export function getLastReasoningUsage() {
   return { ..._lastReasoningUsage };
 }
 
-function trackUsage(usage: { prompt_tokens: number; completion_tokens: number }) {
+function _trackUsage(usage: { prompt_tokens: number; completion_tokens: number }) {
   _lastReasoningUsage.promptTokens += usage.prompt_tokens;
   _lastReasoningUsage.completionTokens += usage.completion_tokens;
 }
@@ -259,7 +259,7 @@ export interface HypothesisResult {
  */
 export async function runHypothesisRefinement(
   question: string,
-  members: Provider[], abortSignal?: AbortSignal
+  members: Provider[], _abortSignal?: AbortSignal
 ): Promise<HypothesisResult> {
   const agents = members.slice(0, 5); // cap for token budget
   const rounds: HypothesisRound[] = [];

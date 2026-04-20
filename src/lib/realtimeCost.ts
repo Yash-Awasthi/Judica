@@ -15,7 +15,7 @@ function dollarsToMicrocents(dollars: number): number {
   return Math.round(dollars * MICROCENTS_PER_DOLLAR);
 }
 
-function microcentsToDollars(microcents: number): number {
+function _microcentsToDollars(microcents: number): number {
   return microcents / MICROCENTS_PER_DOLLAR;
 }
 export interface RealTimeCostEntry {

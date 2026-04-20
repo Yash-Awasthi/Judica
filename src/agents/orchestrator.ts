@@ -76,9 +76,9 @@ const pendingHumanGates = new Map<
 >();
 
 // P8-19: Persist gate to Redis so it survives server restarts
-async function persistGate(gateId: string, data: { conversationId?: string; createdAt: number }): Promise<void> {
+async function _persistGate(gateId: string, data: { conversationId?: string; createdAt: number }): Promise<void> {
   try {
-    await redis.set(`${GATE_REDIS_PREFIX}${gateId}`, JSON.stringify(data), "EX", Math.ceil(HUMAN_GATE_TIMEOUT_MS / 1000));
+    await redis.set(`${GATE_REDIS_PREFIX}${gateId}`, JSON.stringify(data), { EX: Math.ceil(HUMAN_GATE_TIMEOUT_MS / 1000) });
   } catch { /* best effort */ }
 }
 
@@ -108,7 +108,7 @@ export function resolveHumanGate(gateId: string, choice: string): void {
     clearTimeout(gate.timer);
     gate.resolve(choice);
     pendingHumanGates.delete(gateId);
-    removePersistedGate(gateId);
+    void removePersistedGate(gateId);
   }
 }
 
@@ -213,7 +213,7 @@ export class DeliberationOrchestrator {
         text: result.text,
         usage: result.usage,
         // P8-18: Track resolved model so reliability system can attribute correctly
-        resolvedModel: result.resolvedModel || member.model || "auto",
+        resolvedModel: (result as any).resolvedModel || member.model || "auto",
       };
     });
 

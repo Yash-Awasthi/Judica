@@ -7,6 +7,10 @@ vi.mock("../../../src/lib/tools/index.js", () => ({
   callTool: vi.fn().mockResolvedValue("tool result"),
 }));
 
+vi.mock("../../../src/lib/ssrf.js", () => ({
+  validateSafeUrl: vi.fn().mockResolvedValue(undefined),
+}));
+
 import { askGoogle, streamGoogle } from "../../../src/lib/strategies/google.js";
 import type { Provider, Message } from "../../../src/lib/providers.js";
 
@@ -47,7 +51,8 @@ describe("Google Strategy", () => {
       const url = fetchCall[0] as string;
 
       expect(url).toContain("generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent");
-      expect(url).toContain("key=AIzaSyTestKey123");
+      // P1-05: API key is now sent via x-goog-api-key header instead of URL query param
+      expect(fetchCall[1].headers["x-goog-api-key"]).toBe("AIzaSyTestKey123");
       expect(fetchCall[1].method).toBe("POST");
       expect(fetchCall[1].headers["Content-Type"]).toBe("application/json");
     });

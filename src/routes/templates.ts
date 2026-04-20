@@ -1,4 +1,4 @@
-import { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import { TEMPLATES } from "../lib/templates.js";
 
 const templatesPlugin: FastifyPluginAsync = async (fastify) => {

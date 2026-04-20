@@ -1,4 +1,4 @@
-import { FastifyRequest, FastifyReply } from "fastify";
+import type { FastifyRequest, FastifyReply } from "fastify";
 
 /**
  * P0-09 / P4-01: CSRF protection for cookie-authenticated state-mutating requests.

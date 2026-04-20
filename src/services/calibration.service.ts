@@ -6,7 +6,6 @@
  * - Calibration curve: groups predictions by confidence bucket, measures actual accuracy
  */
 
-import logger from "../lib/logger.js";
 
 export interface CalibrationPoint {
   bucket: number;         // confidence range center (e.g., 0.85 for 0.80-0.90)

@@ -1,4 +1,4 @@
-import { ProviderConfig, ProviderResponse, Message } from "./types.js";
+import type { ProviderConfig, ProviderResponse, Message } from "./types.js";
 import { getBreaker } from "../breaker.js";
 
 // P7-18: Default per-request timeout (30s) to prevent indefinite hangs

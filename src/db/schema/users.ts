@@ -9,7 +9,6 @@ import {
   jsonb,
   uniqueIndex,
   index,
-  uuid,
 } from "drizzle-orm/pg-core";
 
 // P8-39: Standardize ID types — use UUID primary keys throughout.

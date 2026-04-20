@@ -6,7 +6,7 @@ import logger from "./logger.js";
 import { env } from "../config/env.js";
 import { redisBackend, postgresBackend } from "./cache/backends.js";
 // P9-20: Import CacheEntry type — opinions type defined once in CacheBackend.ts
-import type { CacheEntry, CacheBackend as CacheBackendType } from "./cache/CacheBackend.js";
+import type { CacheEntry } from "./cache/CacheBackend.js";
 
 // P9-20: Use CacheEntry['opinions'] type from CacheBackend.ts — single source of truth
 type CachedOpinion = CacheEntry['opinions'][number];
@@ -28,7 +28,7 @@ interface CacheMessage {
 }
 
 // P9-17: Externalize semantic similarity threshold to env
-const SEMANTIC_THRESHOLD = Number(env.SEMANTIC_CACHE_THRESHOLD) || 0.15;
+const SEMANTIC_THRESHOLD = Number((env as any).SEMANTIC_CACHE_THRESHOLD) || 0.15;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 // P9-12: Bounded lock map with TTL eviction — prevents unbounded growth under burst traffic

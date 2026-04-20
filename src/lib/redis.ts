@@ -16,7 +16,7 @@
 //   - Artifact streams: should be cleaned up after completion
 //
 // Monitor with: redis-cli INFO memory | grep used_memory_human
-import Redis from "ioredis";
+import { Redis } from "ioredis";
 import { env } from "../config/env.js";
 import logger from "./logger.js";
 
@@ -30,7 +30,7 @@ function getRedis(): Redis {
     client = new Redis(env.REDIS_URL || "redis://localhost:6379", {
       maxRetriesPerRequest: null,
       connectTimeout: 5000,
-      retryStrategy: (times) => {
+      retryStrategy: (times: number) => {
         if (times > 10) {
           logger.error("Redis max reconnection attempts reached — operating in degraded mode");
           return null;
@@ -40,7 +40,7 @@ function getRedis(): Redis {
       lazyConnect: true,
     });
 
-    client.on("error", (err) => {
+    client.on("error", (err: Error) => {
       logger.error({ err: err.message }, "Redis client error");
     });
 
@@ -58,7 +58,7 @@ function getRedis(): Redis {
 
     if (!connecting) {
       connecting = true;
-      client.connect().catch((err) => {
+      client.connect().catch((err: Error) => {
         logger.warn({ err: err.message }, "Redis initialization failed");
         connecting = false;
       });
@@ -206,7 +206,7 @@ const redisWrapper = {
       const args: (string | number)[] = [];
       if (count) args.push("COUNT", count);
       args.push("STREAMS", ...streams, ...ids);
-      return await (getRedis() as any).xread(...args);
+      return await (getRedis() as unknown as { xread: (...args: (string | number)[]) => Promise<unknown[] | null> }).xread(...args);
     } catch {
       return null;
     }
@@ -230,7 +230,7 @@ const redisWrapper = {
       async exec(): Promise<Array<[null, unknown]>> {
         try {
           const results = await p.exec();
-          return (results ?? []).map(([err, val]) => [err, val] as [null, unknown]);
+          return (results ?? []).map(([err, val]: [unknown, unknown]) => [err, val] as [null, unknown]);
         } catch {
           return [];
         }

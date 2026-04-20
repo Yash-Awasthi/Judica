@@ -1,7 +1,8 @@
 import { db } from "../lib/drizzle.js";
 import { conversations, chats } from "../db/schema/conversations.js";
 import { eq, and, desc, asc, sql, or, ilike } from "drizzle-orm";
-import { Message, askProvider, type Provider } from "../lib/providers.js";
+import { askProvider, type Provider } from "../lib/providers.js";
+import type { Message } from "../lib/providers.js";
 import { selectProvider, FREE_TIER_CHAIN } from "../router/providerChain.js";
 import logger from "../lib/logger.js";
 import { getEmbeddingWithLock } from "../lib/cache.js";
@@ -60,7 +61,7 @@ export async function createConversation(input: CreateConversationInput): Promis
       .insert(conversations)
       .values({
         id: crypto.randomUUID(),
-        userId: input.userId,
+        userId: input.userId!,
         title: input.title,
         isPublic: input.isPublic ?? false,
         createdAt: now,

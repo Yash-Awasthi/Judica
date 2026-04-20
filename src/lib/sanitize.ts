@@ -55,6 +55,7 @@ export function sanitizeForPrompt(text: string): string {
     // Escape markdown code blocks that could confuse prompt parsing
     .replace(/```/g, "\\`\\`\\`")
     // Strip ANSI escape sequences
+    // eslint-disable-next-line no-control-regex
     .replace(/\x1b\[[0-9;]*m/g, "");
 }
 

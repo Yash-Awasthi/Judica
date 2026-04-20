@@ -200,7 +200,7 @@ export async function streamOpenAI(
       {
         role: "assistant", content: fullText,
         tool_calls: finalToolCalls.map(tc => ({ id: tc.id, type: "function", function: { name: tc.name, arguments: tc.args } }))
-      } as Message
+      } as unknown as Message
     ];
     for (const tc of finalToolCalls) {
       const result = await callTool({ id: tc.id, name: tc.name, arguments: JSON.parse(tc.args) });

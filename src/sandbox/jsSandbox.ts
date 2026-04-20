@@ -1,7 +1,7 @@
 import ivm from "isolated-vm";
 
 export interface SandboxResult {
-  output: string[];
+  output: string;
   // P7-46: Separate stdout and stderr arrays
   stdout: string[];
   stderr: string[];
@@ -99,7 +99,7 @@ export async function executeJS(code: string, timeout: number = 5000): Promise<S
     await script.run(context, { timeout });
 
     return {
-      output,
+      output: output.join("\n"),
       stdout,
       stderr,
       error: null,
@@ -107,7 +107,7 @@ export async function executeJS(code: string, timeout: number = 5000): Promise<S
     };
   } catch (err: unknown) {
     return {
-      output,
+      output: output.join("\n"),
       stdout,
       stderr,
       error: (err instanceof Error ? err.message : String(err)) || "Execution error",

@@ -42,29 +42,6 @@ export class OllamaAdapter implements IProviderAdapter {
 
     const model = req.model || "llama3.2";
 
-    // P7-34: Verify model is pulled locally before sending request
-    try {
-      const tagsRes = await fetch(`${this.baseUrl}/api/tags`, {
-        signal: AbortSignal.timeout(5000),
-      });
-      if (tagsRes.ok) {
-        const tagsData = await tagsRes.json() as { models?: Array<{ name: string }> };
-        const available = (tagsData.models || []).map((m) => m.name);
-        // Check both exact match and without :latest suffix
-        const modelFound = available.some((m) =>
-          m === model || m === `${model}:latest` || m.split(":")[0] === model
-        );
-        if (!modelFound && available.length > 0) {
-          throw new Error(
-            `Ollama model "${model}" not found locally. Available: ${available.slice(0, 5).join(", ")}. Pull it with: ollama pull ${model}`
-          );
-        }
-      }
-    } catch (err) {
-      // If it's our own error, rethrow; otherwise ignore (Ollama might be starting up)
-      if (err instanceof Error && err.message.includes("not found locally")) throw err;
-    }
-
     const messages: Record<string, unknown>[] = [];
     if (req.system_prompt) messages.push({ role: "system", content: req.system_prompt });
 
@@ -115,7 +92,7 @@ export class OllamaAdapter implements IProviderAdapter {
     const res: Response = await breaker.fire();
 
     if (!res.ok) {
-      throw new Error(`Ollama error: ${res.status} ${res.statusText}`);
+      throw new Error(`Ollama error: ${res.status}`);
     }
 
     return createStreamResult(this.parseNDJSON(res));

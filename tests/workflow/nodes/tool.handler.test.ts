@@ -90,29 +90,30 @@ describe("toolHandler", () => {
     expect(result).toEqual({ result: "plain text response" });
   });
 
-  it("returns result and error when error is present", async () => {
+  it("throws when error is present", async () => {
     mockExecuteTool.mockResolvedValue({
       result: "partial data",
       error: "timeout exceeded",
     });
 
     const ctx = makeCtx({}, { tool_name: "slow_tool" });
-    const result = await toolHandler(ctx);
 
-    expect(result).toEqual({ result: "partial data", error: "timeout exceeded" });
+    await expect(toolHandler(ctx)).rejects.toThrow(
+      'Tool "slow_tool" failed: timeout exceeded',
+    );
   });
 
-  it("does not attempt JSON parse when error is present", async () => {
+  it("throws without JSON parsing when error is present", async () => {
     mockExecuteTool.mockResolvedValue({
       result: '{"valid": "json"}',
       error: "some error",
     });
 
     const ctx = makeCtx({}, { tool_name: "broken" });
-    const result = await toolHandler(ctx);
 
-    // When error is present, the raw result is returned without JSON parsing
-    expect(result).toEqual({ result: '{"valid": "json"}', error: "some error" });
+    await expect(toolHandler(ctx)).rejects.toThrow(
+      'Tool "broken" failed: some error',
+    );
   });
 
   it("generates a tool call ID containing runId", async () => {

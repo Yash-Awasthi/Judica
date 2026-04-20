@@ -1,19 +1,19 @@
 import { BaseProvider } from "./baseProvider.js";
-import { ProviderConfig } from "./types.js";
+import type { ProviderConfig } from "./types.js";
 import { OpenAIProvider } from "./concrete/openai.js";
 import { AnthropicProvider } from "./concrete/anthropic.js";
 import { GoogleProvider } from "./concrete/google.js";
 import { OllamaProvider } from "./concrete/ollama.js";
 import { RPAProvider } from "./concrete/rpa.js";
-import { decrypt, isEncrypted } from "../crypto.js";
+import { decrypt } from "../crypto.js";
 import logger from "../logger.js";
 import { ProviderConfigError } from "../providers.js";
 
 export function createProvider(config: ProviderConfig): BaseProvider {
   const decryptedConfig = { ...config };
 
-  // P0-17: Use proper isEncrypted() check instead of naive includes(":")
-  if (decryptedConfig.apiKey && isEncrypted(decryptedConfig.apiKey)) {
+  // P0-17: Try to decrypt the API key if it looks encrypted
+  if (decryptedConfig.apiKey) {
     try {
       decryptedConfig.apiKey = decrypt(decryptedConfig.apiKey);
     } catch (err) {

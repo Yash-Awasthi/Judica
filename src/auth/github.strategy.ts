@@ -6,10 +6,13 @@
  *   GET /api/auth/github/callback — handles the OAuth callback
  *
  * Requires @fastify/oauth2 in dependencies (replaces passport + passport-github2).
+ * Also exports createGitHubStrategy for passport-based flows.
  */
 import type { FastifyInstance } from "fastify";
 import oauthPlugin from "@fastify/oauth2";
 import crypto from "crypto";
+// @ts-ignore - passport-github2 has no type declarations
+import { Strategy as GitHubStrategy } from "passport-github2";
 import { db } from "../lib/drizzle.js";
 import { users } from "../db/schema/users.js";
 import { eq } from "drizzle-orm";
@@ -34,7 +37,7 @@ export async function githubOAuthPlugin(fastify: FastifyInstance): Promise<void>
     return;
   }
 
-  await fastify.register(oauthPlugin, {
+  await fastify.register(oauthPlugin as any, {
     name: "githubOAuth2",
     scope: ["user:email"],
     credentials: {
@@ -125,4 +128,62 @@ export async function githubOAuthPlugin(fastify: FastifyInstance): Promise<void>
       return reply.code(500).send({ error: "OAuth authentication failed" });
     }
   });
+}
+
+/**
+ * Create a passport-github2 strategy instance for GitHub OAuth.
+ * Returns null if GitHub credentials are not configured.
+ */
+export function createGitHubStrategy(): GitHubStrategy | null {
+  if (!env.GITHUB_CLIENT_ID || !env.GITHUB_CLIENT_SECRET) {
+    return null;
+  }
+
+  const strategy = new GitHubStrategy(
+    {
+      clientID: env.GITHUB_CLIENT_ID,
+      clientSecret: env.GITHUB_CLIENT_SECRET,
+      callbackURL: `${env.OAUTH_CALLBACK_BASE_URL}/api/auth/github/callback`,
+      scope: ["user:email"],
+    },
+    async (accessToken: string, refreshToken: string, profile: any, done: Function) => {
+      try {
+        const emails: Array<{ value: string; verified?: boolean; primary?: boolean }> = profile.emails || [];
+        const emailObj = emails.find((e) => e.verified) || emails.find((e) => e.primary);
+        if (!emailObj) {
+          return done(new Error("No verified email found on GitHub account"));
+        }
+        const email = emailObj.value;
+
+        const [existing] = await db
+          .select()
+          .from(users)
+          .where(eq(users.email, email))
+          .limit(1);
+
+        if (existing) {
+          if (existing.passwordHash && existing.passwordHash !== "") {
+            return done(new Error("An account with this email already exists from a different sign-in method."));
+          }
+          return done(null, existing);
+        }
+
+        const [user] = await db
+          .insert(users)
+          .values({
+            email,
+            username: profile.username || profile.displayName || email.split("@")[0],
+            passwordHash: "",
+            role: "member",
+          })
+          .returning();
+
+        return done(null, user);
+      } catch (err) {
+        return done(err instanceof Error ? err : new Error(String(err)));
+      }
+    }
+  );
+
+  return strategy;
 }

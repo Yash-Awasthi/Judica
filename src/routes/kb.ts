@@ -1,4 +1,4 @@
-import { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync } from "fastify";
 import { db } from "../lib/drizzle.js";
 import { knowledgeBases, kbDocuments, uploads } from "../db/schema/uploads.js";
 import { memories } from "../db/schema/memory.js";

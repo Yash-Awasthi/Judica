@@ -30,6 +30,17 @@ vi.mock("../../src/middleware/errorHandler.js", () => ({
   },
 }));
 
+// ── Mock redis (needed by sandboxRateLimiter) ──────────────────────────────
+const mockRedisIncr = vi.fn().mockRejectedValue(new Error("no redis"));
+const mockRedisExpire = vi.fn().mockResolvedValue(1);
+vi.mock("../../src/lib/redis.js", () => ({
+  default: {
+    incr: (...args: any[]) => mockRedisIncr(...args),
+    expire: (...args: any[]) => mockRedisExpire(...args),
+    get: vi.fn().mockResolvedValue(null),
+  },
+}));
+
 // ── Mock sandbox executors ───────────────────────────────────────────────────
 const mockExecuteJS = vi.fn();
 const mockExecutePython = vi.fn();
@@ -354,35 +365,29 @@ describe("sandbox routes", () => {
       expect(typeof opts.preHandler[1]).toBe("function");
     });
 
-    it("allows requests under the rate limit", () => {
+    it("allows requests under the rate limit", async () => {
       const rateLimiter = routes["POST /execute"].opts.preHandler[1];
       const request = createMockRequest({ userId: 999, ip: "10.0.0.1" });
       const reply = createMockReply();
-      const done = vi.fn();
 
-      rateLimiter(request, reply, done);
+      await rateLimiter(request, reply);
 
-      expect(done).toHaveBeenCalled();
       expect(reply.code).not.toHaveBeenCalled();
     });
 
-    it("blocks the 11th request within a minute window", () => {
+    it("blocks the 11th request within a minute window", async () => {
       const rateLimiter = routes["POST /execute"].opts.preHandler[1];
       const request = createMockRequest({ userId: 8888, ip: "10.0.0.88" });
       const reply = createMockReply();
 
       // Fire 10 requests (should all pass)
       for (let i = 0; i < 10; i++) {
-        const done = vi.fn();
-        rateLimiter(request, reply, done);
-        expect(done).toHaveBeenCalled();
+        await rateLimiter(request, createMockReply());
       }
 
       // 11th request should be blocked
-      const done11 = vi.fn();
-      rateLimiter(request, reply, done11);
+      await rateLimiter(request, reply);
 
-      expect(done11).not.toHaveBeenCalled();
       expect(reply.code).toHaveBeenCalledWith(429);
       expect(reply.send).toHaveBeenCalledWith(
         expect.objectContaining({
@@ -392,7 +397,7 @@ describe("sandbox routes", () => {
       );
     });
 
-    it("uses userId for the rate limit key when present", () => {
+    it("uses userId for the rate limit key when present", async () => {
       const rateLimiter = routes["POST /execute"].opts.preHandler[1];
       // Two requests from different IPs but same userId should share the bucket
       const request1 = createMockRequest({ userId: 7777, ip: "1.1.1.1" });
@@ -401,26 +406,22 @@ describe("sandbox routes", () => {
 
       // Burn through 10 from request1
       for (let i = 0; i < 10; i++) {
-        const done = vi.fn();
-        rateLimiter(request1, reply, done);
+        await rateLimiter(request1, createMockReply());
       }
 
       // request2 with same userId should be blocked
-      const done = vi.fn();
-      rateLimiter(request2, reply, done);
-      expect(done).not.toHaveBeenCalled();
+      await rateLimiter(request2, reply);
       expect(reply.code).toHaveBeenCalledWith(429);
     });
 
-    it("falls back to IP when userId is not set", () => {
+    it("falls back to IP when userId is not set", async () => {
       const rateLimiter = routes["POST /execute"].opts.preHandler[1];
       const request = createMockRequest({ userId: undefined, ip: "192.168.0.42" });
       const reply = createMockReply();
-      const done = vi.fn();
 
-      rateLimiter(request, reply, done);
+      await rateLimiter(request, reply);
 
-      expect(done).toHaveBeenCalled();
+      expect(reply.code).not.toHaveBeenCalled();
     });
   });
 

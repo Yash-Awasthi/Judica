@@ -2,7 +2,8 @@ import { db } from "./drizzle.js";
 import { eq, and, lt, gte, lte, desc, asc, sql } from "drizzle-orm";
 import { auditLogs } from "../db/schema/conversations.js";
 import logger from "./logger.js";
-import { detectPII, PIIDetection } from "./pii.js";
+import { detectPII } from "./pii.js";
+import type { PIIDetection } from "./pii.js";
 
 export interface AuditEntry {
   userId?: number;

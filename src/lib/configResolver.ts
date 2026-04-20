@@ -9,9 +9,9 @@
 // P10-19: This module imports CouncilServiceError from services/councilService.ts,
 // creating a lib → services dependency. This is acceptable as a thin error type import.
 // TODO: Move CouncilServiceError to a shared types/errors.ts to eliminate the cycle.
-import { Provider } from "./providers.js";
+import type { Provider } from "./providers.js";
 import logger from "./logger.js";
-import {
+import type {
   UserProviderConfig,
   UserCouncilConfig,
   ResolvedProvider,
@@ -59,7 +59,7 @@ export function validateUserConfig(
     // P10-18: Deduplicate by (name + model) pair, not just name.
     // Same provider with different models (e.g., openai/gpt-4o and openai/gpt-4o-mini)
     // should be treated as distinct providers.
-    const nameModelPairs = config.providers.map(p => `${p.name}:${p.model || ""}`);
+    const nameModelPairs = config.providers.map(p => `${p.name}:${(p as any).model || ""}`);
     const duplicates = nameModelPairs.filter((pair, index) => nameModelPairs.indexOf(pair) !== index);
     if (duplicates.length > 0) {
       errors.push(`Duplicate provider configurations: ${[...new Set(duplicates)].join(", ")}`);

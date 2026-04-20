@@ -4,7 +4,11 @@ import { EventEmitter } from "events";
 // Use vi.hoisted so these fns exist before the hoisted vi.mock factories run.
 const { mockSpawn, mockExecSync, mockWriteFileSync, mockMkdirSync, mockRmSync } = vi.hoisted(() => ({
   mockSpawn: vi.fn(),
-  mockExecSync: vi.fn(),
+  // Make execSync throw for bwrap/unshare so isolationLevel defaults to "ulimit" (python3)
+  mockExecSync: vi.fn().mockImplementation((cmd: string) => {
+    if (cmd === "bwrap --version" || cmd === "unshare --help") throw new Error("not found");
+    return "";
+  }),
   mockWriteFileSync: vi.fn(),
   mockMkdirSync: vi.fn(),
   mockRmSync: vi.fn(),
@@ -47,6 +51,11 @@ vi.mock("../../src/lib/logger.js", () => ({
     error: vi.fn(),
     debug: vi.fn(),
   },
+}));
+
+vi.mock("../../src/sandbox/seccomp.js", () => ({
+  generateSeccompPolicy: vi.fn(),
+  isSeccompAvailable: vi.fn(() => false),
 }));
 
 import { executePython } from "../../src/sandbox/pythonSandbox.js";
@@ -184,7 +193,7 @@ describe("pythonSandbox – executePython", () => {
     expect(writtenContent).toContain("print(1)");
   });
 
-  it("spawns bash with ulimit constraints", async () => {
+  it("spawns python3 with timeout constraints", async () => {
     const proc = makeFakeProc();
     mockSpawn.mockReturnValue(proc);
 
@@ -193,11 +202,11 @@ describe("pythonSandbox – executePython", () => {
     proc.emit("close", 0);
     await promise;
 
-    expect(mockSpawn).toHaveBeenCalledWith(
-      "bash",
-      expect.arrayContaining(["-c", expect.stringContaining("ulimit")]),
-      expect.objectContaining({ timeout: 10000 }),
-    );
+    const [cmd, args, opts] = mockSpawn.mock.calls[0];
+    expect(cmd).toBe("python3");
+    expect(args[0]).toContain("sandbox_");
+    expect(opts.timeout).toBe(10000);
+    expect(opts.killSignal).toBe("SIGKILL");
   });
 
   it("sets restricted environment variables including PYTHONSAFEPATH", async () => {

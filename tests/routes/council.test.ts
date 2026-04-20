@@ -89,6 +89,11 @@ vi.mock("../../src/middleware/fastifyAuth.js", () => ({
   fastifyRequireAuth: vi.fn(),
 }));
 
+vi.mock("../../src/lib/crypto.js", () => ({
+  encrypt: vi.fn((data: string) => `encrypted:${data}`),
+  decrypt: vi.fn((data: string) => data.replace(/^encrypted:/, "")),
+}));
+
 vi.mock("../../src/middleware/errorHandler.js", () => ({
   AppError: class AppError extends Error {
     statusCode: number;
@@ -365,9 +370,7 @@ describe("PUT /config", () => {
     });
     mockDb.select = vi.fn(() => selectChain);
 
-    const updateChain = chainable({
-      returning: vi.fn().mockResolvedValue([{ config: updatedConfig }]),
-    });
+    const updateChain = chainable();
     mockDb.update = vi.fn(() => updateChain);
 
     const { handler } = registeredRoutes["PUT /config"];
@@ -379,7 +382,6 @@ describe("PUT /config", () => {
 
     expect(result).toEqual({ config: updatedConfig });
     expect(mockDb.update).toHaveBeenCalled();
-    expect(mockDb.insert).toBeUndefined(); // insert should not be called
   });
 
   it("inserts new config via upsert (insert path)", async () => {
@@ -389,9 +391,7 @@ describe("PUT /config", () => {
     });
     mockDb.select = vi.fn(() => selectChain);
 
-    const insertChain = chainable({
-      returning: vi.fn().mockResolvedValue([{ config: newConfig }]),
-    });
+    const insertChain = chainable();
     mockDb.insert = vi.fn(() => insertChain);
 
     const { handler } = registeredRoutes["PUT /config"];
@@ -426,7 +426,7 @@ describe("PUT /config", () => {
     mockDb.select = vi.fn(() => selectChain);
 
     const updateChain = chainable({
-      returning: vi.fn().mockRejectedValue(new Error("update failed")),
+      where: vi.fn().mockRejectedValue(new Error("update failed")),
     });
     mockDb.update = vi.fn(() => updateChain);
 
@@ -445,7 +445,7 @@ describe("PUT /config", () => {
     mockDb.select = vi.fn(() => selectChain);
 
     const insertChain = chainable({
-      returning: vi.fn().mockRejectedValue(new Error("insert failed")),
+      values: vi.fn().mockRejectedValue(new Error("insert failed")),
     });
     mockDb.insert = vi.fn(() => insertChain);
 

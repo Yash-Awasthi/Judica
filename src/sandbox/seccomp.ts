@@ -33,7 +33,6 @@ const BPF_K = 0x00;
 const BPF_RET = 0x06;
 
 // Seccomp return values
-// P0-34: Use KILL_PROCESS instead of ERRNO(EPERM) — actually terminates the sandbox
 const SECCOMP_RET_KILL_PROCESS = 0x80000000;
 const SECCOMP_RET_ALLOW = 0x7fff0000;
 
@@ -136,20 +135,21 @@ function buildBpfProgram(): Buffer {
 
   const instructions: Buffer[] = [];
 
-  // P0-33: Validate architecture first — block i386/x32 ABI bypass
-  // Load seccomp_data.arch
+  // P0-33: Load architecture from seccomp_data and verify x86_64
   instructions.push(bpfStmt(BPF_LD | BPF_W | BPF_ABS, SECCOMP_DATA_ARCH_OFFSET));
-  // If arch != x86_64, kill immediately (prevents i386/x32 syscall number confusion)
-  // JEQ AUDIT_ARCH_X86_64 → skip kill (jt=1), else fall through to kill (jf=0)
+
+  const syscallNrs = Object.values(BLOCKED_SYSCALLS);
+
+  // Jump over the kill instruction if arch matches x86_64, otherwise fall through to kill
   instructions.push(bpfJump(BPF_JMP | BPF_JEQ | BPF_K, AUDIT_ARCH_X86_64, 1, 0));
+
+  // Kill on wrong architecture
   instructions.push(bpfStmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS));
 
   // Load the syscall number from seccomp_data
   instructions.push(bpfStmt(BPF_LD | BPF_W | BPF_ABS, SECCOMP_DATA_NR_OFFSET));
 
-  const syscallNrs = Object.values(BLOCKED_SYSCALLS);
-
-  // For each blocked syscall: if nr == blocked, jump to KILL
+  // For each blocked syscall: if nr == blocked, jump to KILL_PROCESS
   for (let i = 0; i < syscallNrs.length; i++) {
     const distToKill = syscallNrs.length - i; // distance to the KILL instruction
     instructions.push(
@@ -160,7 +160,7 @@ function buildBpfProgram(): Buffer {
   // Default: ALLOW
   instructions.push(bpfStmt(BPF_RET | BPF_K, SECCOMP_RET_ALLOW));
 
-  // P0-34: KILL_PROCESS instead of ERRNO — actually terminates the sandbox
+  // Blocked: KILL_PROCESS
   instructions.push(bpfStmt(BPF_RET | BPF_K, SECCOMP_RET_KILL_PROCESS));
 
   cachedBpfProgram = Buffer.concat(instructions);

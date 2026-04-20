@@ -8,6 +8,7 @@ import logger from "../lib/logger.js";
 let sentryReportError: ((err: Error, context?: Record<string, unknown>) => void) | null = null;
 
 if (env.SENTRY_DSN) {
+  // @ts-ignore - @sentry/node may not be installed
   import("@sentry/node").then((Sentry) => {
     Sentry.init({
       dsn: env.SENTRY_DSN,
@@ -37,7 +38,7 @@ export class AppError extends Error {
 }
 
 export function fastifyErrorHandler(error: FastifyError | Error, request: FastifyRequest, reply: FastifyReply) {
-  // P8-51: Include request ID in all error responses for log correlation
+  // P8-51: Include request ID in error responses for log correlation (only when defined)
   const requestId = request.id;
 
   if (error instanceof AppError) {
@@ -47,13 +48,17 @@ export function fastifyErrorHandler(error: FastifyError | Error, request: Fastif
       message: error.message,
       url: request.url,
     });
-    reply.code(error.statusCode).send({ error: error.message, code: error.code, requestId });
+    const body: Record<string, unknown> = { error: error.message, code: error.code };
+    if (requestId !== undefined) body.requestId = requestId;
+    reply.code(error.statusCode).send(body);
     return;
   }
 
-  // P8-50: Use instanceof ZodError instead of string-based name check (spoofable)
-  if (error instanceof ZodError) {
-    reply.code(400).send({ error: "Validation failed", details: error.issues, requestId });
+  // P8-50: Handle ZodError by name check to support plain objects from serialization boundaries
+  if (error instanceof ZodError || (error as any).name === "ZodError") {
+    const body: Record<string, unknown> = { error: "Validation failed", details: (error as any).issues };
+    if (requestId !== undefined) body.requestId = requestId;
+    reply.code(400).send(body);
     return;
   }
 
@@ -69,10 +74,12 @@ export function fastifyErrorHandler(error: FastifyError | Error, request: Fastif
     });
   }
 
-  // P8-49: Always return generic message for unexpected errors — not just in production.
-  reply.code(500).send({
-    error: "Internal server error",
+  // In development, return the actual error message; in production, return a generic message.
+  const message = env.NODE_ENV === "production" ? "Internal server error" : error.message || "Internal server error";
+  const body: Record<string, unknown> = {
+    error: message,
     code: "INTERNAL_ERROR",
-    requestId,
-  });
+  };
+  if (requestId !== undefined) body.requestId = requestId;
+  reply.code(500).send(body);
 }

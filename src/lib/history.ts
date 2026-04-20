@@ -1,7 +1,7 @@
 import { db } from "./drizzle.js";
 import { chats, contextSummaries } from "../db/schema/conversations.js";
 import { eq, desc, asc, and } from "drizzle-orm";
-import { Message } from "./providers.js";
+import type { Message } from "./providers.js";
 import { estimateStringTokens } from "../router/tokenEstimator.js";
 
 // P9-89: Summarization Limitation

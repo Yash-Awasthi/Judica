@@ -2,7 +2,8 @@ import { db } from "./drizzle.js";
 import { userArchetypes } from "../db/schema/users.js";
 import { chats } from "../db/schema/conversations.js";
 import { eq, and, asc } from "drizzle-orm";
-import { ARCHETYPES, Archetype } from "../config/archetypes.js";
+import { ARCHETYPES } from "../config/archetypes.js";
+import type { Archetype } from "../config/archetypes.js";
 import { randomUUID } from "crypto";
 
 // P10-06: Import size limits to prevent OOM and DB bloat

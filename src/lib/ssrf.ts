@@ -150,7 +150,7 @@ export async function validateSafeUrlWithIP(urlInput: string, options?: { allowL
       throw err;
     }
     if ((err as Error).name === "AbortError") {
-      throw new Error("DNS lookup timed out");
+      throw new Error("DNS lookup timed out", { cause: err });
     }
     throw new Error("Failed to resolve URL hostname", { cause: err });
   }

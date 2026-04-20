@@ -31,7 +31,6 @@ export async function askGoogle(
   // P7-41: SSRF validation on strategy-level fetch
   await validateSafeUrl(apiUrl);
 
-  // P1-05: Move API key from URL query parameter to x-goog-api-key header
   const res = await fetch(
     apiUrl,
     {
@@ -96,7 +95,6 @@ export async function streamGoogle(
   signal: AbortSignal,
   onChunk: (chunk: string) => void
 ): Promise<ProviderResult> {
-  // P1-05: Move API key from URL query parameter to x-goog-api-key header
   const res = await fetch(
     `https://generativelanguage.googleapis.com/v1beta/models/${provider.model || "gemini-2.5-flash-preview-05-20"}:streamGenerateContent?alt=sse`,
     {

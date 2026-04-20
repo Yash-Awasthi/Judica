@@ -6,7 +6,6 @@
  * producing high-quality examples.
  */
 
-import logger from "../lib/logger.js";
 
 export interface TrainingSample {
   id: string;

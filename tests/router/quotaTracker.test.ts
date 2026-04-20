@@ -109,12 +109,12 @@ describe("quotaTracker", () => {
     it("should clear usage for a provider", () => {
       recordUsage(provider, 500);
       expect(getRemainingQuota(provider, 10, 1000).requests_used).toBe(1);
-      resetQuota(provider);
+      resetQuota(provider, undefined, true);
       expect(getRemainingQuota(provider, 10, 1000).requests_used).toBe(0);
     });
 
     it("should be safe to call on unknown provider", () => {
-      expect(() => resetQuota("nonexistent")).not.toThrow();
+      expect(() => resetQuota("nonexistent", undefined, true)).not.toThrow();
     });
   });
 

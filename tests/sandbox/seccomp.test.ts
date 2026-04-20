@@ -25,12 +25,12 @@ describe("seccomp-BPF policy", () => {
     const data = fs.readFileSync(policyPath);
     // Each BPF instruction is 8 bytes
     expect(data.length % 8).toBe(0);
-    // At least: 1 load + N blocked + 1 allow + 1 kill = N+3 instructions
+    // P0-33: arch check (load arch + JEQ + kill) + load nr + N blocked + allow + kill = N+6
     const blockedCount = getBlockedSyscalls().length;
-    expect(data.length / 8).toBe(blockedCount + 3);
+    expect(data.length / 8).toBe(blockedCount + 6);
   });
 
-  it("first instruction loads syscall number (BPF_LD|BPF_W|BPF_ABS, offset 0)", () => {
+  it("first instruction loads architecture (BPF_LD|BPF_W|BPF_ABS, offset 4)", () => {
     const policyPath = generateSeccompPolicy(tmpDir);
     const data = fs.readFileSync(policyPath);
 
@@ -38,9 +38,9 @@ describe("seccomp-BPF policy", () => {
     const code = data.readUInt16LE(0);
     expect(code).toBe(0x20);
 
-    // k = 0 (offset of syscall nr in seccomp_data)
+    // k = 4 (offset of arch in seccomp_data)
     const k = data.readUInt32LE(4);
-    expect(k).toBe(0);
+    expect(k).toBe(4);
   });
 
   it("blocks critical escape syscalls", () => {
@@ -91,18 +91,18 @@ describe("seccomp-BPF policy", () => {
     expect(k).toBe(0x7fff0000);
   });
 
-  it("last instruction is KILL/ERRNO (for blocked syscalls)", () => {
+  it("last instruction is KILL_PROCESS (for blocked syscalls)", () => {
     const policyPath = generateSeccompPolicy(tmpDir);
     const data = fs.readFileSync(policyPath);
     const instructionCount = data.length / 8;
 
-    // Last instruction should be RET ERRNO
+    // Last instruction should be RET KILL_PROCESS
     const killOffset = (instructionCount - 1) * 8;
     const code = data.readUInt16LE(killOffset);
     expect(code).toBe(0x06); // BPF_RET
     const k = data.readUInt32LE(killOffset + 4);
-    // SECCOMP_RET_ERRNO | EPERM = 0x00050001
-    expect(k).toBe(0x00050001);
+    // SECCOMP_RET_KILL_PROCESS = 0x80000000
+    expect(k).toBe(0x80000000);
   });
 
   it("isSeccompAvailable returns boolean", () => {

@@ -13,6 +13,7 @@ vi.mock("../../src/lib/logger.js", () => ({
 describe("GroundingModule", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    vi.resetModules();
   });
 
   it("should verify grounding and return true if response is grounded", async () => {
@@ -37,14 +38,15 @@ describe("GroundingModule", () => {
     expect(result.unsupported_claims).toHaveLength(0);
   });
 
-  it("should return unsupported claims if response is not grounded", async () => {
+  it("should return unsupported claims if response has contradictions", async () => {
     const { groundingModule } = await import("../../src/lib/grounding.js");
     const { askProvider } = await import("../../src/lib/providers.js");
 
     vi.mocked(askProvider).mockResolvedValue({
       text: JSON.stringify({
         claims_extracted: ["Claim 1"],
-        unsupported_claims: ["Claim 1 is wrong"],
+        unsupported_claims: [],
+        contradicted_claims: ["Claim 1 is wrong"],
         grounded: false
       })
     } as any);
@@ -59,7 +61,7 @@ describe("GroundingModule", () => {
     expect(result.unsupported_claims).toContain("Claim 1 is wrong");
   });
 
-  it("should handle JSON parsing errors and default to grounded", async () => {
+  it("should fail closed on JSON parsing errors", async () => {
     const { groundingModule } = await import("../../src/lib/grounding.js");
     const { askProvider } = await import("../../src/lib/providers.js");
 
@@ -71,11 +73,11 @@ describe("GroundingModule", () => {
       {} as any
     );
 
-    expect(result.grounded).toBe(true);
-    expect(result.unsupported_claims).toHaveLength(0);
+    expect(result.grounded).toBe(false);
+    expect(result.unsupported_claims.length).toBeGreaterThan(0);
   });
 
-  it("should handle provider errors and default to grounded", async () => {
+  it("should fail closed on provider errors", async () => {
     const { groundingModule } = await import("../../src/lib/grounding.js");
     const { askProvider } = await import("../../src/lib/providers.js");
 
@@ -87,7 +89,7 @@ describe("GroundingModule", () => {
       {} as any
     );
 
-    expect(result.grounded).toBe(true);
-    expect(result.unsupported_claims).toHaveLength(0);
+    expect(result.grounded).toBe(false);
+    expect(result.unsupported_claims.length).toBeGreaterThan(0);
   });
 });

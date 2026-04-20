@@ -1,6 +1,6 @@
 import logger from "../../logger.js";
 import { BaseProvider } from "../baseProvider.js";
-import { ProviderConfig, ProviderResponse, Message } from "../types.js";
+import type { ProviderConfig, ProviderResponse, Message } from "../types.js";
 import { calculateCost } from "../../cost.js";
 import { validateSafeUrl } from "../../ssrf.js";
 import { getToolDefinitions, callTool } from "../../tools/index.js";
@@ -140,7 +140,7 @@ export class AnthropicProvider extends BaseProvider {
             assistantContent.push({ type: "tool_use", id: tc.id, name: tc.name, input: args });
           }
 
-          const nextMessages: Message[] = [...messages, { role: "assistant", content: assistantContent }];
+          const nextMessages: Message[] = [...messages, { role: "assistant", content: assistantContent } as Message];
           for (const [, tc] of pendingTools) {
             let args: Record<string, unknown> = {};
             try { args = JSON.parse(tc.args); } catch { /* empty */ }

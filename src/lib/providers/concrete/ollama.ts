@@ -1,6 +1,6 @@
 import logger from "../../logger.js";
 import { BaseProvider } from "../baseProvider.js";
-import { ProviderConfig, ProviderResponse, Message } from "../types.js";
+import type { ProviderConfig, ProviderResponse, Message } from "../types.js";
 import { validateSafeUrl } from "../../ssrf.js";
 
 interface OllamaResponse {

@@ -10,7 +10,11 @@ vi.mock("crypto", async () => {
 });
 
 function createMocks() {
-  const request = {} as any;
+  const request = {
+    headers: { accept: "text/html" },
+    protocol: "https",
+    hostname: "localhost",
+  } as any;
   const headerValues: Record<string, string> = {};
   const reply = {
     header: vi.fn((name: string, value: string) => {
@@ -52,7 +56,7 @@ describe("fastifyCspNonce middleware", () => {
     const cspHeader = headerValues["Content-Security-Policy"];
     expect(cspHeader).toContain("default-src 'self'");
     expect(cspHeader).toContain("script-src 'self'");
-    expect(cspHeader).toContain("style-src 'self' 'unsafe-inline'");
+    expect(cspHeader).toContain("style-src 'self'");
     expect(cspHeader).toContain("object-src 'none'");
     expect(cspHeader).toContain("frame-ancestors 'none'");
   });
