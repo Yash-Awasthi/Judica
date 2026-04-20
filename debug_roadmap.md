@@ -2809,25 +2809,25 @@ TOTAL: 228 tasks
              single clean keywords; ambiguous inputs, multi-domain inputs,
              and contradictory signals not covered.
 
-[ ] [P11-72] No multi-domain classification test â€” test only covers
+[x] [P11-72] No multi-domain classification test â€” test only covers
              single-domain inputs; inputs spanning multiple domains (e.g.,
              "medical billing software") not tested.
 
-[ ] [P11-73] DB mock returns only expected shape â€” mock always returns
+[x] [P11-73] DB mock returns only expected shape â€” mock always returns
              a well-formed archetype; DB returning null, partial data, or
              archived archetype never tested.
 
 ### artifacts.test.ts
 --------------------------------------------------------------------------------
-[ ] [P11-74] Boundary conditions for detection thresholds untested â€”
+[x] [P11-74] Boundary conditions for detection thresholds untested â€”
              tests use inputs clearly above or below threshold; values at
              exactly the boundary (e.g., exactly 500 chars) not tested.
 
-[ ] [P11-75] Weak HTML artifact detection â€” HTML detection tested only
+[x] [P11-75] Weak HTML artifact detection â€” HTML detection tested only
              with `<div>` tags; SVG, template literals containing HTML,
              and partial HTML not tested.
 
-[ ] [P11-76] No DB write failure tests â€” artifact persistence tested only
+[x] [P11-76] No DB write failure tests â€” artifact persistence tested only
              on success path; DB constraint violations and connection errors
              not covered.
 
