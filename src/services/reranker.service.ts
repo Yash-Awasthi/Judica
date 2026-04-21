@@ -68,7 +68,7 @@ export async function rerank<T extends RerankableItem>(
         model: COHERE_MODEL,
         query,
         documents,
-        top_n: topN || items.length,
+        top_n: (topN != null && topN > 0) ? topN : items.length, // P26-10: Explicit null check to avoid falsy-0 bug
         return_documents: false,
       }),
     });
@@ -86,7 +86,9 @@ export async function rerank<T extends RerankableItem>(
       results: { index: number; relevance_score: number }[];
     };
 
-    return data.results.map((r) => ({
+    return data.results
+      .filter((r) => r.index >= 0 && r.index < items.length) // P26-05: Validate index bounds
+      .map((r) => ({
       item: items[r.index],
       relevanceScore: r.relevance_score,
       originalIndex: r.index,

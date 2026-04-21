@@ -61,7 +61,8 @@ export async function updateReliability(
       //       + (1 - toolErrors/(totalResponses+1)) * 0.3
       const agreementScore = agreedWith / (agreedWith + contradicted + 1);
       const errorScore = 1 - toolErrors / (totalResponses + 1);
-      const avgConfidence = agreementScore * 0.7 + errorScore * 0.3;
+      // P26-08: Clamp reliability score to [0, 1] range
+      const avgConfidence = Math.min(1, Math.max(0, agreementScore * 0.7 + errorScore * 0.3));
 
       await db
         .insert(modelReliability)
@@ -98,6 +99,12 @@ export async function getReliabilityScores(
 ): Promise<Map<string, { avgConfidence: number; totalResponses: number }>> {
   const result = new Map<string, { avgConfidence: number; totalResponses: number }>();
   if (models.length === 0) return result;
+
+  // P26-04: Cap models array to prevent excessively large SQL IN clause
+  const MAX_MODELS_QUERY = 200;
+  if (models.length > MAX_MODELS_QUERY) {
+    models = models.slice(0, MAX_MODELS_QUERY);
+  }
 
   const rows = await db
     .select()

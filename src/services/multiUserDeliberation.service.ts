@@ -33,6 +33,8 @@ export interface SharedSession {
 
 // ─── In-memory store ────────────────────────────────────────────────────────
 
+// P26-02: Cap sessions Map to prevent unbounded memory growth
+const MAX_SESSIONS = 1000;
 const sessions = new Map<string, SharedSession>();
 
 // ─── Core Functions ─────────────────────────────────────────────────────────
@@ -56,6 +58,15 @@ export function createSession(
     messages: [],
     createdAt: new Date(),
   };
+  // P26-02: Evict oldest completed session if map is full
+  if (sessions.size >= MAX_SESSIONS) {
+    for (const [sid, s] of sessions) {
+      if (s.status === "completed") {
+        sessions.delete(sid);
+        break;
+      }
+    }
+  }
   sessions.set(id, session);
   logger.info({ sessionId: id, hostUserId, deliberationId }, "Created shared session");
   return session;
@@ -114,6 +125,15 @@ export function sendMessage(
   }
   if (session.status === "completed") {
     throw new Error("Session is completed");
+  }
+  // P26-09: Cap message content length and messages array size
+  const MAX_MESSAGE_LENGTH = 50_000;
+  const MAX_MESSAGES_PER_SESSION = 10_000;
+  if (content.length > MAX_MESSAGE_LENGTH) {
+    content = content.slice(0, MAX_MESSAGE_LENGTH);
+  }
+  if (session.messages.length >= MAX_MESSAGES_PER_SESSION) {
+    throw new Error("Session message limit reached");
   }
   const message: SessionMessage = {
     userId,

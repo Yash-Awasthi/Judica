@@ -277,6 +277,11 @@ export function inferDependencies(
   };
 }
 
+// P26-01: Sanitize shell-interpolated values to prevent command injection
+function shellSafe(name: string): string {
+  return name.replace(/[^a-zA-Z0-9_.-]/g, "_");
+}
+
 /**
  * Generate setup instructions.
  */
@@ -285,21 +290,26 @@ function generateSetupInstructions(
   schema: ScaffoldSchema,
   deps: { production: string[]; development: string[] },
 ): string[] {
+  // P26-01: Sanitize projectName and dependency names before interpolating into shell commands
+  const safeName = shellSafe(projectName);
+  const safeProdDeps = deps.production.map(shellSafe);
+  const safeDevDeps = deps.development.map(shellSafe);
+
   const steps: string[] = [
-    `mkdir ${projectName} && cd ${projectName}`,
+    `mkdir ${safeName} && cd ${safeName}`,
     `npm init -y`,
   ];
 
-  if (deps.production.length > 0) {
-    steps.push(`npm install ${deps.production.join(" ")}`);
+  if (safeProdDeps.length > 0) {
+    steps.push(`npm install ${safeProdDeps.join(" ")}`);
   }
-  if (deps.development.length > 0) {
-    steps.push(`npm install -D ${deps.development.join(" ")}`);
+  if (safeDevDeps.length > 0) {
+    steps.push(`npm install -D ${safeDevDeps.join(" ")}`);
   }
 
   if (schema.tables.length > 0) {
     steps.push(`# Set up PostgreSQL database`);
-    steps.push(`createdb ${projectName}`);
+    steps.push(`createdb ${safeName}`);
     steps.push(`npx drizzle-kit generate`);
     steps.push(`npx drizzle-kit migrate`);
   }
