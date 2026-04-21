@@ -22,8 +22,15 @@ const CJK_REGEX = /[\u2E80-\u9FFF\uF900-\uFAFF\uFE30-\uFE4F\u{20000}-\u{2FA1F}]/
  *
  * We classify by sampling the string and blending the ratios.
  */
+// P20-08: Cap input length to prevent DoS via massive string token estimation
+const MAX_ESTIMATE_LENGTH = 2_000_000; // ~2MB of text
+
 export function estimateStringTokens(text: string): number {
   if (text.length === 0) return 0;
+  // Truncate excessively long input to prevent O(n) iteration DoS
+  if (text.length > MAX_ESTIMATE_LENGTH) {
+    text = text.slice(0, MAX_ESTIMATE_LENGTH);
+  }
 
   let asciiChars = 0;
   let cjkChars = 0;

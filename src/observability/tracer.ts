@@ -221,3 +221,21 @@ async function sendToLangfuse(
     logger.warn({ err: (err as Error).message, traceId }, "Langfuse export failed — trace saved to DB only");
   }
 }
+
+/**
+ * P20-09: Graceful shutdown hook for Langfuse client.
+ * Call this during process shutdown to flush pending traces and release resources.
+ */
+export async function shutdownTracer(): Promise<void> {
+  if (!langfuseInstance) return;
+  try {
+    const client = langfuseInstance as LangfuseClient;
+    await (client.flushAsync?.() ?? Promise.resolve());
+    logger.info("Langfuse client flushed on shutdown");
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, "Langfuse flush on shutdown failed");
+  } finally {
+    langfuseInstance = null;
+    langfuseInitAttempted = false;
+  }
+}
