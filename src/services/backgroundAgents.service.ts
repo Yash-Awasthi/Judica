@@ -71,6 +71,35 @@ const agents = new Map<string, BackgroundAgent>();
 const handlers = new Map<string, Array<(ctx: StepContext) => Promise<unknown>>>();
 const progressCallbacks = new Map<string, (agent: BackgroundAgent) => void>();
 
+const MAX_AGENTS = 10_000;
+const AGENT_CLEANUP_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+
+// Automatic cleanup of completed/failed agents older than 1 hour
+const _agentCleanupInterval = setInterval(() => {
+  const cutoff = Date.now() - 3600_000; // 1 hour
+  for (const [id, agent] of agents) {
+    if ((agent.status === "completed" || agent.status === "failed") &&
+        agent.createdAt.getTime() < cutoff) {
+      agents.delete(id);
+      handlers.delete(id);
+      progressCallbacks.delete(id);
+    }
+  }
+  // Hard cap
+  if (agents.size > MAX_AGENTS) {
+    const sorted = [...agents.entries()].sort((a, b) => a[1].createdAt.getTime() - b[1].createdAt.getTime());
+    const excess = agents.size - MAX_AGENTS;
+    for (let i = 0; i < excess; i++) {
+      const [id] = sorted[i];
+      agents.delete(id);
+      handlers.delete(id);
+      progressCallbacks.delete(id);
+    }
+  }
+}, AGENT_CLEANUP_INTERVAL_MS);
+
+if (_agentCleanupInterval.unref) _agentCleanupInterval.unref();
+
 // ─── Core Functions ─────────────────────────────────────────────────────────
 
 /**

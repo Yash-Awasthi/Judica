@@ -126,6 +126,12 @@ export function initSocket(server: HttpServer): WebSocketServer {
 
     ws.on("message", async (raw) => {
       try {
+        // Reject oversized messages to prevent heap exhaustion
+        const MAX_WS_MESSAGE_SIZE = 64 * 1024; // 64KB
+        if (raw.length > MAX_WS_MESSAGE_SIZE) {
+          ws.send(JSON.stringify({ event: "error", data: { message: "Message too large" } }));
+          return;
+        }
         const msg = JSON.parse(raw.toString());
         if (msg.type === "join:conversation" && msg.conversationId) {
           // Verify the user owns this conversation (or it's public)

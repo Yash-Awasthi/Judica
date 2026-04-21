@@ -264,7 +264,7 @@ export class WorkflowExecutor {
           if (recoveryHandler) {
             const recoveryCtx: NodeContext = {
               inputs: {
-                prompt: `A workflow node failed. Rewrite the inputs to fix the problem.\n\nNode type: ${node.type}\nOriginal inputs: ${JSON.stringify(nodeInputs, null, 2)}\nError: ${error}\n\nReturn a JSON object with corrected input values.`,
+                prompt: `A workflow node failed. Rewrite the inputs to fix the problem.\n\nNode type: ${String(node.type).replace(/[^a-zA-Z0-9_.-]/g, "")}\nOriginal inputs: ${JSON.stringify(nodeInputs, null, 2).slice(0, 2000)}\nError: ${String(error).slice(0, 500)}\n\nReturn a JSON object with corrected input values.`,
               },
               nodeData: {
                 model: node.data.model || "auto",

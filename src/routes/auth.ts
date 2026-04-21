@@ -332,8 +332,12 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     const [row] = await db.select().from(councilConfigs).where(eq(councilConfigs.userId, request.userId!)).limit(1);
 
     if (!row) return null;
-    const decrypted = JSON.parse(decrypt(row.config as string));
-    return decrypted;
+    try {
+      const decrypted = JSON.parse(decrypt(row.config as string));
+      return decrypted;
+    } catch {
+      throw new AppError(500, "Failed to decrypt configuration — data may be corrupted");
+    }
   });
 
     fastify.post("/config/rotate", { preHandler: [fastifyRequireAuth] }, async (request, _reply) => {
@@ -344,7 +348,12 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     // Decrypt with the current/previous key, re-encrypt with current key
-    const decrypted = JSON.parse(decrypt(row.config as string));
+    let decrypted: unknown;
+    try {
+      decrypted = JSON.parse(decrypt(row.config as string));
+    } catch {
+      throw new AppError(500, "Failed to decrypt configuration — data may be corrupted");
+    }
     const reEncrypted = encrypt(JSON.stringify(decrypted));
 
     await db.update(councilConfigs).set({ config: reEncrypted }).where(eq(councilConfigs.userId, request.userId!));

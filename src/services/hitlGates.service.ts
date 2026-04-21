@@ -71,6 +71,33 @@ const pendingCallbacks = new Map<string, {
   timer: ReturnType<typeof setTimeout>;
 }>();
 
+const MAX_GATES = 10_000;
+const GATE_CLEANUP_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+
+// Automatic cleanup of resolved/expired gates older than 1 hour
+const _gateCleanupInterval = setInterval(() => {
+  const cutoff = Date.now() - 3600_000;
+  for (const [id, gate] of gates) {
+    if (gate.status !== "pending" && gate.createdAt.getTime() < cutoff) {
+      gates.delete(id);
+      pendingCallbacks.delete(id);
+    }
+  }
+  // Hard cap: remove oldest non-pending gates
+  if (gates.size > MAX_GATES) {
+    const resolved = [...gates.entries()]
+      .filter(([, g]) => g.status !== "pending")
+      .sort((a, b) => a[1].createdAt.getTime() - b[1].createdAt.getTime());
+    const excess = gates.size - MAX_GATES;
+    for (let i = 0; i < Math.min(excess, resolved.length); i++) {
+      gates.delete(resolved[i][0]);
+      pendingCallbacks.delete(resolved[i][0]);
+    }
+  }
+}, GATE_CLEANUP_INTERVAL_MS);
+
+if (_gateCleanupInterval.unref) _gateCleanupInterval.unref();
+
 // ─── Core Functions ─────────────────────────────────────────────────────────
 
 /**

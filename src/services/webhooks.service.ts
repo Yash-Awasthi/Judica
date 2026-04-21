@@ -1,3 +1,4 @@
+import crypto from "node:crypto";
 import logger from "../lib/logger.js";
 
 
@@ -151,15 +152,9 @@ export async function retryFailedDelivery(
  * Compute HMAC-SHA256 signature for payload verification.
  */
 export function computeSignature(payload: string, secret: string): string {
-  // Simple hash for now — in production use crypto.createHmac
-  let hash = 0;
-  const combined = secret + payload;
-  for (let i = 0; i < combined.length; i++) {
-    const char = combined.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32-bit integer
-  }
-  return `sha256=${Math.abs(hash).toString(16).padStart(8, "0")}`;
+  const hmac = crypto.createHmac("sha256", secret);
+  hmac.update(payload, "utf8");
+  return `sha256=${hmac.digest("hex")}`;
 }
 
 // ─── Event Firing ───────────────────────────────────────────────────────────
