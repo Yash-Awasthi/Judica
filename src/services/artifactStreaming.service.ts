@@ -49,6 +49,9 @@ export interface StreamInfo {
 const emitter = new EventEmitter();
 emitter.setMaxListeners(100);
 
+// P24-04: Cap stream maps to prevent unbounded memory growth
+const MAX_STREAMS = 1000;
+
 const streams = new Map<string, StreamInfo>();
 const artifactStore = new Map<string, Artifact[]>();
 
@@ -80,6 +83,22 @@ async function setRedisExpiry(streamId: string): Promise<void> {
  */
 export function createStream(userId: number, title: string, agentId?: string): string {
   const id = `stream_${crypto.randomBytes(8).toString("hex")}`;
+
+  // P24-04: Enforce stream map cap — evict oldest completed stream
+  if (streams.size >= MAX_STREAMS) {
+    let evicted = false;
+    for (const [sid, s] of streams) {
+      if (s.isComplete) {
+        streams.delete(sid);
+        artifactStore.delete(sid);
+        evicted = true;
+        break;
+      }
+    }
+    if (!evicted) {
+      logger.warn({ maxStreams: MAX_STREAMS }, "Artifact stream limit reached, no completed streams to evict");
+    }
+  }
 
   streams.set(id, {
     id,

@@ -30,12 +30,31 @@
  * 5. Migrate data
  * 6. Drop old table
  */
+// P24-01: Strict identifier validation to prevent SQL injection in generated migrations
+const SAFE_IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/;
+
+function assertSafeIdentifier(value: string, label: string): void {
+  if (!SAFE_IDENTIFIER.test(value)) {
+    throw new Error(`${label} contains invalid characters: ${value.slice(0, 30)}`);
+  }
+}
+
 export function generatePartitionMigration(
   tableName: string,
   partitionCount: number = 16,
   vectorColumn: string = "embedding",
   _vectorDimensions: number = 1536,
 ): string {
+  // P24-01: Validate all identifiers interpolated into SQL
+  assertSafeIdentifier(tableName, "tableName");
+  assertSafeIdentifier(vectorColumn, "vectorColumn");
+
+  // P24-10: Validate partitionCount range
+  if (!Number.isFinite(partitionCount) || partitionCount < 1 || partitionCount > 256) {
+    throw new Error(`partitionCount must be between 1 and 256, got: ${partitionCount}`);
+  }
+  partitionCount = Math.floor(partitionCount);
+
   const lines: string[] = [
     `-- P4-50: Partition ${tableName} by userId for HNSW index sharding`,
     `-- Run this migration when ${tableName} exceeds ~500K rows`,
@@ -76,6 +95,9 @@ export function generatePartitionMigration(
  * Generate SQL to check partition sizes and index health.
  */
 export function generatePartitionHealthCheck(tableName: string): string {
+  // P24-01: Validate identifier to prevent SQL injection
+  assertSafeIdentifier(tableName, "tableName");
+
   return [
     `-- Check partition sizes for ${tableName}`,
     `SELECT`,

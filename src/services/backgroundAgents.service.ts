@@ -67,6 +67,9 @@ export interface StepContext {
 
 // ─── Store ──────────────────────────────────────────────────────────────────
 
+// P24-03: Cap in-memory maps to prevent unbounded growth
+const MAX_BACKGROUND_AGENTS = 500;
+
 const agents = new Map<string, BackgroundAgent>();
 const handlers = new Map<string, Array<(ctx: StepContext) => Promise<unknown>>>();
 const progressCallbacks = new Map<string, (agent: BackgroundAgent) => void>();
@@ -99,6 +102,24 @@ export async function createAgent(input: CreateAgentInput): Promise<BackgroundAg
     lastHeartbeat: null,
     metadata: input.metadata ?? {},
   };
+
+  // P24-03: Enforce agent map cap
+  if (agents.size >= MAX_BACKGROUND_AGENTS) {
+    // Evict oldest completed/failed/cancelled agent
+    let evicted = false;
+    for (const [eid, ea] of agents) {
+      if (ea.status === "completed" || ea.status === "failed" || ea.status === "cancelled") {
+        agents.delete(eid);
+        handlers.delete(eid);
+        progressCallbacks.delete(eid);
+        evicted = true;
+        break;
+      }
+    }
+    if (!evicted) {
+      throw new Error(`Maximum background agent limit (${MAX_BACKGROUND_AGENTS}) reached`);
+    }
+  }
 
   agents.set(id, agent);
   handlers.set(id, input.steps.map((s) => s.handler));
