@@ -7,6 +7,8 @@ const MAX_CONCURRENT_RETRIES = 50;
 let activeRetries = 0;
 
 // P9-34: Retry metrics for observability
+// P22-08: Cap retriesByProvider Map to prevent unbounded growth from many distinct labels
+const MAX_PROVIDER_METRIC_ENTRIES = 200;
 const retryMetrics = {
   totalRetries: 0,
   retriesByProvider: new Map<string, number>(),
@@ -80,6 +82,11 @@ export async function withRetry<T>(
       if (options.label) {
         const prev = retryMetrics.retriesByProvider.get(options.label) || 0;
         retryMetrics.retriesByProvider.set(options.label, prev + 1);
+        // P22-08: Evict oldest entry if map exceeds cap
+        if (retryMetrics.retriesByProvider.size > MAX_PROVIDER_METRIC_ENTRIES) {
+          const oldest = retryMetrics.retriesByProvider.keys().next().value;
+          if (oldest !== undefined) retryMetrics.retriesByProvider.delete(oldest);
+        }
       }
 
       if (onRetry) {
