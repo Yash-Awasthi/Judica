@@ -38,8 +38,9 @@ const deliberationsPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(404, "Deliberation not found");
     }
 
-    const payload = (trace as any).payload as Record<string, unknown> | null;
-    const scoredOpinions = (payload?.scoredOpinions ?? payload?.scored ?? []) as Array<{
+    const payload = (trace as unknown as { payload?: Record<string, unknown> }).payload ?? null;
+    const rawScored = payload?.scoredOpinions ?? payload?.scored;
+    const scoredOpinions = (Array.isArray(rawScored) ? rawScored : []) as Array<{
       name: string;
       scores?: {
         confidence?: number;
@@ -101,7 +102,7 @@ const deliberationsPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(404, "Deliberation not found");
     }
 
-    const payload = (trace as any).payload as Record<string, unknown> | null;
+    const payload = (trace as unknown as { payload?: Record<string, unknown> }).payload ?? null;
 
     // Reconstruct the deliberation timeline from the stored trace
     const timeline: Array<{
@@ -110,7 +111,7 @@ const deliberationsPlugin: FastifyPluginAsync = async (fastify) => {
       data: unknown;
     }> = [];
 
-    if (payload?.opinions) {
+    if (Array.isArray(payload?.opinions)) {
       timeline.push({
         phase: "gather_opinions",
         data: (payload.opinions as Array<{ name: string; opinion: string }>).map((o) => ({
@@ -120,17 +121,18 @@ const deliberationsPlugin: FastifyPluginAsync = async (fastify) => {
       });
     }
 
-    if (payload?.peerReviews) {
+    if (Array.isArray(payload?.peerReviews)) {
       timeline.push({
         phase: "peer_review",
         data: payload.peerReviews,
       });
     }
 
-    if (payload?.scoredOpinions || payload?.scored) {
+    const rawScoredReplay = payload?.scoredOpinions ?? payload?.scored;
+    if (Array.isArray(rawScoredReplay)) {
       timeline.push({
         phase: "scoring",
-        data: ((payload.scoredOpinions ?? payload.scored) as Array<{ name: string; scores?: unknown }>).map((s) => ({
+        data: (rawScoredReplay as Array<{ name: string; scores?: unknown }>).map((s) => ({
           name: s.name,
           scores: s.scores,
         })),
@@ -157,6 +159,8 @@ const deliberationsPlugin: FastifyPluginAsync = async (fastify) => {
       });
     }
 
+    const opinionsArray = Array.isArray(payload?.opinions) ? payload.opinions as unknown[] : [];
+
     return reply.send({
       deliberationId: id,
       type: trace.type,
@@ -164,7 +168,7 @@ const deliberationsPlugin: FastifyPluginAsync = async (fastify) => {
       timeline,
       metadata: {
         totalPhases: timeline.length,
-        memberCount: ((payload?.opinions as unknown[]) ?? []).length,
+        memberCount: opinionsArray.length,
       },
     });
   });
