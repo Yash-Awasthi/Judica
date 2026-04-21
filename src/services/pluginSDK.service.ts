@@ -53,6 +53,8 @@ export interface LoadedPlugin {
 
 // ─── Plugin Registry ────────────────────────────────────────────────────────
 
+// P23-06: Cap plugin registry to prevent unbounded memory growth
+const MAX_PLUGINS = 100;
 const plugins = new Map<string, LoadedPlugin>();
 
 /**
@@ -62,6 +64,11 @@ export async function loadPlugin(
   manifest: PluginManifest,
   config: Record<string, unknown> = {},
 ): Promise<void> {
+  // P23-06: Enforce plugin cap
+  if (!plugins.has(manifest.name) && plugins.size >= MAX_PLUGINS) {
+    throw new Error(`Maximum plugin limit (${MAX_PLUGINS}) reached`);
+  }
+
   // Validate required config
   if (manifest.config) {
     for (const [key, schema] of Object.entries(manifest.config.properties)) {

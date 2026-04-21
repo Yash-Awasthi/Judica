@@ -28,13 +28,31 @@ export interface MCPCallResult {
 
 // ─── Connection Registry ────────────────────────────────────────────────────
 
+// P23-10: Cap connections to prevent unbounded memory growth
+const MAX_MCP_CONNECTIONS = 50;
 const connections = new Map<string, MCPServerConnection>();
+// P23-05: Cap tool cache size
+const MAX_TOOL_CACHE_ENTRIES = 100;
 const toolCache = new Map<string, MCPClientTool[]>();
 
 /**
  * Register an external MCP server connection.
  */
 export function addConnection(conn: MCPServerConnection): void {
+  // P23-10: Enforce connection cap
+  if (!connections.has(conn.name) && connections.size >= MAX_MCP_CONNECTIONS) {
+    throw new Error(`Maximum MCP connection limit (${MAX_MCP_CONNECTIONS}) reached`);
+  }
+  // P23-04: Validate URL scheme — only allow http/https to prevent SSRF via file://, ftp://, etc.
+  try {
+    const url = new URL(conn.url);
+    if (!["http:", "https:"].includes(url.protocol)) {
+      throw new Error(`MCP server URL must use http or https, got: ${url.protocol}`);
+    }
+  } catch (err) {
+    if ((err as Error).message.includes("must use http")) throw err;
+    throw new Error(`Invalid MCP server URL: ${conn.url.slice(0, 100)}`);
+  }
   connections.set(conn.name, conn);
   toolCache.delete(conn.name); // Invalidate cache
   logger.info({ serverName: conn.name, transport: conn.transport }, "MCP server connection added");
@@ -110,6 +128,11 @@ export async function discoverTools(
         serverName,
       }));
       toolCache.set(serverName, tools);
+      // P23-05: Evict oldest cache entry if exceeding cap
+      if (toolCache.size > MAX_TOOL_CACHE_ENTRIES) {
+        const oldest = toolCache.keys().next().value;
+        if (oldest !== undefined) toolCache.delete(oldest);
+      }
       logger.info({ serverName, toolCount: tools.length }, "Discovered MCP tools");
       return tools;
     }
