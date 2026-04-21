@@ -31,6 +31,10 @@ interface GitHubUser {
   name?: string;
 }
 
+// CSRF state store for OAuth2 flow (short-lived, in-memory)
+const pendingOAuthStates = new Set<string>();
+const STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+
 export async function githubOAuthPlugin(fastify: FastifyInstance): Promise<void> {
   if (!env.GITHUB_CLIENT_ID || !env.GITHUB_CLIENT_SECRET) {
     logger.info("GitHub OAuth disabled — GITHUB_CLIENT_ID or GITHUB_CLIENT_SECRET not set");
@@ -49,13 +53,18 @@ export async function githubOAuthPlugin(fastify: FastifyInstance): Promise<void>
     startRedirectPath: "/api/auth/github",
     callbackUri: `${env.OAUTH_CALLBACK_BASE_URL}/api/auth/github/callback`,
     generateStateFunction: (_request: unknown) => {
-      // P8-33: Generate cryptographic state parameter to prevent CSRF on OAuth flow
       const state = crypto.randomBytes(32).toString("hex");
+      pendingOAuthStates.add(state);
+      setTimeout(() => pendingOAuthStates.delete(state), STATE_TTL_MS);
       return state;
     },
-    checkStateFunction: (_returnedState: string, _callback: (err?: Error) => void) => {
-      // P8-33: @fastify/oauth2 handles state validation internally when generateStateFunction is provided
-      _callback();
+    checkStateFunction: (returnedState: string, callback: (err?: Error) => void) => {
+      if (pendingOAuthStates.has(returnedState)) {
+        pendingOAuthStates.delete(returnedState);
+        callback();
+      } else {
+        callback(new Error("Invalid OAuth state parameter — possible CSRF attack"));
+      }
     },
     discovery: {
       issuer: "https://github.com",
@@ -75,7 +84,12 @@ export async function githubOAuthPlugin(fastify: FastifyInstance): Promise<void>
           Authorization: `Bearer ${accessToken}`,
           Accept: "application/vnd.github+json",
         },
+        signal: AbortSignal.timeout(10000),
       });
+      if (!emailsRes.ok) {
+        logger.error({ status: emailsRes.status }, "GitHub emails API request failed");
+        return reply.code(502).send({ error: "Failed to retrieve email from GitHub" });
+      }
       const emails = (await emailsRes.json()) as GitHubEmail[];
 
       // SEC-7: Only accept verified emails to prevent email spoofing
@@ -91,7 +105,12 @@ export async function githubOAuthPlugin(fastify: FastifyInstance): Promise<void>
           Authorization: `Bearer ${accessToken}`,
           Accept: "application/vnd.github+json",
         },
+        signal: AbortSignal.timeout(10000),
       });
+      if (!profileRes.ok) {
+        logger.error({ status: profileRes.status }, "GitHub profile API request failed");
+        return reply.code(502).send({ error: "Failed to retrieve profile from GitHub" });
+      }
       const profile = (await profileRes.json()) as GitHubUser;
 
       // Find or create user
@@ -162,7 +181,7 @@ export function createGitHubStrategy(): GitHubStrategy | null {
           .limit(1);
 
         if (existing) {
-          if (existing.passwordHash && existing.passwordHash !== "") {
+          if (existing.authMethod === "password") {
             return done(new Error("An account with this email already exists from a different sign-in method."));
           }
           return done(null, existing);
@@ -174,6 +193,7 @@ export function createGitHubStrategy(): GitHubStrategy | null {
             email,
             username: profile.username || profile.displayName || email.split("@")[0],
             passwordHash: "",
+            authMethod: "github",
             role: "member",
           })
           .returning();
