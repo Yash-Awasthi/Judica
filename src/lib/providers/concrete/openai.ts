@@ -133,7 +133,7 @@ export class OpenAIProvider extends BaseProvider {
           const result = await callTool({ 
             id: tc.id, 
             name: tc.function.name, 
-            arguments: JSON.parse(tc.function.arguments) 
+            arguments: (() => { try { return JSON.parse(tc.function.arguments); } catch { return {}; } })()
           });
           
           const safeResult = `[UNTRUSTED TOOL OUTPUT]\n${result.result || result}\n[/UNTRUSTED TOOL OUTPUT]`;

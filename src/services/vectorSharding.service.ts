@@ -35,10 +35,22 @@ export function getShardName(entityId: string, strategy: ShardConfig["strategy"]
   return `vectors_${strategy}_${entityId}`;
 }
 
+/** Validate that a shard name contains only safe characters for SQL identifiers. */
+function validateIdentifier(name: string): string {
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/.test(name)) {
+    throw new Error(`Invalid SQL identifier: ${name}`);
+  }
+  return name;
+}
+
 /**
  * Generate the SQL for creating a sharded vector table with HNSW index.
  */
 export function generateShardDDL(shardName: string, dimensions: number = 1536): string {
+  validateIdentifier(shardName);
+  if (!Number.isInteger(dimensions) || dimensions < 1 || dimensions > 10000) {
+    throw new Error(`Invalid dimensions: ${dimensions}`);
+  }
   return `
 -- Create sharded vector table
 CREATE TABLE IF NOT EXISTS "${shardName}" (
@@ -96,6 +108,12 @@ export function generateMigrationSQL(
   toShard: string,
   condition: string,
 ): string {
+  validateIdentifier(fromShard);
+  validateIdentifier(toShard);
+  // Reject obvious SQL injection patterns in conditions
+  if (/;\s*(DROP|ALTER|CREATE|TRUNCATE|INSERT|UPDATE|DELETE|GRANT|REVOKE)\b/i.test(condition)) {
+    throw new Error("Potentially dangerous SQL in migration condition");
+  }
   return `
 -- Migrate vectors matching condition
 INSERT INTO "${toShard}" (id, content, embedding, metadata, created_at)

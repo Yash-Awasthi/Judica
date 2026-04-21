@@ -52,6 +52,17 @@ emitter.setMaxListeners(100);
 const streams = new Map<string, StreamInfo>();
 const artifactStore = new Map<string, Artifact[]>();
 
+const MAX_STREAMS = 10_000;
+const MAX_ARTIFACTS_PER_STREAM = 5_000;
+const STREAM_CLEANUP_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+
+// Automatic periodic cleanup of completed streams older than 1 hour
+const _cleanupInterval = setInterval(() => {
+  cleanupStreams(3600_000); // 1 hour for completed streams
+}, STREAM_CLEANUP_INTERVAL_MS);
+
+if (_cleanupInterval.unref) _cleanupInterval.unref();
+
 // ─── Redis Stream Helpers ───────────────────────────────────────────────────
 
 const STREAM_PREFIX = "artifact_stream:";
@@ -81,6 +92,14 @@ async function setRedisExpiry(streamId: string): Promise<void> {
 export function createStream(userId: number, title: string, agentId?: string): string {
   const id = `stream_${crypto.randomBytes(8).toString("hex")}`;
 
+  // Enforce stream cap — clean up old streams first
+  if (streams.size >= MAX_STREAMS) {
+    cleanupStreams(3600_000);
+    if (streams.size >= MAX_STREAMS) {
+      logger.warn({ streamCount: streams.size }, "Stream limit reached, cannot create new stream");
+      return "";
+    }
+  }
   streams.set(id, {
     id,
     userId,
@@ -113,6 +132,10 @@ export async function emitArtifact(
   if (!stream || stream.isComplete) return null;
 
   const artifacts = artifactStore.get(streamId)!;
+  if (artifacts.length >= MAX_ARTIFACTS_PER_STREAM) {
+    logger.warn({ streamId, artifactCount: artifacts.length }, "Artifact limit per stream reached");
+    return null;
+  }
   const artifact: Artifact = {
     id: `artifact_${crypto.randomBytes(6).toString("hex")}`,
     streamId,
