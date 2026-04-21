@@ -18,9 +18,11 @@ const ACCESS_TOKEN_EXPIRY = "15m";
 const REFRESH_TOKEN_TTL_DAYS = 7;
 const REFRESH_TOKEN_TTL_SECS = REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60;
 
-// P0-02: Constant dummy hash to prevent user enumeration via timing
-// Generated with argon2id so verify() takes the same time regardless of user existence
-const DUMMY_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHRoZXJl$dummyhashvaluefortimingequalisation000000000000";
+// P0-02: Constant dummy hash to prevent user enumeration via timing.
+// Generated with argon2id so verify() takes the same time regardless of user existence.
+// L-8: Use a structurally valid argon2id hash so verify() performs real work (not a fast reject).
+// Re-generate with: node -e "require('argon2').hash('dummy-timing-password',{type:2,memoryCost:65536,timeCost:3}).then(console.log)"
+const DUMMY_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHRoZXJlaGVyZQ$Tk5vc1ZmVEI5YVJtWHVXNjlmb2R5T3VRY2hJNjFoZTA";
 
 // P5-04: Pin algorithm to HS256 in sign() to match verify() — prevents algorithm-confusion attacks
 function generateAccessToken(userId: number, username: string, role: string): string {
@@ -203,9 +205,11 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
        const expiresAt = payload?.exp ? new Date(payload.exp * 1000) : new Date(Date.now() + 15 * 60 * 1000);
 
        const ttlSecs = Math.max(1, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
-       await redis.set(`revoked:${token}`, "1", { EX: ttlSecs });
+       // C-1: Always store SHA-256 hash — fastifyAuth.ts looks up by hash, not raw token
+       const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+       await redis.set(`revoked:${tokenHash}`, "1", { EX: ttlSecs });
 
-       await db.insert(revokedTokens).values({ token, expiresAt });
+       await db.insert(revokedTokens).values({ token: tokenHash, expiresAt });
     }
 
     // Revoke refresh token
@@ -297,12 +301,18 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     // P1-14: Sanitize custom_instructions — strip HTML tags and control chars to prevent prompt injection
     let sanitized = custom_instructions;
     // Loop to handle nested/split tags like <scr<script>ipt>
+    // M-2: Cap iterations to prevent ReDoS via deeply-crafted tag strings
     const TAG_RE = /<\/?[a-zA-Z][a-zA-Z0-9]*[^>]{0,256}>/g;
     let prev = "";
-    while (prev !== sanitized) {
+    let iterations = 0;
+    const MAX_SANITIZE_ITERATIONS = 10;
+    while (prev !== sanitized && iterations < MAX_SANITIZE_ITERATIONS) {
       prev = sanitized;
       sanitized = sanitized.replace(TAG_RE, "");
+      iterations++;
     }
+    // Final pass: strip any remaining lone `<` that couldn't form a full tag
+    sanitized = sanitized.replace(/</g, "&lt;");
     sanitized = sanitized
       // eslint-disable-next-line no-control-regex
       .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "") // strip control chars (keep \n \r \t)

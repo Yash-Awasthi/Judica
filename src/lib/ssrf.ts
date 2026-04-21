@@ -114,7 +114,11 @@ export async function validateSafeUrlWithIP(urlInput: string, options?: { allowL
     throw new Error(`Port ${port} is not allowed. Permitted: ${[...ALLOWED_PORTS].join(", ")}`);
   }
 
-  const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  const hostname = url.hostname.toLowerCase()
+    // Strip IPv6 brackets
+    .replace(/^\[|\]$/g, "")
+    // L-3: Strip IPv6 zone ID (e.g. fe80::1%eth0) before validation to prevent bypass
+    .replace(/%[a-zA-Z0-9._~-]+$/, "");
 
   // P0-22: Proper localhost check via parsed hostname
   if (!options?.allowLocalhost && isLocalhostHostname(hostname)) {
