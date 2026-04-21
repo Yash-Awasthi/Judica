@@ -66,6 +66,8 @@ export interface TranscriptionOptions {
 
 // ─── Store ──────────────────────────────────────────────────────────────────
 
+// P25-05: Cap results Map to prevent unbounded memory growth
+const MAX_MEDIA_RESULTS = 500;
 const results = new Map<string, MediaProcessingResult>();
 
 // ─── Transcription Providers ────────────────────────────────────────────────
@@ -136,7 +138,8 @@ async function transcribeWithWhisper(
     start: s.start,
     end: s.end,
     text: s.text.trim(),
-    confidence: s.avg_logprob ? Math.exp(s.avg_logprob) : 0.9,
+    // P25-06: Clamp confidence to [0, 1] range — Math.exp of negative logprob can exceed 1
+    confidence: s.avg_logprob ? Math.min(1, Math.max(0, Math.exp(s.avg_logprob))) : 0.9,
   }));
 
   return {
@@ -282,6 +285,16 @@ export async function processMedia(
     duration: null,
     processingMs: null,
   };
+
+  // P25-05: Evict oldest completed result if map is full
+  if (results.size >= MAX_MEDIA_RESULTS) {
+    for (const [rid, r] of results) {
+      if (r.status === "completed" || r.status === "failed") {
+        results.delete(rid);
+        break;
+      }
+    }
+  }
 
   results.set(id, result);
 
