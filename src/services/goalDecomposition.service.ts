@@ -68,7 +68,10 @@ Goal: ${goal}${contextBlock}`,
 
     const parsed = JSON.parse(match[0]) as { tasks: Omit<SubTask, "status">[] };
 
-    const tasks: SubTask[] = parsed.tasks.map((t) => ({
+    // P28-02: Cap decomposed tasks to prevent unbounded array from LLM output
+    const MAX_SUBTASKS = 50;
+    const rawTasks = Array.isArray(parsed.tasks) ? parsed.tasks.slice(0, MAX_SUBTASKS) : [];
+    const tasks: SubTask[] = rawTasks.map((t) => ({
       ...t,
       status: "pending" as TaskStatus,
     }));
@@ -260,6 +263,10 @@ export async function runMCTS(
   }
 
   // ── Step 2: Generate N diverse reasoning branches in parallel ──────────
+  // P28-01: Cap branches to prevent OOM from unbounded parallel LLM calls
+  if (!Number.isFinite(branches) || branches < 1) branches = 3;
+  branches = Math.min(Math.floor(branches), 10);
+
   const branchPromises = Array.from({ length: branches }, (_, i) =>
     routeAndCollect({
       model: "auto",

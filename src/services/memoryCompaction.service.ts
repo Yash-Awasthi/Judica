@@ -101,9 +101,12 @@ export async function compact(userId: number): Promise<CompactionResult> {
     visited.add(chunk.id);
 
     const cluster: MemoryChunkWithEmbedding[] = [chunk];
+    // P28-05: Cap cluster size to prevent unbounded growth and oversized LLM prompts
+    const MAX_CLUSTER_SIZE = 50;
 
     for (const other of chunksWithEmbeddings) {
       if (visited.has(other.id)) continue;
+      if (cluster.length >= MAX_CLUSTER_SIZE) break;
       const sim = cosineSimilarity(chunk.embedding, other.embedding);
       if (sim > 0.85) {
         cluster.push(other);

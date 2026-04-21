@@ -112,13 +112,15 @@ export async function runResearch(
     try {
       // Try to parse JSON from the response
       const jsonMatch = planResponse.match(/\[[\s\S]*?\]/);
-      subQuestions = jsonMatch ? JSON.parse(jsonMatch[0]) : [query];
+      const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : [query];
+      // P28-06: Validate parsed result is array of strings, cap length
+      subQuestions = (Array.isArray(parsed) ? parsed : [query])
+        .filter((q: unknown): q is string => typeof q === "string" && q.length > 0)
+        .slice(0, 5);
+      if (subQuestions.length === 0) subQuestions = [query];
     } catch {
       subQuestions = [query];
     }
-
-    // Limit to 5 sub-questions
-    subQuestions = subQuestions.slice(0, 5);
 
     const steps: ResearchStep[] = subQuestions.map((q) => ({
       question: q,

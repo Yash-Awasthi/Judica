@@ -145,11 +145,16 @@ export async function visualizeDeliberation(
 ): Promise<VisualOutput[]> {
   const outputs: VisualOutput[] = [];
 
+  // P28-08: Cap opinions array to prevent unbounded output and sanitize topic for Mermaid
+  const MAX_OPINIONS = 50;
+  const safeOpinions = opinions.slice(0, MAX_OPINIONS);
+  const safeTopic = topic.substring(0, 40).replace(/[()]/g, "");
+
   // 1. Generate a Mermaid mindmap of agent positions
   const mindmapContent = [
     "mindmap",
-    `  root((${topic.substring(0, 40)}))`,
-    ...opinions.map((o) => `    ${o.agent}\n      ${o.position.substring(0, 50)}`),
+    `  root((${safeTopic}))`,
+    ...safeOpinions.map((o) => `    ${o.agent}\n      ${o.position.substring(0, 50)}`),
   ].join("\n");
 
   outputs.push({
@@ -160,8 +165,12 @@ export async function visualizeDeliberation(
   });
 
   // 2. Generate a confidence comparison table
-  const tableRows = opinions
-    .map((o) => `| ${o.agent} | ${o.position.substring(0, 60)} | ${(o.confidence * 100).toFixed(0)}% |`)
+  // P28-09: NaN guard on confidence, use bounded safeOpinions
+  const tableRows = safeOpinions
+    .map((o) => {
+      const conf = Number.isFinite(o.confidence) ? Math.min(1, Math.max(0, o.confidence)) : 0;
+      return `| ${o.agent} | ${o.position.substring(0, 60)} | ${(conf * 100).toFixed(0)}% |`;
+    })
     .join("\n");
 
   const table = `| Agent | Position | Confidence |\n|-------|----------|------------|\n${tableRows}`;
