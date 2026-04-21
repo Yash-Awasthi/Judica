@@ -155,7 +155,7 @@ export async function trackTokenUsage(
     const cost = calculateCost(provider, model, inputTokens, outputTokens);
 
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setUTCHours(0, 0, 0, 0);
 
     await db
       .insert(dailyUsage)
@@ -315,7 +315,7 @@ export async function checkUserCostLimits(
 ): Promise<{ withinLimits: boolean; dailyUsage: number; monthlyUsage: number; warnings: string[] }> {
   const now = new Date();
   const today = new Date(now);
-  today.setHours(0, 0, 0, 0);
+  today.setUTCHours(0, 0, 0, 0);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
   const [dailyRows, monthlyRows] = await Promise.all([
