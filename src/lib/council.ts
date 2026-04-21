@@ -110,9 +110,12 @@ export async function prepareCouncilMembers(members: CouncilMemberInput[], summo
       let configData: { customArchetypes?: Archetype[] };
       try {
         configData = JSON.parse(decrypt(config.config as string));
-      } catch {
-        // Fallback: if stored as plaintext (legacy), use directly
-        configData = config.config as { customArchetypes?: Archetype[] };
+      } catch (err) {
+        // R2-07: Do NOT silently fall back to plaintext — a decryption failure could
+        // mean tampering or key mismatch. Log and skip user archetypes rather than
+        // trusting potentially manipulated plaintext.
+        logger.error({ err: (err as Error).message, userId }, "Failed to decrypt council config — skipping custom archetypes");
+        configData = {};
       }
       const customs = configData.customArchetypes || [];
       customs.forEach((a) => {
