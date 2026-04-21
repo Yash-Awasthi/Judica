@@ -205,8 +205,10 @@ export function isSeccompAvailable(): boolean {
     const match = status.match(/Seccomp:\s*(\d+)/);
     if (!match) return false;
     // Seccomp: 0 = disabled, 1 = strict, 2 = filter — we need filter support
-    // If the field exists with value 0, the kernel has seccomp support compiled in
-    return parseInt(match[1], 10) >= 0;
+    // P27-07/P27-09: Validate parsed value and check kernel has seccomp compiled in (value >= 0)
+    const seccompValue = parseInt(match[1], 10);
+    if (Number.isNaN(seccompValue)) return false;
+    return seccompValue >= 0;
   } catch {
     return false;
   }

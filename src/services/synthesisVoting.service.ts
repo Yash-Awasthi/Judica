@@ -37,6 +37,8 @@ export interface SessionResults {
 
 // ─── In-memory store ────────────────────────────────────────────────────────
 
+// P27-04: Cap sessions Map to prevent unbounded memory growth
+const MAX_VOTING_SESSIONS = 2000;
 const sessions = new Map<string, VotingSession>();
 
 // ─── Core Functions ─────────────────────────────────────────────────────────
@@ -64,6 +66,15 @@ export function createVotingSession(
     createdAt: new Date(),
     closedAt: null,
   };
+  // P27-04: Evict oldest closed session if map is full
+  if (sessions.size >= MAX_VOTING_SESSIONS) {
+    for (const [sid, s] of sessions) {
+      if (s.status === "closed") {
+        sessions.delete(sid);
+        break;
+      }
+    }
+  }
   sessions.set(id, session);
   logger.info({ sessionId: id, deliberationId }, "Created voting session");
   return session;

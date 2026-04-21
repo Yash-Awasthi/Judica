@@ -35,10 +35,25 @@ export function getShardName(entityId: string, strategy: ShardConfig["strategy"]
   return `vectors_${strategy}_${entityId}`;
 }
 
+// P27-01: Strict identifier validation to prevent SQL injection in generated DDL
+const SAFE_IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/;
+
+function assertSafeIdentifier(value: string, label: string): void {
+  if (!SAFE_IDENTIFIER.test(value)) {
+    throw new Error(`${label} contains invalid characters: ${value.slice(0, 30)}`);
+  }
+}
+
 /**
  * Generate the SQL for creating a sharded vector table with HNSW index.
  */
 export function generateShardDDL(shardName: string, dimensions: number = 1536): string {
+  // P27-01: Validate all identifiers and numeric params before SQL interpolation
+  assertSafeIdentifier(shardName, "shardName");
+  if (!Number.isFinite(dimensions) || dimensions < 1 || dimensions > 10000) {
+    throw new Error(`dimensions must be between 1 and 10000, got: ${dimensions}`);
+  }
+  dimensions = Math.floor(dimensions);
   return `
 -- Create sharded vector table
 CREATE TABLE IF NOT EXISTS "${shardName}" (
@@ -96,6 +111,13 @@ export function generateMigrationSQL(
   toShard: string,
   condition: string,
 ): string {
+  // P27-01: Validate shard names and reject raw SQL in condition
+  assertSafeIdentifier(fromShard, "fromShard");
+  assertSafeIdentifier(toShard, "toShard");
+  // Only allow simple WHERE conditions (column = $param style), reject dangerous patterns
+  if (/[;'"\\]|--|\bDROP\b|\bDELETE\b|\bINSERT\b|\bUPDATE\b|\bEXEC\b/i.test(condition)) {
+    throw new Error("Migration condition contains disallowed SQL patterns");
+  }
   return `
 -- Migrate vectors matching condition
 INSERT INTO "${toShard}" (id, content, embedding, metadata, created_at)

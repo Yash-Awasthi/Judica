@@ -57,21 +57,21 @@ export async function executeJS(code: string, timeout: number = 5000): Promise<S
       (function() {
         const ALLOWED_GLOBALS = new Set([
           'undefined', 'NaN', 'Infinity', 'null',
-          'Object', 'Function', 'Array', 'Number', 'String', 'Boolean', 'Symbol', 'BigInt',
+          'Object', 'Array', 'Number', 'String', 'Boolean', 'Symbol', 'BigInt',
           'Date', 'RegExp', 'Error', 'TypeError', 'RangeError', 'SyntaxError', 'ReferenceError', 'URIError', 'EvalError',
-          'Map', 'Set', 'WeakMap', 'WeakSet', 'WeakRef',
-          'Promise', 'Proxy', 'Reflect',
+          'Map', 'Set', 'WeakMap', 'WeakSet',
+          'Promise',
           'JSON', 'Math',
           'parseInt', 'parseFloat', 'isNaN', 'isFinite',
           'encodeURI', 'decodeURI', 'encodeURIComponent', 'decodeURIComponent',
-          'ArrayBuffer', 'SharedArrayBuffer', 'DataView',
+          'ArrayBuffer', 'DataView',
           'Int8Array', 'Uint8Array', 'Uint8ClampedArray',
           'Int16Array', 'Uint16Array', 'Int32Array', 'Uint32Array',
           'Float32Array', 'Float64Array', 'BigInt64Array', 'BigUint64Array',
           'globalThis', 'console', '_logCallback',
           'TextEncoder', 'TextDecoder', 'URL', 'URLSearchParams',
           'atob', 'btoa', 'structuredClone',
-          'AggregateError', 'FinalizationRegistry',
+          'AggregateError',
         ]);
         const names = Object.getOwnPropertyNames(globalThis);
         for (const name of names) {

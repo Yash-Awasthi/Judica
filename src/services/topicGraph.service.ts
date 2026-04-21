@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { db } from "../lib/drizzle.js";
 import { sql } from "drizzle-orm";
 import { topicNodes } from "../db/schema/conversations.js";
@@ -113,7 +114,7 @@ export async function linkConversationTopics(
       });
     } else {
       // Create new topic node
-      const nodeId = `topic_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+      const nodeId = `topic_${crypto.randomUUID()}`;
       await db.execute(sql`
         INSERT INTO "TopicNode" ("id", "userId", "label", "embedding", "conversationIds", "strength", "createdAt", "updatedAt")
         VALUES (${nodeId}, ${userId}, ${topicLabel}, ${vectorStr}::vector, ${JSON.stringify([conversationId])}::jsonb, 1, NOW(), NOW())

@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { routeAndCollect } from "../router/index.js";
 import logger from "../lib/logger.js";
 
@@ -255,7 +256,7 @@ Task: ${description}`,
   const parsed = JSON.parse(match[0]) as { name: string; steps: ToolStep[] };
 
   return {
-    id: `chain_${Date.now()}`,
+    id: `chain_${crypto.randomUUID()}`, // P27-10: Use crypto.randomUUID instead of timestamp
     name: parsed.name,
     steps: parsed.steps,
     createdAt: new Date().toISOString(),

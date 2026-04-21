@@ -25,6 +25,8 @@ export interface Annotation {
 
 // ─── In-memory store ────────────────────────────────────────────────────────
 
+// P27-06: Cap annotations Map to prevent unbounded memory growth
+const MAX_ANNOTATIONS = 10_000;
 const annotations = new Map<string, Annotation>();
 
 // ─── Core Functions ─────────────────────────────────────────────────────────
@@ -48,6 +50,17 @@ export function createAnnotation(
     selection,
     createdAt: new Date(),
   };
+  // P27-06: Enforce map cap
+  if (annotations.size >= MAX_ANNOTATIONS) {
+    const oldest = annotations.keys().next().value;
+    if (oldest !== undefined) annotations.delete(oldest);
+  }
+  // P27-08: Validate selection bounds
+  if (selection) {
+    if (selection.start < 0 || selection.end < 0 || selection.start >= selection.end) {
+      throw new Error("Invalid selection bounds: start must be >= 0 and less than end");
+    }
+  }
   annotations.set(id, annotation);
   logger.info({ annotationId: id, userId, type }, "Created annotation");
   return annotation;
