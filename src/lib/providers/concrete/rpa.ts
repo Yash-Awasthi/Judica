@@ -145,8 +145,11 @@ async function launchBrowser(): Promise<import("playwright").Browser> {
   return await playwright.chromium.launch({
     headless: true,
     args: [
-      "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage", 
-      "--disable-gpu", "--disable-web-security"
+      // R4-03: Removed --disable-web-security and --no-sandbox.
+      // --disable-web-security disables SOP/CORS, allowing cross-origin credential
+      // theft. --no-sandbox removes the OS-level process sandbox. Both are unsafe
+      // for a server-side browser that navigates attacker-influenced pages.
+      "--disable-setuid-sandbox", "--disable-dev-shm-usage", "--disable-gpu",
     ],
   });
 }
