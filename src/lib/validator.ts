@@ -5,6 +5,22 @@ import { askProvider } from "./providers.js";
 import type { Provider, Message } from "./providers.js";
 import type { AgentOutput } from "./schemas.js";
 import logger from "./logger.js";
+import { z } from "zod";
+
+// M-8: Zod schemas for LLM JSON responses — prevents arbitrary untrusted JSON from
+// being used directly after JSON.parse, which caused undefined behavior when fields
+// were missing or had unexpected types.
+const llmIssueSchema = z.object({
+  type: z.enum(['hallucination', 'inconsistency', 'inaccuracy', 'bias', 'incomplete', 'safety', 'format']),
+  severity: z.enum(['low', 'medium', 'high']),
+  description: z.string().max(500),
+  location: z.string().max(200).optional(),
+  suggestion: z.string().max(500).optional(),
+});
+
+const llmIssueListSchema = z.object({
+  issues: z.array(llmIssueSchema).max(20),
+});
 
 export interface ValidationResult {
   isValid: boolean;
@@ -222,16 +238,11 @@ Respond with ONLY a JSON object:
       
       const jsonMatch = response.text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const validation = JSON.parse(jsonMatch[0]);
-        
-        if (validation.issues && Array.isArray(validation.issues)) {
-          for (const issue of validation.issues) {
-            issues.push({
-              type: issue.type,
-              severity: issue.severity,
-              description: issue.description,
-              suggestion: issue.suggestion
-            });
+        // M-8: validate LLM JSON output against schema before use
+        const parsed = llmIssueListSchema.safeParse(JSON.parse(jsonMatch[0]));
+        if (parsed.success && parsed.data.issues) {
+          for (const issue of parsed.data.issues) {
+            issues.push(issue);
           }
         }
       }
@@ -315,17 +326,11 @@ Respond with ONLY a JSON object:
       
       const jsonMatch = response.text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const factCheck = JSON.parse(jsonMatch[0]);
-        
-        if (factCheck.issues && Array.isArray(factCheck.issues)) {
-          for (const issue of factCheck.issues) {
-            issues.push({
-              type: 'inaccuracy',
-              severity: issue.severity,
-              description: issue.description,
-              location: issue.location,
-              suggestion: issue.suggestion
-            });
+        // M-8: validate LLM JSON output against schema before use
+        const parsed = llmIssueListSchema.safeParse(JSON.parse(jsonMatch[0]));
+        if (parsed.success && parsed.data.issues) {
+          for (const issue of parsed.data.issues) {
+            issues.push({ type: 'inaccuracy', severity: issue.severity, description: issue.description, location: issue.location, suggestion: issue.suggestion });
           }
         }
       }
@@ -368,16 +373,11 @@ Respond with ONLY a JSON object:
       
       const jsonMatch = response.text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const biasCheck = JSON.parse(jsonMatch[0]);
-        
-        if (biasCheck.issues && Array.isArray(biasCheck.issues)) {
-          for (const issue of biasCheck.issues) {
-            issues.push({
-              type: 'bias',
-              severity: issue.severity,
-              description: issue.description,
-              suggestion: issue.suggestion
-            });
+        // M-8: validate LLM JSON output against schema before use
+        const parsed = llmIssueListSchema.safeParse(JSON.parse(jsonMatch[0]));
+        if (parsed.success && parsed.data.issues) {
+          for (const issue of parsed.data.issues) {
+            issues.push({ type: 'bias', severity: issue.severity, description: issue.description, suggestion: issue.suggestion });
           }
         }
       }
