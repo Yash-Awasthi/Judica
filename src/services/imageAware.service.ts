@@ -113,6 +113,10 @@ export async function crossModalAnalysis(
   inputs: MultiModalInput[],
   question: string,
 ): Promise<CrossModalInsight[]> {
+  // P29-10: Cap inputs array to prevent unbounded LLM prompt size
+  const MAX_INPUTS = 20;
+  if (inputs.length > MAX_INPUTS) inputs = inputs.slice(0, MAX_INPUTS);
+
   try {
     const inputDescriptions = inputs
       .map((input, i) => {

@@ -114,6 +114,10 @@ export function calculateCost(
   outputTokens: number,
   customConfig?: CostConfig[]
 ): number {
+  // P29-09: Non-negative guard on token counts
+  inputTokens = Number.isFinite(inputTokens) && inputTokens > 0 ? inputTokens : 0;
+  outputTokens = Number.isFinite(outputTokens) && outputTokens > 0 ? outputTokens : 0;
+
   const config = customConfig || DEFAULT_COST_CONFIG;
   const pricing = config.find(c => c.provider === provider && c.model === model);
 
