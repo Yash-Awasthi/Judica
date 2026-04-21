@@ -48,7 +48,7 @@ export async function createProject(input: CreateProjectInput): Promise<Project>
       .returning();
     return project as unknown as Project;
   } catch (err) {
-    logger.error({ err, input }, "Failed to create project");
+    logger.error({ err, userId: input.userId, name: input.name }, "Failed to create project");
     throw err;
   }
 }
@@ -108,7 +108,7 @@ export async function updateProject(id: string, userId: number, input: Partial<C
     
     return project as unknown as Project || null;
   } catch (err) {
-    logger.error({ err, id, userId, input }, "Failed to update project");
+    logger.error({ err, id, userId }, "Failed to update project");
     throw err;
   }
 }
