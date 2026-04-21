@@ -37,6 +37,13 @@ const reposPlugin: FastifyPluginAsync = async (fastify) => {
       return { error: "owner and repo are required" };
     }
 
+    // Validate GitHub owner/repo format: alphanumeric, hyphens, underscores, dots only
+    const GITHUB_NAME_RE = /^[a-zA-Z0-9._-]{1,100}$/;
+    if (!GITHUB_NAME_RE.test(owner) || !GITHUB_NAME_RE.test(repo)) {
+      reply.code(400);
+      return { error: "Invalid owner or repo name. Must contain only alphanumeric characters, hyphens, underscores, and dots." };
+    }
+
     // Queue the ingestion via BullMQ
     await repoQueue.add("ingest", { userId, owner: owner.trim(), repo: repo.trim() });
 

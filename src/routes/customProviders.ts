@@ -11,6 +11,12 @@ import logger from "../lib/logger.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
 
 const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
+    function parseProviderId(raw: string): number {
+      const id = parseInt(raw, 10);
+      if (Number.isNaN(id)) throw new AppError(400, "Invalid provider ID: must be numeric");
+      return id;
+    }
+
     fastify.get("/", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const userId = request.userId!;
 
@@ -121,7 +127,7 @@ const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
 
     fastify.put("/custom/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const userId = request.userId!;
-    const providerId = parseInt((request.params as { id: string }).id, 10);
+    const providerId = parseProviderId((request.params as { id: string }).id);
 
     const [existing] = await db
       .select()
@@ -137,7 +143,14 @@ const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
 
     const updateData: Record<string, unknown> = {};
     if (name) updateData.name = name;
-    if (base_url) updateData.baseUrl = base_url;
+    if (base_url) {
+      try {
+        await validateSafeUrl(base_url);
+      } catch {
+        throw new AppError(400, "base_url points to a restricted or private address", "SSRF_BLOCKED");
+      }
+      updateData.baseUrl = base_url;
+    }
     if (auth_type) updateData.authType = auth_type;
     if (auth_key) updateData.authKey = encrypt(auth_key);
     if (auth_header_name !== undefined) updateData.authHeaderName = auth_header_name;
@@ -178,7 +191,7 @@ const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
 
     fastify.delete("/custom/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const userId = request.userId!;
-    const providerId = parseInt((request.params as { id: string }).id, 10);
+    const providerId = parseProviderId((request.params as { id: string }).id);
 
     const [existing] = await db
       .select()
@@ -199,7 +212,7 @@ const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
 
     fastify.post("/custom/:id/test", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const userId = request.userId!;
-    const providerId = parseInt((request.params as { id: string }).id, 10);
+    const providerId = parseProviderId((request.params as { id: string }).id);
 
     const [existing] = await db
       .select()
