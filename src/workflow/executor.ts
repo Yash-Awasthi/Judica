@@ -460,7 +460,12 @@ export class WorkflowExecutor {
           if (pred.targetHandle) {
             nodeInputs[pred.targetHandle] = predOutput;
           } else {
-            Object.assign(nodeInputs, predOutput);
+            // R3-01: Filter forbidden keys before Object.assign to prevent prototype pollution
+            // via crafted workflow node outputs containing __proto__ / constructor keys.
+            const MERGE_FORBIDDEN = new Set(["__proto__", "constructor", "prototype", "__defineGetter__", "__defineSetter__"]);
+            for (const [k, v] of Object.entries(predOutput as Record<string, unknown>)) {
+              if (!MERGE_FORBIDDEN.has(k)) nodeInputs[k] = v;
+            }
           }
         }
       }
