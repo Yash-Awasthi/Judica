@@ -44,8 +44,9 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
 
     return AdminService.getUsers({
       search,
-      limit: parseInt(String(limit)),
-      offset: parseInt(String(offset)),
+      // P30-01: Cap query limit to prevent unbounded user listing
+      limit: Math.min(Math.max(1, parseInt(String(limit), 10) || 20), 100),
+      offset: Math.max(0, parseInt(String(offset), 10) || 0),
       sortBy: safeSortBy,
       sortOrder: safeSortOrder
     });
@@ -234,7 +235,9 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   // GET /analytics/daily-volume — time-series usage data
   fastify.get("/analytics/daily-volume", async (request, _reply) => {
     const { days = 30 } = request.query as { days?: string | number };
-    const data = await AdminService.getUsageAnalytics(parseInt(String(days)));
+    // P30-02: NaN guard on days parameter
+    const daysNum = parseInt(String(days), 10);
+    const data = await AdminService.getUsageAnalytics(Number.isFinite(daysNum) && daysNum > 0 ? Math.min(daysNum, 365) : 30);
     return { data };
   });
 

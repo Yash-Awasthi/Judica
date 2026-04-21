@@ -52,7 +52,10 @@ const deliberationsPlugin: FastifyPluginAsync = async (fastify) => {
       };
     }>;
 
-    const members = scoredOpinions.map((op) => ({
+    // P30-07: Cap scoredOpinions to prevent unbounded array processing
+    const boundedOpinions = scoredOpinions.slice(0, 200);
+
+    const members = boundedOpinions.map((op) => ({
       name: op.name,
       confidence: op.scores?.confidence ?? null,
       agreement: op.scores?.agreement ?? null,

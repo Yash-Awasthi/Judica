@@ -85,8 +85,11 @@ export function buildLayeredContext(
   // This function just provides the context preamble
 
   // Layer 3: Retrieved memory chunks
-  if (ragChunks.length > 0) {
-    parts.push(`[RETRIEVED MEMORY]\n${ragChunks.join("\n\n")}\n[/RETRIEVED MEMORY]`);
+  // P30-04: Cap ragChunks to prevent unbounded concatenation
+  const MAX_RAG_CHUNKS = 20;
+  const boundedChunks = ragChunks.slice(0, MAX_RAG_CHUNKS);
+  if (boundedChunks.length > 0) {
+    parts.push(`[RETRIEVED MEMORY]\n${boundedChunks.map(c => c.substring(0, 2000)).join("\n\n")}\n[/RETRIEVED MEMORY]`);
   }
 
   return parts.join("\n\n");
