@@ -25,9 +25,10 @@ export class GoogleProvider extends BaseProvider {
     await validateSafeUrl(apiHost);
 
     const controller = new AbortController();
+    const onAbort = () => controller.abort();
     if (signal) {
       if (signal.aborted) controller.abort();
-      signal.addEventListener("abort", () => controller.abort());
+      else signal.addEventListener("abort", onAbort, { once: true });
     }
 
     const googleContents = messages.map((m) => ({
@@ -204,6 +205,8 @@ export class GoogleProvider extends BaseProvider {
       }
       logger.error({ err, provider: this.name }, "Google call failed");
       throw err;
+    } finally {
+      signal?.removeEventListener("abort", onAbort);
     }
   }
 }
