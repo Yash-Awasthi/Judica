@@ -134,12 +134,18 @@ export async function createChat(input: CreateChatInput, generateEmbedding: bool
   }
 }
 
-export async function getRecentHistory(conversationId: string): Promise<Message[]> {
+// R4-05: Accept optional userId so callers can scope history to the authenticated user.
+// lib/history.ts has the same function with optional userId — keep both in sync.
+export async function getRecentHistory(conversationId: string, userId?: number): Promise<Message[]> {
   try {
+    const whereClause = userId
+      ? and(eq(chats.conversationId, conversationId), eq(chats.userId, userId))
+      : eq(chats.conversationId, conversationId);
+
     const result = await db
       .select()
       .from(chats)
-      .where(eq(chats.conversationId, conversationId))
+      .where(whereClause)
       .orderBy(asc(chats.createdAt))
       .limit(20);
 
@@ -187,7 +193,8 @@ export async function getConversationList(userId: number, limit: number = 50, of
 
 export async function searchChats(userId: number, q: string, limit: number = 10, filters?: { projectId?: string; after?: Date; before?: Date }): Promise<Chat[]> {
   try {
-    const searchTerm = q.trim();
+    // P41-09: Cap search term to prevent oversized LIKE queries
+    const searchTerm = q.trim().slice(0, 1000);
     const escapedTerm = searchTerm
       .replace(/\\/g, "\\\\")
       .replace(/%/g, "\\%")
@@ -384,7 +391,7 @@ export function formatContextForInjection(context: RelevantContext[]): string {
 
 export async function generateConversationSummary(conversationId: string, userId: number) {
   try {
-    const history = await getRecentHistory(conversationId);
+    const history = await getRecentHistory(conversationId, userId); // R4-05: pass userId for ownership scoping
     if (history.length === 0) {
       throw new AppError(400, "No history found to summarize");
     }
@@ -421,8 +428,8 @@ Respond ONLY with a JSON object in this format:
     const response = await askProvider(providerConfig as Provider, prompt);
     const content = response.text;
 
-    // Extract JSON from response (handle potential markdown blocks)
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    // P41-08: Use non-greedy regex to avoid ReDoS on large AI responses
+    const jsonMatch = content.match(/\{[\s\S]*?\}/);
     if (!jsonMatch) {
       throw new Error("Failed to extract JSON from AI response");
     }

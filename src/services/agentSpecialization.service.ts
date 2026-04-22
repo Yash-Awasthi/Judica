@@ -78,6 +78,10 @@ export const DOMAIN_PROFILES: Record<string, DomainProfile> = {
   },
 };
 
+// P59-02: Freeze domain profiles to prevent runtime mutation
+Object.freeze(DOMAIN_PROFILES);
+for (const p of Object.values(DOMAIN_PROFILES)) Object.freeze(p);
+
 /**
  * Detect the domain of a query from keyword matching.
  */
@@ -138,7 +142,8 @@ export async function getPersonaPerformance(
       const total = row.totalResponses || 1;
       const agreed = row.agreedWith || 0;
       const contradicted = row.contradicted || 0;
-      const agreementRate = agreed / (agreed + contradicted + 1);
+      // P59-09: Use natural rate with explicit zero-case, avoiding Laplace smoothing bias
+      const agreementRate = (agreed + contradicted) > 0 ? agreed / (agreed + contradicted) : 0.5;
 
       // Determine trend based on avg confidence vs agreement rate
       const confidenceGap = (row.avgConfidence || 0.5) - agreementRate;
@@ -232,6 +237,20 @@ export interface DelegationSuggestion {
   reason: string;
 }
 
+// P59-03: Module-level constant — avoids recreating 10 regex patterns per call
+const DELEGATION_RULES: { pattern: RegExp; archetype: string; reason: string }[] = [
+  { pattern: /\b(code|implement|build|debug|refactor)\b/, archetype: "architect", reason: "Implementation task — systems thinking" },
+  { pattern: /\b(research|investigate|find|search|look up)\b/, archetype: "empiricist", reason: "Research task — data-driven analysis" },
+  { pattern: /\b(risk|danger|concern|safety|security)\b/, archetype: "contrarian", reason: "Risk assessment — adversarial thinking" },
+  { pattern: /\b(ethic|moral|fair|bias|privacy|consent)\b/, archetype: "ethicist", reason: "Ethical consideration — values-driven" },
+  { pattern: /\b(trend|future|predict|forecast|emerging)\b/, archetype: "futurist", reason: "Trend analysis — long-term thinking" },
+  { pattern: /\b(plan|strategy|compete|position|market)\b/, archetype: "strategist", reason: "Strategic planning — game theory" },
+  { pattern: /\b(simplif|reduc|minimiz|essenti|core)\b/, archetype: "minimalist", reason: "Simplification task — Occam's razor" },
+  { pattern: /\b(history|precedent|pattern|past|previous)\b/, archetype: "historian", reason: "Historical analysis — pattern matching" },
+  { pattern: /\b(user|experience|feel|empathy|impact on people)\b/, archetype: "empath", reason: "User impact analysis — human-centered" },
+  { pattern: /\b(creative|novel|innovat|brainstorm|idea)\b/, archetype: "creator", reason: "Creative task — novel synthesis" },
+];
+
 /**
  * Suggest which archetype should handle a subtask based on domain matching.
  * Used for dynamic delegation during deliberation.
@@ -242,21 +261,7 @@ export function suggestDelegation(
 ): DelegationSuggestion | null {
   const lower = subtask.toLowerCase();
 
-  // Map keywords to best archetype
-  const delegationRules: { pattern: RegExp; archetype: string; reason: string }[] = [
-    { pattern: /\b(code|implement|build|debug|refactor)\b/, archetype: "architect", reason: "Implementation task — systems thinking" },
-    { pattern: /\b(research|investigate|find|search|look up)\b/, archetype: "empiricist", reason: "Research task — data-driven analysis" },
-    { pattern: /\b(risk|danger|concern|safety|security)\b/, archetype: "contrarian", reason: "Risk assessment — adversarial thinking" },
-    { pattern: /\b(ethic|moral|fair|bias|privacy|consent)\b/, archetype: "ethicist", reason: "Ethical consideration — values-driven" },
-    { pattern: /\b(trend|future|predict|forecast|emerging)\b/, archetype: "futurist", reason: "Trend analysis — long-term thinking" },
-    { pattern: /\b(plan|strategy|compete|position|market)\b/, archetype: "strategist", reason: "Strategic planning — game theory" },
-    { pattern: /\b(simplif|reduc|minimiz|essenti|core)\b/, archetype: "minimalist", reason: "Simplification task — Occam's razor" },
-    { pattern: /\b(history|precedent|pattern|past|previous)\b/, archetype: "historian", reason: "Historical analysis — pattern matching" },
-    { pattern: /\b(user|experience|feel|empathy|impact on people)\b/, archetype: "empath", reason: "User impact analysis — human-centered" },
-    { pattern: /\b(creative|novel|innovat|brainstorm|idea)\b/, archetype: "creator", reason: "Creative task — novel synthesis" },
-  ];
-
-  for (const rule of delegationRules) {
+  for (const rule of DELEGATION_RULES) {
     if (rule.pattern.test(lower) && availableArchetypes.includes(rule.archetype)) {
       return {
         subtask,

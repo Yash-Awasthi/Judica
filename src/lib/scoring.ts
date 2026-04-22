@@ -3,11 +3,17 @@ import { mlWorker } from "../lib/ml/ml_worker.js";
 import { validationModule } from "./validation.js";
 import logger from "./logger.js";
 
+let mlFallbackWarned = false;
+
 async function computeSemanticSimilarityML(a: string, b: string): Promise<number> {
   try {
     return await mlWorker.computeSimilarity(a, b);
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT' || process.env.NODE_ENV === 'test') {
+      if ((err as NodeJS.ErrnoException).code === 'ENOENT' && process.env.NODE_ENV !== 'test' && !mlFallbackWarned) {
+        logger.warn("ML worker binary not found — falling back to Jaccard similarity. Scoring accuracy will be degraded.");
+        mlFallbackWarned = true;
+      }
       const normalize = (s: string) => new Set(s.toLowerCase().replace(/[^a-z0-9]/g, " ").split(/\s+/).filter(w => w.length > 2));
       const setA = normalize(a);
       const setB = normalize(b);

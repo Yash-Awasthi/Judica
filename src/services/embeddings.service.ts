@@ -34,10 +34,10 @@ export async function embed(text: string): Promise<number[]> {
   } else if (env.GOOGLE_API_KEY) {
     const TARGET_DIMENSIONS = 1536;
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent?key=${env.GOOGLE_API_KEY}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent`,
       {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", "x-goog-api-key": env.GOOGLE_API_KEY },
         body: JSON.stringify({
           content: { parts: [{ text }] },
           outputDimensionality: TARGET_DIMENSIONS,

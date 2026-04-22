@@ -128,6 +128,11 @@ async function getEmbedding(text: string): Promise<number[] | null> {
         model: "text-embedding-3-small",
       }),
     });
+    if (!res.ok) {
+      const errorBody = await res.text().catch(() => "unknown");
+      logger.warn({ status: res.status, errorBody }, "OpenAI embeddings API returned error");
+      return null;
+    }
     const data: EmbeddingResponse = await res.json() as EmbeddingResponse;
     if (data.data?.[0]?.embedding) {
       return data.data[0].embedding;
