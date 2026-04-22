@@ -73,9 +73,11 @@ export function estimateTokens(messages: AdapterMessage[]): number {
     }
 
     // Tool calls add overhead
+    // P43-07: Cap tool calls and argument size to prevent DoS
     if (m.tool_calls) {
-      for (const tc of m.tool_calls) {
-        totalTokens += estimateStringTokens(tc.name + JSON.stringify(tc.arguments));
+      for (const tc of m.tool_calls.slice(0, 100)) {
+        const argStr = JSON.stringify(tc.arguments);
+        totalTokens += estimateStringTokens(tc.name + (argStr.length > 100_000 ? argStr.slice(0, 100_000) : argStr));
       }
     }
   }

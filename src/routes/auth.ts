@@ -304,7 +304,8 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     // P1-14: Sanitize custom_instructions — strip HTML tags and control chars to prevent prompt injection
-    let sanitized = custom_instructions;
+    // P43-02: Cap input before regex loop to prevent quadratic behavior on large inputs
+    let sanitized = custom_instructions.slice(0, 2000);
     // Loop to handle nested/split tags like <scr<script>ipt>
     // M-2: Cap iterations to prevent ReDoS via deeply-crafted tag strings
     const TAG_RE = /<\/?[a-zA-Z][a-zA-Z0-9]*[^>]{0,256}>/g;
@@ -329,7 +330,13 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     fastify.post("/config", { preHandler: [fastifyRequireAuth] }, async (request, _reply) => {
-    const encrypted = encrypt(JSON.stringify((request.body as Record<string, string>).config));
+    // P43-03: Validate and cap config size before encryption
+    const configData = (request.body as Record<string, unknown>).config;
+    const configStr = JSON.stringify(configData);
+    if (configStr.length > 100_000) {
+      throw new AppError(413, "Config payload too large (max 100KB)");
+    }
+    const encrypted = encrypt(configStr);
 
     await db.insert(councilConfigs).values({
       userId: request.userId!,
@@ -386,8 +393,13 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   // PUT /api/auth/settings - save user settings
   // P1-15 + P8-61: Zod .strict() schema rejects unknown keys including __proto__/constructor
   // — prevents prototype pollution. Only whitelisted keys pass validation.
+  // P43-06: Cap settings payload size to prevent oversized storage
   fastify.put("/settings", { preHandler: [fastifyRequireAuth] }, async (request, _reply) => {
     const settings = request.body;
+    const settingsStr = JSON.stringify(settings);
+    if (settingsStr.length > 100_000) {
+      throw new AppError(413, "Settings payload too large (max 100KB)");
+    }
 
     await db.insert(userSettings).values({
       userId: request.userId!,
