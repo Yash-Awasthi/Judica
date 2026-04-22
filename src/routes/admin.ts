@@ -4,7 +4,7 @@ import { db } from "../lib/drizzle.js";
 import { users } from "../db/schema/users.js";
 import { customProviders } from "../db/schema/council.js";
 import { auditLogs } from "../db/schema/conversations.js";
-import { desc, sql, gte, lte } from "drizzle-orm";
+import { desc, sql, gte, lte, count, inArray, ne, and } from "drizzle-orm";
 import { fastifyRequireAdmin } from "../middleware/fastifyAuth.js";
 import { AdminService } from "../services/admin.service.js";
 import { AppError } from "../middleware/errorHandler.js";
@@ -79,13 +79,14 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(400, `Role must be: ${validRoles.join(", ")}`);
     }
 
-    // P1-17: Prevent demotion that would leave zero admins
+    // R2-06: Count admins/owners directly in DB — previous code fetched at most
+    // 1000 users which would give a wrong count on large installations.
     const currentUser = await AdminService.getUserDetail(parseId(id));
     if (currentUser && (currentUser.role === "admin" || currentUser.role === "owner") && role !== "admin" && role !== "owner") {
-      const { users: allUsers } = await AdminService.getUsers({ limit: 1000, offset: 0 });
-      const adminCount = allUsers.filter((u: { role: string; id: number }) =>
-        (u.role === "admin" || u.role === "owner") && u.id !== parseId(id)
-      ).length;
+      const [{ value: adminCount }] = await db
+        .select({ value: count() })
+        .from(users)
+        .where(and(inArray(users.role, ["admin", "owner"]), ne(users.id, parseId(id))));
       if (adminCount === 0) {
         throw new AppError(400, "Cannot demote: at least one admin/owner must remain");
       }
