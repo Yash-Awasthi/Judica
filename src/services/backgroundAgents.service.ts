@@ -300,3 +300,14 @@ export function cleanupAgents(maxAgeMs: number = 86400_000 * 7): number {
   }
   return removed;
 }
+
+// Auto-cleanup completed/failed/cancelled agents every 30 minutes
+const AGENT_CLEANUP_INTERVAL_MS = 30 * 60 * 1000;
+const AGENT_CLEANUP_MAX_AGE_MS = 4 * 60 * 60 * 1000; // 4 hours
+
+setInterval(() => {
+  const removed = cleanupAgents(AGENT_CLEANUP_MAX_AGE_MS);
+  if (removed > 0) {
+    logger.info({ removed }, "Auto-cleaned old background agents");
+  }
+}, AGENT_CLEANUP_INTERVAL_MS).unref();

@@ -45,15 +45,13 @@ export function generatePartitionMigration(
   vectorColumn: string = "embedding",
   _vectorDimensions: number = 1536,
 ): string {
-  // P24-01: Validate all identifiers interpolated into SQL
-  assertSafeIdentifier(tableName, "tableName");
-  assertSafeIdentifier(vectorColumn, "vectorColumn");
-
-  // P24-10: Validate partitionCount range
-  if (!Number.isFinite(partitionCount) || partitionCount < 1 || partitionCount > 256) {
-    throw new Error(`partitionCount must be between 1 and 256, got: ${partitionCount}`);
+  // Validate table name to prevent SQL injection in DDL
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/.test(tableName)) {
+    throw new Error(`Invalid table name: must be a valid SQL identifier`);
   }
-  partitionCount = Math.floor(partitionCount);
+  if (!Number.isInteger(partitionCount) || partitionCount < 1 || partitionCount > 256) {
+    throw new Error(`Invalid partitionCount: must be between 1 and 256`);
+  }
 
   const lines: string[] = [
     `-- P4-50: Partition ${tableName} by userId for HNSW index sharding`,
@@ -95,8 +93,9 @@ export function generatePartitionMigration(
  * Generate SQL to check partition sizes and index health.
  */
 export function generatePartitionHealthCheck(tableName: string): string {
-  // P24-01: Validate identifier to prevent SQL injection
-  assertSafeIdentifier(tableName, "tableName");
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/.test(tableName)) {
+    throw new Error(`Invalid table name: must be a valid SQL identifier`);
+  }
 
   return [
     `-- Check partition sizes for ${tableName}`,

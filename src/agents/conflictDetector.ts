@@ -149,9 +149,8 @@ export async function detectConflicts(responses: AgentResponse[]): Promise<Confl
   }
 
   // P8-22: Configurable severity threshold (default 3)
-  // P24-02: NaN guard on env var parse
-  const _parsedSeverity = parseInt(process.env.CONFLICT_SEVERITY_THRESHOLD || "3", 10);
-  const severityThreshold = Number.isFinite(_parsedSeverity) && _parsedSeverity >= 1 && _parsedSeverity <= 5 ? _parsedSeverity : 3;
+  const parsedThreshold = parseInt(process.env.CONFLICT_SEVERITY_THRESHOLD || "3", 10);
+  const severityThreshold = Number.isNaN(parsedThreshold) ? 3 : parsedThreshold;
   return conflicts.filter((c) => c.severity >= severityThreshold);
 }
 

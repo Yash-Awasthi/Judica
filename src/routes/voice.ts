@@ -26,6 +26,7 @@ const voicePlugin: FastifyPluginAsync = async (fastify) => {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}` },
       body: formData,
+      signal: AbortSignal.timeout(60_000),
     });
 
     if (!response.ok) {
@@ -74,6 +75,7 @@ const voicePlugin: FastifyPluginAsync = async (fastify) => {
             "Content-Type": "application/json",
           },
           body: JSON.stringify(attempt.body),
+          signal: AbortSignal.timeout(30_000),
         });
 
         if (!response.ok) continue;

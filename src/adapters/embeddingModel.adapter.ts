@@ -55,5 +55,8 @@ export function getEmbeddingProvider(): EmbeddingProvider {
 
 /** Set a custom embedding provider (e.g., Cohere, local SentenceTransformers). */
 export function setEmbeddingProvider(provider: EmbeddingProvider): void {
+  if (!provider || typeof provider.embed !== "function") {
+    throw new Error("Invalid embedding provider: must implement embed()");
+  }
   currentProvider = provider;
 }

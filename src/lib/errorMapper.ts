@@ -107,8 +107,9 @@ function extractMetadata(err: unknown): { retryAfterMs?: number; metadata?: Reco
 }
 
 const messageLower = (err: unknown): string => {
-  const error = err as Error;
-  return (error.message || String(err)).toLowerCase();
+  if (err instanceof Error) return err.message.toLowerCase();
+  if (typeof err === "string") return err.toLowerCase();
+  return String(err).toLowerCase();
 };
 
 /**
@@ -268,7 +269,8 @@ export function mapProviderErrorStructured(err: unknown): MappedError {
     };
   }
 
-  logger.warn({ err: (err as Error).message || String(err) }, "Unmapped provider error");
+  const errMsg = err instanceof Error ? err.message : String(err);
+  logger.warn({ err: errMsg.slice(0, 500) }, "Unmapped provider error");
 
   return {
     httpStatus: 500,
