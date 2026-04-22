@@ -58,7 +58,16 @@ export function decrypt(encryptedText: string, customKey?: string, aad?: string)
 
     // P0-16: Support both legacy (iv:tag:ct) and new JSON envelope format
     if (encryptedText.startsWith("{")) {
-      const envelope = JSON.parse(encryptedText) as { v: number; kv?: number; iv: string; tag: string; ct: string };
+      // P45-01: Validate JSON envelope structure after parse
+      let envelope: { v: number; kv?: number; iv: string; tag: string; ct: string };
+      try {
+        envelope = JSON.parse(encryptedText);
+      } catch {
+        throw new Error("Invalid encrypted text format (malformed JSON)");
+      }
+      if (!envelope || typeof envelope.iv !== "string" || typeof envelope.tag !== "string" || typeof envelope.ct !== "string") {
+        throw new Error("Invalid encrypted text format (missing fields)");
+      }
       ivHex = envelope.iv;
       tagHex = envelope.tag;
       encryptedData = envelope.ct;
@@ -79,6 +88,10 @@ export function decrypt(encryptedText: string, customKey?: string, aad?: string)
       throw new Error("Invalid encrypted text format");
     }
 
+    // P45-02: Validate hex string lengths before buffer conversion (IV=12 bytes=24 hex, tag=16 bytes=32 hex)
+    if (ivHex.length !== 24 || tagHex.length !== 32) {
+      throw new Error("Invalid encrypted text format (bad IV/tag length)");
+    }
     const iv = Buffer.from(ivHex, "hex");
     const tag = Buffer.from(tagHex, "hex");
     const key = getMasterKey(customKey);
@@ -116,7 +129,7 @@ export function isEncrypted(value: string): boolean {
   // Legacy format: 24-char hex iv : 32-char hex tag : hex ciphertext
   const parts = value.split(":");
   if (parts.length === 3) {
-    return /^[0-9a-f]{24}$/.test(parts[0]) && /^[0-9a-f]{32}$/.test(parts[1]) && /^[0-9a-f]+$/.test(parts[2]);
+    return /^[0-9a-f]{24}$/.test(parts[0]) && /^[0-9a-f]{32}$/.test(parts[1]) && parts[2].length <= 1_000_000 && /^[0-9a-f]+$/.test(parts[2]);
   }
   return false;
 }

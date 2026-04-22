@@ -29,6 +29,10 @@ export class DeliberationController {
   }
 
   decide(round: number, maxRounds: number, consensusScore: number): ControllerDecision {
+    // P45-06: Cap roundScores to prevent unbounded memory growth
+    if (this.roundScores.length >= 1000) {
+      return { shouldHalt: true, reason: "Exceeded maximum round limit (1000)" };
+    }
     // Track round-over-round consensus history
     this.roundScores.push(consensusScore);
     const previousRoundScore =
@@ -88,7 +92,9 @@ export class DeliberationController {
       logger.warn("shouldAcceptRound called with empty scored list — rejecting");
       return false;
     }
-    const currentMax = Math.max(...currentScored.map((s) => s.scores.final), 0);
+    // P45-07: Filter NaN scores before Math.max to prevent NaN propagation
+    const validScores = currentScored.map((s) => s.scores.final).filter(Number.isFinite);
+    const currentMax = validScores.length > 0 ? Math.max(...validScores) : 0;
 
     const anyCriticalFailures = currentScored.some((s) => s.scores.final < 0.2);
 
