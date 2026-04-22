@@ -3,6 +3,15 @@ import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import { Textarea } from "~/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "~/components/ui/dialog";
 import {
   GitBranch,
   Plus,
@@ -23,13 +32,24 @@ import {
 import { ReactFlow, Background, Controls, MiniMap, type Node, type Edge, useNodesState, useEdgesState, addEdge, type Connection } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
 
-const mockWorkflows = [
+type WorkflowStatus = "success" | "failed" | "pending";
+
+type Workflow = {
+  id: string;
+  name: string;
+  description: string;
+  nodeCount: number;
+  status: WorkflowStatus;
+  lastRun: string;
+};
+
+const initialWorkflows: Workflow[] = [
   {
     id: "1",
     name: "Code Review Pipeline",
     description: "Automated code review with multiple archetype passes",
     nodeCount: 7,
-    status: "success" as const,
+    status: "success",
     lastRun: "2 hours ago",
   },
   {
@@ -37,7 +57,7 @@ const mockWorkflows = [
     name: "Research Synthesis",
     description: "Gather, analyze, and synthesize research from multiple sources",
     nodeCount: 12,
-    status: "success" as const,
+    status: "success",
     lastRun: "Yesterday",
   },
   {
@@ -45,7 +65,7 @@ const mockWorkflows = [
     name: "Content Generation",
     description: "Multi-stage content creation with editorial review",
     nodeCount: 5,
-    status: "failed" as const,
+    status: "failed",
     lastRun: "3 hours ago",
   },
   {
@@ -53,7 +73,7 @@ const mockWorkflows = [
     name: "Data Analysis Flow",
     description: "Ingest, clean, analyze, and visualize datasets",
     nodeCount: 9,
-    status: "pending" as const,
+    status: "pending",
     lastRun: "Never",
   },
   {
@@ -61,7 +81,7 @@ const mockWorkflows = [
     name: "Security Audit Chain",
     description: "Sequential security checks across codebase layers",
     nodeCount: 8,
-    status: "success" as const,
+    status: "success",
     lastRun: "1 day ago",
   },
 ];
@@ -225,7 +245,7 @@ function PropertiesPanel({ selectedNode, onUpdateLabel }: { selectedNode: Node |
   );
 }
 
-function WorkflowEditor({ workflow, onBack }: { workflow: typeof mockWorkflows[0]; onBack: () => void }) {
+function WorkflowEditor({ workflow, onBack }: { workflow: Workflow; onBack: () => void }) {
   const [nodes, setNodes, onNodesChange] = useNodesState(workflow.id === '1' ? demoNodes : []);
   const [edges, setEdges, onEdgesChange] = useEdgesState(workflow.id === '1' ? demoEdges : []);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
@@ -335,8 +355,98 @@ function WorkflowEditor({ workflow, onBack }: { workflow: typeof mockWorkflows[0
   );
 }
 
+interface NewWorkflowDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSubmit: (name: string, description: string) => void;
+}
+
+function NewWorkflowDialog({ open, onOpenChange, onSubmit }: NewWorkflowDialogProps) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+
+  const handleOpenChange = (o: boolean) => {
+    if (o) {
+      setName("");
+      setDescription("");
+    }
+    onOpenChange(o);
+  };
+
+  const handleSubmit = () => {
+    if (!name.trim()) return;
+    onSubmit(name.trim(), description.trim());
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle>New Workflow</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          <div className="space-y-1.5">
+            <Label htmlFor="wf-name" className="text-xs">
+              Workflow Name <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="wf-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. Customer Onboarding Flow"
+              className="h-9"
+              onKeyDown={(e) => {
+                if (e.key === "Enter") handleSubmit();
+              }}
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="wf-desc" className="text-xs">Description</Label>
+            <Textarea
+              id="wf-desc"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="Describe what this workflow does..."
+              rows={3}
+              className="text-sm resize-none"
+            />
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSubmit} disabled={!name.trim()}>
+            Create Workflow
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function WorkflowsPage() {
-  const [editingWorkflow, setEditingWorkflow] = useState<typeof mockWorkflows[0] | null>(null);
+  const [workflows, setWorkflows] = useState<Workflow[]>(initialWorkflows);
+  const [editingWorkflow, setEditingWorkflow] = useState<Workflow | null>(null);
+  const [newWorkflowOpen, setNewWorkflowOpen] = useState(false);
+
+  const handleCreateWorkflow = (name: string, description: string) => {
+    const newWorkflow: Workflow = {
+      id: `custom-${Date.now()}`,
+      name,
+      description: description || "New workflow",
+      nodeCount: 0,
+      status: "pending",
+      lastRun: "Never",
+    };
+    setWorkflows((prev) => [...prev, newWorkflow]);
+    // Optionally enter the editor for the new workflow immediately
+    setEditingWorkflow(newWorkflow);
+  };
 
   if (editingWorkflow) {
     return <WorkflowEditor workflow={editingWorkflow} onBack={() => setEditingWorkflow(null)} />;
@@ -355,14 +465,14 @@ export default function WorkflowsPage() {
               </p>
             </div>
           </div>
-          <Button size="sm" className="gap-2">
+          <Button size="sm" className="gap-2" onClick={() => setNewWorkflowOpen(true)}>
             <Plus className="size-3.5" />
             New Workflow
           </Button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {mockWorkflows.map((wf) => {
+          {workflows.map((wf) => {
             const st = statusConfig[wf.status];
             const StatusIcon = st.icon;
             return (
@@ -403,6 +513,12 @@ export default function WorkflowsPage() {
           })}
         </div>
       </div>
+
+      <NewWorkflowDialog
+        open={newWorkflowOpen}
+        onOpenChange={setNewWorkflowOpen}
+        onSubmit={handleCreateWorkflow}
+      />
     </div>
   );
 }

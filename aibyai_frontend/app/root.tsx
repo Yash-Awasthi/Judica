@@ -29,6 +29,8 @@ import {
   FolderOpen,
   ClipboardCheck,
   LogOut,
+  Sun,
+  Moon,
 } from "lucide-react";
 
 import { TooltipProvider } from "~/components/ui/tooltip";
@@ -47,6 +49,7 @@ import {
   SidebarTrigger,
 } from "~/components/ui/sidebar";
 import { mockUser } from "~/lib/mock-data";
+import { ThemeProvider, useTheme } from "~/context/ThemeContext";
 
 import type { Route } from "./+types/root";
 import "./app.css";
@@ -157,6 +160,28 @@ function NavItem({
   );
 }
 
+function ThemeToggleButton() {
+  const { theme, toggleTheme } = useTheme();
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton
+        onClick={toggleTheme}
+        tooltip={theme === "dark" ? "Switch to Light Mode" : "Switch to Dark Mode"}
+        className="flex items-center gap-2 text-muted-foreground hover:text-foreground cursor-pointer"
+      >
+        {theme === "dark" ? (
+          <Sun className="size-4" />
+        ) : (
+          <Moon className="size-4" />
+        )}
+        <span className="group-data-[collapsible=icon]:hidden text-xs">
+          {theme === "dark" ? "Light Mode" : "Dark Mode"}
+        </span>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
 function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
@@ -206,6 +231,7 @@ function AppSidebar() {
               </NavLink>
             </SidebarMenuButton>
           </SidebarMenuItem>
+          <ThemeToggleButton />
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Logout">
               <NavLink to="/login" className="flex items-center gap-2 text-muted-foreground hover:text-foreground">
@@ -225,22 +251,28 @@ export default function App() {
   const isAuthPage = location.pathname === "/login" || location.pathname === "/register";
 
   if (isAuthPage) {
-    return <Outlet />;
+    return (
+      <ThemeProvider>
+        <Outlet />
+      </ThemeProvider>
+    );
   }
 
   return (
-    <TooltipProvider>
-      <SidebarProvider>
-        <AppSidebar />
-        <main className="flex-1 overflow-auto">
-          <div className="flex items-center gap-2 border-b border-border px-4 py-2 md:hidden">
-            <SidebarTrigger />
-            <span className="text-sm font-semibold">AIBYAI</span>
-          </div>
-          <Outlet />
-        </main>
-      </SidebarProvider>
-    </TooltipProvider>
+    <ThemeProvider>
+      <TooltipProvider>
+        <SidebarProvider>
+          <AppSidebar />
+          <main className="flex-1 overflow-auto">
+            <div className="flex items-center gap-2 border-b border-border px-4 py-2 md:hidden">
+              <SidebarTrigger />
+              <span className="text-sm font-semibold">AIBYAI</span>
+            </div>
+            <Outlet />
+          </main>
+        </SidebarProvider>
+      </TooltipProvider>
+    </ThemeProvider>
   );
 }
 

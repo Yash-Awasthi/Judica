@@ -1,8 +1,38 @@
+import { useState } from "react";
 import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
-import { Users, Plus } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
+import { Textarea } from "~/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "~/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "~/components/ui/dropdown-menu";
+import { Users, Plus, MoreHorizontal, Eye, Pencil, Trash2 } from "lucide-react";
 
-const archetypes = [
+type Archetype = {
+  id: string;
+  name: string;
+  icon: string;
+  color: string;
+  thinkingStyle: string;
+  description: string;
+  systemPrompt?: string;
+  model?: string;
+  temperature?: number;
+  isCustom?: boolean;
+};
+
+const builtinArchetypes: Archetype[] = [
   {
     id: "architect",
     name: "The Architect",
@@ -109,7 +139,244 @@ const archetypes = [
   },
 ];
 
+const modelOptions = [
+  { value: "gpt-4o", label: "GPT-4o" },
+  { value: "gpt-4o-mini", label: "GPT-4o Mini" },
+  { value: "claude-sonnet-4-6", label: "Claude Sonnet 4.6" },
+  { value: "claude-haiku", label: "Claude Haiku" },
+  { value: "gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+];
+
+const defaultFormState = {
+  name: "",
+  icon: "🤖",
+  thinkingStyle: "",
+  description: "",
+  systemPrompt: "",
+  model: "claude-sonnet-4-6",
+  temperature: 0.7,
+};
+
+type FormState = typeof defaultFormState;
+
+interface ArchetypeDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onSave: (data: FormState) => void;
+  initial?: FormState;
+  title: string;
+}
+
+function ArchetypeDialog({ open, onOpenChange, onSave, initial, title }: ArchetypeDialogProps) {
+  const [form, setForm] = useState<FormState>(initial ?? defaultFormState);
+
+  // Reset form when dialog opens with new data
+  const handleOpenChange = (o: boolean) => {
+    if (o) setForm(initial ?? defaultFormState);
+    onOpenChange(o);
+  };
+
+  const handleSave = () => {
+    if (!form.name.trim()) return;
+    onSave(form);
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={handleOpenChange}>
+      <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{title}</DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4 py-2">
+          <div className="grid grid-cols-[80px_1fr] gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="arch-icon" className="text-xs">Icon</Label>
+              <Input
+                id="arch-icon"
+                value={form.icon}
+                onChange={(e) => setForm((f) => ({ ...f, icon: e.target.value }))}
+                className="h-9 text-xl text-center"
+                maxLength={4}
+                placeholder="🤖"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="arch-name" className="text-xs">Name <span className="text-destructive">*</span></Label>
+              <Input
+                id="arch-name"
+                value={form.name}
+                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                placeholder="e.g. The Analyst"
+                className="h-9"
+              />
+            </div>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="arch-thinking" className="text-xs">Thinking Style</Label>
+            <Input
+              id="arch-thinking"
+              value={form.thinkingStyle}
+              onChange={(e) => setForm((f) => ({ ...f, thinkingStyle: e.target.value }))}
+              placeholder="e.g. Analytical Reasoning"
+              className="h-9"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="arch-desc" className="text-xs">Description</Label>
+            <Textarea
+              id="arch-desc"
+              value={form.description}
+              onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
+              placeholder="Describe how this archetype thinks and what it excels at..."
+              rows={3}
+              className="text-sm resize-none"
+            />
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="arch-prompt" className="text-xs">System Prompt</Label>
+            <Textarea
+              id="arch-prompt"
+              value={form.systemPrompt}
+              onChange={(e) => setForm((f) => ({ ...f, systemPrompt: e.target.value }))}
+              placeholder="You are an expert who..."
+              rows={4}
+              className="text-sm font-mono resize-none"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="arch-model" className="text-xs">Model</Label>
+              <select
+                id="arch-model"
+                value={form.model}
+                onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
+                className="w-full h-9 text-sm bg-background border border-border rounded-md px-3 text-foreground"
+              >
+                {modelOptions.map((m) => (
+                  <option key={m.value} value={m.value}>{m.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="arch-temp" className="text-xs">
+                Temperature: <span className="font-mono text-muted-foreground">{form.temperature.toFixed(1)}</span>
+              </Label>
+              <input
+                id="arch-temp"
+                type="range"
+                min={0}
+                max={2}
+                step={0.1}
+                value={form.temperature}
+                onChange={(e) => setForm((f) => ({ ...f, temperature: parseFloat(e.target.value) }))}
+                className="w-full accent-primary mt-2"
+              />
+            </div>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={handleSave} disabled={!form.name.trim()}>
+            Save Archetype
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+interface ViewDetailsDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  archetype: Archetype | null;
+}
+
+function ViewDetailsDialog({ open, onOpenChange, archetype }: ViewDetailsDialogProps) {
+  if (!archetype) return null;
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-md">
+        <DialogHeader>
+          <DialogTitle className="flex items-center gap-2">
+            <span className="text-2xl">{archetype.icon}</span>
+            {archetype.name}
+          </DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <div>
+            <p className="text-xs font-medium text-muted-foreground mb-1">Thinking Style</p>
+            <p className="text-sm">{archetype.thinkingStyle}</p>
+          </div>
+          <div>
+            <p className="text-xs font-medium text-muted-foreground mb-1">Description</p>
+            <p className="text-sm text-muted-foreground leading-relaxed">{archetype.description}</p>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Close</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function ArchetypesPage() {
+  const [archetypes, setArchetypes] = useState<Archetype[]>(builtinArchetypes);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [editTarget, setEditTarget] = useState<Archetype | null>(null);
+  const [viewTarget, setViewTarget] = useState<Archetype | null>(null);
+
+  const handleCreate = (data: FormState) => {
+    const newArch: Archetype = {
+      id: `custom-${Date.now()}`,
+      name: data.name,
+      icon: data.icon || "🤖",
+      color: "bg-primary/20 border-primary/30",
+      thinkingStyle: data.thinkingStyle,
+      description: data.description,
+      systemPrompt: data.systemPrompt,
+      model: data.model,
+      temperature: data.temperature,
+      isCustom: true,
+    };
+    setArchetypes((prev) => [...prev, newArch]);
+  };
+
+  const handleEdit = (data: FormState) => {
+    if (!editTarget) return;
+    setArchetypes((prev) =>
+      prev.map((a) =>
+        a.id === editTarget.id
+          ? {
+              ...a,
+              name: data.name,
+              icon: data.icon || a.icon,
+              thinkingStyle: data.thinkingStyle,
+              description: data.description,
+              systemPrompt: data.systemPrompt,
+              model: data.model,
+              temperature: data.temperature,
+            }
+          : a
+      )
+    );
+    setEditTarget(null);
+  };
+
+  const handleDelete = (id: string) => {
+    setArchetypes((prev) => prev.filter((a) => a.id !== id));
+  };
+
   return (
     <div className="flex-1 overflow-y-auto">
       <div className="max-w-6xl mx-auto p-6 space-y-6">
@@ -123,7 +390,7 @@ export default function ArchetypesPage() {
               </p>
             </div>
           </div>
-          <Button size="sm" className="gap-2">
+          <Button size="sm" className="gap-2" onClick={() => setCreateOpen(true)}>
             <Plus className="size-3.5" />
             Create Custom
           </Button>
@@ -135,24 +402,119 @@ export default function ArchetypesPage() {
               key={arch.id}
               className={`cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all border ${arch.color}`}
             >
-              <CardHeader>
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl">{arch.icon}</span>
-                  <div>
-                    <CardTitle className="text-sm">{arch.name}</CardTitle>
-                    <span className="text-[11px] text-muted-foreground">{arch.thinkingStyle}</span>
+              <CardHeader className="pb-2">
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl">{arch.icon}</span>
+                    <div>
+                      <CardTitle className="text-sm">{arch.name}</CardTitle>
+                      <span className="text-[11px] text-muted-foreground">{arch.thinkingStyle}</span>
+                    </div>
                   </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-6 shrink-0 -mr-1 -mt-1 opacity-0 group-hover:opacity-100 hover:opacity-100 focus:opacity-100"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <MoreHorizontal className="size-3.5" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-40">
+                      {arch.isCustom ? (
+                        <>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setEditTarget(arch);
+                            }}
+                          >
+                            <Pencil className="size-3.5 mr-2" />
+                            Edit
+                          </DropdownMenuItem>
+                          <DropdownMenuItem
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleDelete(arch.id);
+                            }}
+                            className="text-destructive focus:text-destructive"
+                          >
+                            <Trash2 className="size-3.5 mr-2" />
+                            Delete
+                          </DropdownMenuItem>
+                        </>
+                      ) : (
+                        <DropdownMenuItem
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setViewTarget(arch);
+                          }}
+                        >
+                          <Eye className="size-3.5 mr-2" />
+                          View Details
+                        </DropdownMenuItem>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </div>
               </CardHeader>
               <CardContent>
                 <p className="text-xs text-muted-foreground leading-relaxed">
                   {arch.description}
                 </p>
+                {arch.isCustom && (
+                  <div className="mt-2 flex items-center gap-1.5">
+                    <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded-full font-medium">
+                      Custom
+                    </span>
+                    {arch.model && (
+                      <span className="text-[10px] text-muted-foreground">{arch.model}</span>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))}
         </div>
       </div>
+
+      {/* Create dialog */}
+      <ArchetypeDialog
+        open={createOpen}
+        onOpenChange={setCreateOpen}
+        onSave={handleCreate}
+        title="Create Custom Archetype"
+      />
+
+      {/* Edit dialog */}
+      <ArchetypeDialog
+        open={!!editTarget}
+        onOpenChange={(o) => { if (!o) setEditTarget(null); }}
+        onSave={handleEdit}
+        initial={
+          editTarget
+            ? {
+                name: editTarget.name,
+                icon: editTarget.icon,
+                thinkingStyle: editTarget.thinkingStyle,
+                description: editTarget.description,
+                systemPrompt: editTarget.systemPrompt ?? "",
+                model: editTarget.model ?? "claude-sonnet-4-6",
+                temperature: editTarget.temperature ?? 0.7,
+              }
+            : undefined
+        }
+        title="Edit Archetype"
+      />
+
+      {/* View Details dialog */}
+      <ViewDetailsDialog
+        open={!!viewTarget}
+        onOpenChange={(o) => { if (!o) setViewTarget(null); }}
+        archetype={viewTarget}
+      />
     </div>
   );
 }

@@ -14,6 +14,12 @@ type Pages = {
   "/": {
     params: {};
   };
+  "/login": {
+    params: {};
+  };
+  "/register": {
+    params: {};
+  };
   "/chat": {
     params: {};
   };
@@ -49,6 +55,18 @@ type Pages = {
   "/memory": {
     params: {};
   };
+  "/skills": {
+    params: {};
+  };
+  "/repos": {
+    params: {};
+  };
+  "/evaluation": {
+    params: {};
+  };
+  "/projects": {
+    params: {};
+  };
   "/admin/users": {
     params: {};
   };
@@ -66,11 +84,19 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/chat" | "/chat/:id" | "/settings" | "/profile" | "/language-models" | "/workflows" | "/prompts" | "/knowledge-bases" | "/marketplace" | "/archetypes" | "/memory" | "/admin/users" | "/admin/analytics" | "/admin/system" | "/admin/audit";
+    page: "/" | "/login" | "/register" | "/chat" | "/chat/:id" | "/settings" | "/profile" | "/language-models" | "/workflows" | "/prompts" | "/knowledge-bases" | "/marketplace" | "/archetypes" | "/memory" | "/skills" | "/repos" | "/evaluation" | "/projects" | "/admin/users" | "/admin/analytics" | "/admin/system" | "/admin/audit";
   };
   "routes/home.tsx": {
     id: "routes/home";
     page: "/";
+  };
+  "routes/login.tsx": {
+    id: "routes/login";
+    page: "/login";
+  };
+  "routes/register.tsx": {
+    id: "routes/register";
+    page: "/register";
   };
   "routes/chat.tsx": {
     id: "routes/chat";
@@ -116,6 +142,22 @@ type RouteFiles = {
     id: "routes/memory";
     page: "/memory";
   };
+  "routes/skills.tsx": {
+    id: "routes/skills";
+    page: "/skills";
+  };
+  "routes/repos.tsx": {
+    id: "routes/repos";
+    page: "/repos";
+  };
+  "routes/evaluation.tsx": {
+    id: "routes/evaluation";
+    page: "/evaluation";
+  };
+  "routes/projects.tsx": {
+    id: "routes/projects";
+    page: "/projects";
+  };
   "routes/admin-users.tsx": {
     id: "routes/admin-users";
     page: "/admin/users";
@@ -137,6 +179,8 @@ type RouteFiles = {
 type RouteModules = {
   "root": typeof import("./app/root.tsx");
   "routes/home": typeof import("./app/routes/home.tsx");
+  "routes/login": typeof import("./app/routes/login.tsx");
+  "routes/register": typeof import("./app/routes/register.tsx");
   "routes/chat": typeof import("./app/routes/chat.tsx");
   "routes/chat-detail": typeof import("./app/routes/chat-detail.tsx");
   "routes/settings": typeof import("./app/routes/settings.tsx");
@@ -148,6 +192,10 @@ type RouteModules = {
   "routes/marketplace": typeof import("./app/routes/marketplace.tsx");
   "routes/archetypes": typeof import("./app/routes/archetypes.tsx");
   "routes/memory": typeof import("./app/routes/memory.tsx");
+  "routes/skills": typeof import("./app/routes/skills.tsx");
+  "routes/repos": typeof import("./app/routes/repos.tsx");
+  "routes/evaluation": typeof import("./app/routes/evaluation.tsx");
+  "routes/projects": typeof import("./app/routes/projects.tsx");
   "routes/admin-users": typeof import("./app/routes/admin-users.tsx");
   "routes/admin-analytics": typeof import("./app/routes/admin-analytics.tsx");
   "routes/admin-system": typeof import("./app/routes/admin-system.tsx");
