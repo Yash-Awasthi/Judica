@@ -216,9 +216,12 @@ const promptsPlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     // Replace {{input}} placeholder with test_input if provided
+    // R2-08: Sanitize test_input against prompt injection before substituting
     let resolvedContent = content;
     if (test_input) {
-      resolvedContent = resolvedContent.replace(/\{\{input\}\}/g, test_input);
+      const { sanitizeForPrompt } = await import("../lib/sanitize.js");
+      const safeInput = sanitizeForPrompt(test_input).slice(0, 2000);
+      resolvedContent = resolvedContent.replace(/\{\{input\}\}/g, safeInput);
     }
 
     const startTime = Date.now();

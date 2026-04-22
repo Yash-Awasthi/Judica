@@ -23,6 +23,9 @@ export const customProviders = pgTable(
     name: text("name").notNull(),
     baseUrl: text("baseUrl").notNull(),
     authType: text("authType").notNull(),
+    // P55-09: SECURITY — authKey is stored as text. Application layer (routes/customProviders.ts)
+    // MUST encrypt before INSERT and decrypt on SELECT. Use lib/crypto.ts encrypt/decrypt functions.
+    // TODO: migrate to pgcrypto or application-level AES-256-GCM encryption.
     authKey: text("authKey").notNull(),
     authHeaderName: text("authHeaderName"),
     capabilities: jsonb("capabilities").notNull(),
@@ -62,7 +65,8 @@ export const customPersonas = pgTable(
     id: text("id").primaryKey(),
     userId: integer("userId")
       .notNull()
-      .references(() => users.id),
+      // P55-05: Cascade delete when user is removed
+      .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     systemPrompt: text("systemPrompt").notNull(),
     temperature: real("temperature").default(0.7).notNull(),
@@ -85,7 +89,7 @@ export const promptDnas = pgTable(
     id: text("id").primaryKey(),
     userId: integer("userId")
       .notNull()
-      .references(() => users.id),
+      .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     systemPrompt: text("systemPrompt").notNull(),
     steeringRules: text("steeringRules").notNull(),
@@ -103,7 +107,8 @@ export const contradictionRecords = pgTable(
   "ContradictionRecord",
   {
     id: text("id").primaryKey(),
-    conversationId: text("conversationId").notNull(),
+    // P55-04: Add FK constraint to prevent orphaned contradiction records
+    conversationId: text("conversationId").notNull().references(() => conversations.id, { onDelete: "cascade" }),
     userId: integer("userId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),

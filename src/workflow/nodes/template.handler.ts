@@ -19,10 +19,14 @@ const FILTERS: Record<string, (val: string) => string> = {
   length: (v) => String(v.length),
 };
 
+// R2-09: Block dangerous keys to prevent prototype pollution via template variables
+const TEMPLATE_FORBIDDEN_KEYS = new Set(["__proto__", "constructor", "prototype", "__defineGetter__", "__defineSetter__"]);
+
 function resolveVariable(path: string, vars: Record<string, unknown>): unknown {
   const parts = path.split(".");
   let current: unknown = vars;
   for (const part of parts) {
+    if (TEMPLATE_FORBIDDEN_KEYS.has(part)) return undefined;
     if (current === null || current === undefined) return undefined;
     current = (current as Record<string, unknown>)[part];
   }
