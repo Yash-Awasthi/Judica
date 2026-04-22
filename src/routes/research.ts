@@ -121,6 +121,14 @@ const researchPlugin: FastifyPluginAsync = async (fastify) => {
     });
 
     let lastStepCount = 0;
+    const MAX_STREAM_DURATION_MS = 30 * 60 * 1000; // 30 minutes
+    const streamTimeout = setTimeout(() => {
+      clearInterval(interval);
+      if (!reply.raw.writableEnded) {
+        reply.raw.write(`data: ${JSON.stringify({ type: "error", message: "Stream timeout — research job may still be running" })}\n\n`);
+        reply.raw.end();
+      }
+    }, MAX_STREAM_DURATION_MS);
     const interval = setInterval(async () => {
       try {
         const [current] = await db
@@ -131,6 +139,7 @@ const researchPlugin: FastifyPluginAsync = async (fastify) => {
 
         if (!current) {
           clearInterval(interval);
+          clearTimeout(streamTimeout);
           reply.raw.end();
           return;
         }
@@ -153,10 +162,12 @@ const researchPlugin: FastifyPluginAsync = async (fastify) => {
           reply.raw.write(`data: ${JSON.stringify({ type: "report_ready", report: current.report })}\n\n`);
           reply.raw.write(`data: ${JSON.stringify({ type: "done", jobId: current.id })}\n\n`);
           clearInterval(interval);
+          clearTimeout(streamTimeout);
           reply.raw.end();
         } else if (current.status === "failed") {
           reply.raw.write(`data: ${JSON.stringify({ type: "error", message: "Research failed" })}\n\n`);
           clearInterval(interval);
+          clearTimeout(streamTimeout);
           reply.raw.end();
         }
       } catch (err) {
@@ -165,15 +176,9 @@ const researchPlugin: FastifyPluginAsync = async (fastify) => {
       }
     }, 2000);
 
-    // P31-10: Safety timeout — stop polling after 30 minutes to prevent zombie intervals
-    const safetyTimeout = setTimeout(() => {
-      clearInterval(interval);
-      try { reply.raw.end(); } catch { /* already closed */ }
-    }, 30 * 60 * 1000);
-
     request.raw.on("close", () => {
       clearInterval(interval);
-      clearTimeout(safetyTimeout);
+      clearTimeout(streamTimeout);
     });
   });
 

@@ -202,12 +202,12 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
        const payload = jwt.decode(token) as { userId?: number; exp?: number } | null;
        const expiresAt = payload?.exp ? new Date(payload.exp * 1000) : new Date(Date.now() + 15 * 60 * 1000);
 
-       // P31-01: NaN guard on TTL calculation to prevent Redis misuse
-       const ttlRaw = Math.floor((expiresAt.getTime() - Date.now()) / 1000);
-       const ttlSecs = Number.isFinite(ttlRaw) && ttlRaw > 0 ? ttlRaw : 900; // fallback 15min
-       await redis.set(`revoked:${token}`, "1", { EX: ttlSecs });
+       const ttlSecs = Math.max(1, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
+       // C-1 fix: store hash, not raw token, to match fastifyAuth.ts isTokenRevoked lookup
+       const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+       await redis.set(`revoked:${tokenHash}`, "1", { EX: ttlSecs });
 
-       await db.insert(revokedTokens).values({ token, expiresAt });
+       await db.insert(revokedTokens).values({ token: tokenHash, expiresAt });
     }
 
     // Revoke refresh token

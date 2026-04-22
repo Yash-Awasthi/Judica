@@ -157,8 +157,10 @@ export function createStreamResult(
       let finish_reason: AdapterCollectedResponse["finish_reason"];
 
       // If stream was already partially consumed, we can't collect reliably
-      const source = streamConsumed ? gen : gen;
-      for await (const chunk of source) {
+      if (streamConsumed && !collected) {
+        throw new Error("Cannot collect: stream was already partially consumed. Use .stream OR .collect(), not both.");
+      }
+      for await (const chunk of gen) {
         switch (chunk.type) {
           case "text":
             text += chunk.text || "";

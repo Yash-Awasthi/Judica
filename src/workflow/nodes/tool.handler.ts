@@ -6,14 +6,19 @@ import logger from "../../lib/logger.js";
 import "../../lib/tools/builtin.js";
 
 // P10-118: Configurable tool execution timeout (default 60s)
-const TOOL_TIMEOUT_MS = parseInt(process.env.TOOL_EXECUTION_TIMEOUT_MS || "60000", 10);
+// P22-01: NaN guards — fall back to defaults if env vars are non-numeric
+const _parsedToolTimeout = parseInt(process.env.TOOL_EXECUTION_TIMEOUT_MS || "60000", 10);
+const TOOL_TIMEOUT_MS = Number.isFinite(_parsedToolTimeout) && _parsedToolTimeout > 0 ? _parsedToolTimeout : 60000;
 
 // P10-119: Max output size for tool results (default 5MB)
-const MAX_TOOL_OUTPUT_SIZE = parseInt(process.env.TOOL_MAX_OUTPUT_BYTES || "5242880", 10);
+const _parsedToolMaxOutput = parseInt(process.env.TOOL_MAX_OUTPUT_BYTES || "5242880", 10);
+const MAX_TOOL_OUTPUT_SIZE = Number.isFinite(_parsedToolMaxOutput) && _parsedToolMaxOutput > 0 ? _parsedToolMaxOutput : 5242880;
 
 // P10-120: Allowed tool whitelist (if set, only these tools can execute in workflows)
-const TOOL_WHITELIST = process.env.WORKFLOW_TOOL_WHITELIST
-  ? new Set(process.env.WORKFLOW_TOOL_WHITELIST.split(",").map(s => s.trim()))
+// P22-07: Guard against empty whitelist — treat empty string as "no whitelist"
+const _rawWhitelist = (process.env.WORKFLOW_TOOL_WHITELIST || "").trim();
+const TOOL_WHITELIST = _rawWhitelist.length > 0
+  ? new Set(_rawWhitelist.split(",").map(s => s.trim()).filter(s => s.length > 0))
   : null;
 
 export const toolHandler: NodeHandler = async (ctx) => {

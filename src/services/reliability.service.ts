@@ -1,4 +1,4 @@
-import { eq, inArray } from "drizzle-orm";
+import { eq, inArray, sql } from "drizzle-orm";
 import { db } from "../lib/drizzle.js";
 import { modelReliability } from "../db/schema/traces.js";
 import logger from "../lib/logger.js";
@@ -45,42 +45,28 @@ export async function updateReliability(
 
     // Upsert each model's reliability
     for (const [model, deltas] of modelUpdates.entries()) {
-      const rows = await db
-        .select()
-        .from(modelReliability)
-        .where(eq(modelReliability.model, model))
-        .limit(1);
-      const existing = rows[0];
-
-      const totalResponses = (existing?.totalResponses ?? 0) + deltas.totalResponses;
-      const agreedWith = (existing?.agreedWith ?? 0) + deltas.agreedWith;
-      const contradicted = (existing?.contradicted ?? 0) + deltas.contradicted;
-      const toolErrors = existing?.toolErrors ?? 0;
-
-      // score = (agreedWith / (agreedWith + contradicted + 1)) * 0.7
-      //       + (1 - toolErrors/(totalResponses+1)) * 0.3
-      const agreementScore = agreedWith / (agreedWith + contradicted + 1);
-      const errorScore = 1 - toolErrors / (totalResponses + 1);
-      const avgConfidence = agreementScore * 0.7 + errorScore * 0.3;
-
       await db
         .insert(modelReliability)
         .values({
           model,
-          totalResponses,
-          agreedWith,
-          contradicted,
-          toolErrors,
-          avgConfidence,
+          totalResponses: deltas.totalResponses,
+          agreedWith: deltas.agreedWith,
+          contradicted: deltas.contradicted,
+          toolErrors: 0,
+          avgConfidence: deltas.agreedWith / (deltas.agreedWith + deltas.contradicted + 1) * 0.7 + 0.3,
           updatedAt: new Date(),
         })
         .onConflictDoUpdate({
           target: modelReliability.model,
           set: {
-            totalResponses,
-            agreedWith,
-            contradicted,
-            avgConfidence,
+            totalResponses: sql`${modelReliability.totalResponses} + ${deltas.totalResponses}`,
+            agreedWith: sql`${modelReliability.agreedWith} + ${deltas.agreedWith}`,
+            contradicted: sql`${modelReliability.contradicted} + ${deltas.contradicted}`,
+            avgConfidence: sql`
+              (${modelReliability.agreedWith} + ${deltas.agreedWith})::float
+              / (${modelReliability.agreedWith} + ${deltas.agreedWith} + ${modelReliability.contradicted} + ${deltas.contradicted} + 1) * 0.7
+              + (1.0 - ${modelReliability.toolErrors}::float / (${modelReliability.totalResponses} + ${deltas.totalResponses} + 1)) * 0.3
+            `,
             updatedAt: new Date(),
           },
         });

@@ -177,10 +177,11 @@ const WorkflowOutputSchema = z.object({
 
 export const WorkflowDefinitionSchema = z.object({
   version: z.number().int().positive().optional(),
-  nodes: z.array(WorkflowNodeSchema).min(1, "Workflow must have at least one node"),
-  edges: z.array(WorkflowEdgeSchema),
-  inputs: z.array(WorkflowInputSchema),
-  outputs: z.array(WorkflowOutputSchema),
+  // P59-10: Cap array sizes to prevent memory exhaustion from malicious payloads
+  nodes: z.array(WorkflowNodeSchema).min(1, "Workflow must have at least one node").max(500, "Workflow cannot exceed 500 nodes"),
+  edges: z.array(WorkflowEdgeSchema).max(2000, "Workflow cannot exceed 2000 edges"),
+  inputs: z.array(WorkflowInputSchema).max(50, "Workflow cannot exceed 50 inputs"),
+  outputs: z.array(WorkflowOutputSchema).max(50, "Workflow cannot exceed 50 outputs"),
 });
 
 /** P10-92: Validate a raw workflow definition at ingestion time.
@@ -193,5 +194,32 @@ export function parseWorkflowDefinition(raw: unknown): WorkflowDefinition {
       .join("; ");
     throw new Error(`Invalid workflow definition: ${issues}`);
   }
-  return result.data as WorkflowDefinition;
+  // P59-08: Detect cycles in the workflow graph to prevent infinite execution loops
+  const def = result.data as WorkflowDefinition;
+  const adjacency = new Map<string, string[]>();
+  for (const node of def.nodes) adjacency.set(node.id, []);
+  for (const edge of def.edges) {
+    const targets = adjacency.get(edge.source);
+    if (targets) targets.push(edge.target);
+  }
+  const visited = new Set<string>();
+  const inStack = new Set<string>();
+  function hasCycle(nodeId: string): boolean {
+    if (inStack.has(nodeId)) return true;
+    if (visited.has(nodeId)) return false;
+    visited.add(nodeId);
+    inStack.add(nodeId);
+    for (const neighbor of adjacency.get(nodeId) ?? []) {
+      if (hasCycle(neighbor)) return true;
+    }
+    inStack.delete(nodeId);
+    return false;
+  }
+  for (const node of def.nodes) {
+    if (hasCycle(node.id)) {
+      throw new Error("Invalid workflow definition: cycle detected in node graph");
+    }
+  }
+
+  return def;
 }

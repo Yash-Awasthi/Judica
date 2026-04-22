@@ -13,6 +13,25 @@ import { prompts, promptVersions } from "../db/schema/prompts.js";
 import { eq, and, asc, desc } from "drizzle-orm";
 import { AppError } from "../middleware/errorHandler.js";
 
+const VALID_ACCESS_TYPES = ["read", "write"] as const;
+const VALID_EXPIRES_IN = ["24h", "7d", "30d"] as const;
+
+function validateAccess(access?: string): "read" | "write" {
+  if (access === undefined) return "read";
+  if (!VALID_ACCESS_TYPES.includes(access as any)) {
+    throw new AppError(400, "Invalid access type. Must be 'read' or 'write'");
+  }
+  return access as "read" | "write";
+}
+
+function validateExpiresIn(expiresIn?: string): string | undefined {
+  if (expiresIn === undefined) return undefined;
+  if (!VALID_EXPIRES_IN.includes(expiresIn as any)) {
+    throw new AppError(400, "Invalid expiresIn value. Must be '24h', '7d', or '30d'");
+  }
+  return expiresIn;
+}
+
 function parseExpiry(expiresIn?: string): Date | null {
   if (expiresIn === "24h") return new Date(Date.now() + 24 * 60 * 60 * 1000);
   if (expiresIn === "7d") return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
@@ -31,8 +50,10 @@ const sharePlugin: FastifyPluginAsync = async (fastify) => {
       .limit(1);
     if (!convo) throw new AppError(404, "Conversation not found", "NOT_FOUND");
 
-    const { access, expiresIn } = request.body as { access?: string; expiresIn?: string };
-    const expiresAt = parseExpiry(expiresIn);
+    const { access: rawAccess, expiresIn: rawExpiresIn } = request.body as { access?: string; expiresIn?: string };
+    const validatedAccess = validateAccess(rawAccess);
+    const validatedExpiresIn = validateExpiresIn(rawExpiresIn);
+    const expiresAt = parseExpiry(validatedExpiresIn);
 
     const [shared] = await db
       .insert(sharedConversations)
@@ -40,13 +61,13 @@ const sharePlugin: FastifyPluginAsync = async (fastify) => {
         id: randomUUID(),
         conversationId: convo.id,
         ownerId: request.userId!,
-        access: access || "read",
+        access: validatedAccess,
         shareToken: randomUUID(),
         expiresAt,
       })
       .onConflictDoUpdate({
         target: sharedConversations.conversationId,
-        set: { access: access || "read", expiresAt },
+        set: { access: validatedAccess, expiresAt },
       })
       .returning();
 
@@ -105,8 +126,9 @@ const sharePlugin: FastifyPluginAsync = async (fastify) => {
       .limit(1);
     if (!wf) throw new AppError(404, "Workflow not found", "NOT_FOUND");
 
-    const { expiresIn } = request.body as { expiresIn?: string };
-    const expiresAt = parseExpiry(expiresIn);
+    const { expiresIn: rawExpiresIn } = request.body as { expiresIn?: string };
+    const validatedExpiresIn = validateExpiresIn(rawExpiresIn);
+    const expiresAt = parseExpiry(validatedExpiresIn);
 
     const [shared] = await db
       .insert(sharedWorkflows)
@@ -154,8 +176,9 @@ const sharePlugin: FastifyPluginAsync = async (fastify) => {
       .limit(1);
     if (!prompt) throw new AppError(404, "Prompt not found", "NOT_FOUND");
 
-    const { expiresIn } = request.body as { expiresIn?: string };
-    const expiresAt = parseExpiry(expiresIn);
+    const { expiresIn: rawExpiresIn } = request.body as { expiresIn?: string };
+    const validatedExpiresIn = validateExpiresIn(rawExpiresIn);
+    const expiresAt = parseExpiry(validatedExpiresIn);
 
     const [shared] = await db
       .insert(sharedPrompts)

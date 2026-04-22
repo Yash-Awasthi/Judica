@@ -447,10 +447,7 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
 
     const { choice, nodeId } = request.body as { choice?: string; nodeId?: string };
     if (!choice) throw new AppError(400, "Choice is required", "GATE_CHOICE_REQUIRED");
-    // P31-05: Validate nodeId is present and reasonable
-    if (!nodeId || typeof nodeId !== "string" || nodeId.length > 256) {
-      throw new AppError(400, "Valid nodeId is required", "GATE_NODE_ID_REQUIRED");
-    }
+    if (!nodeId) throw new AppError(400, "nodeId is required", "GATE_NODE_REQUIRED");
 
     const active = activeRuns.get(run.id);
     if (!active) {

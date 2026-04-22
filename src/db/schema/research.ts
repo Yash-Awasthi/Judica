@@ -7,6 +7,7 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
+import { conversations } from "./conversations.js";
 
 // ─── ResearchJob ─────────────────────────────────────────────────────────────
 export const researchJobs = pgTable(
@@ -28,6 +29,8 @@ export const researchJobs = pgTable(
       table.userId,
       table.createdAt,
     ),
+    // P56-09: Index for filtering jobs by status per user
+    index("ResearchJob_userId_status_idx").on(table.userId, table.status),
   ],
 );
 
@@ -39,7 +42,8 @@ export const artifacts = pgTable(
     userId: integer("userId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    conversationId: text("conversationId"),
+    // P56-01: Add FK constraint to prevent orphaned artifacts
+    conversationId: text("conversationId").references(() => conversations.id, { onDelete: "set null" }),
     name: text("name").notNull(),
     type: text("type").notNull(),
     content: text("content").notNull(),

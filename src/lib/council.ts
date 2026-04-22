@@ -43,7 +43,8 @@ const MAX_CACHE_ENTRIES = parseInt(process.env.COUNCIL_CACHE_MAX || "50", 10);
 const deliberationCache = new Map<string, { result: { verdict: string; opinions: { name: string; opinion: string }[]; metrics: { totalTokens: number; totalCost: number; hallucinationCount: number } }; expiresAt: number }>();
 
 function getCacheKey(messages: Message[], memberNames: string[]): string {
-  const content = messages.map(m => m.content).join("|") + "||" + memberNames.sort().join(",");
+  // P30-10: Use slice to avoid mutating caller's array with sort()
+  const content = messages.map(m => m.content).join("|") + "||" + [...memberNames].sort().join(",");
   return createHash("sha256").update(content).digest("hex").slice(0, 32);
 }
 
@@ -110,9 +111,12 @@ export async function prepareCouncilMembers(members: CouncilMemberInput[], summo
       let configData: { customArchetypes?: Archetype[] };
       try {
         configData = JSON.parse(decrypt(config.config as string));
-      } catch {
-        // Fallback: if stored as plaintext (legacy), use directly
-        configData = config.config as { customArchetypes?: Archetype[] };
+      } catch (err) {
+        // R2-07: Do NOT silently fall back to plaintext — a decryption failure could
+        // mean tampering or key mismatch. Log and skip user archetypes rather than
+        // trusting potentially manipulated plaintext.
+        logger.error({ err: (err as Error).message, userId }, "Failed to decrypt council config — skipping custom archetypes");
+        configData = {};
       }
       const customs = configData.customArchetypes || [];
       customs.forEach((a) => {
