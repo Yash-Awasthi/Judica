@@ -55,6 +55,10 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
       : "createdAt";
     const safeSortOrder = sortOrder === "asc" ? "asc" : "desc";
 
+    // P42-01: NaN-safe parseInt with upper bounds on limit/offset
+    const safeLimit = Math.min(Math.max(1, Number.isFinite(parseInt(String(limit), 10)) ? parseInt(String(limit), 10) : 20), 200);
+    const safeOffset = Math.max(0, Number.isFinite(parseInt(String(offset), 10)) ? parseInt(String(offset), 10) : 0);
+
     return AdminService.getUsers({
       search,
       // P30-01: Cap query limit to prevent unbounded user listing
@@ -153,8 +157,11 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.post("/groups", async (request, reply) => {
     const { name, description } = request.body as { name?: string; description?: string };
     if (!name) throw new AppError(400, "Group name is required");
+    // P42-04: Cap group name and description length
+    if (name.length > 100) throw new AppError(400, "Group name must be ≤ 100 characters");
+    const safeDescription = description ? description.slice(0, 1000) : undefined;
     
-    const group = await AdminService.createGroup(name, description, request.userId!);
+    const group = await AdminService.createGroup(name, safeDescription, request.userId!);
     reply.code(201);
     return { success: true, group };
   });
@@ -266,6 +273,9 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   // GET /audit-log — view administrative actions
   fastify.get("/audit-log", async (request, _reply) => {
     const { actionType, limit, offset, startDate, endDate } = request.query as { actionType?: string; limit?: string; offset?: string; startDate?: string; endDate?: string };
+    // P42-03: NaN-safe parseInt with bounds on audit log pagination
+    const auditLimit = Math.min(Math.max(1, limit && Number.isFinite(parseInt(limit, 10)) ? parseInt(limit, 10) : 50), 500);
+    const auditOffset = Math.max(0, offset && Number.isFinite(parseInt(offset, 10)) ? parseInt(offset, 10) : 0);
     const logs = await AdminService.getAuditLogs({
       actionType,
       limit: safeInt(limit, 50),

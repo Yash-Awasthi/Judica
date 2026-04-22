@@ -83,9 +83,9 @@ export const readWebpageTool: ToolInstance = {
       const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
       let content = bodyMatch ? bodyMatch[1] : html;
 
-      // Strip HTML tags safely (handles multi-line, nested tags)
-      content = content.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
-      content = content.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "");
+      // Strip HTML tags safely — P45-10: Use non-backtracking regex to prevent ReDoS
+      content = content.replace(/<script\b[\s\S]*?<\/script>/gi, "");
+      content = content.replace(/<style\b[\s\S]*?<\/style>/gi, "");
 
       const text = content
         .replace(/<[^>]+>/g, " ")

@@ -9,7 +9,7 @@ import { db } from "./drizzle.js";
 import { eq, and, gte, sql } from "drizzle-orm";
 import { dailyUsage } from "../db/schema/users.js";
 import logger from "./logger.js";
-import { readFileSync, existsSync } from "fs";
+import { readFileSync, existsSync, statSync } from "fs";
 import { resolve } from "path";
 
 export interface CostConfig {
@@ -45,6 +45,8 @@ const PRICING_CONFIG_PATH = resolve(process.cwd(), "config/pricing.json");
 function loadPricingConfig(): CostConfig[] {
   try {
     if (existsSync(PRICING_CONFIG_PATH)) {
+      const stats = statSync(PRICING_CONFIG_PATH);
+      if (stats.size > 1_000_000) throw new Error("Pricing config too large");
       const raw = readFileSync(PRICING_CONFIG_PATH, "utf-8");
       const parsed = JSON.parse(raw) as CostConfig[];
       logger.info({ count: parsed.length, path: PRICING_CONFIG_PATH }, "Loaded external pricing config");

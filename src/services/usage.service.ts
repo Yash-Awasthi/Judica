@@ -85,10 +85,11 @@ export async function getUsageStats(userId: number): Promise<{
     }).from(dailyUsage)
       .where(eq(dailyUsage.userId, userId));
 
+    // P24-09: Use Math.max(0, ...) to ensure non-negative values from DB aggregates
     return {
-      totalTokens: Number(result.totalTokens) || 0,
-      totalRequests: Number(result.totalRequests) || 0,
-      daysActive: Number(result.daysActive) || 0,
+      totalTokens: Math.max(0, Number(result.totalTokens) || 0),
+      totalRequests: Math.max(0, Number(result.totalRequests) || 0),
+      daysActive: Math.max(0, Number(result.daysActive) || 0),
     };
   } catch (err) {
     logger.error({ err, userId }, "Failed to get usage stats");

@@ -49,6 +49,9 @@ export interface StreamInfo {
 const emitter = new EventEmitter();
 emitter.setMaxListeners(100);
 
+// P24-04: Cap stream maps to prevent unbounded memory growth
+const MAX_STREAMS = 1000;
+
 const streams = new Map<string, StreamInfo>();
 const artifactStore = new Map<string, Artifact[]>();
 

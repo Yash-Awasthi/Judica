@@ -8,9 +8,19 @@ interface SlidingWindow {
 }
 
 const windows = new Map<string, SlidingWindow>();
+const MAX_WINDOWS = 10_000;
 
 function getWindow(provider: string): SlidingWindow {
   let win = windows.get(provider);
+  if (!win && windows.size >= MAX_WINDOWS) {
+    // Prune windows with no recent activity (all timestamps older than 60s)
+    const cutoff = Date.now() - 60_000;
+    for (const [k, w] of windows) {
+      if (w.timestamps.length === 0 || w.timestamps[w.timestamps.length - 1] < cutoff) {
+        windows.delete(k);
+      }
+    }
+  }
   if (!win) {
     win = { timestamps: [], start: 0 };
     windows.set(provider, win);

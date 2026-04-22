@@ -117,7 +117,7 @@ const deliberationsPlugin: FastifyPluginAsync = async (fastify) => {
     if (Array.isArray(payload?.opinions)) {
       timeline.push({
         phase: "gather_opinions",
-        data: (payload.opinions as Array<{ name: string; opinion: string }>).map((o) => ({
+        data: opinions.map((o) => ({
           name: o.name,
           opinion: typeof o.opinion === "string" ? o.opinion.substring(0, 500) : o.opinion,
         })),

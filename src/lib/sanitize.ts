@@ -77,10 +77,16 @@ export function sanitizeForTemplate(text: string): string {
  */
 export function sanitizeHeaders(headers: Record<string, string>): Record<string, string> {
   const clean: Record<string, string> = {};
+  // P45-09: Cap header count and value size to prevent resource exhaustion
+  const MAX_HEADERS = 100;
+  const MAX_HEADER_VALUE_SIZE = 8192;
+  let count = 0;
   for (const [key, value] of Object.entries(headers)) {
+    if (count >= MAX_HEADERS) break;
     // P10-102/P10-137: Reject headers with newlines (HTTP header injection)
     if (/[\r\n\0]/.test(key) || /[\r\n\0]/.test(value)) continue;
-    clean[key] = value;
+    clean[key] = typeof value === "string" && value.length > MAX_HEADER_VALUE_SIZE ? value.slice(0, MAX_HEADER_VALUE_SIZE) : value;
+    count++;
   }
   return clean;
 }
