@@ -9,6 +9,10 @@ import logger from "../lib/logger.js";
  * Validates every component is a finite number to prevent SQL injection.
  */
 function safeVectorLiteral(vec: number[]): string {
+  // P36-07: Cap vector dimensions to prevent unbounded array processing
+  if (vec.length > 4096) {
+    throw new Error(`Vector dimension ${vec.length} exceeds maximum 4096`);
+  }
   for (let i = 0; i < vec.length; i++) {
     if (typeof vec[i] !== "number" || !Number.isFinite(vec[i])) {
       throw new Error(`Invalid vector component at index ${i}: must be a finite number`);

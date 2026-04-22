@@ -117,9 +117,10 @@ export async function saveArtifact(
     id: randomUUID(),
     userId,
     conversationId,
-    name: artifact.name,
+    // P36-09: Cap artifact name and content to prevent excessive DB writes
+    name: artifact.name.slice(0, 500),
     type: artifact.type,
-    content: artifact.content,
+    content: artifact.content.slice(0, 500_000),
     language: artifact.language || null,
     updatedAt: new Date(),
   }).returning();
