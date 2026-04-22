@@ -136,6 +136,11 @@ export function calculateCost(
     return (inputTokens * 0.003 + outputTokens * 0.015) / 1000; // fallback to mid-tier pricing
   }
 
+  // P41-04: Guard against NaN/Infinity in pricing calculation
+  if (!Number.isFinite(pricing.inputTokenPrice) || !Number.isFinite(pricing.outputTokenPrice)) {
+    return (inputTokens * 0.003 + outputTokens * 0.015) / 1000;
+  }
+
   const inputCost = (inputTokens * pricing.inputTokenPrice) / 1000;
   const outputCost = (outputTokens * pricing.outputTokenPrice) / 1000;
 
@@ -247,6 +252,8 @@ export async function getUserCostBreakdown(
 // P9-66: Use actual weighted average from pricing table instead of a magic constant.
 // This tracks closer to real costs as the model mix changes.
 function estimateCostFromTokens(tokens: number): number {
+  // P41-03: Guard against NaN/Infinity/negative tokens
+  if (!Number.isFinite(tokens) || tokens < 0) return 0;
   if (DEFAULT_COST_CONFIG.length === 0) {
     return tokens * 0.00002; // fallback: ~$0.02 per 1K tokens
   }
