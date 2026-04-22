@@ -14,6 +14,10 @@ import type { FastifyRequest, FastifyReply } from "fastify";
  */
 const STATE_MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
+const ALLOWED_ORIGINS_LIST: string[] = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean)
+  : ["http://localhost:3000", "http://localhost:5173"];
+
 export async function fastifyCsrfProtection(request: FastifyRequest, reply: FastifyReply) {
   // Only enforce on state-mutating methods
   if (!STATE_MUTATING_METHODS.has(request.method)) return;

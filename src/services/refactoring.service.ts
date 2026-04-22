@@ -267,7 +267,8 @@ export async function refactorCode(
   // Limit to top N by severity
   const severityOrder: Record<string, number> = { critical: 0, warning: 1, suggestion: 2 };
   opportunities.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
-  const maxOps = options?.maxOpportunities ?? 5;
+  // P28-10: Hard cap maxOpportunities to prevent unbounded parallel LLM calls
+  const maxOps = Math.min(options?.maxOpportunities ?? 5, 20);
   opportunities = opportunities.slice(0, maxOps);
 
   // Step 2: Generate diffs for each opportunity

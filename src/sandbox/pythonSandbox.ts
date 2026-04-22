@@ -218,6 +218,9 @@ function buildCommand(tmpFile: string, tmpDir: string): SandboxCommand {
 }
 
 export async function executePython(code: string, timeout: number = 10000): Promise<SandboxResult> {
+  // P28-03: Validate timeout to prevent hangs or negative values
+  if (!Number.isFinite(timeout) || timeout < 100) timeout = 10000;
+  timeout = Math.min(timeout, 60_000); // Hard cap at 60s
   const start = Date.now();
 
   const MAX_CODE_SIZE = 500_000; // 500KB
@@ -275,6 +278,8 @@ export async function executePython(code: string, timeout: number = 10000): Prom
         cwd: tmpDir,
       });
 
+      // P28-04: Cap stdout/stderr to prevent OOM from malicious print loops
+      const MAX_OUTPUT_LINES = 5000;
       proc.stdout.on("data", (data) => {
         if (stdout.length >= MAX_OUTPUT_LINES || totalBytes >= MAX_OUTPUT_BYTES) return;
         const lines = data.toString().split("\n").filter((l: string) => l.length > 0);

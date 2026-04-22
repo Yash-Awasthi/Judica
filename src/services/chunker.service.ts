@@ -21,6 +21,7 @@ export function chunkText(text: string, chunkSize: number = 512, overlap: number
   let buffer = "";
 
   for (const para of paragraphs) {
+    if (chunks.length >= MAX_CHUNKS) break;
     if (buffer.length + para.length + 1 <= chunkSize) {
       buffer += (buffer ? "\n\n" : "") + para;
     } else {
@@ -30,7 +31,8 @@ export function chunkText(text: string, chunkSize: number = 512, overlap: number
         buffer = para;
       } else {
         // Split long paragraph by sentences
-        const sentences = para.match(/[^.!?]+[.!?]+\s*/g) || [para];
+        // P39-08: Cap sentences per paragraph to prevent pathological regex results
+        const sentences = (para.match(/[^.!?]+[.!?]+\s*/g) || [para]).slice(0, 500);
         buffer = "";
 
         for (const sentence of sentences) {

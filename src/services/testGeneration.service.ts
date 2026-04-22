@@ -109,8 +109,13 @@ Return ONLY the JSON array.`,
     })
   );
 
+  // P28-07: Cap total edge cases to prevent unbounded accumulation from LLM
+  const MAX_EDGE_CASES = 100;
   for (const cases of results) {
-    allEdgeCases.push(...cases);
+    for (const c of cases) {
+      if (allEdgeCases.length >= MAX_EDGE_CASES) break;
+      allEdgeCases.push(c);
+    }
   }
 
   // Deduplicate by description similarity (simple substring match)

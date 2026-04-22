@@ -289,6 +289,10 @@ export async function retrieveRelevantContext(
   query: string,
   maxResults: number = 3
 ): Promise<RelevantContext[]> {
+  // P24-07: Cap maxResults to prevent excessive memory use
+  const MAX_CONTEXT_RESULTS = 50;
+  maxResults = Math.min(Math.max(1, maxResults), MAX_CONTEXT_RESULTS);
+
   try {
     const queryEmbedding = await getEmbeddingWithLock(query);
 

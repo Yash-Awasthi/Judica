@@ -23,8 +23,12 @@ export class GroundingModule {
     const contextHash = hashContent(context.map(c => c.answer).join("|"));
     const cacheKey = `${responseHash}:${contextHash}`;
     const cached = groundingCache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) {
-      return cached.result;
+    if (cached) {
+      if (cached.expiresAt > Date.now()) {
+        return cached.result;
+      }
+      // TTL expired — remove stale entry
+      groundingCache.delete(cacheKey);
     }
 
     const contextText = context.map((c, i) => `Response ${i+1}: ${c.answer}`).join("\n\n");
