@@ -22,6 +22,12 @@ export interface UsageUpdateInput {
 export async function updateDailyUsage(input: UsageUpdateInput): Promise<void> {
   const { userId, tokensUsed, isCacheHit } = input;
 
+  // P38-08: Validate tokensUsed is a non-negative finite number
+  if (!Number.isFinite(tokensUsed) || tokensUsed < 0) {
+    logger.warn({ userId, tokensUsed }, "Invalid tokensUsed value — skipping usage update");
+    return;
+  }
+
   if (!isCacheHit && tokensUsed > 0) {
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);

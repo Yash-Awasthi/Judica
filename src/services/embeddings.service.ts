@@ -26,6 +26,10 @@ export async function embed(text: string): Promise<number[]> {
     });
     if (!res.ok) throw new Error(`OpenAI embeddings failed: ${res.status} ${await res.text()}`);
     const data = await res.json() as { data: Array<{ embedding: number[] }> };
+    // P38-04: Validate API response structure before accessing
+    if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
+      throw new Error("OpenAI embeddings returned empty or malformed response");
+    }
     embedding = data.data[0].embedding;
   } else if (env.GOOGLE_API_KEY) {
     const TARGET_DIMENSIONS = 1536;
@@ -42,6 +46,10 @@ export async function embed(text: string): Promise<number[]> {
     );
     if (!res.ok) throw new Error(`Gemini embeddings failed: ${res.status} ${await res.text()}`);
     const data = await res.json() as { embedding: { values: number[] } };
+    // P38-05: Validate Gemini response structure
+    if (!data.embedding || !Array.isArray(data.embedding.values) || data.embedding.values.length === 0) {
+      throw new Error("Gemini embeddings returned empty or malformed response");
+    }
     const rawEmbedding: number[] = data.embedding.values;
 
     // If Gemini returns fewer dimensions than required (e.g. 768 instead of 1536),
@@ -68,6 +76,8 @@ export async function embed(text: string): Promise<number[]> {
 }
 
 export async function embedBatch(texts: string[]): Promise<number[][]> {
-  // Simple sequential for now, can batch with OpenAI later
-  return Promise.all(texts.map((t) => embed(t)));
+  // P38-06: Cap batch size to prevent unbounded parallel embedding requests
+  const MAX_BATCH_SIZE = 100;
+  const safeBatch = texts.slice(0, MAX_BATCH_SIZE);
+  return Promise.all(safeBatch.map((t) => embed(t)));
 }

@@ -54,6 +54,9 @@ export interface LoadedPlugin {
 // ─── Plugin Registry ────────────────────────────────────────────────────────
 
 const plugins = new Map<string, LoadedPlugin>();
+// P38-09: Cap plugins and tools to prevent unbounded memory growth
+const MAX_PLUGINS = 100;
+const MAX_TOOLS_PER_PLUGIN = 500;
 
 /**
  * Load and register a plugin.
@@ -62,6 +65,20 @@ export async function loadPlugin(
   manifest: PluginManifest,
   config: Record<string, unknown> = {},
 ): Promise<void> {
+  // P38-09: Validate manifest and enforce limits
+  if (!manifest.name || typeof manifest.name !== "string" || manifest.name.length > 200) {
+    throw new Error("Plugin manifest: name is required and must be ≤ 200 characters");
+  }
+  if (!Array.isArray(manifest.tools)) {
+    throw new Error(`Plugin ${manifest.name}: tools must be an array`);
+  }
+  if (manifest.tools.length > MAX_TOOLS_PER_PLUGIN) {
+    throw new Error(`Plugin ${manifest.name}: too many tools (max ${MAX_TOOLS_PER_PLUGIN})`);
+  }
+  if (!plugins.has(manifest.name) && plugins.size >= MAX_PLUGINS) {
+    throw new Error(`Plugin limit reached (max ${MAX_PLUGINS})`);
+  }
+
   // Validate required config
   if (manifest.config) {
     for (const [key, schema] of Object.entries(manifest.config.properties)) {
