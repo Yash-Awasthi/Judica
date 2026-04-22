@@ -62,8 +62,13 @@ Return ONLY the JSON object.`,
 
     const match = result.text.match(/\{[\s\S]*\}/);
     if (match) {
-      const parsed = JSON.parse(match[0]) as { title: string; content: string; description: string };
-      return { type: "mermaid", ...parsed };
+      // P32-03: Safe JSON.parse with try-catch on LLM output
+      try {
+        const parsed = JSON.parse(match[0]) as { title: string; content: string; description: string };
+        return { type: "mermaid", ...parsed };
+      } catch {
+        return { type: "mermaid", content: "", title: "", description: "Failed to parse diagram JSON" };
+      }
     }
     return { type: "mermaid", content: "", title: "", description: "Failed to generate diagram" };
   } catch (err) {
@@ -129,7 +134,12 @@ Return ONLY the JSON object.`,
 
     const match = result.text.match(/\{[\s\S]*\}/);
     if (match) {
-      return JSON.parse(match[0]) as ChartSpec;
+      // P32-04: Safe JSON.parse with try-catch on LLM output
+      try {
+        return JSON.parse(match[0]) as ChartSpec;
+      } catch {
+        return null;
+      }
     }
     return null;
   } catch (err) {
