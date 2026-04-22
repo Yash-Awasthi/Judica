@@ -161,6 +161,8 @@ export async function visualizeDeliberation(
   const outputs: VisualOutput[] = [];
 
   // 1. Generate a Mermaid mindmap of agent positions
+  // P34-06: Cap opinions array to prevent unbounded rendering
+  const cappedOpinions = opinions.slice(0, 50);
   const mindmapContent = [
     "mindmap",
     `  root((${sanitizeMermaid(topic.substring(0, 40))}))`,
@@ -175,8 +177,12 @@ export async function visualizeDeliberation(
   });
 
   // 2. Generate a confidence comparison table
-  const tableRows = opinions
-    .map((o) => `| ${o.agent} | ${o.position.substring(0, 60)} | ${(o.confidence * 100).toFixed(0)}% |`)
+  // P34-07: NaN guard on confidence + use capped opinions
+  const tableRows = cappedOpinions
+    .map((o) => {
+      const conf = Number.isFinite(o.confidence) ? o.confidence : 0;
+      return `| ${o.agent} | ${o.position.substring(0, 60)} | ${(Math.min(1, Math.max(0, conf)) * 100).toFixed(0)}% |`;
+    })
     .join("\n");
 
   const table = `| Agent | Position | Confidence |\n|-------|----------|------------|\n${tableRows}`;
