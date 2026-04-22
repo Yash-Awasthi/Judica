@@ -9,7 +9,7 @@ export interface CouncilTemplate {
   }[];
 }
 
-export const TEMPLATES: CouncilTemplate[] = [
+export const TEMPLATES: readonly CouncilTemplate[] = [
   {
     id: "debate",
     name: "Debate Council",
@@ -55,3 +55,7 @@ export const TEMPLATES: CouncilTemplate[] = [
     ],
   },
 ];
+
+// P57-05: Freeze built-in templates to prevent runtime mutation
+Object.freeze(TEMPLATES);
+for (const t of TEMPLATES) { Object.freeze(t); Object.freeze(t.members); for (const m of t.members) Object.freeze(m); }
