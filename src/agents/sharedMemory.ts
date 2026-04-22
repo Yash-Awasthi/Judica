@@ -47,7 +47,8 @@ export async function getFacts(conversationId: string): Promise<SharedFactData[]
     .select()
     .from(sharedFacts)
     .where(eq(sharedFacts.conversationId, conversationId))
-    .orderBy(asc(sharedFacts.createdAt));
+    .orderBy(asc(sharedFacts.createdAt))
+    .limit(500);
   return facts as SharedFactData[];
 }
 
