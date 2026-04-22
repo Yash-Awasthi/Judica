@@ -29,6 +29,7 @@ export async function embed(text: string): Promise<number[]> {
     embedding = data.data[0].embedding;
   } else if (env.GOOGLE_API_KEY) {
     const TARGET_DIMENSIONS = 1536;
+    // P25-09: Move API key from URL query parameter to header to prevent key leaking in logs
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent`,
       {
@@ -68,6 +69,11 @@ export async function embed(text: string): Promise<number[]> {
 }
 
 export async function embedBatch(texts: string[]): Promise<number[][]> {
+  // P25-10: Cap batch size to prevent memory exhaustion
+  const MAX_BATCH_SIZE = 200;
+  if (texts.length > MAX_BATCH_SIZE) {
+    texts = texts.slice(0, MAX_BATCH_SIZE);
+  }
   // Simple sequential for now, can batch with OpenAI later
   return Promise.all(texts.map((t) => embed(t)));
 }

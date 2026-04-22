@@ -134,6 +134,8 @@ export class ValidationModule {
       while (peek() === "*" || peek() === "/") {
         const op = consume();
         const right = parseFactor();
+        // L-5: Explicit division-by-zero check — return null via exception
+        if (op === "/" && right === 0) throw new Error("Division by zero");
         result = op === "*" ? result * right : result / right;
       }
       return result;

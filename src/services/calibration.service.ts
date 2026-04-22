@@ -34,6 +34,10 @@ const predictions: PredictionRecord[] = [];
  * Record a prediction and its outcome for calibration tracking.
  */
 export function recordPrediction(confidence: number, wasCorrect: boolean): void {
+  // P25-02: Evict oldest entries when cap exceeded
+  if (predictions.length >= MAX_PREDICTIONS) {
+    predictions.splice(0, predictions.length - MAX_PREDICTIONS + 1);
+  }
   predictions.push({
     confidence: Math.max(0, Math.min(1, confidence)),
     wasCorrect,
@@ -69,6 +73,10 @@ export function computeBrierScore(): BrierScore {
  * Generate calibration curve data (10 buckets from 0.0-1.0).
  */
 export function computeCalibrationCurve(bucketCount: number = 10): CalibrationPoint[] {
+  // P25-03: Validate bucketCount to prevent division by zero or excessive iteration
+  if (!Number.isFinite(bucketCount) || bucketCount < 1) bucketCount = 10;
+  bucketCount = Math.min(Math.floor(bucketCount), 100);
+
   const bucketSize = 1.0 / bucketCount;
   const points: CalibrationPoint[] = [];
 

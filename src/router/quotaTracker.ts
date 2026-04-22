@@ -108,3 +108,28 @@ export function getAllQuotas(): Record<string, QuotaEntry> {
   }
   return result;
 }
+
+// ─── Periodic cleanup of stale quota entries ────────────────────────────────
+
+const MAX_QUOTA_ENTRIES = 50_000;
+const QUOTA_CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // hourly
+
+const _cleanupInterval = setInterval(() => {
+  const midnight = getTodayMidnight();
+  // Remove entries from previous days (already stale)
+  for (const [key, entry] of quotas) {
+    if (entry.last_reset < midnight) {
+      quotas.delete(key);
+    }
+  }
+  // Hard cap: if still over limit, evict entries with lowest usage first
+  if (quotas.size > MAX_QUOTA_ENTRIES) {
+    const entries = [...quotas.entries()].sort((a, b) => a[1].requests_used - b[1].requests_used);
+    const excess = quotas.size - MAX_QUOTA_ENTRIES;
+    for (let i = 0; i < excess; i++) {
+      quotas.delete(entries[i][0]);
+    }
+  }
+}, QUOTA_CLEANUP_INTERVAL_MS);
+
+if (_cleanupInterval.unref) _cleanupInterval.unref();

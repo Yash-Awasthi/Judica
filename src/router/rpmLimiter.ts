@@ -67,3 +67,29 @@ export function getCurrentRPM(provider: string, userId?: string): number {
   prune(win, Date.now() - 60_000);
   return activeCount(win);
 }
+
+// ─── Periodic cleanup of stale windows ─────────────────────────────────────
+
+const MAX_WINDOWS = 50_000;
+const WINDOW_CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
+const _cleanupInterval = setInterval(() => {
+  const cutoff = Date.now() - 60_000;
+  for (const [key, win] of windows) {
+    prune(win, cutoff);
+    if (activeCount(win) === 0) {
+      windows.delete(key);
+    }
+  }
+  // Hard cap: if still over limit, evict oldest entries
+  if (windows.size > MAX_WINDOWS) {
+    const excess = windows.size - MAX_WINDOWS;
+    const keys = windows.keys();
+    for (let i = 0; i < excess; i++) {
+      const k = keys.next().value;
+      if (k) windows.delete(k);
+    }
+  }
+}, WINDOW_CLEANUP_INTERVAL_MS);
+
+if (_cleanupInterval.unref) _cleanupInterval.unref();
