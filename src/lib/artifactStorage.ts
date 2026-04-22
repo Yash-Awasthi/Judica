@@ -39,25 +39,29 @@ export interface ArtifactStore {
  * In-memory artifact store — the current default.
  * Suitable for single-process deployments and development.
  */
+// P19-08: Cap in-memory artifact store to prevent unbounded memory growth
+const MAX_STREAMS = 500;
+const MAX_ARTIFACTS_PER_STREAM = 100;
+
 class InMemoryArtifactStore implements ArtifactStore {
   readonly name = "memory";
   private store = new Map<string, Map<string, Buffer>>();
 
   async put(streamId: string, artifactId: string, data: Buffer | string): Promise<void> {
-    const size = Buffer.isBuffer(data) ? data.byteLength : Buffer.byteLength(data);
-    if (size > MAX_ARTIFACT_SIZE) {
-      throw new Error(`Artifact exceeds maximum size of ${MAX_ARTIFACT_SIZE} bytes (got ${size})`);
+    if (!this.store.has(streamId)) {
+      // Evict oldest stream if at capacity
+      if (this.store.size >= MAX_STREAMS) {
+        const oldestKey = this.store.keys().next().value;
+        if (oldestKey) this.store.delete(oldestKey);
+      }
+      this.store.set(streamId, new Map());
     }
-
-    // Count total artifacts across all streams.
-    let totalArtifacts = 0;
-    for (const m of this.store.values()) totalArtifacts += m.size;
-    if (totalArtifacts >= MAX_ARTIFACTS) {
-      throw new Error(`Artifact store limit reached (max ${MAX_ARTIFACTS} artifacts)`);
+    const streamMap = this.store.get(streamId)!;
+    if (streamMap.size >= MAX_ARTIFACTS_PER_STREAM) {
+      const oldestArtifact = streamMap.keys().next().value;
+      if (oldestArtifact) streamMap.delete(oldestArtifact);
     }
-
-    if (!this.store.has(streamId)) this.store.set(streamId, new Map());
-    this.store.get(streamId)!.set(artifactId, Buffer.from(data));
+    streamMap.set(artifactId, Buffer.from(data));
   }
 
   async get(streamId: string, artifactId: string): Promise<Buffer | null> {

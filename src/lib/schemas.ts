@@ -101,9 +101,24 @@ export function parseAgentOutput(raw: string): AgentOutput | null {
     jsonStr = codeBlockMatch[1].trim();
   }
 
-  // P10-58: Use last JSON block to avoid greedy capture issues
-  const jsonMatches = jsonStr.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g);
-  const jsonMatch = jsonMatches ? jsonMatches[jsonMatches.length - 1] : null;
+  // P57-04: Bracket-counting extraction handles arbitrary nesting depth.
+  // Previous regex only handled 1 level of nesting, breaking on deep objects.
+  let jsonMatch: string | null = null;
+  for (let i = jsonStr.length - 1; i >= 0; i--) {
+    if (jsonStr[i] === '}') {
+      let depth = 0;
+      let start = -1;
+      for (let j = i; j >= 0; j--) {
+        if (jsonStr[j] === '}') depth++;
+        else if (jsonStr[j] === '{') depth--;
+        if (depth === 0) { start = j; break; }
+      }
+      if (start >= 0) {
+        jsonMatch = jsonStr.slice(start, i + 1);
+        break;
+      }
+    }
+  }
   if (!jsonMatch) return null;
 
   try {

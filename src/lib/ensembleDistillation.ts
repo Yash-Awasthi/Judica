@@ -14,6 +14,7 @@
  *   const dataset = exportDistillationDataset("jsonl");
  */
 
+import { randomUUID } from "crypto";
 import logger from "./logger.js";
 
 export interface DistillationSample {
@@ -68,9 +69,10 @@ export function recordDistillationSample(sample: {
   }
 
   const entry: DistillationSample = {
-    id: `ds_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
-    query: truncate(sample.query, MAX_QUERY_LENGTH),
-    answer: truncate(sample.answer, MAX_ANSWER_LENGTH),
+    // P20-03: Use crypto.randomUUID for collision-resistant IDs instead of Math.random
+    id: `ds_${randomUUID()}`,
+    query: sample.query,
+    answer: sample.answer,
     confidence: sample.confidence,
     consensusScore: sample.consensusScore,
     participatingModels: sample.participatingModels,

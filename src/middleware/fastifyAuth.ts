@@ -48,7 +48,7 @@ async function isTokenRevoked(token: string): Promise<boolean> {
   const revokedInRedis = await redis.get(`revoked:${tokenHash}`);
   if (revokedInRedis) return true;
 
-  const [revokedInDB] = await db.select().from(revokedTokens).where(eq(revokedTokens.token, tokenHash)).limit(1);
+  const [revokedInDB] = await db.select().from(revokedTokens).where(eq(revokedTokens.tokenHash, tokenHash)).limit(1);
   return !!revokedInDB;
 }
 

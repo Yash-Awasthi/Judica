@@ -82,20 +82,16 @@ async function sweepContextSummaries(): Promise<number> {
 
 async function sweepRedisKeys(): Promise<number> {
   try {
-    const keys = await redis.keys("cache:*");
     let swept = 0;
+    const stream = redis.scanStream({ match: "cache:*", count: 100 });
 
-    for (const key of keys) {
-      const ttl = await redis.pttl(key);
-      // TTL -1 = no expiration (persistent key, do NOT delete)
-      // TTL -2 = key doesn't exist (skip)
-      // TTL  0 = actively expiring
-      if (ttl === -2 || ttl === -1) {
-        continue;
-      }
-      if (ttl === 0) {
-        await redis.del(key);
-        swept++;
+    for await (const keys of stream) {
+      for (const key of keys as string[]) {
+        const ttl = await redis.pttl(key);
+        if (ttl === -1 || ttl <= 0) {
+          await redis.del(key);
+          swept++;
+        }
       }
     }
 

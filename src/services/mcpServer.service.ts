@@ -85,6 +85,17 @@ export function clearTools(): void {
   toolRegistry.clear();
 }
 
+const MCP_TOOL_TIMEOUT_MS = 30_000; // 30 seconds
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`MCP tool "${label}" timed out after ${ms}ms`)), ms),
+    ),
+  ]);
+}
+
 // ─── JSON-RPC Handler ───────────────────────────────────────────────────────
 
 /**
@@ -129,7 +140,7 @@ export async function handleMCPRequest(request: MCPRequest): Promise<MCPResponse
           };
         }
 
-        const result = await tool.handler(args);
+        const result = await withTimeout(tool.handler(args), MCP_TOOL_TIMEOUT_MS, toolName);
         return { ...baseResponse, result };
       }
 

@@ -196,14 +196,10 @@ class RealTimeCostTracker {
     requestType: string = "deliberation"
   ): RealTimeCostEntry {
     this.lastAccessTime.set(userId, new Date());
-    const rawCost = calculateCost(provider, model, inputTokens, outputTokens);
-    // P50-08: Guard against NaN propagation — if calculateCost returns NaN
-    // (e.g., bad pricing config), treat as zero to prevent corrupting all running totals.
-    const cost = Number.isFinite(rawCost) ? rawCost : 0;
-    if (cost !== rawCost) {
-      logger.warn({ provider, model, inputTokens, outputTokens, rawCost },
-        "calculateCost returned non-finite value — defaulting to 0");
-    }
+    // P20-05: Clamp negative token counts to zero — prevents negative cost accumulation
+    inputTokens = Math.max(0, Math.floor(inputTokens));
+    outputTokens = Math.max(0, Math.floor(outputTokens));
+    const cost = calculateCost(provider, model, inputTokens, outputTokens);
     
     const entry: RealTimeCostEntry = {
       sessionId,
@@ -517,4 +513,11 @@ const costTrackerInterval = setInterval(() => {
 
 export function cleanupCostTrackerInterval(): void {
   clearInterval(costTrackerInterval);
+}
+
+// P20-10: Auto-cleanup on SIGTERM/SIGINT to prevent dangling timers in containers
+for (const signal of ["SIGTERM", "SIGINT"] as const) {
+  process.once(signal, () => {
+    clearInterval(costTrackerInterval);
+  });
 }

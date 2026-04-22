@@ -297,3 +297,8 @@ const templatesMapSchema = z.record(z.string(), templateSchema);
 archetypesMapSchema.parse(ARCHETYPES);
 summonsMapSchema.parse(SUMMONS);
 templatesMapSchema.parse(COUNCIL_TEMPLATES);
+
+// P22-05: Freeze config objects to prevent runtime mutation bypassing Zod validation
+Object.freeze(ARCHETYPES);
+Object.freeze(SUMMONS);
+Object.freeze(COUNCIL_TEMPLATES);

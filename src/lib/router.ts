@@ -230,9 +230,15 @@ const FALLBACK_ARCHETYPES = ["strategist", "architect", "empiricist", "outsider"
 const CONFIDENCE_THRESHOLD = 0.4;
 
 export function classifyQuery(query: string): RouterResult {
+  if (!query || query.length === 0) {
+    return { type: "analytical", archetypes: FALLBACK_ARCHETYPES, confidence: 0, reasoning: "Empty query", fallback: true };
+  }
+  // Cap query length to prevent O(n*m) DoS on keyword scanning
+  const cappedQuery = query.length > 10_000 ? query.slice(0, 10_000) : query;
+
   const startTime = Date.now();
 
-  const scores = calculateScores(query);
+  const scores = calculateScores(cappedQuery);
   const { type, score: topScore, totalScore } = selectBestType(scores);
 
   const confidence = calculateConfidence(topScore, totalScore);
@@ -255,7 +261,7 @@ export function classifyQuery(query: string): RouterResult {
   }
 
   logger.debug({
-    query: query.slice(0, 50),
+    query: cappedQuery.slice(0, 50),
     type,
     confidence,
     archetypes,
