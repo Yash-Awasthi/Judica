@@ -1,5 +1,6 @@
 import { randomUUID } from "crypto";
 import type { FastifyRequest, FastifyReply } from "fastify";
+import { requestContext } from "../lib/context.js";
 
 // P1-28: Validate request ID format — accept alphanumeric strings with hyphens
 const REQUEST_ID_RE = /^[a-z0-9-]{1,64}$/i;
@@ -10,4 +11,6 @@ export async function fastifyRequestId(request: FastifyRequest, reply: FastifyRe
   const id = (header && REQUEST_ID_RE.test(header)) ? header : randomUUID();
   (request as unknown as { requestId: string }).requestId = id;
   reply.header("X-Request-ID", id);
+  // P58-08: Initialize AsyncLocalStorage context so logger mixin and getContextOrThrow() work
+  requestContext.enterWith({ requestId: id });
 }

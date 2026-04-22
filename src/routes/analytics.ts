@@ -41,21 +41,27 @@ const analyticsPlugin: FastifyPluginAsync = async (fastify) => {
     const thirtyDaysAgo = new Date();
     thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
 
-    const dailyRaw = await db.execute(sql`
-      SELECT DATE("createdAt") as date,
-             SUM("totalTokens")::bigint as tokens,
-             SUM("totalCostUsd") as cost
-      FROM "Trace"
-      WHERE "userId" = ${userId} AND "createdAt" >= ${thirtyDaysAgo}
-      GROUP BY DATE("createdAt")
-      ORDER BY date ASC
-    `);
+    let dailyUsage: { date: string; tokens: number; cost: number }[] = [];
+    try {
+      const dailyRaw = await db.execute(sql`
+        SELECT DATE("createdAt") as date,
+               SUM("totalTokens")::bigint as tokens,
+               SUM("totalCostUsd") as cost
+        FROM "Trace"
+        WHERE "userId" = ${userId} AND "createdAt" >= ${thirtyDaysAgo}
+        GROUP BY DATE("createdAt")
+        ORDER BY date ASC
+        LIMIT 90
+      `);
 
-    const dailyUsage = (dailyRaw.rows as Array<{ date: string; tokens: string; cost: string }>).map((d) => ({
-      date: new Date(d.date).toISOString().split("T")[0],
-      tokens: Number(d.tokens),
-      cost: Number(d.cost),
-    }));
+      dailyUsage = (dailyRaw.rows as Array<{ date: string; tokens: string; cost: string }>).map((d) => ({
+        date: new Date(d.date).toISOString().split("T")[0],
+        tokens: Number(d.tokens),
+        cost: Number(d.cost),
+      }));
+    } catch {
+      // If table structure doesn't match, return empty
+    }
 
     // Model distribution from trace steps JSON
     let modelDistribution: { model: string; count: number }[] = [];

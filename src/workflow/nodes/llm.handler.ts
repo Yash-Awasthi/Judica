@@ -1,5 +1,6 @@
 import type { NodeHandler } from "../types.js";
 import { routeAndCollect } from "../../router/index.js";
+import { sanitizeForPrompt as libSanitizeForPrompt } from "../../lib/sanitize.js";
 
 // P10-104: Improved template engine with proper missing variable handling
 function applyTemplate(template: string, vars: Record<string, unknown>): string {
@@ -31,12 +32,11 @@ function applyTemplate(template: string, vars: Record<string, unknown>): string 
   return result;
 }
 
-// P10-103: Escape user-provided content that will be interpolated into prompts
+// R3-02: Use the shared sanitizeForPrompt from lib/sanitize.ts which handles
+// backtick injection, template delimiters, and role-prefix injection patterns.
+// The local stub was insufficient (only blocked "system:|user:|assistant:" prefixes).
 function sanitizeForPrompt(value: string): string {
-  // Strip common prompt injection patterns
-  return value
-    .replace(/^(system|assistant|user):/gim, "[$1]:")
-    .replace(/```/g, "\\`\\`\\`");
+  return libSanitizeForPrompt(value);
 }
 
 export const llmHandler: NodeHandler = async (ctx) => {
