@@ -15,7 +15,8 @@ jobs:
           node-version: 22
           cache: 'npm'
       - run: npm ci --ignore-scripts
-      - run: npm run lint --if-present
+      # L-15: Remove --if-present so CI fails if the lint script is missing from package.json
+      - run: npm run lint
 
   typecheck:
     runs-on: ubuntu-latest

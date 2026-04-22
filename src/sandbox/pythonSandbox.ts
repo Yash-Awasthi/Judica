@@ -216,6 +216,9 @@ export async function executePython(code: string, timeout: number = 10000): Prom
   const tmpDir = path.join(os.tmpdir(), `sandbox_${sandboxId}`);
   const tmpFile = path.join(tmpDir, "script.py");
 
+  // L-12: Log the isolation tier for each execution so operators can audit sandbox strength
+  logger.debug({ sandboxId, isolationLevel, timeout }, "Python sandbox execution starting");
+
   try {
     // Create isolated temp directory
     fs.mkdirSync(tmpDir, { mode: 0o700 });

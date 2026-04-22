@@ -90,6 +90,8 @@ export function decrypt(encryptedText: string, customKey?: string, aad?: string)
       }
     } else {
       // Legacy format: iv:tag:ct
+      // L-1: Warn so operators know to migrate to the JSON envelope format
+      logger.warn("Decrypting legacy iv:tag:ct format — consider re-encrypting with current version");
       [ivHex, tagHex, encryptedData] = encryptedText.split(":");
     }
 

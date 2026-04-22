@@ -25,13 +25,20 @@ export function fastifyValidate(schema: ZodSchema) {
 export const providerSchema = z.object({
   name: z.string().min(1).max(50),
   type: z.string().min(1).max(20).default("api"),
-  apiKey: z.string().max(1000).optional().or(z.literal("")),
+  // L-10: Transform empty string to undefined so downstream code always gets a real key or nothing
+  apiKey: z.string().max(1000).optional()
+    .or(z.literal("").transform(() => undefined))
+    .optional(),
   model: z.string().min(1).max(100),
   // P1-24: Restrict baseUrl to http/https protocols only
+  // L-10: Warn if http:// (not https://) is used — https strongly preferred
   baseUrl: z.string().url().refine(
     (url) => /^https?:\/\//i.test(url),
     { message: "baseUrl must use http or https protocol" }
-  ).optional().or(z.literal("")),
+  ).refine(
+    (url) => /^https:\/\//i.test(url),
+    { message: "baseUrl should use https for security; http is only acceptable for local development" }
+  ).optional().or(z.literal("").transform(() => undefined)).optional(),
   systemPrompt: z.string().max(2000).optional(),
   maxTokens: z.number().int().min(256).max(8192).optional(),
 });

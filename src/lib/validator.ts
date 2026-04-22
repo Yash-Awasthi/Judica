@@ -522,12 +522,19 @@ Provide a corrected version that addresses these issues while preserving the cor
   private storeValidationHistory(sessionId: string, result: ValidationResult): void {
     const history = this.validationHistory.get(sessionId) || [];
     history.push(result);
-    
+
     if (history.length > 10) {
       history.shift();
     }
-    
+
     this.validationHistory.set(sessionId, history);
+
+    // L-6: Cap the number of tracked sessions to prevent unbounded memory growth.
+    // Evict the oldest session when the Map exceeds 1000 entries.
+    if (this.validationHistory.size > 1000) {
+      const oldestKey = this.validationHistory.keys().next().value;
+      if (oldestKey !== undefined) this.validationHistory.delete(oldestKey);
+    }
   }
 
   getValidationStats(): {

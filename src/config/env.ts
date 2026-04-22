@@ -97,5 +97,10 @@ if (!parsed.success) {
 export const env = parsed.data;
 
 if (!parsed.data.OPENAI_API_KEY && !parsed.data.ANTHROPIC_API_KEY && !parsed.data.GOOGLE_API_KEY) {
-  process.stderr.write("WARNING: No AI provider API keys found (OPENAI_API_KEY / ANTHROPIC_API_KEY / GOOGLE_API_KEY). All council requests will fail at runtime.\n");
+  // L-9: In production, missing AI provider keys is a fatal misconfiguration — throw instead of warn
+  const msg = "No AI provider API keys found (OPENAI_API_KEY / ANTHROPIC_API_KEY / GOOGLE_API_KEY). All council requests will fail at runtime.";
+  if (parsed.data.NODE_ENV === "production") {
+    throw new Error(msg);
+  }
+  process.stderr.write(`WARNING: ${msg}\n`);
 }
