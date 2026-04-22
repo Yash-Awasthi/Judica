@@ -7,9 +7,13 @@
  * GET /api/admin/provider-health → { providers: [...] }
  */
 
-import type { FastifyPluginAsync } from "fastify";
+import type { FastifyPluginAsync, FastifyRequest, FastifyReply } from "fastify";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { listAvailableProviders, getAdapterOrNull } from "../adapters/registry.js";
+import { db } from "../lib/drizzle.js";
+import { users } from "../db/schema/users.js";
+import { eq } from "drizzle-orm";
+import { AppError } from "../middleware/errorHandler.js";
 
 export interface ProviderHealthStatus {
   provider: string;
@@ -19,8 +23,28 @@ export interface ProviderHealthStatus {
   circuitState: "closed" | "open" | "half-open" | "unknown";
 }
 
+async function requireAdmin(request: FastifyRequest, reply: FastifyReply) {
+  await fastifyRequireAuth(request, reply);
+  if (reply.sent) return;
+
+  if (!request.userId) {
+    reply.code(401).send({ error: "Not authenticated" });
+    return;
+  }
+
+  const [user] = await db
+    .select({ role: users.role })
+    .from(users)
+    .where(eq(users.id, request.userId))
+    .limit(1);
+
+  if (!user || user.role !== "admin") {
+    throw new AppError(403, "Admin access required", "FORBIDDEN");
+  }
+}
+
 const providerHealthPlugin: FastifyPluginAsync = async (fastify) => {
-  fastify.get("/provider-health", { preHandler: fastifyRequireAuth }, async (_request, reply) => {
+  fastify.get("/provider-health", { preHandler: requireAdmin }, async (_request, reply) => {
     const providers = listAvailableProviders();
 
     const statuses: ProviderHealthStatus[] = providers.map((provider) => {

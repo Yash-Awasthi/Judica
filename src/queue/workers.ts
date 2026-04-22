@@ -46,7 +46,7 @@ export function startWorkers() {
   ingestionWorker = new Worker(
     "ingestion",
     async (job) => {
-      logger.info({ jobId: job.id, userId: job.data?.userId, kbId: job.data?.kbId }, "Processing KB ingestion job");
+      logger.info({ jobId: job.id, kbId: job.data?.kbId, chunkIndex: job.data?.chunkIndex }, "Processing KB ingestion job");
       const { storeChunk } = await import("../services/vectorStore.service.js");
       const { userId, kbId, content, chunkIndex, sourceName, sourceUrl } = job.data;
       await storeChunk(userId, kbId, content, chunkIndex, sourceName, sourceUrl);
@@ -58,7 +58,7 @@ export function startWorkers() {
   repoWorker = new Worker(
     "repo-ingestion",
     async (job) => {
-      logger.info({ jobId: job.id, userId: job.data?.userId, owner: job.data?.owner, repo: job.data?.repo }, "Processing repo ingestion job");
+      logger.info({ jobId: job.id, owner: job.data?.owner, repo: job.data?.repo }, "Processing repo ingestion job");
       const { ingestGitHubRepo } = await import("../services/repoIngestion.service.js");
       const { userId, owner, repo } = job.data;
       await ingestGitHubRepo(userId, owner, repo);
@@ -70,7 +70,7 @@ export function startWorkers() {
   researchWorker = new Worker(
     "research",
     async (job) => {
-      logger.info({ jobId: job.id, userId: job.data?.userId }, "Processing research job");
+      logger.info({ jobId: job.id, researchJobId: job.data?.jobId }, "Processing research job");
       const { runResearch } = await import("../services/research.service.js");
       const { jobId, userId, query } = job.data;
       await runResearch(jobId, userId, query);

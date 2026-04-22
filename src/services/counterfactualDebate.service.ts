@@ -5,6 +5,14 @@
  * then measures how robust the original verdict is to counterarguments.
  */
 
+/** Sanitize user-controlled text before interpolation into LLM prompts */
+function sanitizeForPrompt(text: string): string {
+  return text
+    .replace(/\b(system|assistant|user|human)\s*:/gi, (_m, role) => `${role as string} -`)
+    .replace(/ignore\s+(all\s+)?previous\s+instructions/gi, "[filtered]")
+    .replace(/you\s+are\s+now\b/gi, "[filtered]");
+}
+
 
 export interface CounterfactualResult {
   originalVerdict: string;
@@ -32,10 +40,10 @@ export function buildCounterfactualPrompt(
 ): string {
   return `You are playing devil's advocate. The council reached this verdict:
 
-"${originalVerdict}"
+"${sanitizeForPrompt(originalVerdict.substring(0, 2000))}"
 
-For the question: "${originalQuestion}"
-${context ? `\nContext: ${context}` : ""}
+For the question: "${sanitizeForPrompt(originalQuestion.substring(0, 2000))}"
+${context ? `\nContext: ${sanitizeForPrompt(context.substring(0, 2000))}` : ""}
 
 Your task: Construct the STRONGEST possible argument AGAINST this verdict.
 Find weaknesses, contradictions, overlooked evidence, or logical fallacies.

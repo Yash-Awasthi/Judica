@@ -9,9 +9,13 @@ import { computeConsensus } from "./metrics.js";
 import { getFallbackProvider } from "../config/fallbacks.js";
 
 // P10-43: Configurable phase timeouts (ms) via environment variables
-const OPINION_TIMEOUT_MS = parseInt(process.env.OPINION_TIMEOUT_MS || "60000", 10);
-const DEBATE_TIMEOUT_MS = parseInt(process.env.DEBATE_TIMEOUT_MS || "60000", 10);
-const _REVIEW_TIMEOUT_MS = parseInt(process.env.REVIEW_TIMEOUT_MS || "60000", 10);
+// P21-01: NaN guards — fall back to defaults if env vars are non-numeric
+const _parsedOpinionTimeout = parseInt(process.env.OPINION_TIMEOUT_MS || "60000", 10);
+const OPINION_TIMEOUT_MS = Number.isFinite(_parsedOpinionTimeout) && _parsedOpinionTimeout > 0 ? _parsedOpinionTimeout : 60000;
+const _parsedDebateTimeout = parseInt(process.env.DEBATE_TIMEOUT_MS || "60000", 10);
+const DEBATE_TIMEOUT_MS = Number.isFinite(_parsedDebateTimeout) && _parsedDebateTimeout > 0 ? _parsedDebateTimeout : 60000;
+const _parsedReviewTimeout = parseInt(process.env.REVIEW_TIMEOUT_MS || "60000", 10);
+const _REVIEW_TIMEOUT_MS = Number.isFinite(_parsedReviewTimeout) && _parsedReviewTimeout > 0 ? _parsedReviewTimeout : 60000;
 
 let scoreOpinions: typeof import('./scoring.js').scoreOpinions | null = null;
 async function lazyScoreOpinions(...args: Parameters<typeof import('./scoring.js').scoreOpinions>) {

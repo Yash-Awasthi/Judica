@@ -73,22 +73,34 @@ export async function logAudit(entry: AuditEntry): Promise<void> {
       tokensIn: entry.tokensIn,
       tokensOut: entry.tokensOut,
       latencyMs: entry.latencyMs,
-      metadata: {
-        sessionId: entry.sessionId,
-        requestType: entry.requestType,
-        success: entry.success,
-        errorCode: entry.errorCode,
-        errorMessage: entry.errorMessage,
-        piiDetected: {
-          prompt: { found: promptPII.found, riskScore: promptPII.riskScore, types: promptPII.types },
-          response: { found: responsePII.found, riskScore: responsePII.riskScore, types: responsePII.types }
-        },
-        originalLengths: {
-          prompt: entry.prompt.length,
-          response: entry.response.length
-        },
-        ...entry.metadata
-      }
+      metadata: (() => {
+        // P21-10: Cap serialized metadata size to prevent unbounded DB bloat
+        const MAX_METADATA_BYTES = 10_000;
+        const meta = {
+          sessionId: entry.sessionId,
+          requestType: entry.requestType,
+          success: entry.success,
+          errorCode: entry.errorCode,
+          errorMessage: entry.errorMessage,
+          piiDetected: {
+            prompt: { found: promptPII.found, riskScore: promptPII.riskScore, types: promptPII.types },
+            response: { found: responsePII.found, riskScore: responsePII.riskScore, types: responsePII.types }
+          },
+          originalLengths: {
+            prompt: entry.prompt.length,
+            response: entry.response.length
+          },
+          ...entry.metadata
+        };
+        const serialized = JSON.stringify(meta);
+        if (serialized.length > MAX_METADATA_BYTES) {
+          logger.warn({ userId: entry.userId, size: serialized.length }, "Audit metadata exceeds size cap — stripping caller metadata");
+          const { ...rest } = meta;
+          delete (rest as Record<string, unknown>)["toolArgs"];
+          return rest;
+        }
+        return meta;
+      })()
     });
 
     if (promptPII.riskScore >= 70 || responsePII.riskScore >= 70) {
@@ -215,7 +227,11 @@ export async function getUserAuditLogs(
     successOnly?: boolean;
   } = {}
 ) {
-  const { limit = 50, offset = 0, requestType, dateFrom, dateTo, successOnly } = options;
+  // P21-05: Cap limit/offset to prevent excessive DB reads
+  const MAX_AUDIT_LIMIT = 200;
+  const { limit: rawLimit = 50, offset: rawOffset = 0, requestType, dateFrom, dateTo, successOnly } = options;
+  const limit = Math.min(Math.max(1, rawLimit), MAX_AUDIT_LIMIT);
+  const offset = Math.max(0, rawOffset);
 
   const conditions = [eq(auditLogs.userId, userId)];
 

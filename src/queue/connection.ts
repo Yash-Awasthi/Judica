@@ -7,7 +7,11 @@ const connection = new Redis(
 );
 
 connection.on("error", (err) => {
-  logger.error({ err: err.message }, "BullMQ Redis connection error");
+  logger.error({ err }, "Redis connection error");
+});
+
+connection.on("reconnecting", () => {
+  logger.info("Redis reconnecting");
 });
 
 export default connection;

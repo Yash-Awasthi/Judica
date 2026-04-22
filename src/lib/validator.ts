@@ -5,6 +5,7 @@ import { askProvider } from "./providers.js";
 import type { Provider, Message } from "./providers.js";
 import type { AgentOutput } from "./schemas.js";
 import logger from "./logger.js";
+import { sanitizeForPrompt } from "./sanitize.js";
 
 export interface ValidationResult {
   isValid: boolean;
@@ -192,11 +193,15 @@ export class ColdValidator {
     const issues: ValidationIssue[] = [];
 
     try {
+      // H-2 fix: sanitize untrusted inputs before embedding in LLM prompt
+      const safeQuestion = sanitizeForPrompt(question);
+      const safeVerdict = sanitizeForPrompt(verdict);
+
       const validationPrompt = `You are a content validator. Analyze this Q&A pair for quality issues:
 
-QUESTION: ${question}
+QUESTION: ${safeQuestion}
 
-VERDICT: ${verdict}
+VERDICT: ${safeVerdict}
 
 Check for:
 1. Answer relevance to the question
@@ -209,7 +214,7 @@ Respond with ONLY a JSON object:
   "issues": [
     {
       "type": "inconsistency|inaccuracy|incomplete",
-      "severity": "low|medium|high", 
+      "severity": "low|medium|high",
       "description": "Detailed description of the issue",
       "suggestion": "How to fix it"
     }
@@ -285,11 +290,15 @@ Respond with ONLY a JSON object:
     const issues: ValidationIssue[] = [];
 
     try {
+      // H-2 fix: sanitize before embedding in LLM prompt
+      const safeQuestion = sanitizeForPrompt(question);
+      const safeVerdict = sanitizeForPrompt(verdict);
+
       const factCheckPrompt = `You are a fact checker. Identify any potential factual inaccuracies in this response:
 
-QUESTION: ${question}
+QUESTION: ${safeQuestion}
 
-VERDICT: ${verdict}
+VERDICT: ${safeVerdict}
 
 Look for:
 1. Incorrect dates, numbers, or statistics
@@ -340,9 +349,12 @@ Respond with ONLY a JSON object:
     const issues: ValidationIssue[] = [];
 
     try {
+      // H-2 fix: sanitize before embedding in LLM prompt
+      const safeVerdict = sanitizeForPrompt(verdict);
+
       const biasPrompt = `You are a bias detector. Analyze this response for potential biases:
 
-VERDICT: ${verdict}
+VERDICT: ${safeVerdict}
 
 Check for:
 1. Political or ideological bias
@@ -492,7 +504,7 @@ Respond with ONLY a JSON object:
   }
 
   private async attemptCorrection(verdict: string, issues: ValidationIssue[]): Promise<string | undefined> {
-    const correctableIssues = issues.filter(i => 
+    const correctableIssues = issues.filter(i =>
       i.severity === 'low' && (i.type === 'format' || i.type === 'incomplete')
     );
 
@@ -501,9 +513,12 @@ Respond with ONLY a JSON object:
     }
 
     try {
+      // H-2 fix: sanitize verdict before embedding in LLM prompt
+      const safeVerdict = sanitizeForPrompt(verdict);
+
       const correctionPrompt = `Improve this verdict by addressing these minor issues:
 
-VERDICT: ${verdict}
+VERDICT: ${safeVerdict}
 
 ISSUES TO FIX:
 ${correctableIssues.map(i => `- ${i.description}: ${i.suggestion}`).join('\n')}

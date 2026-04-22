@@ -35,8 +35,9 @@ export async function processAudio(filePath: string, mimeType: string): Promise<
     }
 
     const fileBuffer = Buffer.alloc(stat.size);
-    await fh.read(fileBuffer, 0, stat.size, 0);
-  const ext = mimeType.split("/")[1]?.replace("mpeg", "mp3") || "mp3";
+    fs.readSync(fd, fileBuffer, 0, stat.size, 0);
+  const rawExt = mimeType.split("/")[1]?.replace("mpeg", "mp3") || "mp3";
+  const ext = rawExt.replace(/[^a-zA-Z0-9]/g, "").slice(0, 10) || "mp3";
   const filename = `audio.${ext}`;
 
   const form = new FormData();
