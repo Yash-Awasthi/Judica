@@ -1,4 +1,4 @@
-import fs from "fs";
+import fs from "fs/promises";
 import FormData from "form-data";
 // node-fetch not needed — Node 18+ has native fetch
 import type { ProcessedFile } from "./types.js";
@@ -15,9 +15,9 @@ export async function processAudio(filePath: string, mimeType: string): Promise<
   assertFileSizeLimit(filePath);
 
   // Open file descriptor once to avoid TOCTOU race between stat and read
-  const fd = fs.openSync(filePath, "r");
+  const fh = await fs.open(filePath, "r");
   try {
-    const stat = fs.fstatSync(fd);
+    const stat = await fh.stat();
     if (stat.size > WHISPER_MAX_BYTES) {
       throw new Error(
         `Audio file too large for Whisper (${(stat.size / (1024 * 1024)).toFixed(1)} MB > 25 MB limit)`
@@ -75,6 +75,6 @@ export async function processAudio(filePath: string, mimeType: string): Promise<
     metadata: { mimeType, transcribed: true, whisperModel: "whisper-1" },
   };
   } finally {
-    fs.closeSync(fd);
+    await fh.close();
   }
 }

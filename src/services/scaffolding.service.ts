@@ -282,6 +282,11 @@ export function inferDependencies(
   };
 }
 
+// P26-01: Sanitize shell-interpolated values to prevent command injection
+function shellSafe(name: string): string {
+  return name.replace(/[^a-zA-Z0-9_.-]/g, "_");
+}
+
 /**
  * Generate setup instructions.
  */
@@ -298,11 +303,11 @@ function generateSetupInstructions(
     `npm init -y`,
   ];
 
-  if (deps.production.length > 0) {
-    steps.push(`npm install ${deps.production.join(" ")}`);
+  if (safeProdDeps.length > 0) {
+    steps.push(`npm install ${safeProdDeps.join(" ")}`);
   }
-  if (deps.development.length > 0) {
-    steps.push(`npm install -D ${deps.development.join(" ")}`);
+  if (safeDevDeps.length > 0) {
+    steps.push(`npm install -D ${safeDevDeps.join(" ")}`);
   }
 
   if (schema.tables.length > 0) {

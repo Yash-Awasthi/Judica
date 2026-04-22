@@ -64,6 +64,9 @@ const MAX_INSTALLED_SIZE = 5000;
 const registry = new Map<string, FederatedTool>();
 const installed = new Map<string, InstalledTool>(); // key: `userId:toolId`
 
+const MAX_REGISTRY_SIZE = 5_000;
+const MAX_INSTALLED_SIZE = 50_000;
+
 // Seed with built-in tools
 const BUILT_IN_TOOLS: FederatedTool[] = [
   {
@@ -199,6 +202,9 @@ export function publishTool(
     publishedAt: new Date(),
   };
 
+  if (registry.size >= MAX_REGISTRY_SIZE) {
+    throw new Error("Tool registry is at capacity. Remove unused tools before publishing new ones.");
+  }
   registry.set(id, published);
   logger.info({ toolId: id, name: tool.name }, "Tool published to registry");
   return published;
@@ -218,6 +224,9 @@ export function installTool(
   const key = `${userId}:${toolId}`;
   if (installed.has(key)) return { success: false, error: "Tool already installed" };
 
+  if (installed.size >= MAX_INSTALLED_SIZE) {
+    return { success: false, error: "Installation limit reached. Uninstall unused tools first." };
+  }
   installed.set(key, {
     toolId,
     name: tool.name,

@@ -35,13 +35,12 @@ export function getShardName(entityId: string, strategy: ShardConfig["strategy"]
   return `vectors_${strategy}_${entityId}`;
 }
 
-// P27-01: Strict identifier validation to prevent SQL injection in generated DDL
-const SAFE_IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/;
-
-function assertSafeIdentifier(value: string, label: string): void {
-  if (!SAFE_IDENTIFIER.test(value)) {
-    throw new Error(`${label} contains invalid characters: ${value.slice(0, 30)}`);
+/** Validate that a shard name contains only safe characters for SQL identifiers. */
+function validateIdentifier(name: string): string {
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/.test(name)) {
+    throw new Error(`Invalid SQL identifier: ${name}`);
   }
+  return name;
 }
 
 /**

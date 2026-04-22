@@ -40,7 +40,7 @@ export function createGoogleStrategy() {
         const [user] = await db
           .insert(users)
           .values({
-            email: email ?? undefined,
+            email,
             username: profile.displayName || email.split("@")[0],
             passwordHash: "", // OAuth user, no password
             authMethod: "google",

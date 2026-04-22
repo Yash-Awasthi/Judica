@@ -57,9 +57,10 @@ export class AdminService {
       .from(usageLogs);
 
     return {
-      totalUsers: Number(userCount.value),
-      totalConversations: Number(convCount.value),
-      totalMessages: Number(msgCount.value),
+      // P44-08: NaN-safe Number() conversions on SQL aggregation results
+      totalUsers: Number(userCount.value) || 0,
+      totalConversations: Number(convCount.value) || 0,
+      totalMessages: Number(msgCount.value) || 0,
       totalTokens: (Number(tokenStats.totalPrompt) || 0) + (Number(tokenStats.totalCompletion) || 0),
     };
   }
@@ -86,10 +87,14 @@ export class AdminService {
 
   static async getConfig() {
     const configs = await db.select().from(systemConfigs);
+    // P34-04: Use Object.create(null) to prevent prototype pollution via __proto__ key
+    const BLOCKED_KEYS = new Set(["__proto__", "constructor", "prototype"]);
     return configs.reduce((acc, curr) => {
-      acc[curr.key] = curr.value as string;
+      if (!BLOCKED_KEYS.has(curr.key)) {
+        acc[curr.key] = curr.value as string;
+      }
       return acc;
-    }, {} as Record<string, string>);
+    }, Object.create(null) as Record<string, string>);
   }
 
   static async updateConfig(key: string, value: string, adminId: number) {

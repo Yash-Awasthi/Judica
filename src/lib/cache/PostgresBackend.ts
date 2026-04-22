@@ -104,9 +104,18 @@ export class PostgresBackend implements CacheBackend {
           keyHash: rows[0].keyHash,
           verdict: rows[0].verdict,
           // P9-27: Handle mixed opinions field schema — may be string or JSON
-          opinions: typeof rows[0].opinions === 'string'
-            ? JSON.parse(rows[0].opinions)
-            : rows[0].opinions,
+          // P51-07: Safe-parse opinions so malformed JSON doesn't discard a valid row
+          opinions: (() => {
+            let opinions: CacheOpinion[];
+            try {
+              opinions = typeof rows[0].opinions === 'string'
+                ? JSON.parse(rows[0].opinions)
+                : rows[0].opinions;
+            } catch {
+              opinions = [];
+            }
+            return opinions;
+          })(),
           distance: rows[0].distance
         };
       }
