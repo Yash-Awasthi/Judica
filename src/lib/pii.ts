@@ -69,7 +69,7 @@ const PII_PATTERNS: { type: string; pattern: RegExp; severity: 'low' | 'medium' 
     }
   },
 
-  { type: "email", pattern: /[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/g, severity: "medium" },
+  { type: "email", pattern: /[a-zA-Z0-9._%+-]{1,64}@[a-zA-Z0-9.-]{1,255}\.[a-zA-Z]{2,}/g, severity: "medium" },
   {
     type: "phone",
     pattern: /(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g,
@@ -98,17 +98,21 @@ const PII_PATTERNS: { type: string; pattern: RegExp; severity: 'low' | 'medium' 
 ];
 
 export function detectPII(text: string): PIIDetection {
+  // P45-05: Cap input length to prevent regex DoS on very large inputs
+  const safeText = text.length > 1_000_000 ? text.slice(0, 1_000_000) : text;
   const matches: PIIDetection["matches"] = [];
   const types = new Set<string>();
   let riskScore = 0;
 
   // P10-68: Collect all matches, then resolve overlaps by specificity
   const rawMatches: Array<PIIDetection["matches"][0] & { specificity: number }> = [];
+  const MAX_MATCHES = 10_000;
 
   for (const { type, pattern, severity, validate } of PII_PATTERNS) {
     pattern.lastIndex = 0;
     let match;
-    while ((match = pattern.exec(text)) !== null) {
+    while ((match = pattern.exec(safeText)) !== null) {
+      if (rawMatches.length >= MAX_MATCHES) break;
       // P10-69: Apply algorithmic validation if available
       if (validate && !validate(match[0])) continue;
 
