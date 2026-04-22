@@ -35,6 +35,14 @@ export function getShardName(entityId: string, strategy: ShardConfig["strategy"]
   return `vectors_${strategy}_${entityId}`;
 }
 
+/** Validate that a shard name contains only safe characters for SQL identifiers. */
+function validateIdentifier(name: string): string {
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/.test(name)) {
+    throw new Error(`Invalid SQL identifier: ${name}`);
+  }
+  return name;
+}
+
 /**
  * Generate the SQL for creating a sharded vector table with HNSW index.
  */

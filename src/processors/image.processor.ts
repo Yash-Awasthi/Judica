@@ -1,4 +1,4 @@
-import fs from "fs";
+import fs from "fs/promises";
 import type { ProcessedFile } from "./types.js";
 import { assertFileSizeLimit } from "./types.js";
 

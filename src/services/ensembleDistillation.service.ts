@@ -34,6 +34,9 @@ const DEFAULT_CONFIG: DistillationConfig = {
   format: "jsonl",
 };
 
+// P36-02: Hard cap on maxSamples to prevent memory exhaustion
+const ABSOLUTE_MAX_SAMPLES = 50_000;
+
 /**
  * Filter deliberation results that are high-quality enough for training.
  */
@@ -45,7 +48,7 @@ export function filterForTraining(
     .filter((s) => s.confidence >= config.minConfidence)
     .filter((s) => s.quality === "high" || s.quality === "medium")
     .sort((a, b) => b.confidence - a.confidence)
-    .slice(0, config.maxSamples);
+    .slice(0, Math.min(config.maxSamples, ABSOLUTE_MAX_SAMPLES)); // P36-02: Enforce hard cap
 }
 
 /**

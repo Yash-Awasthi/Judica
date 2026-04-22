@@ -212,7 +212,8 @@ export async function* deliberate(
   let totalTokens = 0;
   let totalCost = 0; // P10-26: Aggregate real cost from provider responses
   // P10-127: Per-query cost limit enforcement
-  const _parsedCost = parseFloat(process.env.MAX_DELIBERATION_COST || "");
+  // P34-01: NaN-safe parseFloat — NaN bypasses cost limit comparison
+  const _parsedCost = parseFloat(process.env.MAX_DELIBERATION_COST || "0");
   const MAX_DELIBERATION_COST = Number.isFinite(_parsedCost) && _parsedCost > 0 ? _parsedCost : Infinity;
 
   for (let r = 1; r <= rounds; r++) {
@@ -321,7 +322,9 @@ export async function* deliberate(
           yield { type: "status", round: r, message: "Round discarded: No improvement in quality/consensus. Reverting to previous best." };
         } else {
           // P10-29: Update best opinions when round is accepted
-          const roundMaxScore = Math.max(...currentScored.map(s => s.scores.final), 0);
+          // P34-02: NaN-safe Math.max — filter NaN scores before comparison
+          const finalScores = currentScored.map(s => s.scores.final).filter(Number.isFinite);
+          const roundMaxScore = finalScores.length > 0 ? Math.max(...finalScores) : 0;
           if (roundMaxScore > bestRoundScore) {
             bestRoundScore = roundMaxScore;
             bestOpinions = [...opinions];
@@ -345,8 +348,11 @@ export async function* deliberate(
         }
         const conflicts: Array<{ agentA: string; agentB: string }> = [];
         const concessions: string[] = [];
+        // P34-03: Cap conflicts/concessions arrays to prevent unbounded growth
+        const MAX_CONFLICTS = 500;
         for (const review of reviews) {
           for (const flaw of review.identified_flaws) {
+            if (conflicts.length >= MAX_CONFLICTS) break;
             conflicts.push({ agentA: review.reviewer, agentB: flaw.target });
           }
           if (review.identified_flaws.length === 0) {

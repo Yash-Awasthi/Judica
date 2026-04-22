@@ -47,7 +47,8 @@ export async function getFacts(conversationId: string): Promise<SharedFactData[]
     .select()
     .from(sharedFacts)
     .where(eq(sharedFacts.conversationId, conversationId))
-    .orderBy(asc(sharedFacts.createdAt));
+    .orderBy(asc(sharedFacts.createdAt))
+    .limit(500);
   return facts as SharedFactData[];
 }
 
@@ -125,7 +126,7 @@ export async function extractAndStoreFacts(
 
   try {
     const match = result.text.match(/\[[\s\S]*\]/);
-    if (!match) return [];
+    if (!match || match[0].length > 10_000) return []; // Cap parsed JSON size
     const claims = JSON.parse(match[0]) as Array<{
       content: string;
       type: string;
