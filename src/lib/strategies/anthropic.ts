@@ -114,6 +114,8 @@ export async function streamAnthropic(
   const reader = res.body!.getReader();
   const decoder = new TextDecoder();
   let fullText = "";
+  // P21-07: Cap accumulated stream buffer to prevent memory exhaustion on very large responses
+  const MAX_STREAM_BUFFER = 2_000_000; // ~2MB
   const usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
   // P1-10: Buffer across reads and split on \n boundary properly
   let buffer = "";
@@ -122,6 +124,10 @@ export async function streamAnthropic(
     const { done, value } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
+    if (fullText.length > MAX_STREAM_BUFFER) {
+      logger.warn("Anthropic stream exceeded max buffer size — truncating");
+      break;
+    }
     let idx: number;
     while ((idx = buffer.indexOf("\n")) >= 0) {
       const line = buffer.slice(0, idx).trim();
