@@ -463,6 +463,124 @@ function AddMemberDialog({ open, onClose, onAdd }: AddMemberDialogProps) {
   );
 }
 
+// ─── Inline Archetype Creation Dialog ────────────────────────────────────────
+
+function InlineArchetypeDialog({
+  open,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: (name: string) => void;
+}) {
+  const store = useStore();
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+  const [thinkingStyle, setThinkingStyle] = useState("");
+
+  const reset = () => { setName(""); setDescription(""); setThinkingStyle(""); };
+
+  const handleCreate = () => {
+    if (!name.trim()) return;
+    store.addCustomArchetype({
+      name: name.trim(),
+      icon: "Hexagon",
+      color: "violet",
+      thinkingStyle: thinkingStyle.trim() || "General purpose",
+      description: description.trim(),
+    });
+    onCreated(name.trim());
+    reset();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) { reset(); onClose(); } }}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Create New Archetype</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Name *</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. The Strategist" className="h-8 text-sm" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Description</Label>
+            <Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Short description" className="h-8 text-sm" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">Thinking Style</Label>
+            <Input value={thinkingStyle} onChange={(e) => setThinkingStyle(e.target.value)} placeholder="e.g. Strategic, big-picture" className="h-8 text-sm" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={() => { reset(); onClose(); }}>Cancel</Button>
+          <Button size="sm" onClick={handleCreate} disabled={!name.trim()}>Create</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+// ─── Inline Model Creation Dialog ────────────────────────────────────────────
+
+function InlineModelDialog({
+  open,
+  onClose,
+  onCreated,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onCreated: (modelId: string) => void;
+}) {
+  const store = useStore();
+  const [name, setName] = useState("");
+  const [apiUrl, setApiUrl] = useState("");
+  const [apiKey, setApiKey] = useState("");
+
+  const reset = () => { setName(""); setApiUrl(""); setApiKey(""); };
+
+  const handleCreate = () => {
+    if (!name.trim() || !apiUrl.trim()) return;
+    const newId = store.addCustomModel({
+      label: name.trim(),
+      apiUrl: apiUrl.trim(),
+      apiKey: apiKey.trim() || undefined,
+    });
+    onCreated(newId);
+    reset();
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={(v) => { if (!v) { reset(); onClose(); } }}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Add New Model</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 py-2">
+          <div className="space-y-1.5">
+            <Label className="text-xs">Name *</Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Mistral Large" className="h-8 text-sm" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">API URL *</Label>
+            <Input value={apiUrl} onChange={(e) => setApiUrl(e.target.value)} placeholder="https://api.example.com/v1/chat" className="h-8 text-sm" />
+          </div>
+          <div className="space-y-1.5">
+            <Label className="text-xs">API Key</Label>
+            <Input type="password" value={apiKey} onChange={(e) => setApiKey(e.target.value)} placeholder="sk-..." className="h-8 text-sm" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" size="sm" onClick={() => { reset(); onClose(); }}>Cancel</Button>
+          <Button size="sm" onClick={handleCreate} disabled={!name.trim() || !apiUrl.trim()}>Add Model</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ChatPage() {
@@ -491,6 +609,11 @@ export default function ChatPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [toast, setToast] = useState<string | null>(null);
   const [customDialogOpen, setCustomDialogOpen] = useState(false);
+  // Inline creation states for council member card dropdowns
+  const [inlineArchOpen, setInlineArchOpen] = useState(false);
+  const [inlineArchTarget, setInlineArchTarget] = useState<string | null>(null); // member id
+  const [inlineModelOpen, setInlineModelOpen] = useState(false);
+  const [inlineModelTarget, setInlineModelTarget] = useState<string | null>(null); // member id
   const stopRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -894,8 +1017,12 @@ export default function ChatPage() {
                   <Select
                     value={member.name}
                     onValueChange={(v) => {
+                      if (v === "__new_archetype__") {
+                        setInlineArchTarget(member.id);
+                        setInlineArchOpen(true);
+                        return;
+                      }
                       updateMember(member.id, "name", v);
-                      // Also update model to archetype default if it's a built-in
                       const arch = BUILT_IN_ARCHETYPES.find((a) => a.name === v);
                       if (arch) updateMember(member.id, "model", arch.model);
                     }}
@@ -910,6 +1037,12 @@ export default function ChatPage() {
                           {a.name}
                         </SelectItem>
                       ))}
+                      <SelectItem value="__new_archetype__" className="text-xs">
+                        <span className="flex items-center gap-1.5 text-primary">
+                          <Plus className="size-3" />
+                          Create New Archetype...
+                        </span>
+                      </SelectItem>
                     </SelectContent>
                   </Select>
                   <Button
@@ -924,7 +1057,14 @@ export default function ChatPage() {
                 </div>
                 <Select
                   value={member.model}
-                  onValueChange={(v) => updateMember(member.id, "model", v)}
+                  onValueChange={(v) => {
+                    if (v === "__new_model__") {
+                      setInlineModelTarget(member.id);
+                      setInlineModelOpen(true);
+                      return;
+                    }
+                    updateMember(member.id, "model", v);
+                  }}
                   disabled={isStreaming}
                 >
                   <SelectTrigger className="h-7 text-xs">
@@ -936,6 +1076,12 @@ export default function ChatPage() {
                         {m.label}
                       </SelectItem>
                     ))}
+                    <SelectItem value="__new_model__" className="text-xs">
+                      <span className="flex items-center gap-1.5 text-primary">
+                        <Plus className="size-3" />
+                        Add New Model...
+                      </span>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -1337,6 +1483,28 @@ export default function ChatPage() {
         open={customDialogOpen}
         onClose={() => setCustomDialogOpen(false)}
         onAdd={addCustomMember}
+      />
+
+      {/* Inline Create Archetype Dialog (from member card dropdown) */}
+      <InlineArchetypeDialog
+        open={inlineArchOpen}
+        onClose={() => { setInlineArchOpen(false); setInlineArchTarget(null); }}
+        onCreated={(name) => {
+          if (inlineArchTarget) updateMember(inlineArchTarget, "name", name);
+          setInlineArchOpen(false);
+          setInlineArchTarget(null);
+        }}
+      />
+
+      {/* Inline Add Model Dialog (from member card dropdown) */}
+      <InlineModelDialog
+        open={inlineModelOpen}
+        onClose={() => { setInlineModelOpen(false); setInlineModelTarget(null); }}
+        onCreated={(modelId) => {
+          if (inlineModelTarget) updateMember(inlineModelTarget, "model", modelId);
+          setInlineModelOpen(false);
+          setInlineModelTarget(null);
+        }}
       />
 
       {toast && <Toast message={toast} onDismiss={() => setToast(null)} />}

@@ -37,7 +37,7 @@ interface StoreContextType {
   builtinModels: typeof BUILTIN_MODELS;
   customModels: CustomModel[];
   allModels: { id: string; label: string }[];
-  addCustomModel: (model: Omit<CustomModel, "id">) => void;
+  addCustomModel: (model: Omit<CustomModel, "id">) => string;
 
   // Archetypes
   customArchetypes: CustomArchetype[];
@@ -53,10 +53,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [customArchetypes, setCustomArchetypes] = useState<CustomArchetype[]>([]);
 
   const addCustomModel = useCallback((model: Omit<CustomModel, "id">) => {
+    const id = `custom-model-${Date.now()}`;
     setCustomModels((prev) => [
       ...prev,
-      { ...model, id: `custom-model-${Date.now()}` },
+      { ...model, id },
     ]);
+    return id;
   }, []);
 
   const allModels = [
