@@ -162,9 +162,12 @@ function hasKeywordOverlap(text: string, keywords: string[]): boolean {
 }
 
 function isStopWord(word: string): boolean {
-  const stopWords = new Set(['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'what', 'which', 'who', 'when', 'where', 'why', 'how', 'not', 'no', 'yes', 'if', 'then', 'else', 'because', 'since', 'until', 'while', 'during', 'before', 'after', 'above', 'below', 'under', 'over', 'between', 'among', 'through', 'against', 'without', 'within', 'upon', 'about', 'along', 'around', 'behind', 'beyond', 'inside', 'outside', 'toward', 'towards', 'into', 'onto', 'onto', 'off']);
-  return stopWords.has(word);
+  // P34-08: Moved stopWords to module level to avoid re-creation per call; fixed duplicate 'onto'
+  return HISTORY_STOP_WORDS.has(word);
 }
+
+// P34-08: Module-level Set avoids re-allocation on every call
+const HISTORY_STOP_WORDS = new Set(['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'what', 'which', 'who', 'when', 'where', 'why', 'how', 'not', 'no', 'yes', 'if', 'then', 'else', 'because', 'since', 'until', 'while', 'during', 'before', 'after', 'above', 'below', 'under', 'over', 'between', 'among', 'through', 'against', 'without', 'within', 'upon', 'about', 'along', 'around', 'behind', 'beyond', 'inside', 'outside', 'toward', 'towards', 'into', 'onto', 'off']);
 
 async function extractRelevantMemories(conversationId: string, keywords: string[]): Promise<string[]> {
   const pastChats = await db.select().from(chats)
@@ -175,10 +178,13 @@ async function extractRelevantMemories(conversationId: string, keywords: string[
   const relevantMemories: string[] = [];
 
   for (const chat of pastChats) {
+    // P34-09: Early exit once we have enough relevant memories
+    if (relevantMemories.length >= 5) break;
     const combinedText = `${chat.question} ${chat.verdict}`;
     if (hasKeywordOverlap(combinedText, keywords)) {
       const opinions = chat.opinions as { name: string; opinion: string }[];
-      if (opinions && opinions.length > 0) {
+      // P34-09: Validate opinions is actually an array before use
+      if (Array.isArray(opinions) && opinions.length > 0) {
         const relevantOpinion = opinions.find((op: { opinion: string }) =>
           hasKeywordOverlap(op.opinion, keywords)
         );

@@ -112,7 +112,17 @@ export async function runResearch(
     try {
       // Try to parse JSON from the response
       const jsonMatch = planResponse.match(/\[[\s\S]*?\]/);
-      subQuestions = jsonMatch ? JSON.parse(jsonMatch[0]) : [query];
+      // P34-05: Validate parsed sub-questions are string array
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (Array.isArray(parsed) && parsed.every((q: unknown) => typeof q === "string")) {
+          subQuestions = parsed;
+        } else {
+          subQuestions = [query];
+        }
+      } else {
+        subQuestions = [query];
+      }
     } catch {
       subQuestions = [query];
     }

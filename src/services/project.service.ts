@@ -29,6 +29,13 @@ export interface CreateProjectInput {
 }
 
 export async function createProject(input: CreateProjectInput): Promise<Project> {
+  // P34-10: Validate input string lengths and council composition bounds
+  if (input.name.length > 200) throw new Error("Project name too long (max 200)");
+  if (input.description && input.description.length > 5000) throw new Error("Description too long (max 5000)");
+  if (input.defaultSystemPrompt && input.defaultSystemPrompt.length > 10_000) throw new Error("System prompt too long (max 10000)");
+  if (input.defaultCouncilComposition && Object.keys(input.defaultCouncilComposition).length > 50) {
+    throw new Error("Council composition has too many entries (max 50)");
+  }
   try {
     const now = new Date();
     const [project] = await db
