@@ -36,6 +36,8 @@ const MAX_PRESENCE_ENTRIES = 10_000;
 // Key: `${sessionId}:${userId}`
 const presenceMap = new Map<string, PresenceState>();
 const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
+// P35-06: Cap presence entries to prevent unbounded memory growth
+const MAX_PRESENCE_ENTRIES = 10_000;
 
 function key(sessionId: string, userId: string): string {
   return `${sessionId}:${userId}`;
@@ -50,6 +52,10 @@ export function updatePresence(
 ): PresenceState {
   const k = key(sessionId, userId);
   const existing = presenceMap.get(k);
+  // P35-06: Enforce presence map cap
+  if (!existing && presenceMap.size >= MAX_PRESENCE_ENTRIES) {
+    throw new Error("Presence map full — too many active sessions");
+  }
   const updated: PresenceState = {
     userId,
     sessionId,

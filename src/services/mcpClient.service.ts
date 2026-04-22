@@ -36,6 +36,10 @@ const connections = new Map<string, MCPServerConnection>();
 const MAX_TOOL_CACHE_ENTRIES = 100;
 const toolCache = new Map<string, MCPClientTool[]>();
 
+// P35-03: Cap MCP connection and tool cache maps
+const MAX_MCP_CONNECTIONS = 100;
+const MAX_TOOL_CACHE_ENTRIES = 100;
+
 /**
  * Register an external MCP server connection.
  * R3-06: Validate URL against SSRF before storing — MCP servers with HTTP/SSE
@@ -115,7 +119,8 @@ export async function discoverTools(
     const data = await response.json() as { result?: { tools: { name: string; description: string; inputSchema: Record<string, unknown> }[] } };
 
     if (data.result?.tools) {
-      const tools: MCPClientTool[] = data.result.tools.map((t) => ({
+      // P35-05: Cap discovered tools to prevent unbounded cache growth
+      const tools: MCPClientTool[] = data.result.tools.slice(0, 500).map((t) => ({
         ...t,
         serverName,
       }));
