@@ -6,6 +6,9 @@ import {
   primaryKey,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
+import { conversations } from "./conversations.js";
+import { workflows } from "./workflows.js";
+import { prompts } from "./prompts.js";
 
 // ─── UserGroup ───────────────────────────────────────────────────────────────
 export const userGroups = pgTable("UserGroup", {
@@ -31,7 +34,7 @@ export const groupMemberships = pgTable(
 // ─── SharedConversation ──────────────────────────────────────────────────────
 export const sharedConversations = pgTable("SharedConversation", {
   id: text("id").primaryKey(),
-  conversationId: text("conversationId").notNull().unique(),
+  conversationId: text("conversationId").notNull().unique().references(() => conversations.id, { onDelete: "cascade" }),
   ownerId: integer("ownerId")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
@@ -44,7 +47,7 @@ export const sharedConversations = pgTable("SharedConversation", {
 // ─── SharedWorkflow ──────────────────────────────────────────────────────────
 export const sharedWorkflows = pgTable("SharedWorkflow", {
   id: text("id").primaryKey(),
-  workflowId: text("workflowId").notNull().unique(),
+  workflowId: text("workflowId").notNull().unique().references(() => workflows.id, { onDelete: "cascade" }),
   ownerId: integer("ownerId")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
@@ -57,7 +60,7 @@ export const sharedWorkflows = pgTable("SharedWorkflow", {
 // ─── SharedPrompt ────────────────────────────────────────────────────────────
 export const sharedPrompts = pgTable("SharedPrompt", {
   id: text("id").primaryKey(),
-  promptId: text("promptId").notNull().unique(),
+  promptId: text("promptId").notNull().unique().references(() => prompts.id, { onDelete: "cascade" }),
   ownerId: integer("ownerId")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),

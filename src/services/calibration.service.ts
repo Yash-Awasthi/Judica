@@ -27,7 +27,6 @@ export interface PredictionRecord {
 }
 
 // In-memory store for predictions (would use DB in production)
-// P25-02: Cap predictions array to prevent unbounded memory growth
 const MAX_PREDICTIONS = 10_000;
 const predictions: PredictionRecord[] = [];
 
@@ -44,6 +43,9 @@ export function recordPrediction(confidence: number, wasCorrect: boolean): void 
     wasCorrect,
     timestamp: new Date(),
   });
+  if (predictions.length > MAX_PREDICTIONS) {
+    predictions.splice(0, predictions.length - MAX_PREDICTIONS);
+  }
 }
 
 /**

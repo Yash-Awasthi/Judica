@@ -180,7 +180,8 @@ export async function getConversationContradictions(
   const rows = await db
     .select()
     .from(contradictionRecords)
-    .where(eq(contradictionRecords.conversationId, conversationId));
+    .where(eq(contradictionRecords.conversationId, conversationId))
+    .limit(100);
 
   return rows as Contradiction[];
 }
@@ -199,7 +200,8 @@ export async function getOpenContradictions(
         eq(contradictionRecords.userId, userId),
         eq(contradictionRecords.status, "open")
       )
-    );
+    )
+    .limit(100);
 
   return rows as Contradiction[];
 }

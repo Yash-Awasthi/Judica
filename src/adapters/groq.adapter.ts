@@ -15,8 +15,8 @@ export class GroqAdapter extends OpenAICompatibleAdapter {
     const usage = xGroq?.usage || (parsed.usage as { prompt_tokens?: number; completion_tokens?: number } | undefined);
     if (usage) {
       return {
-        prompt_tokens: usage.prompt_tokens || 0,
-        completion_tokens: usage.completion_tokens || 0,
+        prompt_tokens: Math.max(0, Number(usage.prompt_tokens) || 0),
+        completion_tokens: Math.max(0, Number(usage.completion_tokens) || 0),
       };
     }
     return null;

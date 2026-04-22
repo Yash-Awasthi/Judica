@@ -34,10 +34,7 @@ export async function embed(text: string): Promise<number[]> {
       `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent`,
       {
         method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-goog-api-key": env.GOOGLE_API_KEY,
-        },
+        headers: { "Content-Type": "application/json", "x-goog-api-key": env.GOOGLE_API_KEY },
         body: JSON.stringify({
           content: { parts: [{ text }] },
           outputDimensionality: TARGET_DIMENSIONS,

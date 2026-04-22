@@ -53,6 +53,7 @@ export interface LoadedPlugin {
 
 // ─── Plugin Registry ────────────────────────────────────────────────────────
 
+const MAX_PLUGINS = 100;
 const plugins = new Map<string, LoadedPlugin>();
 
 /**
@@ -62,6 +63,11 @@ export async function loadPlugin(
   manifest: PluginManifest,
   config: Record<string, unknown> = {},
 ): Promise<void> {
+  // Enforce plugin limit
+  if (!plugins.has(manifest.name) && plugins.size >= MAX_PLUGINS) {
+    throw new Error(`Plugin limit reached (${MAX_PLUGINS}). Unload a plugin before loading a new one.`);
+  }
+
   // Validate required config
   if (manifest.config) {
     for (const [key, schema] of Object.entries(manifest.config.properties)) {
