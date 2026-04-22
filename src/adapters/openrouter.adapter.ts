@@ -23,10 +23,12 @@ export class OpenRouterAdapter extends OpenAICompatibleAdapter {
   }
 
   protected override formatMessages(req: AdapterRequest): Record<string, unknown>[] {
+    const MAX_MESSAGES = 500;
     const msgs: Record<string, unknown>[] = [];
     if (req.system_prompt) msgs.push({ role: "system", content: req.system_prompt });
 
-    for (const m of req.messages) {
+    const messages = req.messages.length > MAX_MESSAGES ? req.messages.slice(-MAX_MESSAGES) : req.messages;
+    for (const m of messages) {
       if (m.tool_calls) {
         msgs.push({
           role: m.role,

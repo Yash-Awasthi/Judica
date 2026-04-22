@@ -31,10 +31,15 @@ function loadChainFromEnv(envKey: string, fallback: ChainEntry[]): ChainEntry[] 
       logger.warn({ envKey }, "Invalid provider chain config (not a non-empty array), using default");
       return fallback;
     }
-    // Basic validation
+    // P20-07: Validate types and numeric ranges — reject nonsensical values like negative RPM
     for (const entry of parsed) {
       if (!entry.provider || !entry.model || typeof entry.rpm !== "number") {
         logger.warn({ envKey, entry }, "Invalid chain entry, using default chain");
+        return fallback;
+      }
+      if (entry.rpm <= 0 || (entry.daily_tokens !== undefined && entry.daily_tokens <= 0) ||
+          (entry.daily_requests !== undefined && entry.daily_requests <= 0)) {
+        logger.warn({ envKey, entry }, "Chain entry has non-positive numeric limits, using default chain");
         return fallback;
       }
     }

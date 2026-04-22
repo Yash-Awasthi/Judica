@@ -6,6 +6,11 @@ import logger from "../lib/logger.js";
  * Security, Performance, and Style analysis.
  */
 
+/** Escape backtick sequences to prevent breaking markdown code blocks in prompts */
+function sanitizeDiffForPrompt(diff: string): string {
+  return diff.replace(/`{3,}/g, '\\`\\`\\`');
+}
+
 export type ReviewCategory = "security" | "performance" | "style";
 
 export interface ReviewFinding {
@@ -89,7 +94,7 @@ If no issues found, return [].
 
 Diff:
 \`\`\`
-${diff.substring(0, 5000)}
+${sanitizeDiffForPrompt(diff.substring(0, 5000))}
 \`\`\`
 
 Return ONLY the JSON array.`,

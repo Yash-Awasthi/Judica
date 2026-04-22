@@ -98,6 +98,14 @@ export async function ingestGitHubRepo(
 
             if (!content.trim()) return;
 
+            // R3-14: Reject files with traversal sequences in the path returned by GitHub API.
+            // Although GitHub's API is trusted, a compromised or malicious repo manifest
+            // could return paths like "../../etc/passwd".
+            if (!file.path || file.path.includes("..") || file.path.startsWith("/")) {
+              logger.warn({ path: file.path }, "Skipping file with unsafe path");
+              return;
+            }
+
             const ext = getExtension(file.path!);
             const language = extensionToLanguage(ext);
             const embedding = await embed(content);

@@ -198,6 +198,11 @@ export async function scaffoldProject(
 ): Promise<ScaffoldResult> {
   logger.info({ projectName, descLength: description.length }, "Starting project scaffolding");
 
+  // Validate project name to prevent command injection in setup instructions
+  if (!/^[a-zA-Z0-9_-]{1,64}$/.test(projectName)) {
+    throw new Error("Invalid project name: must contain only letters, numbers, hyphens, and underscores (max 64 chars)");
+  }
+
   // Step 1: Generate schema
   const schema = await generateSchema(description);
 
@@ -285,8 +290,11 @@ function generateSetupInstructions(
   schema: ScaffoldSchema,
   deps: { production: string[]; development: string[] },
 ): string[] {
+  // Double-check project name is safe for shell commands
+  const safeName = projectName.replace(/[^a-zA-Z0-9_-]/g, '_');
+
   const steps: string[] = [
-    `mkdir ${projectName} && cd ${projectName}`,
+    `mkdir ${safeName} && cd ${safeName}`,
     `npm init -y`,
   ];
 
@@ -299,7 +307,7 @@ function generateSetupInstructions(
 
   if (schema.tables.length > 0) {
     steps.push(`# Set up PostgreSQL database`);
-    steps.push(`createdb ${projectName}`);
+    steps.push(`createdb ${safeName}`);
     steps.push(`npx drizzle-kit generate`);
     steps.push(`npx drizzle-kit migrate`);
   }

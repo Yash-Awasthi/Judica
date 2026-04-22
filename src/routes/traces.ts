@@ -4,6 +4,13 @@ import { traces } from "../db/schema/traces.js";
 import { eq, and, gte, lte, count, desc, type SQL } from "drizzle-orm";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 
+function parseDate(value: string | undefined): Date | null {
+  if (!value) return null;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return null;
+  return d;
+}
+
 const tracesPlugin: FastifyPluginAsync = async (fastify) => {
     fastify.get(
     "/",
@@ -26,8 +33,14 @@ const tracesPlugin: FastifyPluginAsync = async (fastify) => {
 
       if (type) conditions.push(eq(traces.type, type));
       if (conversation_id) conditions.push(eq(traces.conversationId, conversation_id));
-      if (date_from) conditions.push(gte(traces.createdAt, new Date(date_from)));
-      if (date_to) conditions.push(lte(traces.createdAt, new Date(date_to)));
+      if (date_from) {
+        const d = parseDate(date_from);
+        if (d) conditions.push(gte(traces.createdAt, d));
+      }
+      if (date_to) {
+        const d = parseDate(date_to);
+        if (d) conditions.push(lte(traces.createdAt, d));
+      }
 
       const whereClause = and(...conditions);
 

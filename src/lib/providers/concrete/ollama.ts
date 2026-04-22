@@ -32,17 +32,19 @@ export class OllamaProvider extends BaseProvider {
     isFallback?: boolean;
     onChunk?: (chunk: string) => void;
   }): Promise<ProviderResponse> {
-    const finalPrompt = prompt || messages[messages.length - 1].content;
+    const rawContent = prompt || messages[messages.length - 1].content;
+    const finalPrompt = typeof rawContent === "string" ? rawContent : JSON.stringify(rawContent);
     const model = this.config.model || "llama3";
 
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 60000);
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 60000);
+    const onAbort = () => controller.abort();
+    if (signal) {
+      if (signal.aborted) controller.abort();
+      else signal.addEventListener("abort", onAbort, { once: true });
+    }
 
-      if (signal) {
-        if (signal.aborted) controller.abort();
-        signal.addEventListener("abort", () => controller.abort());
-      }
+    try {
 
       await this.validateBaseUrl(this.baseUrl);
 
@@ -58,9 +60,8 @@ export class OllamaProvider extends BaseProvider {
         signal: controller.signal
       });
 
-      clearTimeout(timeout);
-
       if (!response.ok) {
+        clearTimeout(timeout);
         throw new Error(`Ollama error: ${response.status} ${response.statusText}`);
       }
 
@@ -77,6 +78,10 @@ export class OllamaProvider extends BaseProvider {
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
+          // P41-05: Cap buffer to prevent unbounded memory from malicious streams
+          if (buffer.length > 10_000_000) {
+            throw new Error("Ollama stream buffer exceeded maximum size");
+          }
           let newlineIndex;
           while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
             const line = buffer.slice(0, newlineIndex).trim();
@@ -90,14 +95,16 @@ export class OllamaProvider extends BaseProvider {
                 text += parsed.response;
                 onChunk(parsed.response);
               }
-              // Capture token counts from the final chunk (done=true)
+              // P41-06: Use nullish coalescing to distinguish 0 from missing
               if (parsed.done) {
-                streamPromptTokens = parsed.prompt_eval_count || 0;
-                streamCompletionTokens = parsed.eval_count || 0;
+                streamPromptTokens = parsed.prompt_eval_count ?? 0;
+                streamCompletionTokens = parsed.eval_count ?? 0;
               }
             } catch { /* ignore unparseable chunk */ }
           }
         }
+
+        clearTimeout(timeout);
 
         // Use actual counts from stream if available, otherwise estimate
         const promptTokens = streamPromptTokens || Math.ceil(finalPrompt.length / 4);
@@ -114,6 +121,7 @@ export class OllamaProvider extends BaseProvider {
       }
 
       const data = await response.json() as OllamaResponse;
+      clearTimeout(timeout);
       
       return {
         text: data.response || "",
@@ -125,6 +133,7 @@ export class OllamaProvider extends BaseProvider {
         cost: 0 // Local is free
       };
     } catch (err) {
+      signal?.removeEventListener("abort", onAbort);
       if ((err as Error).name === "AbortError" || signal?.aborted) {
         logger.warn({ model }, "Ollama call aborted");
         throw err;

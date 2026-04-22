@@ -15,6 +15,7 @@ export interface UserCouncilConfig {
   
   providers: UserProviderConfig[];
 
+  /** Maximum agents in council. Must be 1-10 — enforced in configResolver.ts. */
   maxAgents?: number;
 
   allowRPA?: boolean;
@@ -25,6 +26,7 @@ export interface UserCouncilConfig {
 export interface ResolvedProvider {
   name: string;
   type: "api" | "local" | "rpa";
+  /** SENSITIVE — never log or include in error objects. Redacted by logger. */
   apiKey: string;
   model: string;
   baseUrl?: string;

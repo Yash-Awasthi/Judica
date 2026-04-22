@@ -64,6 +64,10 @@ async function runAutoSummarization(): Promise<void> {
         try {
           await summarizeSession(convo.id, convo.userId as number);
           summarizedSessions.add(convo.id); // P10-63: Mark as processed
+          // Cap the tracking set to prevent unbounded growth
+          if (summarizedSessions.size > 10000) {
+            summarizedSessions.clear();
+          }
           logger.info({ conversationId: convo.id }, "Auto-summarized conversation");
         } catch (err) {
           logger.error({ err, conversationId: convo.id }, "Auto-summarization failed");

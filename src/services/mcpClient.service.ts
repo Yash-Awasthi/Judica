@@ -1,4 +1,5 @@
 import logger from "../lib/logger.js";
+import { validateSafeUrl } from "../lib/ssrf.js";
 
 /**
  * MCP Client Mode: allows agents to call external MCP servers
@@ -37,20 +38,12 @@ const MAX_TOOL_CACHE_ENTRIES = 100;
 
 /**
  * Register an external MCP server connection.
+ * R3-06: Validate URL against SSRF before storing — MCP servers with HTTP/SSE
+ * transport could otherwise be pointed at internal services.
  */
-export function addConnection(conn: MCPServerConnection): void {
-  // P35-04: SSRF validation on MCP server URL
-  const url = new URL(conn.url);
-  const hostname = url.hostname.toLowerCase();
-  if (
-    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" ||
-    hostname === "0.0.0.0" || hostname.endsWith(".local") || hostname.endsWith(".internal") ||
-    hostname.startsWith("10.") || hostname.startsWith("192.168.") || hostname.startsWith("169.254.")
-  ) {
-    throw new Error(`MCP server URL targets a restricted hostname: ${hostname}`);
-  }
-  if (connections.size >= MAX_MCP_CONNECTIONS && !connections.has(conn.name)) {
-    throw new Error(`Maximum MCP connections (${MAX_MCP_CONNECTIONS}) reached`);
+export async function addConnection(conn: MCPServerConnection): Promise<void> {
+  if (conn.transport === "http" || conn.transport === "sse") {
+    await validateSafeUrl(conn.url);
   }
   connections.set(conn.name, conn);
   toolCache.delete(conn.name); // Invalidate cache

@@ -165,3 +165,10 @@ export function _reset(): void {
   typingTimers.clear();
   presenceMap.clear();
 }
+
+// Auto-cleanup stale presence entries every 30 seconds
+const PRESENCE_CLEANUP_INTERVAL_MS = 30_000;
+
+setInterval(() => {
+  cleanupStale(60_000); // Remove entries inactive for more than 1 minute
+}, PRESENCE_CLEANUP_INTERVAL_MS).unref();

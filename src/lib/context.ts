@@ -20,9 +20,11 @@ export function withContext<T>(ctx: RequestContext, fn: () => T): T {
   return requestContext.run(ctx, fn);
 }
 
-// P9-87: Async variant for async functions
+// P56-08: DEPRECATED — withContext already handles async functions correctly.
+// Kept for backward compatibility; prefer withContext for new code.
+/** @deprecated Use withContext instead — it handles both sync and async. */
 export function withContextAsync<T>(ctx: RequestContext, fn: () => Promise<T>): Promise<T> {
-  return requestContext.run(ctx, fn);
+  return withContext(ctx, fn);
 }
 
 // P9-88: Context is now immutable via `readonly` properties on the interface.
