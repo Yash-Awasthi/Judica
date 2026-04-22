@@ -10,7 +10,7 @@ import redis from "../lib/redis.js";
 import logger from "../lib/logger.js";
 import { env } from "../config/env.js";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
-import { authSchema, configSchema, userSettingsSchema } from "../middleware/validate.js";
+import { authSchema, configSchema, userSettingsSchema, fastifyValidate } from "../middleware/validate.js";
 import { encrypt, decrypt } from "../lib/crypto.js";
 import { AppError } from "../middleware/errorHandler.js";
 
@@ -126,7 +126,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   };
 
     // Fix CodeQL alert: Explicit rate limit config so static analyzers detect it
-    fastify.post("/register", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } }, preHandler: [authRateLimit] }, async (request, reply) => {
+    fastify.post("/register", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } }, preHandler: [authRateLimit, fastifyValidate(authSchema)] }, async (request, reply) => {
     try {
       const { username, password } = request.body as { username: string; password: string };
       const hash = await argon2.hash(password, { type: argon2.argon2id, memoryCost: 65536, timeCost: 3 });
@@ -145,7 +145,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     // Fix CodeQL alert #61: Explicit rate limit config so static analyzers detect it
-    fastify.post("/login", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } }, preHandler: [authRateLimit] }, async (request, reply) => {
+    fastify.post("/login", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } }, preHandler: [authRateLimit, fastifyValidate(authSchema)] }, async (request, reply) => {
     const { username, password } = request.body as { username: string; password: string };
     const [user] = await db.select().from(users).where(eq(users.username, username)).limit(1);
 
@@ -335,7 +335,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     return { success: true };
   });
 
-    fastify.post("/config", { preHandler: [fastifyRequireAuth] }, async (request, _reply) => {
+    fastify.post("/config", { preHandler: [fastifyRequireAuth, fastifyValidate(configSchema)] }, async (request, _reply) => {
     // P43-03: Validate and cap config size before encryption
     const configData = (request.body as Record<string, unknown>).config;
     const configStr = JSON.stringify(configData);
@@ -400,7 +400,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   // P1-15 + P8-61: Zod .strict() schema rejects unknown keys including __proto__/constructor
   // — prevents prototype pollution. Only whitelisted keys pass validation.
   // P43-06: Cap settings payload size to prevent oversized storage
-  fastify.put("/settings", { preHandler: [fastifyRequireAuth] }, async (request, _reply) => {
+  fastify.put("/settings", { preHandler: [fastifyRequireAuth, fastifyValidate(userSettingsSchema)] }, async (request, _reply) => {
     const settings = request.body;
     const settingsStr = JSON.stringify(settings);
     if (settingsStr.length > 100_000) {

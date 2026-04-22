@@ -75,7 +75,7 @@ export interface DistributedLock {
 }
 
 // P10-142: Default in-memory lock (single-process only)
-class InMemoryLock implements DistributedLock {
+export class InMemoryLock implements DistributedLock {
   private locks = new Map<string, number>();
   async acquire(key: string, ttlMs: number): Promise<boolean> {
     const now = Date.now();
@@ -88,8 +88,6 @@ class InMemoryLock implements DistributedLock {
     this.locks.delete(key);
   }
 }
-
-const _nodeLock: DistributedLock = new InMemoryLock();
 
 export class WorkflowExecutor {
   private definition: WorkflowDefinition;
