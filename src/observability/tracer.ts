@@ -5,6 +5,9 @@ import logger from "../lib/logger.js";
 import { env } from "../config/env.js";
 import { calculateCost } from "../lib/cost.js";
 
+// P51-10: Cap trace steps to prevent unbounded memory growth on long-running workflows
+const MAX_TRACE_STEPS = 500;
+
 // P4-08: Log OTEL endpoint availability at startup
 if (env.OTEL_EXPORTER_OTLP_ENDPOINT) {
   logger.info({ endpoint: env.OTEL_EXPORTER_OTLP_ENDPOINT }, "OTEL exporter endpoint configured");
@@ -83,6 +86,12 @@ export function addStep(
   ctx: TraceContext,
   step: Omit<TraceStep, "latencyMs"> & { latencyMs?: number }
 ): void {
+  // P51-10: Enforce step limit to prevent unbounded memory growth
+  if (ctx.steps.length >= MAX_TRACE_STEPS) {
+    logger.warn({ traceId: ctx.id, maxSteps: MAX_TRACE_STEPS }, "Trace step limit reached — dropping step");
+    return;
+  }
+
   // P9-103: Use -1 to indicate missing instrumentation (not 0 which looks healthy)
   const latencyMs = step.latencyMs ?? -1;
   if (latencyMs < 0) {
@@ -111,6 +120,11 @@ export function endTrace(ctx: TraceContext): string {
       // Fallback: assume 60/40 input/output split for legacy steps without granularity
       totalCostUsd += calculateCost("unknown", step.model ?? "unknown", Math.round(step.tokens * 0.6), Math.round(step.tokens * 0.4));
     }
+  }
+
+  // P51-10: Guard against NaN propagation from cost calculation
+  if (!Number.isFinite(totalCostUsd)) {
+    totalCostUsd = 0;
   }
 
   // P9-99: Fire-and-forget — don't await DB write on the request path

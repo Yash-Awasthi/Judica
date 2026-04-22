@@ -149,14 +149,16 @@ export async function detectConflicts(responses: AgentResponse[]): Promise<Confl
   }
 
   // P8-22: Configurable severity threshold (default 3)
-  const severityThreshold = parseInt(process.env.CONFLICT_SEVERITY_THRESHOLD || "3", 10);
+  const _parsed = parseInt(process.env.CONFLICT_SEVERITY_THRESHOLD || "3", 10);
+  const severityThreshold = Number.isNaN(_parsed) ? 3 : _parsed;
   return conflicts.filter((c) => c.severity >= severityThreshold);
 }
+
+const STOP_WORDS = new Set(["the", "a", "an", "is", "are", "was", "were", "be", "been", "has", "have", "had", "do", "does", "did", "will", "would", "could", "should", "may", "might", "can", "shall", "this", "that", "these", "those", "it", "its", "of", "in", "on", "at", "to", "for", "with", "by", "from", "and", "or", "but", "not", "no"]);
 
 // P8-20: Simple keyword overlap check to pre-filter unlikely-to-conflict pairs
 function hasTopicOverlap(claimsA: Claim[], claimsB: Claim[]): boolean {
   if (claimsA.length === 0 || claimsB.length === 0) return false;
-  const STOP_WORDS = new Set(["the", "a", "an", "is", "are", "was", "were", "be", "been", "has", "have", "had", "do", "does", "did", "will", "would", "could", "should", "may", "might", "can", "shall", "this", "that", "these", "those", "it", "its", "of", "in", "on", "at", "to", "for", "with", "by", "from", "and", "or", "but", "not", "no"]);
   const wordsA = new Set(
     claimsA.flatMap(c => c.claim.toLowerCase().split(/\W+/).filter(w => w.length > 3 && !STOP_WORDS.has(w)))
   );

@@ -19,6 +19,8 @@
  *   - Queries already filter by userId, so partition pruning kicks in
  */
 
+const SAFE_IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_]{0,63}$/;
+
 /**
  * Generate SQL to convert a table to hash-partitioned by userId.
  *
@@ -36,6 +38,16 @@ export function generatePartitionMigration(
   vectorColumn: string = "embedding",
   _vectorDimensions: number = 1536,
 ): string {
+  if (!SAFE_IDENTIFIER.test(tableName)) {
+    throw new Error(`Invalid table name: ${tableName}`);
+  }
+  if (!SAFE_IDENTIFIER.test(vectorColumn)) {
+    throw new Error(`Invalid column name: ${vectorColumn}`);
+  }
+  if (!Number.isInteger(partitionCount) || partitionCount < 1 || partitionCount > 256) {
+    throw new Error(`Invalid partition count: ${partitionCount} (must be integer 1-256)`);
+  }
+
   const lines: string[] = [
     `-- P4-50: Partition ${tableName} by userId for HNSW index sharding`,
     `-- Run this migration when ${tableName} exceeds ~500K rows`,
@@ -76,6 +88,10 @@ export function generatePartitionMigration(
  * Generate SQL to check partition sizes and index health.
  */
 export function generatePartitionHealthCheck(tableName: string): string {
+  if (!SAFE_IDENTIFIER.test(tableName)) {
+    throw new Error(`Invalid table name: ${tableName}`);
+  }
+
   return [
     `-- Check partition sizes for ${tableName}`,
     `SELECT`,

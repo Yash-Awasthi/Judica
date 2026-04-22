@@ -6,6 +6,9 @@ import { fileURLToPath } from "url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+const MAX_TEXT_LENGTH = 50_000; // 50K chars
+const MAX_PENDING = 100;
+
 class MLWorker {
   private process: ChildProcess | null = null;
   private isReady = false;
@@ -82,10 +85,17 @@ class MLWorker {
       throw err;
     }
 
+    const t1 = text1.length > MAX_TEXT_LENGTH ? text1.slice(0, MAX_TEXT_LENGTH) : text1;
+    const t2 = text2.length > MAX_TEXT_LENGTH ? text2.slice(0, MAX_TEXT_LENGTH) : text2;
+
     await this.init();
 
     if (!this.process || !this.process.stdin) {
       throw new Error("ML worker not available");
+    }
+
+    if (this.callbacks.length >= MAX_PENDING) {
+      throw new Error("ML worker overloaded — too many pending requests");
     }
 
     return new Promise((resolve, reject) => {
@@ -103,7 +113,7 @@ class MLWorker {
         }
       });
 
-      const payload = JSON.stringify({ action: "similarity", text1, text2 }) + "\n";
+      const payload = JSON.stringify({ action: "similarity", text1: t1, text2: t2 }) + "\n";
       this.process!.stdin!.write(payload);
     });
   }
