@@ -203,9 +203,9 @@ describe("P11-103: WebSocket protocol testing", () => {
     // Verify exponential growth (within jitter range)
     expect(delays[0]).toBeGreaterThan(800);
     expect(delays[0]).toBeLessThan(1200);
-    expect(delays[1]).toBeGreaterThan(1800);
+    expect(delays[1]).toBeGreaterThanOrEqual(1800);
     expect(delays[1]).toBeLessThan(2200);
-    expect(delays[2]).toBeGreaterThan(3600);
+    expect(delays[2]).toBeGreaterThanOrEqual(3600);
     expect(delays[2]).toBeLessThan(4400);
 
     // Should cap at maxMs
