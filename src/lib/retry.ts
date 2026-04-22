@@ -89,7 +89,11 @@ export async function withRetry<T>(
       // P9-35: Check AbortSignal during backoff sleep — don't wait if already aborted
       try {
         await new Promise<void>((resolve, reject) => {
-          const timer = setTimeout(resolve, delay);
+          let onAbort: (() => void) | undefined;
+          const timer = setTimeout(() => {
+            if (onAbort && signal) signal.removeEventListener("abort", onAbort);
+            resolve();
+          }, delay);
 
           if (signal) {
             if (signal.aborted) {
@@ -97,7 +101,7 @@ export async function withRetry<T>(
               reject(new DOMException("Retry aborted", "AbortError"));
               return;
             }
-            const onAbort = () => {
+            onAbort = () => {
               clearTimeout(timer);
               reject(new DOMException("Retry aborted", "AbortError"));
             };
