@@ -33,7 +33,34 @@ export interface SharedSession {
 
 // ─── In-memory store ────────────────────────────────────────────────────────
 
+// P26-02: Cap sessions Map to prevent unbounded memory growth
+const MAX_SESSIONS = 1000;
 const sessions = new Map<string, SharedSession>();
+
+const MAX_SESSIONS = 5_000;
+const SESSION_CLEANUP_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+
+// Automatic cleanup of completed/closed sessions older than 1 hour
+const _sessionCleanupInterval = setInterval(() => {
+  const cutoff = Date.now() - 3600_000;
+  for (const [id, session] of sessions) {
+    if (session.status !== "active" && session.createdAt.getTime() < cutoff) {
+      sessions.delete(id);
+    }
+  }
+  // Hard cap
+  if (sessions.size > MAX_SESSIONS) {
+    const inactive = [...sessions.entries()]
+      .filter(([, s]) => s.status !== "active")
+      .sort((a, b) => a[1].createdAt.getTime() - b[1].createdAt.getTime());
+    const excess = sessions.size - MAX_SESSIONS;
+    for (let i = 0; i < Math.min(excess, inactive.length); i++) {
+      sessions.delete(inactive[i][0]);
+    }
+  }
+}, SESSION_CLEANUP_INTERVAL_MS);
+
+if (_sessionCleanupInterval.unref) _sessionCleanupInterval.unref();
 
 // ─── Core Functions ─────────────────────────────────────────────────────────
 
@@ -56,6 +83,15 @@ export function createSession(
     messages: [],
     createdAt: new Date(),
   };
+  // P26-02: Evict oldest completed session if map is full
+  if (sessions.size >= MAX_SESSIONS) {
+    for (const [sid, s] of sessions) {
+      if (s.status === "completed") {
+        sessions.delete(sid);
+        break;
+      }
+    }
+  }
   sessions.set(id, session);
   logger.info({ sessionId: id, hostUserId, deliberationId }, "Created shared session");
   return session;

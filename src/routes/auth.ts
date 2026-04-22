@@ -18,9 +18,11 @@ const ACCESS_TOKEN_EXPIRY = "15m";
 const REFRESH_TOKEN_TTL_DAYS = 7;
 const REFRESH_TOKEN_TTL_SECS = REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60;
 
-// P0-02: Constant dummy hash to prevent user enumeration via timing
-// Generated with argon2id so verify() takes the same time regardless of user existence
-const DUMMY_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHRoZXJl$dummyhashvaluefortimingequalisation000000000000";
+// P0-02: Constant dummy hash to prevent user enumeration via timing.
+// Generated with argon2id so verify() takes the same time regardless of user existence.
+// L-8: Use a structurally valid argon2id hash so verify() performs real work (not a fast reject).
+// Re-generate with: node -e "require('argon2').hash('dummy-timing-password',{type:2,memoryCost:65536,timeCost:3}).then(console.log)"
+const DUMMY_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHRoZXJlaGVyZQ$Tk5vc1ZmVEI5YVJtWHVXNjlmb2R5T3VRY2hJNjFoZTA";
 
 // P5-04: Pin algorithm to HS256 in sign() to match verify() — prevents algorithm-confusion attacks
 function generateAccessToken(userId: number, username: string, role: string): string {
@@ -300,14 +302,18 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     // P43-02: Cap input before regex loop to prevent quadratic behavior on large inputs
     let sanitized = custom_instructions.slice(0, 2000);
     // Loop to handle nested/split tags like <scr<script>ipt>
+    // M-2: Cap iterations to prevent ReDoS via deeply-crafted tag strings
     const TAG_RE = /<\/?[a-zA-Z][a-zA-Z0-9]*[^>]{0,256}>/g;
     let prev = "";
     let iterations = 0;
-    while (prev !== sanitized && iterations < 10) {
+    const MAX_SANITIZE_ITERATIONS = 10;
+    while (prev !== sanitized && iterations < MAX_SANITIZE_ITERATIONS) {
       prev = sanitized;
       sanitized = sanitized.replace(TAG_RE, "");
       iterations++;
     }
+    // Final pass: strip any remaining lone `<` that couldn't form a full tag
+    sanitized = sanitized.replace(/</g, "&lt;");
     sanitized = sanitized
       // eslint-disable-next-line no-control-regex
       .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, "") // strip control chars (keep \n \r \t)
@@ -343,14 +349,12 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     const [row] = await db.select().from(councilConfigs).where(eq(councilConfigs.userId, request.userId!)).limit(1);
 
     if (!row) return null;
-    // P43-04: Safe JSON.parse on decrypted config
-    let decrypted: unknown;
     try {
-      decrypted = JSON.parse(decrypt(row.config as string));
+      const decrypted = JSON.parse(decrypt(row.config as string));
+      return decrypted;
     } catch {
-      throw new AppError(500, "Failed to parse stored config");
+      throw new AppError(500, "Failed to decrypt configuration — data may be corrupted");
     }
-    return decrypted;
   });
 
     fastify.post("/config/rotate", { preHandler: [fastifyRequireAuth] }, async (request, _reply) => {
@@ -361,12 +365,11 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     // Decrypt with the current/previous key, re-encrypt with current key
-    // P43-05: Safe JSON.parse on decrypted config
     let decrypted: unknown;
     try {
       decrypted = JSON.parse(decrypt(row.config as string));
     } catch {
-      throw new AppError(500, "Failed to parse stored config during rotation");
+      throw new AppError(500, "Failed to decrypt configuration — data may be corrupted");
     }
     const reEncrypted = encrypt(JSON.stringify(decrypted));
 
