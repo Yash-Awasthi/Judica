@@ -184,7 +184,8 @@ export async function getConversationList(userId: number, limit: number = 50, of
 
 export async function searchChats(userId: number, q: string, limit: number = 10, filters?: { projectId?: string; after?: Date; before?: Date }): Promise<Chat[]> {
   try {
-    const searchTerm = q.trim();
+    // P41-09: Cap search term to prevent oversized LIKE queries
+    const searchTerm = q.trim().slice(0, 1000);
     const escapedTerm = searchTerm
       .replace(/\\/g, "\\\\")
       .replace(/%/g, "\\%")
@@ -416,8 +417,8 @@ Respond ONLY with a JSON object in this format:
     const response = await askProvider(providerConfig as Provider, prompt);
     const content = response.text;
 
-    // Extract JSON from response (handle potential markdown blocks)
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    // P41-08: Use non-greedy regex to avoid ReDoS on large AI responses
+    const jsonMatch = content.match(/\{[\s\S]*?\}/);
     if (!jsonMatch) {
       throw new Error("Failed to extract JSON from AI response");
     }
