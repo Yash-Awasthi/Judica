@@ -57,9 +57,10 @@ export class AdminService {
       .from(usageLogs);
 
     return {
-      totalUsers: Number(userCount.value),
-      totalConversations: Number(convCount.value),
-      totalMessages: Number(msgCount.value),
+      // P44-08: NaN-safe Number() conversions on SQL aggregation results
+      totalUsers: Number(userCount.value) || 0,
+      totalConversations: Number(convCount.value) || 0,
+      totalMessages: Number(msgCount.value) || 0,
       totalTokens: (Number(tokenStats.totalPrompt) || 0) + (Number(tokenStats.totalCompletion) || 0),
     };
   }
