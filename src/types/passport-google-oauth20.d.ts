@@ -1,3 +1,9 @@
+/**
+ * P59-04: passport-google-oauth20 type declarations.
+ * Google OAuth now uses @fastify/oauth2 (see src/auth/google.strategy.ts).
+ * This file is kept for backward compatibility with any code that may import
+ * from "passport-google-oauth20" directly. Prefer @fastify/oauth2 types for new code.
+ */
 declare module "passport-google-oauth20" {
   import { Strategy as PassportStrategy } from "passport";
 

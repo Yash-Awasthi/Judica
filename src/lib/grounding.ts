@@ -6,7 +6,9 @@ import { createHash } from "crypto";
 
 // P10-59: Grounding result cache — keyed by (response_hash, source_hash)
 const groundingCache = new Map<string, { result: GroundingResult; expiresAt: number }>();
-const GROUNDING_CACHE_TTL = parseInt(process.env.GROUNDING_CACHE_TTL_MS || "600000", 10); // 10 min
+// P20-02: NaN guard — fall back to 10 min default if env var is non-numeric
+const _parsedGroundingTtl = parseInt(process.env.GROUNDING_CACHE_TTL_MS || "600000", 10);
+const GROUNDING_CACHE_TTL = Number.isFinite(_parsedGroundingTtl) && _parsedGroundingTtl > 0 ? _parsedGroundingTtl : 600000; // 10 min
 const MAX_GROUNDING_CACHE = 200;
 
 function hashContent(content: string): string {

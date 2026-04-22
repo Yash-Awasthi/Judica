@@ -37,9 +37,42 @@ export interface SessionResults {
 
 // ─── In-memory store ────────────────────────────────────────────────────────
 
-// P27-04: Cap sessions Map to prevent unbounded memory growth
-const MAX_VOTING_SESSIONS = 2000;
+const MAX_SESSIONS = 5000;
+const SESSION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+
 const sessions = new Map<string, VotingSession>();
+
+/** Remove sessions older than SESSION_TTL_MS. */
+function evictExpiredSessions(): void {
+  const now = Date.now();
+  for (const [id, session] of sessions) {
+    if (now - session.createdAt.getTime() > SESSION_TTL_MS) {
+      sessions.delete(id);
+    }
+  }
+}
+
+/** If at capacity, evict the oldest session. */
+function evictOldestIfNeeded(): void {
+  if (sessions.size < MAX_SESSIONS) return;
+  let oldestId: string | null = null;
+  let oldestTime = Infinity;
+  for (const [id, session] of sessions) {
+    const t = session.createdAt.getTime();
+    if (t < oldestTime) {
+      oldestTime = t;
+      oldestId = id;
+    }
+  }
+  if (oldestId) {
+    sessions.delete(oldestId);
+    logger.warn({ evictedSessionId: oldestId }, "Evicted oldest voting session (cap reached)");
+  }
+}
+
+const _cleanupTimer = setInterval(evictExpiredSessions, CLEANUP_INTERVAL_MS);
+_cleanupTimer.unref(); // don't keep the process alive just for cleanup
 
 // ─── Core Functions ─────────────────────────────────────────────────────────
 
@@ -66,15 +99,7 @@ export function createVotingSession(
     createdAt: new Date(),
     closedAt: null,
   };
-  // P27-04: Evict oldest closed session if map is full
-  if (sessions.size >= MAX_VOTING_SESSIONS) {
-    for (const [sid, s] of sessions) {
-      if (s.status === "closed") {
-        sessions.delete(sid);
-        break;
-      }
-    }
-  }
+  evictOldestIfNeeded();
   sessions.set(id, session);
   logger.info({ sessionId: id, deliberationId }, "Created voting session");
   return session;
@@ -150,4 +175,5 @@ export function listSessionsForDeliberation(deliberationId: string): VotingSessi
 
 export function _reset(): void {
   sessions.clear();
+  clearInterval(_cleanupTimer);
 }

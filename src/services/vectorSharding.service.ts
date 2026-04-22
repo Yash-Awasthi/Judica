@@ -48,12 +48,14 @@ function assertSafeIdentifier(value: string, label: string): void {
  * Generate the SQL for creating a sharded vector table with HNSW index.
  */
 export function generateShardDDL(shardName: string, dimensions: number = 1536): string {
-  // P27-01: Validate all identifiers and numeric params before SQL interpolation
-  assertSafeIdentifier(shardName, "shardName");
-  if (!Number.isFinite(dimensions) || dimensions < 1 || dimensions > 10000) {
-    throw new Error(`dimensions must be between 1 and 10000, got: ${dimensions}`);
+  // Validate shard name to prevent SQL injection in DDL
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/.test(shardName)) {
+    throw new Error(`Invalid shard name: must be a valid SQL identifier (letters, numbers, underscores)`);
   }
-  dimensions = Math.floor(dimensions);
+  if (!Number.isInteger(dimensions) || dimensions < 1 || dimensions > 4096) {
+    throw new Error(`Invalid dimensions: must be an integer between 1 and 4096`);
+  }
+
   return `
 -- Create sharded vector table
 CREATE TABLE IF NOT EXISTS "${shardName}" (
@@ -111,13 +113,15 @@ export function generateMigrationSQL(
   toShard: string,
   condition: string,
 ): string {
-  // P27-01: Validate shard names and reject raw SQL in condition
-  assertSafeIdentifier(fromShard, "fromShard");
-  assertSafeIdentifier(toShard, "toShard");
-  // Only allow simple WHERE conditions (column = $param style), reject dangerous patterns
-  if (/[;'"\\]|--|\bDROP\b|\bDELETE\b|\bINSERT\b|\bUPDATE\b|\bEXEC\b/i.test(condition)) {
-    throw new Error("Migration condition contains disallowed SQL patterns");
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/.test(fromShard) || !/^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/.test(toShard)) {
+    throw new Error(`Invalid shard name: must be a valid SQL identifier`);
   }
+  // Reject dangerous SQL patterns in condition to prevent injection
+  const dangerousPatterns = /;|--|\bdrop\b|\btruncate\b|\balter\b|\bcreate\b/i;
+  if (dangerousPatterns.test(condition)) {
+    throw new Error(`Condition contains disallowed SQL patterns`);
+  }
+
   return `
 -- Migrate vectors matching condition
 INSERT INTO "${toShard}" (id, content, embedding, metadata, created_at)

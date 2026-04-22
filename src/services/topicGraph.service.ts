@@ -1,4 +1,4 @@
-import crypto from "crypto";
+import { randomUUID } from "crypto";
 import { db } from "../lib/drizzle.js";
 import { sql } from "drizzle-orm";
 import { topicNodes } from "../db/schema/conversations.js";
@@ -7,6 +7,14 @@ import { embed } from "./embeddings.service.js";
 import { safeVectorLiteral } from "./vectorStore.service.js";
 import { routeAndCollect } from "../router/index.js";
 import logger from "../lib/logger.js";
+
+/** Sanitize user-controlled text before interpolation into LLM prompts */
+function sanitizeForPrompt(text: string): string {
+  return text
+    .replace(/\b(system|assistant|user|human)\s*:/gi, (_m, role) => `${role as string} -`)
+    .replace(/ignore\s+(all\s+)?previous\s+instructions/gi, "[filtered]")
+    .replace(/you\s+are\s+now\b/gi, "[filtered]");
+}
 
 export interface TopicNode {
   id: string;
@@ -39,7 +47,7 @@ async function extractTopics(conversationTitle: string, messages: string[]): Pro
       messages: [
         {
           role: "user",
-          content: `Extract 2-5 key topics from this conversation. Return ONLY a JSON array of short topic labels (2-4 words each), no explanation.\n\nTitle: ${conversationTitle}\n\nContent:\n${sample}`,
+          content: `Extract 2-5 key topics from this conversation. Return ONLY a JSON array of short topic labels (2-4 words each), no explanation.\n\nTitle: ${sanitizeForPrompt(conversationTitle)}\n\nContent:\n${sanitizeForPrompt(sample)}`,
         },
       ],
       temperature: 0,
@@ -95,13 +103,16 @@ export async function linkConversationTopics(
       // Merge with existing topic
       const existingIds: string[] = (topRow.conversationIds as string[]) || [];
       if (!existingIds.includes(conversationId)) {
-        existingIds.push(conversationId);
+        // Atomic jsonb array append — prevents lost updates under concurrency
         await db.execute(sql`
           UPDATE "TopicNode"
-          SET "conversationIds" = ${JSON.stringify(existingIds)}::jsonb,
+          SET "conversationIds" = CASE
+                WHEN "conversationIds" @> ${JSON.stringify([conversationId])}::jsonb THEN "conversationIds"
+                ELSE "conversationIds" || ${JSON.stringify([conversationId])}::jsonb
+              END,
               "strength" = "strength" + 1,
               "updatedAt" = NOW()
-          WHERE "id" = ${topRow.id}
+          WHERE "id" = ${topRow.id as string}
         `);
       }
 
@@ -114,7 +125,7 @@ export async function linkConversationTopics(
       });
     } else {
       // Create new topic node
-      const nodeId = `topic_${crypto.randomUUID()}`;
+      const nodeId = `topic_${randomUUID()}`;
       await db.execute(sql`
         INSERT INTO "TopicNode" ("id", "userId", "label", "embedding", "conversationIds", "strength", "createdAt", "updatedAt")
         VALUES (${nodeId}, ${userId}, ${topicLabel}, ${vectorStr}::vector, ${JSON.stringify([conversationId])}::jsonb, 1, NOW(), NOW())
