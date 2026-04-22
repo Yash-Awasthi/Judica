@@ -324,7 +324,8 @@ export async function getUserEvaluationMetrics(userId: number, days: number = 30
         gte(evaluations.timestamp, startDate)
       )
     )
-    .orderBy(asc(evaluations.timestamp));
+    .orderBy(asc(evaluations.timestamp))
+    .limit(1000);
 
   if (results.length === 0) {
     return {
