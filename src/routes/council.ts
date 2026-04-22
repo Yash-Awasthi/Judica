@@ -107,13 +107,13 @@ const councilPlugin: FastifyPluginAsync = async (fastify) => {
       if (existing.length > 0) {
         await db
           .update(councilConfigs)
-          .set({ config, updatedAt: new Date() })
+          .set({ config: encrypt(JSON.stringify(config)), updatedAt: new Date() })
           .where(eq(councilConfigs.userId, userId));
         return { config };
       } else {
         await db
           .insert(councilConfigs)
-          .values({ userId, config, updatedAt: new Date() } as typeof councilConfigs.$inferInsert);
+          .values({ userId, config: encrypt(JSON.stringify(config)), updatedAt: new Date() } as typeof councilConfigs.$inferInsert);
         return { config };
       }
     } catch (err) {

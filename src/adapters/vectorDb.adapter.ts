@@ -94,5 +94,8 @@ export function getVectorAdapter(): VectorDbAdapter {
 
 /** Swap the vector DB adapter (e.g., to Pinecone or Qdrant). */
 export function setVectorAdapter(adapter: VectorDbAdapter): void {
+  if (!adapter || typeof adapter.search !== "function") {
+    throw new Error("Invalid vector DB adapter: must implement search()");
+  }
   currentAdapter = adapter;
 }

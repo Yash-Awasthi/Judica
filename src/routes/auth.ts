@@ -203,9 +203,11 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
        const expiresAt = payload?.exp ? new Date(payload.exp * 1000) : new Date(Date.now() + 15 * 60 * 1000);
 
        const ttlSecs = Math.max(1, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
-       await redis.set(`revoked:${token}`, "1", { EX: ttlSecs });
+       // C-1 fix: store hash, not raw token, to match fastifyAuth.ts isTokenRevoked lookup
+       const tokenHash = crypto.createHash("sha256").update(token).digest("hex");
+       await redis.set(`revoked:${tokenHash}`, "1", { EX: ttlSecs });
 
-       await db.insert(revokedTokens).values({ token, expiresAt });
+       await db.insert(revokedTokens).values({ token: tokenHash, expiresAt });
     }
 
     // Revoke refresh token

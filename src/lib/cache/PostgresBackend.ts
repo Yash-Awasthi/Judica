@@ -80,6 +80,11 @@ export class PostgresBackend implements CacheBackend {
 
   async searchSemantic(embedding: number[], threshold = 0.15): Promise<SemanticSearchResult | null> {
     try {
+      // P21-03: Validate embedding array contains only finite numbers to prevent SQL injection
+      if (!embedding.every(n => Number.isFinite(n))) {
+        logger.warn("searchSemantic: embedding contains non-finite values — rejecting");
+        return null;
+      }
       const embeddingStr = `[${embedding.join(',')}]`;
       // P9-22: Check that HNSW index exists — warn if falling back to seqscan
       // P9-23: Push similarity threshold into WHERE clause to reduce sort cost

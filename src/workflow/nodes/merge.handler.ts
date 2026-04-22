@@ -3,6 +3,9 @@ import type { NodeHandler } from "../types.js";
 // P10-111: Keys that would cause prototype pollution
 const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
+// P22-06: Cap conflict array size to prevent unbounded memory growth
+const MAX_CONFLICT_ARRAY_SIZE = 100;
+
 // P10-113: Merge strategy types
 type MergeStrategy = "overwrite" | "array_append" | "deep_merge";
 
@@ -11,7 +14,13 @@ function isSafeKey(key: string): boolean {
 }
 
 // P10-113: Deep merge helper for nested objects
-function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>): Record<string, unknown> {
+// P22-02: Add recursion depth limit to prevent stack overflow from deeply nested objects
+const MAX_MERGE_DEPTH = 20;
+
+function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>, depth = 0): Record<string, unknown> {
+  if (depth > MAX_MERGE_DEPTH) {
+    return { ...target, ...source }; // Shallow merge at max depth
+  }
   const result: Record<string, unknown> = Object.create(null);
   Object.assign(result, target);
   for (const key of Object.keys(source)) {
@@ -21,7 +30,7 @@ function deepMerge(target: Record<string, unknown>, source: Record<string, unkno
       typeof value === "object" && value !== null && !Array.isArray(value) &&
       typeof result[key] === "object" && result[key] !== null && !Array.isArray(result[key])
     ) {
-      result[key] = deepMerge(result[key] as Record<string, unknown>, value as Record<string, unknown>);
+      result[key] = deepMerge(result[key] as Record<string, unknown>, value as Record<string, unknown>, depth + 1);
     } else {
       result[key] = value;
     }
@@ -60,7 +69,10 @@ export const mergeHandler: NodeHandler = async (ctx) => {
           // P10-113: Handle conflicts based on strategy
           if (strategy === "array_append") {
             if (!conflicts[k]) conflicts[k] = [merged[k]];
-            conflicts[k].push(v);
+            // P22-06: Cap conflict array to prevent unbounded growth
+            if (conflicts[k].length < MAX_CONFLICT_ARRAY_SIZE) {
+              conflicts[k].push(v);
+            }
             merged[k] = conflicts[k];
           } else if (strategy === "deep_merge" && typeof v === "object" && v !== null && !Array.isArray(v)) {
             merged[k] = deepMerge(
