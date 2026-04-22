@@ -33,6 +33,8 @@ export interface SharedSession {
 
 // ─── In-memory store ────────────────────────────────────────────────────────
 
+// P26-02: Cap sessions Map to prevent unbounded memory growth
+const MAX_SESSIONS = 1000;
 const sessions = new Map<string, SharedSession>();
 
 const MAX_SESSIONS = 5_000;
@@ -81,6 +83,15 @@ export function createSession(
     messages: [],
     createdAt: new Date(),
   };
+  // P26-02: Evict oldest completed session if map is full
+  if (sessions.size >= MAX_SESSIONS) {
+    for (const [sid, s] of sessions) {
+      if (s.status === "completed") {
+        sessions.delete(sid);
+        break;
+      }
+    }
+  }
   sessions.set(id, session);
   logger.info({ sessionId: id, hostUserId, deliberationId }, "Created shared session");
   return session;
