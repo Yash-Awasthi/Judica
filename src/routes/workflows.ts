@@ -81,6 +81,8 @@ export const activeRuns = new Map<
 const MAX_ACTIVE_RUNS = 500;
 /** Maximum age (ms) before an entry is evicted regardless of state */
 const ACTIVE_RUN_TTL_MS = 30 * 60 * 1000; // 30 minutes
+/** Maximum events stored per active run */
+const MAX_EVENTS_PER_RUN = 1_000;
 /** How often the sweep runs */
 const SWEEP_INTERVAL_MS = 60 * 1000; // every 60 seconds
 
@@ -294,10 +296,10 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
       try {
         for await (const event of executor.run(inputs || {})) {
           const entry = activeRuns.get(run.id);
-          // P31-04: Cap events array to prevent unbounded memory growth
           if (entry) {
-            if (entry.events.length >= 10_000) {
-              entry.events.splice(0, entry.events.length - 5000);
+            if (entry.events.length >= MAX_EVENTS_PER_RUN) {
+              // Drop oldest events to stay within bounds
+              entry.events.splice(0, entry.events.length - MAX_EVENTS_PER_RUN + 100);
             }
             entry.events.push(event);
           }

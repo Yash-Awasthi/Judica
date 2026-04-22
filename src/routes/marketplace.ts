@@ -225,7 +225,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
       .from(users)
       .where(eq(users.id, request.userId!))
       .limit(1);
-    if (item.authorId !== request.userId && user?.role !== "admin") {
+    if (item.authorId !== request.userId && user?.role !== "admin" && user?.role !== "owner") {
       throw new AppError(403, "Not authorized to delete this item", "FORBIDDEN");
     }
 
@@ -375,7 +375,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
     const { id: itemId } = request.params as { id: string };
     const { rating, comment } = request.body as { rating?: number; comment?: string };
 
-    if (!rating || rating < 1 || rating > 5) {
+    if (rating == null || typeof rating !== 'number' || rating < 1 || rating > 5) {
       throw new AppError(400, "Rating must be between 1 and 5", "INVALID_RATING");
     }
 
@@ -386,6 +386,22 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
       .limit(1);
     if (!item) {
       throw new AppError(404, "Item not found", "ITEM_NOT_FOUND");
+    }
+
+    if (item.authorId === request.userId) {
+      throw new AppError(403, "Cannot review your own item", "SELF_REVIEW");
+    }
+
+    const [existingReview] = await db
+      .select({ id: marketplaceReviews.id })
+      .from(marketplaceReviews)
+      .where(and(
+        eq(marketplaceReviews.itemId, itemId),
+        eq(marketplaceReviews.userId, request.userId!)
+      ))
+      .limit(1);
+    if (existingReview) {
+      throw new AppError(409, "You have already reviewed this item", "DUPLICATE_REVIEW");
     }
 
     const [review] = await db

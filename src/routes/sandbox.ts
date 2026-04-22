@@ -16,6 +16,8 @@ const MAX_CONCURRENT_PER_USER = 3; // P1-22: cap concurrent sandbox executions
 const inflightMap = new Map<string, number>();
 
 // P1-21: Redis-backed rate limiter with in-memory fallback
+// P44-06: Cap memoryBuckets to prevent unbounded growth
+const MAX_MEMORY_BUCKETS = 10_000;
 const memoryBuckets = new Map<string, { count: number; resetAt: number }>();
 const MAX_BUCKETS = 10_000;
 
