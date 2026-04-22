@@ -83,9 +83,15 @@ export const readWebpageTool: ToolInstance = {
       const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
       let content = bodyMatch ? bodyMatch[1] : html;
 
-      // Strip HTML tags safely — P45-10: Use non-backtracking regex to prevent ReDoS
-      content = content.replace(/<script\b[\s\S]*?<\/script>/gi, "");
-      content = content.replace(/<style\b[\s\S]*?<\/style>/gi, "");
+      // Strip script/style blocks — use loop to handle nested/split tags (CodeQL js/incomplete-multi-character-sanitization)
+      // Closing tag regex matches optional whitespace before '>' (CodeQL js/bad-tag-filter)
+      const SCRIPT_RE = /<script\b[\s\S]*?<\/script\s*>/gi;
+      const STYLE_RE = /<style\b[\s\S]*?<\/style\s*>/gi;
+      let prev = "";
+      while (prev !== content) {
+        prev = content;
+        content = content.replace(SCRIPT_RE, "").replace(STYLE_RE, "");
+      }
 
       const text = content
         .replace(/<[^>]+>/g, " ")

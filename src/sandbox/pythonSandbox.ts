@@ -242,14 +242,20 @@ export async function executePython(code: string, timeout: number = 10000): Prom
 
   try {
     // Write script to the secure temp directory created by mkdtemp
-    await fs.promises.writeFile(tmpFile, SANDBOX_PREAMBLE + "\n" + code, { encoding: "utf-8", mode: 0o600 });
+    // Canonicalize and assert the destination is inside tmpDir — prevents path-traversal (CodeQL js/http-to-file-access)
+    const resolvedTmpFile = path.resolve(tmpFile);
+    const resolvedTmpDir = path.resolve(tmpDir);
+    if (!resolvedTmpFile.startsWith(resolvedTmpDir + path.sep)) {
+      throw new Error("Sandbox script path escaped temp directory");
+    }
+    await fs.promises.writeFile(resolvedTmpFile, SANDBOX_PREAMBLE + "\n" + code, { encoding: "utf-8", mode: 0o600 });
 
     return await new Promise<SandboxResult>((resolve) => {
       const stdout: string[] = [];
       const stderr: string[] = [];
       let totalBytes = 0;
 
-      const { cmd, args, seccompFd } = buildCommand(tmpFile, tmpDir);
+      const { cmd, args, seccompFd } = buildCommand(resolvedTmpFile, tmpDir);
 
       const stdioDef: Array<"pipe" | "inherit" | number> = ["pipe", "pipe", "pipe"];
       if (seccompFd) {

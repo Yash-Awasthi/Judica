@@ -6,9 +6,17 @@ import { validateSafeUrl } from "../ssrf.js";
 
 /** Strip HTML tags safely (handles multi-line, nested tags, entities) */
 function stripHtml(html: string): string {
-  return html
-    .replace(/<script\b[\s\S]*?<\/script>/gi, "")
-    .replace(/<style\b[\s\S]*?<\/style>/gi, "")
+  // Use loop to handle nested/split tags — prevents incomplete-multi-character-sanitization
+  // Closing tag regex matches optional whitespace before '>' — prevents bad-tag-filter (CodeQL)
+  const SCRIPT_RE = /<script\b[\s\S]*?<\/script\s*>/gi;
+  const STYLE_RE = /<style\b[\s\S]*?<\/style\s*>/gi;
+  let result = html;
+  let prev = "";
+  while (prev !== result) {
+    prev = result;
+    result = result.replace(SCRIPT_RE, "").replace(STYLE_RE, "");
+  }
+  return result
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/g, " ")
     .replace(/&lt;/g, "<")
