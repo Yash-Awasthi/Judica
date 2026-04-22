@@ -23,6 +23,11 @@ import logger from "./logger.js";
 let client: Redis | null = null;
 let connecting = false;
 
+function validateKey(key: string): void {
+  if (key.length > 1024) throw new Error("Redis key exceeds maximum length of 1024 bytes");
+  if (/[\r\n]/.test(key)) throw new Error("Redis key contains invalid characters");
+}
+
 function getRedis(): Redis {
   if (client && client.status === "ready") return client;
 
@@ -70,6 +75,7 @@ function getRedis(): Redis {
 
 const redisWrapper = {
   async get(key: string): Promise<string | null> {
+    validateKey(key);
     try {
       return await getRedis().get(key);
     } catch {
@@ -78,6 +84,7 @@ const redisWrapper = {
   },
 
   async set(key: string, value: string, options?: { EX?: number; PX?: number }): Promise<string | null> {
+    validateKey(key);
     try {
       const c = getRedis();
       if (options?.PX) {
@@ -93,6 +100,7 @@ const redisWrapper = {
   },
 
   async del(key: string): Promise<number> {
+    validateKey(key);
     try {
       return await getRedis().del(key);
     } catch {
@@ -142,6 +150,7 @@ const redisWrapper = {
   },
 
   async pttl(key: string): Promise<number> {
+    validateKey(key);
     try {
       return await getRedis().pttl(key);
     } catch {
@@ -174,6 +183,7 @@ const redisWrapper = {
   },
 
   async incr(key: string): Promise<number> {
+    validateKey(key);
     try {
       return await getRedis().incr(key);
     } catch {
@@ -182,6 +192,7 @@ const redisWrapper = {
   },
 
   async decr(key: string): Promise<number> {
+    validateKey(key);
     try {
       return await getRedis().decr(key);
     } catch {
@@ -190,6 +201,7 @@ const redisWrapper = {
   },
 
   async expire(key: string, seconds: number): Promise<boolean> {
+    validateKey(key);
     try {
       const result = await getRedis().expire(key, seconds);
       return result === 1;
@@ -200,6 +212,7 @@ const redisWrapper = {
 
   // Redis Streams support for multi-replica pub/sub
   async xadd(key: string, id: string, ...fieldValues: string[]): Promise<string | null> {
+    validateKey(key);
     try {
       return await getRedis().xadd(key, id, ...fieldValues);
     } catch {

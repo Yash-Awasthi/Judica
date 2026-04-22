@@ -52,7 +52,7 @@ const envSchema = z.object({
   MISTRAL_API_KEY: z.string().optional(),
   CEREBRAS_API_KEY: z.string().optional(),
   COHERE_API_KEY: z.string().optional(),
-  OLLAMA_BASE_URL: z.string().optional().default("http://localhost:11434"),
+  OLLAMA_BASE_URL: z.string().url().optional().default("http://localhost:11434"),
   SERP_API_KEY: z.string().optional(),
   LANGFUSE_SECRET_KEY: z.string().optional(),
   LANGFUSE_PUBLIC_KEY: z.string().optional(),

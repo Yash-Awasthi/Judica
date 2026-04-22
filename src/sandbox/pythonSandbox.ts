@@ -160,6 +160,10 @@ interface SandboxCommand {
   seccompFd?: string; // path to seccomp BPF file to open as fd
 }
 
+// P1-35: Cap output arrays to prevent Node heap exhaustion (match jsSandbox limits)
+const MAX_OUTPUT_LINES = 1000;
+const MAX_OUTPUT_BYTES = 1_000_000; // 1MB total output cap
+
 function buildCommand(tmpFile: string, tmpDir: string): SandboxCommand {
   if (isolationLevel === "bwrap") {
     // bubblewrap provides the strongest userspace sandboxing:
@@ -242,8 +246,8 @@ export async function executePython(code: string, timeout: number = 10000): Prom
 
   try {
     // Create isolated temp directory
-    fs.mkdirSync(tmpDir, { mode: 0o700 });
-    fs.writeFileSync(tmpFile, SANDBOX_PREAMBLE + "\n" + code, { encoding: "utf-8", mode: 0o600 });
+    await fs.promises.mkdir(tmpDir, { mode: 0o700 });
+    await fs.promises.writeFile(tmpFile, SANDBOX_PREAMBLE + "\n" + code, { encoding: "utf-8", mode: 0o600 });
 
     return await new Promise<SandboxResult>((resolve) => {
       const stdout: string[] = [];
@@ -322,6 +326,6 @@ export async function executePython(code: string, timeout: number = 10000): Prom
       try { fs.closeSync(bpfFd); } catch { /* cleanup */ }
     }
     // Clean up sandbox directory
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* cleanup best-effort */ }
+    try { await fs.promises.rm(tmpDir, { recursive: true, force: true }); } catch { /* cleanup best-effort */ }
   }
 }

@@ -19,6 +19,11 @@ import { eq } from "drizzle-orm";
 import { env } from "../config/env.js";
 import logger from "../lib/logger.js";
 
+// Map of generated OAuth state tokens to their creation timestamps (ms).
+// Used to validate the state parameter on callback and prevent CSRF attacks.
+const STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const pendingStates = new Map<string, number>();
+
 interface GitHubEmail {
   email: string;
   verified: boolean;
@@ -196,6 +201,7 @@ export function createGitHubStrategy(): GitHubStrategy | null {
             passwordHash: "",
             authMethod: "github",
             role: "member",
+            authMethod: "github",
           })
           .returning();
 

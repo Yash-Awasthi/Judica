@@ -97,6 +97,8 @@ const PII_PATTERNS: { type: string; pattern: RegExp; severity: 'low' | 'medium' 
   { type: "company", pattern: /\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:Inc|LLC|Corp|Ltd)\.?\b/g, severity: "low" },
 ];
 
+const MAX_INPUT_LENGTH = 100_000;
+
 export function detectPII(text: string): PIIDetection {
   // P45-05: Cap input length to prevent regex DoS on very large inputs
   const safeText = text.length > 1_000_000 ? text.slice(0, 1_000_000) : text;
