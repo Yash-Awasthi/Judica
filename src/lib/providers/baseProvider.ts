@@ -33,7 +33,10 @@ export abstract class BaseProvider {
     init: RequestInit,
   ): Promise<Response> {
     // P7-18: Enforce a timeout even when no AbortSignal is supplied
-    const timeoutMs = this.config.timeoutMs || DEFAULT_REQUEST_TIMEOUT_MS;
+    // P29-03: NaN guard on timeoutMs
+    let timeoutMs = this.config.timeoutMs || DEFAULT_REQUEST_TIMEOUT_MS;
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS;
+    timeoutMs = Math.min(timeoutMs, 300_000); // Hard cap at 5 minutes
     if (!init.signal) {
       init = { ...init, signal: AbortSignal.timeout(timeoutMs) };
     }
@@ -47,7 +50,8 @@ export abstract class BaseProvider {
   protected maskConfig() {
     const masked = { ...this.config };
     if (masked.apiKey) {
-      masked.apiKey = masked.apiKey.length > 4
+      // P29-04: Only reveal prefix for keys longer than 8 chars
+      masked.apiKey = masked.apiKey.length > 8
         ? masked.apiKey.slice(0, 4) + "****"
         : "****";
     }

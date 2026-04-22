@@ -22,6 +22,7 @@ export type ContentBlock =
 export interface ProviderUsage {
   promptTokens: number;
   completionTokens: number;
+  /** Must equal promptTokens + completionTokens. Enforced at creation, not by the type system. */
   totalTokens: number;
 }
 
@@ -36,6 +37,7 @@ export interface ProviderConfig {
   name: string;
   type: "api" | "local" | "rpa";
   provider?: "openai" | "anthropic" | "google" | "ollama" | "chatgpt" | "claude" | "deepseek" | "gemini";
+  /** SENSITIVE — never log, serialize to cache keys, or include in error objects. Redacted by logger. */
   apiKey: string;
   model: string;
   baseUrl?: string;

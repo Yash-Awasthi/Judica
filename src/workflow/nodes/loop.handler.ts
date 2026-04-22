@@ -9,7 +9,9 @@ import type { NodeHandler } from "../types.js";
 const MAX_EXPR_LENGTH = 2000;
 
 // P10-110: Configurable global loop timeout (default 5 minutes)
-const LOOP_TOTAL_TIMEOUT_MS = parseInt(process.env.LOOP_TOTAL_TIMEOUT_MS || "300000", 10);
+// P19-07: Guard against NaN from invalid env var
+const _parsedLoopTimeout = parseInt(process.env.LOOP_TOTAL_TIMEOUT_MS || "300000", 10);
+const LOOP_TOTAL_TIMEOUT_MS = Number.isFinite(_parsedLoopTimeout) && _parsedLoopTimeout > 0 ? _parsedLoopTimeout : 300000;
 
 // P10-107: Reuse a single isolate across iterations to avoid 100x startup overhead
 async function safeEvalExpr(

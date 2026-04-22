@@ -25,6 +25,7 @@ export const adminAuditLogs = pgTable(
     details: jsonb("details").default({}).notNull(), // JSON representation of changes { old: ..., new: ... }
     status: text("status").default("success").notNull(), // 'success', 'failure'
     errorMessage: text("errorMessage"),
+    // P60-05: Contains PII — subject to data-retention / GDPR right-to-erasure policies
     ipAddress: text("ipAddress"),
     createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
@@ -32,6 +33,7 @@ export const adminAuditLogs = pgTable(
     index("AdminAuditLog_adminId_idx").on(table.adminId),
     index("AdminAuditLog_actionType_idx").on(table.actionType),
     index("AdminAuditLog_createdAt_idx").on(table.createdAt),
+    index("AdminAuditLog_resource_idx").on(table.resourceType, table.resourceId),
   ],
 );
 

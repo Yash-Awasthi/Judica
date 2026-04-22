@@ -23,7 +23,8 @@ export const workflows = pgTable(
     version: integer("version").default(1).notNull(),
     published: boolean("published").default(false).notNull(),
     createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull(),
+    // P60-04: Add defaultNow to prevent insert failures when updatedAt is omitted
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     index("Workflow_userId_createdAt_idx").on(table.userId, table.createdAt),
@@ -55,6 +56,10 @@ export const workflowRuns = pgTable(
     ),
     index("WorkflowRun_userId_startedAt_idx").on(
       table.userId,
+      table.startedAt,
+    ),
+    index("WorkflowRun_status_startedAt_idx").on(
+      table.status,
       table.startedAt,
     ),
   ],

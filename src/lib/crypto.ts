@@ -12,7 +12,9 @@ const HKDF_SALT = Buffer.from("aibyai-encryption-v1", "utf8");
 const HKDF_INFO = Buffer.from("aes-256-gcm-key", "utf8");
 
 // P0-21: Support multiple key versions for rotation
-const CURRENT_KEY_VERSION = parseInt(process.env.CURRENT_ENCRYPTION_VERSION || "1", 10);
+const _parsedKeyVersion = parseInt(process.env.CURRENT_ENCRYPTION_VERSION || "1", 10);
+// P29-01: NaN guard on key version parse
+const CURRENT_KEY_VERSION = Number.isFinite(_parsedKeyVersion) && _parsedKeyVersion >= 1 ? _parsedKeyVersion : 1;
 
 // P0-14: Use HKDF-SHA256 instead of raw sha256 for key derivation
 function getMasterKey(customKey?: string): Buffer {
@@ -70,13 +72,17 @@ export function decrypt(encryptedText: string, customKey?: string, aad?: string)
 
     // P0-16: Support both legacy (iv:tag:ct) and new JSON envelope format
     if (encryptedText.startsWith("{")) {
-      const envelope = JSON.parse(encryptedText) as { v: number; kv?: number; iv: string; tag: string; ct: string };
+      const envelope = JSON.parse(encryptedText) as Record<string, unknown>;
+      // P29-02: Validate envelope properties before use
+      if (typeof envelope.iv !== "string" || typeof envelope.tag !== "string" || typeof envelope.ct !== "string") {
+        throw new Error("Invalid encrypted envelope: missing iv, tag, or ct");
+      }
       ivHex = envelope.iv;
       tagHex = envelope.tag;
       encryptedData = envelope.ct;
       // P0-21: If key version differs from current and no custom key provided,
       // try PREVIOUS_ENCRYPTION_KEY for older versions
-      if (!customKey && envelope.kv && envelope.kv !== CURRENT_KEY_VERSION) {
+      if (!customKey && typeof envelope.kv === "number" && envelope.kv !== CURRENT_KEY_VERSION) {
         const prevKey = process.env.PREVIOUS_ENCRYPTION_KEY;
         if (prevKey) {
           customKey = prevKey;

@@ -61,9 +61,8 @@ export function validateToolResult(result: string): string {
     if (parsed && typeof parsed === "object" && "error" in parsed) {
       return "[No useful data from tool]";
     }
-  } catch (error) {
-    logger.warn({ err: error instanceof Error ? error.message : String(error) }, "Tool execution failed");
-    return "[Tool execution failed - please try again]";
+  } catch {
+    // JSON.parse failed — result is plain text, which is valid. Continue.
   }
 
   const trimmedResult = result.trim();
