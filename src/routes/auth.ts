@@ -295,13 +295,16 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     // P1-14: Sanitize custom_instructions — strip HTML tags and control chars to prevent prompt injection
-    let sanitized = custom_instructions;
+    // P43-02: Cap input before regex loop to prevent quadratic behavior on large inputs
+    let sanitized = custom_instructions.slice(0, 2000);
     // Loop to handle nested/split tags like <scr<script>ipt>
     const TAG_RE = /<\/?[a-zA-Z][a-zA-Z0-9]*[^>]{0,256}>/g;
     let prev = "";
-    while (prev !== sanitized) {
+    let iterations = 0;
+    while (prev !== sanitized && iterations < 10) {
       prev = sanitized;
       sanitized = sanitized.replace(TAG_RE, "");
+      iterations++;
     }
     sanitized = sanitized
       // eslint-disable-next-line no-control-regex
@@ -314,7 +317,13 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
     fastify.post("/config", { preHandler: [fastifyRequireAuth] }, async (request, _reply) => {
-    const encrypted = encrypt(JSON.stringify((request.body as Record<string, string>).config));
+    // P43-03: Validate and cap config size before encryption
+    const configData = (request.body as Record<string, unknown>).config;
+    const configStr = JSON.stringify(configData);
+    if (configStr.length > 100_000) {
+      throw new AppError(413, "Config payload too large (max 100KB)");
+    }
+    const encrypted = encrypt(configStr);
 
     await db.insert(councilConfigs).values({
       userId: request.userId!,
@@ -332,7 +341,13 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     const [row] = await db.select().from(councilConfigs).where(eq(councilConfigs.userId, request.userId!)).limit(1);
 
     if (!row) return null;
-    const decrypted = JSON.parse(decrypt(row.config as string));
+    // P43-04: Safe JSON.parse on decrypted config
+    let decrypted: unknown;
+    try {
+      decrypted = JSON.parse(decrypt(row.config as string));
+    } catch {
+      throw new AppError(500, "Failed to parse stored config");
+    }
     return decrypted;
   });
 
@@ -344,7 +359,13 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     // Decrypt with the current/previous key, re-encrypt with current key
-    const decrypted = JSON.parse(decrypt(row.config as string));
+    // P43-05: Safe JSON.parse on decrypted config
+    let decrypted: unknown;
+    try {
+      decrypted = JSON.parse(decrypt(row.config as string));
+    } catch {
+      throw new AppError(500, "Failed to parse stored config during rotation");
+    }
     const reEncrypted = encrypt(JSON.stringify(decrypted));
 
     await db.update(councilConfigs).set({ config: reEncrypted }).where(eq(councilConfigs.userId, request.userId!));
@@ -362,8 +383,13 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   // PUT /api/auth/settings - save user settings
   // P1-15 + P8-61: Zod .strict() schema rejects unknown keys including __proto__/constructor
   // — prevents prototype pollution. Only whitelisted keys pass validation.
+  // P43-06: Cap settings payload size to prevent oversized storage
   fastify.put("/settings", { preHandler: [fastifyRequireAuth] }, async (request, _reply) => {
     const settings = request.body;
+    const settingsStr = JSON.stringify(settings);
+    if (settingsStr.length > 100_000) {
+      throw new AppError(413, "Settings payload too large (max 100KB)");
+    }
 
     await db.insert(userSettings).values({
       userId: request.userId!,

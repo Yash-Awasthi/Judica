@@ -112,11 +112,13 @@ export async function hybridSearch(
   kbId?: string | null,
   limit: number = 5
 ): Promise<MemoryChunk[]> {
+  // P43-09: Bounds on hybridSearch limit
+  const safeLimit = Math.min(Math.max(1, Number.isFinite(limit) ? limit : 5), 100);
   const k = 60; // RRF constant
 
   const [vectorResults, kwResults] = await Promise.all([
-    searchSimilar(userId, query, kbId, limit * 2),
-    keywordSearch(userId, query, kbId, limit * 2),
+    searchSimilar(userId, query, kbId, safeLimit * 2),
+    keywordSearch(userId, query, kbId, safeLimit * 2),
   ]);
 
   // Build RRF scores
@@ -145,7 +147,7 @@ export async function hybridSearch(
   // Sort by RRF score and return top N
   const merged = Array.from(scoreMap.values())
     .sort((a, b) => b.rrfScore - a.rrfScore)
-    .slice(0, limit)
+    .slice(0, safeLimit)
     .map(({ chunk, rrfScore }) => ({ ...chunk, score: rrfScore }));
 
   return merged;
@@ -285,15 +287,17 @@ export async function enhancedHybridSearch(
   limit: number = 5,
   useHyde: boolean = false,
 ): Promise<MemoryChunk[]> {
+  // P43-10: Bounds on enhancedHybridSearch limit
+  const safeLimit = Math.min(Math.max(1, Number.isFinite(limit) ? limit : 5), 100);
   const k = 60;
 
   const searches: Promise<MemoryChunk[]>[] = [
-    searchSimilar(userId, query, kbId, limit * 2),
-    keywordSearch(userId, query, kbId, limit * 2),
+    searchSimilar(userId, query, kbId, safeLimit * 2),
+    keywordSearch(userId, query, kbId, safeLimit * 2),
   ];
 
   if (useHyde) {
-    searches.push(hydeSearch(userId, query, kbId, limit * 2));
+    searches.push(hydeSearch(userId, query, kbId, safeLimit * 2));
   }
 
   const allResults = await Promise.all(searches);
@@ -313,6 +317,6 @@ export async function enhancedHybridSearch(
 
   return Array.from(scoreMap.values())
     .sort((a, b) => b.rrfScore - a.rrfScore)
-    .slice(0, limit)
+    .slice(0, safeLimit)
     .map(({ chunk, rrfScore }) => ({ ...chunk, score: rrfScore }));
 }

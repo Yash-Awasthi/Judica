@@ -36,6 +36,13 @@ const projectsPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.post("/", async (request, reply) => {
     const userId = request.userId!;
     const body = request.body as { name: string; description?: string; defaultCouncilComposition?: Record<string, unknown>; color?: string; icon?: string; defaultSystemPrompt?: string };
+    // P43-08: Validate project input field lengths
+    if (!body.name || typeof body.name !== "string" || body.name.trim().length === 0) {
+      throw new AppError(400, "Project name is required");
+    }
+    if (body.name.length > 255) throw new AppError(400, "Project name must be ≤ 255 characters");
+    if (body.description && body.description.length > 2000) throw new AppError(400, "Description must be ≤ 2000 characters");
+    if (body.defaultSystemPrompt && body.defaultSystemPrompt.length > 10000) throw new AppError(400, "System prompt must be ≤ 10000 characters");
     const project = await createProject({
       userId,
       name: body.name,
