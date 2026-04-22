@@ -868,56 +868,17 @@ export default function ChatPage() {
     </>
   );
 
+  // Build archetype options for member card dropdowns
+  const allArchetypeOptions = [
+    ...BUILT_IN_ARCHETYPES.map((a) => ({ name: a.name, description: a.description })),
+    ...store.customArchetypes.map((a) => ({ name: a.name, description: a.description })),
+  ];
+
   // ── Council Panel content
   const CouncilPanelContent = (
     <ScrollArea className="flex-1">
       <div className="p-3 space-y-3">
-        {/* Archetype quick-add dropdown */}
         <div className="space-y-1.5">
-          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium px-0.5">
-            Quick Add Archetype
-          </p>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="outline"
-                size="sm"
-                className="w-full gap-2 text-xs justify-between"
-                disabled={isStreaming}
-              >
-                <span className="flex items-center gap-2">
-                  <Sparkles className="size-3" />
-                  Add Archetype
-                </span>
-                <ChevronRight className="size-3 opacity-50" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64">
-              {BUILT_IN_ARCHETYPES.map((a) => (
-                <DropdownMenuItem
-                  key={a.name}
-                  onClick={() => addArchetype(a)}
-                  className="flex flex-col items-start gap-0.5 py-2"
-                >
-                  <span className="font-medium text-xs">{a.name}</span>
-                  <span className="text-[10px] text-muted-foreground leading-snug">{a.description}</span>
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full gap-2 text-xs"
-            onClick={() => setCustomDialogOpen(true)}
-            disabled={isStreaming || councilMembers.length >= 5}
-          >
-            <Settings2 className="size-3" />
-            Create Custom
-          </Button>
-        </div>
-
-        <div className="border-t border-border pt-3 space-y-1.5">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium px-0.5">
             Current Council
           </p>
@@ -930,12 +891,27 @@ export default function ChatPage() {
               >
                 <div className="flex items-center gap-2">
                   <span className={`size-2 rounded-full ${c.dot} shrink-0`} />
-                  <Input
+                  <Select
                     value={member.name}
-                    onChange={(e) => updateMember(member.id, "name", e.target.value)}
-                    className="h-7 text-xs flex-1 min-w-0"
-                    placeholder="Member name"
-                  />
+                    onValueChange={(v) => {
+                      updateMember(member.id, "name", v);
+                      // Also update model to archetype default if it's a built-in
+                      const arch = BUILT_IN_ARCHETYPES.find((a) => a.name === v);
+                      if (arch) updateMember(member.id, "model", arch.model);
+                    }}
+                    disabled={isStreaming}
+                  >
+                    <SelectTrigger className="h-7 text-xs flex-1 min-w-0">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {allArchetypeOptions.map((a) => (
+                        <SelectItem key={a.name} value={a.name} className="text-xs">
+                          {a.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                   <Button
                     variant="ghost"
                     size="icon"
@@ -970,8 +946,8 @@ export default function ChatPage() {
             variant="outline"
             size="sm"
             className="w-full gap-2 text-xs"
-            onClick={addMember}
-            disabled={isStreaming || councilMembers.length >= 5}
+            onClick={() => setCustomDialogOpen(true)}
+            disabled={isStreaming}
           >
             <Plus className="size-3" />
             Add Member
