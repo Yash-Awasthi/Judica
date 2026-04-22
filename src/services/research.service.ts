@@ -120,12 +120,17 @@ export async function runResearch(
     try {
       // Try to parse JSON from the response
       const jsonMatch = planResponse.match(/\[[\s\S]*?\]/);
-      const parsed = jsonMatch ? JSON.parse(jsonMatch[0]) : [query];
-      // P28-06: Validate parsed result is array of strings, cap length
-      subQuestions = (Array.isArray(parsed) ? parsed : [query])
-        .filter((q: unknown): q is string => typeof q === "string" && q.length > 0)
-        .slice(0, 5);
-      if (subQuestions.length === 0) subQuestions = [query];
+      // P34-05: Validate parsed sub-questions are string array
+      if (jsonMatch) {
+        const parsed = JSON.parse(jsonMatch[0]);
+        if (Array.isArray(parsed) && parsed.every((q: unknown) => typeof q === "string")) {
+          subQuestions = parsed;
+        } else {
+          subQuestions = [query];
+        }
+      } else {
+        subQuestions = [query];
+      }
     } catch {
       subQuestions = [query];
     }

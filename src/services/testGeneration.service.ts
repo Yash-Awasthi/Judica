@@ -91,8 +91,15 @@ Return ONLY the JSON array.`,
 
         const match = result.text.match(/\[[\s\S]*?\]/);
         if (match) {
-          const cases = JSON.parse(match[0]) as Omit<EdgeCase, "suggestedBy">[];
-          return cases.map((c) => ({ ...c, suggestedBy: perspective.name }));
+          // P32-01: Safe JSON.parse with try-catch on LLM output
+          let cases: Omit<EdgeCase, "suggestedBy">[];
+          try {
+            cases = JSON.parse(match[0]) as Omit<EdgeCase, "suggestedBy">[];
+          } catch {
+            return [];
+          }
+          if (!Array.isArray(cases)) return [];
+          return cases.slice(0, 50).map((c) => ({ ...c, suggestedBy: perspective.name }));
         }
         return [];
       } catch (err) {
@@ -181,7 +188,13 @@ Return ONLY the JSON array.`,
 
     const match = result.text.match(/\[[\s\S]*\]/);
     if (match) {
-      return JSON.parse(match[0]) as GeneratedTest[];
+      // P32-02: Safe JSON.parse with try-catch + cap on LLM output
+      try {
+        const tests = JSON.parse(match[0]) as GeneratedTest[];
+        return Array.isArray(tests) ? tests.slice(0, 100) : [];
+      } catch {
+        return [];
+      }
     }
     return [];
   } catch (err) {

@@ -74,7 +74,19 @@ Goal: ${sanitizeForPrompt(goal.substring(0, 2000))}${contextBlock}`,
       throw new Error("Failed to parse task decomposition");
     }
 
-    const parsed = JSON.parse(match[0]) as { tasks: Omit<SubTask, "status">[] };
+    // P32-05: Safe JSON.parse with try-catch + cap tasks array
+    let parsed: { tasks: Omit<SubTask, "status">[] };
+    try {
+      parsed = JSON.parse(match[0]) as { tasks: Omit<SubTask, "status">[] };
+    } catch {
+      throw new Error("Failed to parse task decomposition JSON");
+    }
+    if (!Array.isArray(parsed.tasks)) {
+      throw new Error("Invalid task decomposition: tasks is not an array");
+    }
+    if (parsed.tasks.length > 50) {
+      parsed.tasks = parsed.tasks.slice(0, 50);
+    }
 
     // P28-02: Cap decomposed tasks to prevent unbounded array from LLM output
     const MAX_SUBTASKS = 50;
