@@ -27,7 +27,11 @@ try {
 }
 
 try {
-  await app.listen({ port: Number(env.PORT), host: "0.0.0.0" });
+  const port = Number(env.PORT);
+  if (!Number.isFinite(port) || port < 1 || port > 65535) {
+    throw new Error(`Invalid PORT: ${env.PORT} — must be a number between 1 and 65535`);
+  }
+  await app.listen({ port, host: "0.0.0.0" });
   logger.info({ port: env.PORT, env: env.NODE_ENV }, "Council server started (Fastify)");
 
   startSweepers();
@@ -56,7 +60,7 @@ const shutdown = async (signal: string) => {
 
   logger.info({ signal }, "Shutdown signal received, shutting down gracefully");
 
-  const shutdownMs = env.GRACEFUL_SHUTDOWN_MS || 10_000;
+  const shutdownMs = env.GRACEFUL_SHUTDOWN_MS ?? 10_000;
   const forceTimer = setTimeout(() => {
     logger.error(`Graceful shutdown timed out after ${shutdownMs}ms, forcing exit`);
     process.exit(1);

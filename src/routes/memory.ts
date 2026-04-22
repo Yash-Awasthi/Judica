@@ -2,7 +2,8 @@ import type { FastifyPluginAsync } from "fastify";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { db } from "../lib/drizzle.js";
 import { memories } from "../db/schema/memory.js";
-import { eq, count } from "drizzle-orm";
+import { eq, and, count } from "drizzle-orm";
+import { conversations } from "../db/schema/conversations.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { compact } from "../services/memoryCompaction.service.js";
 import { getBackend, setBackend, removeBackend } from "../services/memoryRouter.service.js";
@@ -93,6 +94,16 @@ const memoryPlugin: FastifyPluginAsync = async (fastify) => {
     // POST /summarize/:conversationId — manually trigger session summary
   fastify.post("/summarize/:conversationId", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { conversationId } = request.params as { conversationId: string };
+
+    const [convo] = await db
+      .select({ id: conversations.id })
+      .from(conversations)
+      .where(and(eq(conversations.id, conversationId), eq(conversations.userId, request.userId!)))
+      .limit(1);
+    if (!convo) {
+      throw new AppError(404, "Conversation not found", "CONVERSATION_NOT_FOUND");
+    }
+
     const summary = await summarizeSession(String(conversationId), request.userId!);
     return { summary };
   });

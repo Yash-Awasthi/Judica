@@ -8,6 +8,15 @@ import {
 import type { AgentOutput } from "../lib/schemas.js";
 import { AppError } from "../middleware/errorHandler.js";
 
+// ─── Helpers ────────────────────────────────────────────────────────────────
+
+function parseDays(days: unknown): number {
+  const parsed = parseInt(days as string);
+  if (isNaN(parsed) || parsed < 1) return 30;
+  if (parsed > 365) return 365;
+  return parsed;
+}
+
 // ─── Plugin ─────────────────────────────────────────────────────────────────
 
 const evaluationPlugin: FastifyPluginAsync = async (fastify) => {
@@ -50,7 +59,7 @@ const evaluationPlugin: FastifyPluginAsync = async (fastify) => {
 
   fastify.get("/metrics", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { days = 30 } = request.query as { days?: string };
-    const metrics = await getUserEvaluationMetrics(request.userId!, parseInt(days as string));
+    const metrics = await getUserEvaluationMetrics(request.userId!, parseDays(days));
 
     return {
       metrics,
@@ -64,10 +73,16 @@ const evaluationPlugin: FastifyPluginAsync = async (fastify) => {
       queryComplexity?: string;
     };
 
+    const size = Math.max(1, Math.min(10, parseInt(councilSize as string) || 3));
+    const validComplexities = ["simple", "moderate", "complex"] as const;
+    const complexity = validComplexities.includes(queryComplexity as any)
+      ? queryComplexity as 'simple' | 'moderate' | 'complex'
+      : 'moderate';
+
     const benchmark = await benchmarkCouncilPerformance(
       request.userId!,
-      parseInt(councilSize as string),
-      queryComplexity as 'simple' | 'moderate' | 'complex'
+      size,
+      complexity
     );
 
     return {
@@ -79,7 +94,7 @@ const evaluationPlugin: FastifyPluginAsync = async (fastify) => {
 
   fastify.get("/dashboard", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { days = 30 } = request.query as { days?: string };
-    const daysNum = parseInt(days as string);
+    const daysNum = parseDays(days);
 
     const [metrics, benchmark] = await Promise.all([
       getUserEvaluationMetrics(request.userId!, daysNum),

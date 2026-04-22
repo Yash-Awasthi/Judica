@@ -10,6 +10,7 @@ import { getBreaker } from "../lib/breaker.js";
 import logger from "../lib/logger.js";
 
 const DEFAULT_TIMEOUT_MS = 60_000;
+const MAX_BUFFER_SIZE = 1_048_576; // 1 MB
 
 export class AnthropicAdapter implements IProviderAdapter {
   readonly providerId = "anthropic";
@@ -161,6 +162,10 @@ export class AnthropicAdapter implements IProviderAdapter {
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
+        if (buffer.length > MAX_BUFFER_SIZE) {
+          logger.warn("Anthropic stream buffer exceeded MAX_BUFFER_SIZE; aborting read");
+          break;
+        }
         let newlineIdx: number;
         while ((newlineIdx = buffer.indexOf("\n")) >= 0) {
           const line = buffer.slice(0, newlineIdx).trim();
@@ -244,6 +249,7 @@ export class AnthropicAdapter implements IProviderAdapter {
     // P3-06: Try the real /v1/models endpoint first, fall back to known models.
     // Anthropic's models API requires beta header and may not be available for all plans.
     try {
+      await validateSafeUrl(this.baseUrl);
       const res = await fetch(`${this.baseUrl}/v1/models`, {
         headers: {
           "x-api-key": this.apiKey,
@@ -274,7 +280,7 @@ export class AnthropicAdapter implements IProviderAdapter {
   // P7-25: Validate key format — check prefix
   async isAvailable(): Promise<boolean> {
     if (typeof this.apiKey !== "string") return false;
-    if (!this.apiKey.startsWith("sk-ant-")) return false;
+    if (!this.apiKey.startsWith("sk-")) return false;
     if (this.apiKey.length < 10) return false;
     return true;
   }
