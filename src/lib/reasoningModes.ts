@@ -98,7 +98,8 @@ export async function runSocraticPrelude(
     }
   });
 
-  const allQuestions = (await Promise.all(questionPromises)).flat();
+  // P39-09: Cap questions before deduplication to prevent unbounded intermediate array
+  const allQuestions = (await Promise.all(questionPromises)).flat().slice(0, 50);
   // Deduplicate similar questions
   const uniqueQ = [...new Set(allQuestions)].slice(0, 8);
 
@@ -393,17 +394,21 @@ export async function runConfidenceCalibration(
           ],
           temperature: 0.5,
         });
-        const match = res.text.match(/\{[\s\S]*\}/);
+        // P39-03: Use non-greedy match to avoid spanning multiple JSON objects
+        const match = res.text.match(/\{[\s\S]*?\}/);
         if (!match) throw new Error("no JSON");
         const parsed = JSON.parse(match[0]) as {
           opinion: string;
           confidence: number;
           reasoning: string;
         };
+        // P39-02: NaN-safe confidence normalization
+        const confValue = Number(parsed.confidence);
+        const safeConfidence = Number.isFinite(confValue) ? confValue : 50;
         return {
           agent: m.name,
           opinion: parsed.opinion || res.text,
-          confidence: Math.max(0, Math.min(100, Number(parsed.confidence) || 50)) / 100,
+          confidence: Math.max(0, Math.min(100, safeConfidence)) / 100,
           reasoning: parsed.reasoning || "",
         };
       } catch {
