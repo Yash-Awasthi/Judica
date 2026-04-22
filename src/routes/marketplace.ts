@@ -39,7 +39,8 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     if (tags) {
-      const tagList = tags.split(",").map((t) => t.trim());
+      // P37-01: Cap tags to prevent unbounded array in SQL query
+      const tagList = tags.split(",").map((t) => t.trim()).slice(0, 20);
       conditions.push(
         sql`${marketplaceItems.tags} && ARRAY[${sql.join(tagList.map(t => sql`${t}`), sql`,`)}]::text[]`
       );
@@ -366,8 +367,9 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
     const { id: itemId } = request.params as { id: string };
     const { rating, comment } = request.body as { rating?: number; comment?: string };
 
-    if (!rating || rating < 1 || rating > 5) {
-      throw new AppError(400, "Rating must be between 1 and 5", "INVALID_RATING");
+    // P37-02: NaN guard on rating — reject non-finite values before range check
+    if (typeof rating !== "number" || !Number.isFinite(rating) || rating < 1 || rating > 5) {
+      throw new AppError(400, "Rating must be a number between 1 and 5", "INVALID_RATING");
     }
 
     const [item] = await db
@@ -379,6 +381,9 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(404, "Item not found", "ITEM_NOT_FOUND");
     }
 
+    // P37-03: Cap comment length to prevent oversized payloads
+    const safeComment = comment ? comment.slice(0, 5000) : null;
+
     const [review] = await db
       .insert(marketplaceReviews)
       .values({
@@ -386,7 +391,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
         itemId,
         userId: request.userId!,
         rating: Math.round(rating),
-        comment: comment || null,
+        comment: safeComment,
       })
       .returning();
 

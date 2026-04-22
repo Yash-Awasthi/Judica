@@ -38,7 +38,8 @@ const deliberationsPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(404, "Deliberation not found");
     }
 
-    const payload = (trace as any).payload as Record<string, unknown> | null;
+    // P37-07: Replace unsafe `as any` with proper type assertion
+    const payload = (trace as unknown as { payload: Record<string, unknown> | null }).payload;
     const scoredOpinions = (payload?.scoredOpinions ?? payload?.scored ?? []) as Array<{
       name: string;
       scores?: {
@@ -101,7 +102,8 @@ const deliberationsPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(404, "Deliberation not found");
     }
 
-    const payload = (trace as any).payload as Record<string, unknown> | null;
+    // P37-07: Replace unsafe `as any` with proper type assertion
+    const payload = (trace as unknown as { payload: Record<string, unknown> | null }).payload;
 
     // Reconstruct the deliberation timeline from the stored trace
     const timeline: Array<{
@@ -111,9 +113,11 @@ const deliberationsPlugin: FastifyPluginAsync = async (fastify) => {
     }> = [];
 
     if (payload?.opinions) {
+      // P37-08: Cap opinions to prevent oversized responses
+      const opinions = (payload.opinions as Array<{ name: string; opinion: string }>).slice(0, 200);
       timeline.push({
         phase: "gather_opinions",
-        data: (payload.opinions as Array<{ name: string; opinion: string }>).map((o) => ({
+        data: opinions.map((o) => ({
           name: o.name,
           opinion: typeof o.opinion === "string" ? o.opinion.substring(0, 500) : o.opinion,
         })),

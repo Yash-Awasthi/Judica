@@ -39,6 +39,9 @@ export function createProvider(config: ProviderConfig): BaseProvider {
       case "claude":
       case "deepseek":
       case "gemini":    return new RPAProvider(decryptedConfig);
+      // P37-09: Log unknown provider values that fall through the switch
+      default:
+        logger.warn({ provider: decryptedConfig.provider }, "Unknown provider value — falling through to type-based resolution");
     }
   }
 
