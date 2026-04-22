@@ -1,5 +1,6 @@
+import crypto from "crypto";
 import logger from "../lib/logger.js";
-import { randomUUID } from "crypto";
+import { isPrivateIP } from "../lib/ssrf.js";
 
 
 /**
@@ -56,32 +57,25 @@ const deliveryLog: WebhookDelivery[] = [];
  * Register a webhook.
  */
 export function registerWebhook(config: Omit<WebhookConfig, "id" | "createdAt">): WebhookConfig {
-  // P23-09: Enforce webhook registry cap
-  if (webhooks.size >= MAX_WEBHOOKS) {
-    throw new Error(`Maximum webhook limit (${MAX_WEBHOOKS}) reached`);
-  }
-
-  // P23-01: Wrap URL parsing in try-catch to prevent uncaught exceptions on malformed URLs
-  let url: URL;
+  // R2-02: Replace manual hostname list with isPrivateIP (covers all RFC-1918/loopback/link-local)
+  let parsedUrl: URL;
   try {
-    url = new URL(config.url);
+    parsedUrl = new URL(config.url);
   } catch {
-    throw new Error(`Invalid webhook URL: ${config.url.slice(0, 100)}`);
+    throw new Error("Invalid webhook URL");
   }
-
-  // P6-10: Validate webhook URL against SSRF before registration
-  const hostname = url.hostname.toLowerCase();
+  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+    throw new Error("Webhook URL must use http or https protocol");
+  }
+  const hostname = parsedUrl.hostname.toLowerCase().replace(/^\[|\]$/g, "");
   if (
     hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "::1" ||
-    hostname === "[::1]" ||
-    hostname === "0.0.0.0" ||
     hostname.endsWith(".local") ||
     hostname.endsWith(".internal") ||
-    hostname === "metadata.google.internal"
+    hostname === "metadata.google.internal" ||
+    isPrivateIP(hostname)
   ) {
-    throw new Error(`Webhook URL targets a restricted hostname: ${hostname}`);
+    throw new Error("Webhook URL targets a restricted hostname");
   }
 
   const webhook: WebhookConfig = {
@@ -171,17 +165,11 @@ export async function retryFailedDelivery(
 
 /**
  * Compute HMAC-SHA256 signature for payload verification.
+ * Format matches GitHub/Stripe webhook conventions: "sha256=<hex>"
  */
 export function computeSignature(payload: string, secret: string): string {
-  // Simple hash for now — in production use crypto.createHmac
-  let hash = 0;
-  const combined = secret + payload;
-  for (let i = 0; i < combined.length; i++) {
-    const char = combined.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32-bit integer
-  }
-  return `sha256=${Math.abs(hash).toString(16).padStart(8, "0")}`;
+  // R2-01: Use proper HMAC-SHA256 — the previous djb2-style hash was trivially forgeable
+  return "sha256=" + crypto.createHmac("sha256", secret).update(payload, "utf8").digest("hex");
 }
 
 // ─── Event Firing ───────────────────────────────────────────────────────────

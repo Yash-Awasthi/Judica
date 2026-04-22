@@ -1,4 +1,5 @@
 import logger from "../lib/logger.js";
+import { validateSafeUrl } from "../lib/ssrf.js";
 
 /**
  * MCP Client Mode: allows agents to call external MCP servers
@@ -37,21 +38,12 @@ const toolCache = new Map<string, MCPClientTool[]>();
 
 /**
  * Register an external MCP server connection.
+ * R3-06: Validate URL against SSRF before storing — MCP servers with HTTP/SSE
+ * transport could otherwise be pointed at internal services.
  */
-export function addConnection(conn: MCPServerConnection): void {
-  // P23-10: Enforce connection cap
-  if (!connections.has(conn.name) && connections.size >= MAX_MCP_CONNECTIONS) {
-    throw new Error(`Maximum MCP connection limit (${MAX_MCP_CONNECTIONS}) reached`);
-  }
-  // P23-04: Validate URL scheme — only allow http/https to prevent SSRF via file://, ftp://, etc.
-  try {
-    const url = new URL(conn.url);
-    if (!["http:", "https:"].includes(url.protocol)) {
-      throw new Error(`MCP server URL must use http or https, got: ${url.protocol}`);
-    }
-  } catch (err) {
-    if ((err as Error).message.includes("must use http")) throw err;
-    throw new Error(`Invalid MCP server URL: ${conn.url.slice(0, 100)}`);
+export async function addConnection(conn: MCPServerConnection): Promise<void> {
+  if (conn.transport === "http" || conn.transport === "sse") {
+    await validateSafeUrl(conn.url);
   }
   connections.set(conn.name, conn);
   toolCache.delete(conn.name); // Invalidate cache

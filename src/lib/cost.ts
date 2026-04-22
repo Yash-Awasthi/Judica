@@ -114,6 +114,10 @@ export function calculateCost(
   outputTokens: number,
   customConfig?: CostConfig[]
 ): number {
+  // P29-09: Non-negative guard on token counts
+  inputTokens = Number.isFinite(inputTokens) && inputTokens > 0 ? inputTokens : 0;
+  outputTokens = Number.isFinite(outputTokens) && outputTokens > 0 ? outputTokens : 0;
+
   const config = customConfig || DEFAULT_COST_CONFIG;
   const pricing = config.find(c => c.provider === provider && c.model === model);
 
@@ -130,6 +134,11 @@ export function calculateCost(
       return (inputTokens * median.inputTokenPrice + outputTokens * median.outputTokenPrice) / 1000;
     }
     return (inputTokens * 0.003 + outputTokens * 0.015) / 1000; // fallback to mid-tier pricing
+  }
+
+  // P41-04: Guard against NaN/Infinity in pricing calculation
+  if (!Number.isFinite(pricing.inputTokenPrice) || !Number.isFinite(pricing.outputTokenPrice)) {
+    return (inputTokens * 0.003 + outputTokens * 0.015) / 1000;
   }
 
   const inputCost = (inputTokens * pricing.inputTokenPrice) / 1000;
@@ -155,7 +164,7 @@ export async function trackTokenUsage(
     const cost = calculateCost(provider, model, inputTokens, outputTokens);
 
     const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    today.setUTCHours(0, 0, 0, 0);
 
     await db
       .insert(dailyUsage)
@@ -243,6 +252,8 @@ export async function getUserCostBreakdown(
 // P9-66: Use actual weighted average from pricing table instead of a magic constant.
 // This tracks closer to real costs as the model mix changes.
 function estimateCostFromTokens(tokens: number): number {
+  // P41-03: Guard against NaN/Infinity/negative tokens
+  if (!Number.isFinite(tokens) || tokens < 0) return 0;
   if (DEFAULT_COST_CONFIG.length === 0) {
     return tokens * 0.00002; // fallback: ~$0.02 per 1K tokens
   }
@@ -315,7 +326,7 @@ export async function checkUserCostLimits(
 ): Promise<{ withinLimits: boolean; dailyUsage: number; monthlyUsage: number; warnings: string[] }> {
   const now = new Date();
   const today = new Date(now);
-  today.setHours(0, 0, 0, 0);
+  today.setUTCHours(0, 0, 0, 0);
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
 
   const [dailyRows, monthlyRows] = await Promise.all([

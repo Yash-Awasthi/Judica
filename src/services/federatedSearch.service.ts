@@ -6,6 +6,11 @@ import { hybridSearch } from "./vectorStore.service.js";
 import { pool } from "../lib/db.js";
 import logger from "../lib/logger.js";
 
+const MAX_FEDERATED_LIMIT = 50;
+function clampLimit(limit: number): number {
+  return Math.max(1, Math.min(limit, MAX_FEDERATED_LIMIT));
+}
+
 /**
  * Federated search result: a unified item from any index.
  */
@@ -27,6 +32,7 @@ async function searchConversations(
   limit: number,
 ): Promise<FederatedResult[]> {
   try {
+    limit = clampLimit(limit);
     const vectorStr = safeVectorLiteral(queryEmbedding);
     const result = await db.execute(sql`
       SELECT "id", "question", "verdict",
@@ -60,6 +66,7 @@ async function searchAllRepos(
   limit: number,
 ): Promise<FederatedResult[]> {
   try {
+    limit = clampLimit(limit);
     const vectorStr = safeVectorLiteral(queryEmbedding);
     const { rows } = await pool.query<{
       id: string;
@@ -105,6 +112,8 @@ async function searchFacts(
     // SharedFact doesn't have embeddings, so do text-based search
     // Only include if conversationId is provided
     if (!conversationId) return [];
+
+    limit = clampLimit(limit);
 
     const result = await db.execute(sql`
       SELECT "id", "content", "sourceAgent", "type", "confidence"
@@ -166,14 +175,18 @@ export async function federatedSearch(opts: FederatedSearchOptions): Promise<Fed
     promise: Promise<T>,
     fallback: T,
   ): Promise<T> {
+    let timer: ReturnType<typeof setTimeout>;
     return Promise.race([
-      promise,
-      new Promise<T>((resolve) =>
-        setTimeout(() => {
+      promise.then((result) => {
+        clearTimeout(timer);
+        return result;
+      }),
+      new Promise<T>((resolve) => {
+        timer = setTimeout(() => {
           logger.warn({ source, timeoutMs: perSourceTimeoutMs }, "Federated search source timed out");
           resolve(fallback);
-        }, perSourceTimeoutMs),
-      ),
+        }, perSourceTimeoutMs);
+      }),
     ]);
   }
 

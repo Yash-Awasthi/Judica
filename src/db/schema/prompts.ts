@@ -37,6 +37,7 @@ export const promptVersions = pgTable(
     versionNum: integer("versionNum").notNull(),
     content: text("content").notNull(),
     model: text("model"),
+    // P60-08: Valid range 0.0–2.0; validate at application layer before insert
     temperature: real("temperature"),
     notes: text("notes"),
     createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),

@@ -22,7 +22,9 @@ export class RedisBackend implements CacheBackend {
 
     try {
       return JSON.parse(value) as CacheEntry;
-    } catch {
+    } catch (err) {
+      // P21-06: Log JSON parse errors for debugging corrupted cache entries
+      logger.warn({ key: this.getKey(key), err: (err as Error).message }, "Redis cache entry JSON parse failed — returning null");
       return null;
     }
   }

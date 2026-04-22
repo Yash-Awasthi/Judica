@@ -119,7 +119,7 @@ const archetypesPlugin: FastifyPluginAsync = async (fastify) => {
     return reply.send(exportData);
   });
 
-  fastify.post("/import", { preHandler: fastifyOptionalAuth }, async (request, reply) => {
+  fastify.post("/import", { preHandler: fastifyOptionalAuth, bodyLimit: 1024 * 1024 }, async (request, reply) => {
     const userId = request.userId;
     if (!userId) {
       throw new AppError(401, "Authentication required");
@@ -128,6 +128,10 @@ const archetypesPlugin: FastifyPluginAsync = async (fastify) => {
     const { jsonData } = request.body as { jsonData?: string };
     if (!jsonData) {
       throw new AppError(400, "JSON data is required");
+    }
+
+    if (jsonData.length > 512 * 1024) {
+      throw new AppError(413, "Import payload too large (max 512KB)");
     }
 
     const result = await importArchetypes(userId, jsonData);

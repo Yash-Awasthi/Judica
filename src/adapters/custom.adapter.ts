@@ -77,9 +77,10 @@ export class CustomAdapter implements IProviderAdapter {
     let url = `${baseUrl}/chat/completions`;
 
     // Append API key as query parameter for api_key_query auth type
+    // R2-05: URL-encode the key to prevent injection if it contains special characters
     if (this.config.auth_type === "api_key_query") {
       const separator = url.includes("?") ? "&" : "?";
-      url = `${url}${separator}api_key=${apiKey}`;
+      url = `${url}${separator}api_key=${encodeURIComponent(apiKey)}`;
     }
 
     // Build OpenAI-compatible request body
