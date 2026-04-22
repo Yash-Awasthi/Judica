@@ -13,8 +13,7 @@ vi.mock("../../src/lib/drizzle.js", () => {
   const mockValues = vi.fn(() => ({ onConflictDoUpdate: mockOnConflictDoUpdate }));
   const mockInsert = vi.fn(() => ({ values: mockValues }));
 
-  const mockLimit = vi.fn(async () => []);
-  const mockWhere = vi.fn(() => ({ limit: mockLimit }));
+  const mockWhere = vi.fn(async () => []);
   const mockFrom = vi.fn(() => ({ where: mockWhere }));
   const mockSelect = vi.fn(() => ({ from: mockFrom }));
 
@@ -22,7 +21,7 @@ vi.mock("../../src/lib/drizzle.js", () => {
     db: {
       insert: mockInsert,
       select: mockSelect,
-      __mock: { mockLimit, mockWhere, mockFrom, mockOnConflictDoUpdate, mockValues },
+      __mock: { mockWhere, mockFrom, mockOnConflictDoUpdate, mockValues },
     },
   };
 });
@@ -34,7 +33,6 @@ vi.mock("../../src/lib/logger.js", () => ({
 // Helpers to access inner mocks
 function getDbMock() {
   return (db as any).__mock as {
-    mockLimit: ReturnType<typeof vi.fn>;
     mockWhere: ReturnType<typeof vi.fn>;
     mockFrom: ReturnType<typeof vi.fn>;
     mockOnConflictDoUpdate: ReturnType<typeof vi.fn>;
@@ -54,8 +52,6 @@ describe("reliability.service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     const m = getDbMock();
-    // Reset mockLimit to return no existing rows by default
-    m.mockLimit.mockResolvedValue([]);
     m.mockOnConflictDoUpdate.mockResolvedValue([]);
   });
 
@@ -179,7 +175,7 @@ describe("reliability.service", () => {
 
     // ─── Score formula ────────────────────────────────────────────────────
 
-    describe("score formula: 70% agreement + 30% error rate", () => {
+    describe("score formula: 70% agreement + 30% baseline", () => {
       it("should compute correct score for fresh model with no prior data", async () => {
         // No existing row -> contradicted=1, agreedWith=0, totalResponses=1, toolErrors=0
         const memberModels = new Map([
@@ -191,9 +187,7 @@ describe("reliability.service", () => {
         const calls = vi.mocked(getDbMock().mockValues).mock.calls;
         const modelXCall = calls.find((c: any) => c[0].model === "model-x")![0];
 
-        // agreementScore = 0 / (0 + 1 + 1) = 0
-        // errorScore = 1 - 0/(1+1) = 1
-        // avgConfidence = 0 * 0.7 + 1 * 0.3 = 0.3
+        // avgConfidence = 0 / (0 + 1 + 1) * 0.7 + 0.3 = 0 + 0.3 = 0.3
         expect(modelXCall.avgConfidence).toBeCloseTo(0.3, 5);
       });
 
@@ -205,26 +199,13 @@ describe("reliability.service", () => {
         const row = calls[0][0];
 
         // agreedWith=1, contradicted=0, totalResponses=1, toolErrors=0
-        // agreementScore = 1 / (1 + 0 + 1) = 0.5
-        // errorScore = 1 - 0/(1+1) = 1
-        // avgConfidence = 0.5 * 0.7 + 1 * 0.3 = 0.35 + 0.3 = 0.65
+        // avgConfidence = 1 / (1 + 0 + 1) * 0.7 + 0.3 = 0.5 * 0.7 + 0.3 = 0.65
         expect(row.avgConfidence).toBeCloseTo(0.65, 5);
       });
 
-      it("should compute correct score incorporating existing data (upsert)", async () => {
-        // Simulate an existing row in DB
-        const m = getDbMock();
-        m.mockLimit.mockResolvedValue([
-          {
-            model: "model-x",
-            totalResponses: 10,
-            agreedWith: 5,
-            contradicted: 2,
-            toolErrors: 1,
-            avgConfidence: 0.5,
-          },
-        ]);
-
+      it("should compute correct score for insert values (upsert inserts deltas only)", async () => {
+        // The source no longer reads existing rows before upserting.
+        // The insert values only contain the deltas, not merged totals.
         const memberModels = new Map([["a1", "model-x"]]);
         // One new concession -> agreedWith delta=1
         await updateReliability([], ["a1"], memberModels);
@@ -232,49 +213,29 @@ describe("reliability.service", () => {
         const calls = vi.mocked(getDbMock().mockValues).mock.calls;
         const row = calls[0][0];
 
-        // totalResponses = 10 + 1 = 11
-        // agreedWith = 5 + 1 = 6
-        // contradicted = 2 + 0 = 2
-        // toolErrors = 1 (unchanged)
-        expect(row.totalResponses).toBe(11);
-        expect(row.agreedWith).toBe(6);
-        expect(row.contradicted).toBe(2);
-        expect(row.toolErrors).toBe(1);
+        // Insert values are just the deltas
+        expect(row.totalResponses).toBe(1);
+        expect(row.agreedWith).toBe(1);
+        expect(row.contradicted).toBe(0);
+        expect(row.toolErrors).toBe(0);
 
-        // agreementScore = 6 / (6 + 2 + 1) = 6/9
-        // errorScore = 1 - 1/(11+1) = 1 - 1/12 = 11/12
-        // avgConfidence = (6/9) * 0.7 + (11/12) * 0.3
-        const expected = (6 / 9) * 0.7 + (11 / 12) * 0.3;
-        expect(row.avgConfidence).toBeCloseTo(expected, 5);
+        // avgConfidence = 1 / (1 + 0 + 1) * 0.7 + 0.3 = 0.65
+        expect(row.avgConfidence).toBeCloseTo(0.65, 5);
       });
 
-      it("should preserve existing toolErrors in score calculation", async () => {
-        const m = getDbMock();
-        m.mockLimit.mockResolvedValue([
-          {
-            model: "model-x",
-            totalResponses: 20,
-            agreedWith: 10,
-            contradicted: 5,
-            toolErrors: 4,
-            avgConfidence: 0.5,
-          },
-        ]);
-
+      it("should compute correct score with conflicts and concessions combined", async () => {
         const memberModels = new Map([
           ["a1", "model-x"],
           ["a2", "model-y"],
         ]);
-        await updateReliability([{ agentA: "a1", agentB: "a2" }], [], memberModels);
+        await updateReliability([{ agentA: "a1", agentB: "a2" }], ["a1"], memberModels);
 
         const calls = vi.mocked(getDbMock().mockValues).mock.calls;
         const modelXRow = calls.find((c: any) => c[0].model === "model-x")![0];
 
-        // totalResponses = 20 + 1 = 21
-        // agreedWith = 10 + 0 = 10, contradicted = 5 + 1 = 6, toolErrors = 4
-        // agreementScore = 10 / (10 + 6 + 1) = 10/17
-        // errorScore = 1 - 4/(21+1) = 1 - 4/22 = 18/22
-        const expected = (10 / 17) * 0.7 + (18 / 22) * 0.3;
+        // model-x: agreedWith=1, contradicted=1
+        // avgConfidence = 1 / (1 + 1 + 1) * 0.7 + 0.3 = (1/3)*0.7 + 0.3
+        const expected = (1 / 3) * 0.7 + 0.3;
         expect(modelXRow.avgConfidence).toBeCloseTo(expected, 5);
       });
     });
@@ -291,10 +252,7 @@ describe("reliability.service", () => {
           expect.objectContaining({
             target: modelReliability.model,
             set: expect.objectContaining({
-              totalResponses: expect.any(Number),
-              agreedWith: expect.any(Number),
-              contradicted: expect.any(Number),
-              avgConfidence: expect.any(Number),
+              updatedAt: expect.any(Date),
             }),
           })
         );
@@ -311,11 +269,11 @@ describe("reliability.service", () => {
         expect(conflictCall.set.updatedAt).toBeInstanceOf(Date);
       });
 
-      it("should select existing row before upserting", async () => {
+      it("should not select existing row before upserting (uses onConflictDoUpdate)", async () => {
         const memberModels = new Map([["a1", "gpt-4"]]);
         await updateReliability([], ["a1"], memberModels);
 
-        expect(db.select).toHaveBeenCalled();
+        expect(db.select).not.toHaveBeenCalled();
       });
     });
 
@@ -366,7 +324,7 @@ describe("reliability.service", () => {
 
     it("should catch and log errors without throwing", async () => {
       const logger = (await import("../../src/lib/logger.js")).default;
-      vi.mocked(db.select).mockImplementationOnce(() => {
+      vi.mocked(db.insert).mockImplementationOnce(() => {
         throw new Error("DB down");
       });
 

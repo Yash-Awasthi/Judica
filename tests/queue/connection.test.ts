@@ -8,6 +8,7 @@ vi.mock("ioredis", () => {
     constructor(...args: any[]) {
       callArgs.push(args);
     }
+    on() { return this; }
   }
   return { default: MockIORedis, Redis: MockIORedis };
 });

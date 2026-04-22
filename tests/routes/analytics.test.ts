@@ -422,7 +422,7 @@ describe("GET /overview - errors", () => {
     await expect(handler(createRequest(), createReply())).rejects.toThrow("traces agg failed");
   });
 
-  it("propagates db.execute error from daily usage query", async () => {
+  it("silently catches db.execute error from daily usage query", async () => {
     let selectCallIndex = 0;
     mockDb.select = vi.fn(() => {
       selectCallIndex++;
@@ -439,7 +439,11 @@ describe("GET /overview - errors", () => {
     mockDb.execute = vi.fn(() => Promise.reject(new Error("daily usage query failed")));
 
     const { handler } = registeredRoutes["GET /overview"];
-    await expect(handler(createRequest(), createReply())).rejects.toThrow("daily usage query failed");
+    const result = await handler(createRequest(), createReply());
+
+    // Error is caught silently, daily usage defaults to empty
+    expect(result.dailyUsage).toEqual([]);
+    expect(result.totalConversations).toBe(10);
   });
 
   it("silently catches model distribution query errors and returns empty array", async () => {

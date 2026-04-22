@@ -14,6 +14,11 @@ vi.mock("../../src/config/env.js", () => ({
   },
 }));
 
+// Mock SSRF validation so addConnection doesn't reject test URLs
+vi.mock("../../src/lib/ssrf.js", () => ({
+  validateSafeUrl: vi.fn().mockResolvedValue("http://mocked"),
+}));
+
 import {
   addConnection,
   removeConnection,
@@ -31,8 +36,8 @@ describe("mcpClient.service", () => {
   });
 
   describe("connection registry", () => {
-    it("should add and retrieve a connection", () => {
-      addConnection({ name: "github", url: "http://localhost:3001", transport: "http" });
+    it("should add and retrieve a connection", async () => {
+      await addConnection({ name: "github", url: "http://localhost:3001", transport: "http" });
 
       const conn = getConnection("github");
       expect(conn).toBeDefined();
@@ -40,15 +45,15 @@ describe("mcpClient.service", () => {
       expect(conn!.transport).toBe("http");
     });
 
-    it("should list all connections", () => {
-      addConnection({ name: "a", url: "http://a", transport: "http" });
-      addConnection({ name: "b", url: "http://b", transport: "sse" });
+    it("should list all connections", async () => {
+      await addConnection({ name: "a", url: "http://a", transport: "http" });
+      await addConnection({ name: "b", url: "http://b", transport: "sse" });
 
       expect(listConnections()).toHaveLength(2);
     });
 
-    it("should remove a connection", () => {
-      addConnection({ name: "temp", url: "http://temp", transport: "http" });
+    it("should remove a connection", async () => {
+      await addConnection({ name: "temp", url: "http://temp", transport: "http" });
 
       expect(removeConnection("temp")).toBe(true);
       expect(getConnection("temp")).toBeUndefined();
@@ -58,7 +63,7 @@ describe("mcpClient.service", () => {
 
   describe("discoverTools", () => {
     it("should discover tools from a remote server", async () => {
-      addConnection({ name: "github", url: "http://localhost:3001", transport: "http" });
+      await addConnection({ name: "github", url: "http://localhost:3001", transport: "http" });
 
       const mockFetch = vi.fn().mockResolvedValue({
         json: async () => ({
@@ -80,7 +85,7 @@ describe("mcpClient.service", () => {
     });
 
     it("should cache discovered tools", async () => {
-      addConnection({ name: "cached", url: "http://localhost:3001", transport: "http" });
+      await addConnection({ name: "cached", url: "http://localhost:3001", transport: "http" });
 
       const mockFetch = vi.fn().mockResolvedValue({
         json: async () => ({ result: { tools: [{ name: "t1", description: "", inputSchema: {} }] } }),
@@ -99,8 +104,8 @@ describe("mcpClient.service", () => {
 
   describe("discoverAllTools", () => {
     it("should discover tools from all servers", async () => {
-      addConnection({ name: "a", url: "http://a", transport: "http" });
-      addConnection({ name: "b", url: "http://b", transport: "http" });
+      await addConnection({ name: "a", url: "http://a", transport: "http" });
+      await addConnection({ name: "b", url: "http://b", transport: "http" });
 
       const mockFetch = vi.fn()
         .mockResolvedValueOnce({
@@ -117,8 +122,8 @@ describe("mcpClient.service", () => {
     });
 
     it("should handle partial failures gracefully", async () => {
-      addConnection({ name: "ok", url: "http://ok", transport: "http" });
-      addConnection({ name: "fail", url: "http://fail", transport: "http" });
+      await addConnection({ name: "ok", url: "http://ok", transport: "http" });
+      await addConnection({ name: "fail", url: "http://fail", transport: "http" });
 
       const mockFetch = vi.fn()
         .mockResolvedValueOnce({
@@ -135,7 +140,7 @@ describe("mcpClient.service", () => {
 
   describe("callTool", () => {
     it("should call a tool on a remote server", async () => {
-      addConnection({ name: "github", url: "http://localhost:3001", transport: "http" });
+      await addConnection({ name: "github", url: "http://localhost:3001", transport: "http" });
 
       const mockFetch = vi.fn().mockResolvedValue({
         json: async () => ({
@@ -160,7 +165,7 @@ describe("mcpClient.service", () => {
     });
 
     it("should handle remote errors", async () => {
-      addConnection({ name: "err", url: "http://err", transport: "http" });
+      await addConnection({ name: "err", url: "http://err", transport: "http" });
 
       const mockFetch = vi.fn().mockResolvedValue({
         json: async () => ({
@@ -175,7 +180,7 @@ describe("mcpClient.service", () => {
     });
 
     it("should handle network failures", async () => {
-      addConnection({ name: "down", url: "http://down", transport: "http" });
+      await addConnection({ name: "down", url: "http://down", transport: "http" });
 
       const mockFetch = vi.fn().mockRejectedValue(new Error("ECONNREFUSED"));
 
@@ -186,7 +191,7 @@ describe("mcpClient.service", () => {
     });
 
     it("should include headers from connection config", async () => {
-      addConnection({
+      await addConnection({
         name: "auth",
         url: "http://auth",
         transport: "http",

@@ -25,14 +25,16 @@ describe("search – executeSearch", () => {
   });
 
   it("returns search results from SerpAPI", async () => {
+    const data = {
+      organic_results: [
+        { title: "Result 1", link: "https://example.com/1", snippet: "First result" },
+        { title: "Result 2", link: "https://example.com/2", snippet: "Second result" },
+      ],
+    };
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({
-        organic_results: [
-          { title: "Result 1", link: "https://example.com/1", snippet: "First result" },
-          { title: "Result 2", link: "https://example.com/2", snippet: "Second result" },
-        ],
-      }),
+      headers: { get: () => "100" },
+      text: async () => JSON.stringify(data),
     });
 
     const raw = await executeSearch({ query: "test query" });
@@ -45,15 +47,17 @@ describe("search – executeSearch", () => {
   });
 
   it("deduplicates results by URL", async () => {
+    const data = {
+      organic_results: [
+        { title: "Result A", link: "https://example.com/dup", snippet: "First" },
+        { title: "Result B", link: "https://example.com/dup", snippet: "Duplicate" },
+        { title: "Result C", link: "https://example.com/unique", snippet: "Unique" },
+      ],
+    };
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({
-        organic_results: [
-          { title: "Result A", link: "https://example.com/dup", snippet: "First" },
-          { title: "Result B", link: "https://example.com/dup", snippet: "Duplicate" },
-          { title: "Result C", link: "https://example.com/unique", snippet: "Unique" },
-        ],
-      }),
+      headers: { get: () => "100" },
+      text: async () => JSON.stringify(data),
     });
 
     const raw = await executeSearch({ query: "duplicates" });
@@ -68,7 +72,8 @@ describe("search – executeSearch", () => {
     const longSnippet = "A".repeat(500);
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({
+      headers: { get: () => "100" },
+      text: async () => JSON.stringify({
         organic_results: [
           { title: "Long", link: "https://example.com/long", snippet: longSnippet },
         ],
@@ -89,7 +94,8 @@ describe("search – executeSearch", () => {
     }));
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({ organic_results: manyResults }),
+      headers: { get: () => "100" },
+      text: async () => JSON.stringify({ organic_results: manyResults }),
     });
 
     const raw = await executeSearch({ query: "many results" });
@@ -99,7 +105,7 @@ describe("search – executeSearch", () => {
   });
 
   it("handles API failure gracefully by returning empty array", async () => {
-    mockFetch.mockResolvedValueOnce({ ok: false, status: 500 });
+    mockFetch.mockResolvedValueOnce({ ok: false, status: 500, headers: { get: () => "0" } });
 
     const raw = await executeSearch({ query: "fail" });
 
@@ -121,15 +127,17 @@ describe("search – executeSearch", () => {
   });
 
   it("filters out results with empty title or URL", async () => {
+    const data = {
+      organic_results: [
+        { title: "", link: "https://example.com/empty-title", snippet: "No title" },
+        { title: "Has title", link: "", snippet: "No url" },
+        { title: "Valid", link: "https://example.com/valid", snippet: "Good" },
+      ],
+    };
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({
-        organic_results: [
-          { title: "", link: "https://example.com/empty-title", snippet: "No title" },
-          { title: "Has title", link: "", snippet: "No url" },
-          { title: "Valid", link: "https://example.com/valid", snippet: "Good" },
-        ],
-      }),
+      headers: { get: () => "100" },
+      text: async () => JSON.stringify(data),
     });
 
     const raw = await executeSearch({ query: "filter" });
@@ -140,17 +148,19 @@ describe("search – executeSearch", () => {
   });
 
   it("collapses whitespace in snippets", async () => {
+    const data = {
+      organic_results: [
+        {
+          title: "Spaced",
+          link: "https://example.com/spaced",
+          snippet: "has   multiple   spaces\n\nand  newlines",
+        },
+      ],
+    };
     mockFetch.mockResolvedValueOnce({
       ok: true,
-      json: async () => ({
-        organic_results: [
-          {
-            title: "Spaced",
-            link: "https://example.com/spaced",
-            snippet: "has   multiple   spaces\n\nand  newlines",
-          },
-        ],
-      }),
+      headers: { get: () => "100" },
+      text: async () => JSON.stringify(data),
     });
 
     const raw = await executeSearch({ query: "spaces" });

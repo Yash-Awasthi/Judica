@@ -1,18 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import fs from "fs";
 
-vi.mock("fs", () => ({
-  default: {
-    statSync: vi.fn(),
-  },
-  statSync: vi.fn(),
+const { mockAssertFileSizeLimit } = vi.hoisted(() => ({
+  mockAssertFileSizeLimit: vi.fn(),
 }));
+
+vi.mock("../../src/processors/types.js", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("../../src/processors/types.js")>();
+  return {
+    ...orig,
+    assertFileSizeLimit: mockAssertFileSizeLimit,
+  };
+});
 
 vi.mock("mammoth", () => ({
   extractRawText: vi.fn(),
 }));
-
-const mockedFs = vi.mocked(fs);
 
 import * as mammoth from "mammoth";
 import { processDOCX } from "../../src/processors/docx.processor.js";
@@ -22,7 +24,7 @@ const mockedMammoth = vi.mocked(mammoth);
 describe("processDOCX", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockedFs.statSync.mockReturnValue({ size: 1024 } as any);
+    mockAssertFileSizeLimit.mockImplementation(() => {});
   });
 
   it("should return extracted text from a DOCX file", async () => {
@@ -64,7 +66,9 @@ describe("processDOCX", () => {
   });
 
   it("should throw when file exceeds size limit", async () => {
-    mockedFs.statSync.mockReturnValue({ size: 200 * 1024 * 1024 } as any);
+    mockAssertFileSizeLimit.mockImplementation(() => {
+      throw new Error("File too large for processing: 200.0MB exceeds the 100MB limit");
+    });
 
     await expect(processDOCX("/tmp/huge.docx")).rejects.toThrow(
       /File too large/

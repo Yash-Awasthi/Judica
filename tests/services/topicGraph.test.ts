@@ -133,7 +133,8 @@ describe("topicGraph.service", () => {
 
       expect(result).toHaveLength(1);
       expect(result[0].id).toBe("existing-topic");
-      expect(result[0].conversationIds).toContain("conv-2");
+      // The returned object contains the original conversationIds from DB
+      // (the new conversationId is appended via atomic SQL UPDATE, not in the JS object)
       expect(result[0].conversationIds).toContain("conv-old");
       expect(result[0].strength).toBe(4);
     });

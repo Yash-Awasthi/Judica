@@ -19,6 +19,7 @@ vi.mock("../../src/lib/logger.js", () => ({
 // Mock fs/promises at the top level
 vi.mock("fs/promises", () => ({
   readFile: vi.fn(),
+  open: vi.fn(),
 }));
 
 import {
@@ -74,9 +75,12 @@ describe("loadProviderConfig", () => {
     };
 
     const fs = await import("fs/promises");
-    (fs.readFile as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
-      JSON.stringify(customConfig)
-    );
+    const mockFileHandle = {
+      stat: vi.fn().mockResolvedValueOnce({ size: 100 }),
+      readFile: vi.fn().mockResolvedValueOnce(JSON.stringify(customConfig)),
+      close: vi.fn().mockResolvedValueOnce(undefined),
+    };
+    (fs.open as ReturnType<typeof vi.fn>).mockResolvedValueOnce(mockFileHandle);
 
     const config = await loadProviderConfig();
     expect(config.providers).toHaveLength(1);
@@ -87,7 +91,7 @@ describe("loadProviderConfig", () => {
     (env as any).PROVIDER_REGISTRY_CONFIG = "/nonexistent/path.json";
 
     const fs = await import("fs/promises");
-    (fs.readFile as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+    (fs.open as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
       new Error("ENOENT: no such file or directory")
     );
 

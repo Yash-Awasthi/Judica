@@ -15,6 +15,24 @@ globalThis.fetch = mockFetch as any;
 
 import { readWebpageTool } from "../../../src/lib/tools/read_webpage.js";
 
+/** Helper: create a mock ReadableStream body from a string */
+function mockBody(html: string) {
+  const encoded = new TextEncoder().encode(html);
+  let read = false;
+  return {
+    getReader: () => ({
+      read: async () => {
+        if (!read) {
+          read = true;
+          return { done: false, value: encoded };
+        }
+        return { done: true, value: undefined };
+      },
+      cancel: vi.fn(),
+    }),
+  };
+}
+
 describe("readWebpageTool", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -23,12 +41,12 @@ describe("readWebpageTool", () => {
   });
 
   it("fetches and extracts text from HTML", async () => {
+    const html = "<html><body><h1>Hello</h1><p>World content here.</p></body></html>";
     mockFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
       headers: new Map([["content-length", "100"]]),
-      text: async () =>
-        "<html><body><h1>Hello</h1><p>World content here.</p></body></html>",
+      body: mockBody(html),
     });
 
     const result = await readWebpageTool.execute({ url: "https://example.com" });
@@ -41,12 +59,12 @@ describe("readWebpageTool", () => {
   });
 
   it("strips script tags from content", async () => {
+    const html = '<html><body><p>Visible</p><script>alert("xss")</script><p>Also visible</p></body></html>';
     mockFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
       headers: new Map([["content-length", "200"]]),
-      text: async () =>
-        '<html><body><p>Visible</p><script>alert("xss")</script><p>Also visible</p></body></html>',
+      body: mockBody(html),
     });
 
     const result = await readWebpageTool.execute({ url: "https://example.com" });
@@ -58,12 +76,12 @@ describe("readWebpageTool", () => {
   });
 
   it("strips style tags from content", async () => {
+    const html = "<html><body><style>body { color: red; }</style><p>Styled text</p></body></html>";
     mockFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
       headers: new Map([["content-length", "200"]]),
-      text: async () =>
-        "<html><body><style>body { color: red; }</style><p>Styled text</p></body></html>",
+      body: mockBody(html),
     });
 
     const result = await readWebpageTool.execute({ url: "https://example.com" });
@@ -86,7 +104,7 @@ describe("readWebpageTool", () => {
         ok: true,
         status: 200,
         headers: new Map([["content-length", "50"]]),
-        text: async () => "<html><body><p>Final page</p></body></html>",
+        body: mockBody("<html><body><p>Final page</p></body></html>"),
       });
 
     const result = await readWebpageTool.execute({ url: "https://example.com/redirect" });
@@ -112,11 +130,12 @@ describe("readWebpageTool", () => {
 
   it("truncates long content to 10000 chars plus truncation marker", async () => {
     const longBody = "A".repeat(20000);
+    const html = `<html><body><p>${longBody}</p></body></html>`;
     mockFetch.mockResolvedValueOnce({
       ok: true,
       status: 200,
       headers: new Map([["content-length", "20100"]]),
-      text: async () => `<html><body><p>${longBody}</p></body></html>`,
+      body: mockBody(html),
     });
 
     const result = await readWebpageTool.execute({ url: "https://example.com/long" });

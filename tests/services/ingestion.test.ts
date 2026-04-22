@@ -258,16 +258,20 @@ describe("ingestDocument", () => {
     );
   });
 
-  it("should propagate errors from storeChunk", async () => {
+  it("should catch and skip errors from storeChunk without throwing", async () => {
     mockedChunkHierarchical.mockReturnValue([parentChunk("a")]);
     mockedStoreChunk.mockRejectedValueOnce(new Error("vector store down"));
 
     const promise = ingestDocument(userId, kbId, docId, filename, "text");
-    // Attach a no-op catch so the rejection is "handled" before vitest's runner sees it
-    promise.catch(() => {});
     await vi.runAllTimersAsync();
 
-    await expect(promise).rejects.toThrow("vector store down");
+    // Error is caught and logged, returns 0 successful chunks
+    const result = await promise;
+    expect(result).toBe(0);
+    expect(mockedLogger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ docId, chunkIndex: 0 }),
+      "Failed to store chunk — skipping"
+    );
   });
 
   it("should propagate errors from the DB update", async () => {

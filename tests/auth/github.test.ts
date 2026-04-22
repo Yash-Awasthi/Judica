@@ -106,8 +106,8 @@ describe("createGitHubStrategy", () => {
     expect(done).toHaveBeenCalledWith(null, existingUser);
   });
 
-  it("returns error when existing user has passwordHash (email signup)", async () => {
-    const existingUser = { id: 1, email: "test@example.com", passwordHash: "hashed", role: "member" };
+  it("returns error when existing user has password authMethod", async () => {
+    const existingUser = { id: 1, email: "test@example.com", authMethod: "password", passwordHash: "hashed", role: "member" };
     mockLimit.mockResolvedValueOnce([existingUser]);
 
     const strategy = createGitHubStrategy() as any;

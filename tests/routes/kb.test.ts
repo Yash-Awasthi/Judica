@@ -213,7 +213,7 @@ describe("GET /", () => {
             chainable({
               where: vi.fn(() =>
                 chainable({
-                  orderBy: vi.fn().mockResolvedValue(mockKbs),
+                  orderBy: vi.fn(() => chainable({ limit: vi.fn().mockResolvedValue(mockKbs) })),
                 })
               ),
             })
@@ -253,7 +253,7 @@ describe("GET /", () => {
           chainable({
             where: vi.fn(() =>
               chainable({
-                orderBy: vi.fn().mockResolvedValue([]),
+                orderBy: vi.fn(() => chainable({ limit: vi.fn().mockResolvedValue([]) })),
               })
             ),
           })
@@ -273,7 +273,7 @@ describe("GET /", () => {
           chainable({
             where: vi.fn(() =>
               chainable({
-                orderBy: vi.fn().mockRejectedValue(new Error("db down")),
+                orderBy: vi.fn(() => chainable({ limit: vi.fn().mockRejectedValue(new Error("db down")) })),
               })
             ),
           })
@@ -425,7 +425,7 @@ describe("GET /:id", () => {
             chainable({
               where: vi.fn(() =>
                 chainable({
-                  orderBy: vi.fn().mockResolvedValue(mockDocs),
+                  orderBy: vi.fn(() => chainable({ limit: vi.fn().mockResolvedValue(mockDocs) })),
                 })
               ),
             })
@@ -499,7 +499,7 @@ describe("GET /:id", () => {
             chainable({
               where: vi.fn(() =>
                 chainable({
-                  orderBy: vi.fn().mockResolvedValue([]),
+                  orderBy: vi.fn(() => chainable({ limit: vi.fn().mockResolvedValue([]) })),
                 })
               ),
             })
@@ -901,7 +901,7 @@ describe("GET /:id/documents", () => {
           chainable({
             where: vi.fn(() =>
               chainable({
-                orderBy: vi.fn().mockResolvedValue(mockDocs),
+                orderBy: vi.fn(() => chainable({ limit: vi.fn().mockResolvedValue(mockDocs) })),
               })
             ),
           })
@@ -961,7 +961,7 @@ describe("GET /:id/documents", () => {
           chainable({
             where: vi.fn(() =>
               chainable({
-                orderBy: vi.fn().mockResolvedValue([]),
+                orderBy: vi.fn(() => chainable({ limit: vi.fn().mockResolvedValue([]) })),
               })
             ),
           })

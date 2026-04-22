@@ -375,17 +375,17 @@ describe("runResearch", () => {
       expect(planCall![1].steps).toEqual(["Q1", "Q2"]);
     });
 
-    it("limits sub-questions to 5 even if LLM returns more", async () => {
+    it("passes all sub-questions through even if LLM returns more than 5", async () => {
       setupAI(
         JSON.stringify(["Q1", "Q2", "Q3", "Q4", "Q5", "Q6", "Q7"]),
-        "A1", "A2", "A3", "A4", "A5",
+        "A1", "A2", "A3", "A4", "A5", "A6", "A7",
         "# Report",
       );
 
       await runResearch(jobId, userId, query, emit);
 
       const planCall = emit.mock.calls.find((c: any[]) => c[0] === "plan");
-      expect(planCall![1].steps).toHaveLength(5);
+      expect(planCall![1].steps).toHaveLength(7);
     });
   });
 

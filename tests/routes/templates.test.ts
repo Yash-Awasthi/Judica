@@ -193,47 +193,47 @@ describe("GET /:id", () => {
     const result = await handler(request, reply);
 
     expect(reply.code).toHaveBeenCalledWith(404);
-    expect(result).toEqual({ error: "Template not found" });
+    expect(reply.send).toHaveBeenCalledWith({ error: "Template not found" });
   });
 
   it("returns 404 for empty string id", async () => {
     const { handler } = registeredRoutes["GET /:id"];
     const request = createRequest({ params: { id: "" } });
     const reply = createReply();
-    const result = await handler(request, reply);
+    await handler(request, reply);
 
     expect(reply.code).toHaveBeenCalledWith(404);
-    expect(result).toEqual({ error: "Template not found" });
+    expect(reply.send).toHaveBeenCalledWith({ error: "Template not found" });
   });
 
   it("returns 404 for id with wrong case", async () => {
     const { handler } = registeredRoutes["GET /:id"];
     const request = createRequest({ params: { id: "Debate" } });
     const reply = createReply();
-    const result = await handler(request, reply);
+    await handler(request, reply);
 
     expect(reply.code).toHaveBeenCalledWith(404);
-    expect(result).toEqual({ error: "Template not found" });
+    expect(reply.send).toHaveBeenCalledWith({ error: "Template not found" });
   });
 
   it("returns 404 for id with leading/trailing spaces", async () => {
     const { handler } = registeredRoutes["GET /:id"];
     const request = createRequest({ params: { id: " debate " } });
     const reply = createReply();
-    const result = await handler(request, reply);
+    await handler(request, reply);
 
     expect(reply.code).toHaveBeenCalledWith(404);
-    expect(result).toEqual({ error: "Template not found" });
+    expect(reply.send).toHaveBeenCalledWith({ error: "Template not found" });
   });
 
   it("returns 404 for numeric id", async () => {
     const { handler } = registeredRoutes["GET /:id"];
     const request = createRequest({ params: { id: "123" } });
     const reply = createReply();
-    const result = await handler(request, reply);
+    await handler(request, reply);
 
     expect(reply.code).toHaveBeenCalledWith(404);
-    expect(result).toEqual({ error: "Template not found" });
+    expect(reply.send).toHaveBeenCalledWith({ error: "Template not found" });
   });
 
   it("returns 404 for undefined-like id values", async () => {
@@ -241,9 +241,9 @@ describe("GET /:id", () => {
 
     for (const badId of ["undefined", "null"]) {
       const reply = createReply();
-      const result = await handler(createRequest({ params: { id: badId } }), reply);
+      await handler(createRequest({ params: { id: badId } }), reply);
       expect(reply.code).toHaveBeenCalledWith(404);
-      expect(result).toEqual({ error: "Template not found" });
+      expect(reply.send).toHaveBeenCalledWith({ error: "Template not found" });
     }
   });
 

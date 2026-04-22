@@ -105,7 +105,8 @@ describe("Embeddings Service", () => {
       expect(mockFetch).toHaveBeenCalledOnce();
       const [url, opts] = mockFetch.mock.calls[0];
       expect(url).toContain("text-embedding-004:embedContent");
-      expect(url).toContain("key=google-test-key");
+      expect(url).not.toContain("key="); // API key moved to header
+      expect(opts.headers["x-goog-api-key"]).toBe("google-test-key");
       const body = JSON.parse(opts.body);
       expect(body.content.parts[0].text).toBe("hello gemini");
       expect(body.outputDimensionality).toBe(1536);

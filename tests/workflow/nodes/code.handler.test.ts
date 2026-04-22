@@ -54,7 +54,7 @@ describe("codeHandler", () => {
     const ctx = makeCtx({}, { code: "print(3.14)", language: "python" });
     const result = await codeHandler(ctx);
 
-    expect(mockExecutePython).toHaveBeenCalledWith("import json\n__inputs__ = json.loads('{}')\nprint(3.14)");
+    expect(mockExecutePython).toHaveBeenCalledWith("import json\n__inputs__ = json.loads(\"{}\")\nprint(3.14)");
     expect(mockExecuteJS).not.toHaveBeenCalled();
     expect(result).toEqual({ output: "3.14", error: "" });
   });

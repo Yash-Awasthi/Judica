@@ -284,21 +284,19 @@ describe("share routes", () => {
       expect(result.shareToken).toBe("tok-30d");
     });
 
-    it("passes null expiry for unknown expiresIn value", async () => {
+    it("throws 400 for unknown expiresIn value", async () => {
       const convo = { id: "conv-1", userId: 1 };
-      const shared = { shareToken: "tok-none" };
 
       const selectChain = chainable({ limit: vi.fn(() => [convo]) });
       mockDb.select = vi.fn(() => selectChain);
 
-      const insertChain = chainable({ returning: vi.fn(() => [shared]) });
+      const insertChain = chainable({ returning: vi.fn(() => [{ shareToken: "tok-none" }]) });
       mockDb.insert = vi.fn(() => insertChain);
 
       const req = createRequest({ params: { id: "conv-1" }, body: { expiresIn: "bogus" } });
       const reply = createReply();
 
-      const result = await route().handler(req, reply);
-      expect(result.shareToken).toBe("tok-none");
+      await expect(route().handler(req, reply)).rejects.toThrow("Invalid expiresIn value");
     });
   });
 

@@ -1343,7 +1343,7 @@ describe("POST /runs/:runId/gate (resume gate)", () => {
     const { handler } = registeredRoutes["POST /runs/:runId/gate"];
     await expect(
       handler(
-        createRequest({ params: { runId: "run-1" }, body: { choice: "approve" } }),
+        createRequest({ params: { runId: "run-1" }, body: { choice: "approve", nodeId: "node-1" } }),
         createReply(),
       ),
     ).rejects.toThrow("No active executor for this run");
@@ -1374,7 +1374,7 @@ describe("POST /runs/:runId/gate (resume gate)", () => {
     expect(mockExecutorResumeGate).toHaveBeenCalledWith("gate-node-1", "approve");
   });
 
-  it("passes nodeId as undefined when not provided", async () => {
+  it("throws when nodeId is not provided", async () => {
     const run = { id: "run-gate2", status: "running" };
     const chain = chainable({ limit: vi.fn().mockResolvedValue([run]) });
     mockDb.select = vi.fn(() => chain);
@@ -1387,14 +1387,14 @@ describe("POST /runs/:runId/gate (resume gate)", () => {
     });
 
     const { handler } = registeredRoutes["POST /runs/:runId/gate"];
-    await handler(
-      createRequest({
-        params: { runId: "run-gate2" },
-        body: { choice: "reject" },
-      }),
-      createReply(),
-    );
-
-    expect(mockExecutorResumeGate).toHaveBeenCalledWith(undefined, "reject");
+    await expect(
+      handler(
+        createRequest({
+          params: { runId: "run-gate2" },
+          body: { choice: "reject" },
+        }),
+        createReply(),
+      ),
+    ).rejects.toThrow("nodeId is required");
   });
 });

@@ -239,13 +239,15 @@ describe("POST /github — start ingestion", () => {
     expect(result).toEqual({ message: "Ingestion queued", owner: "acme", repo: "widgets" });
   });
 
-  it("trims whitespace from owner and repo", async () => {
+  it("returns 400 when owner/repo has whitespace (fails format validation)", async () => {
     const req = createMockRequest({ body: { owner: "  acme  ", repo: "  widgets  " }, userId: "user-1" });
     const reply = createMockReply();
 
-    await routes["POST /github"].handler(req, reply);
+    const result = await routes["POST /github"].handler(req, reply);
 
-    expect(mockQueueAdd).toHaveBeenCalledWith("ingest", { userId: "user-1", owner: "acme", repo: "widgets" });
+    expect(reply.code).toHaveBeenCalledWith(400);
+    expect(result).toEqual({ error: "Invalid owner or repo name. Must contain only alphanumeric characters, hyphens, underscores, and dots." });
+    expect(mockQueueAdd).not.toHaveBeenCalled();
   });
 
   it("propagates queue errors", async () => {
