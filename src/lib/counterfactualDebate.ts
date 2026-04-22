@@ -63,7 +63,9 @@ export async function runCounterfactualDebate(
 
   // Step 3: Extract robustness score from rebuttal
   const confidenceMatch = rebuttal.match(/(?:confidence|rating|score)[:\s]*([01](?:\.\d+)?)/i);
-  const robustnessScore = confidenceMatch ? parseFloat(confidenceMatch[1]) : 0.5;
+  // P20-04: NaN guard — parseFloat can return NaN if regex captures non-numeric text
+  const _parsedRobustness = confidenceMatch ? parseFloat(confidenceMatch[1]) : 0.5;
+  const robustnessScore = Number.isFinite(_parsedRobustness) ? _parsedRobustness : 0.5;
 
   // Step 4: Extract concessions
   const concessions: string[] = [];

@@ -94,6 +94,14 @@ export const dbPoolStats = new client.Gauge({
 
 });
 
+// P57-03: CARDINALITY WARNING — tenant_id labels create O(tenants) time series.
+// At >1000 tenants, this WILL degrade Prometheus performance.
+// Mitigation options:
+//   1. Use recording rules to pre-aggregate by tenant bucket (small/medium/large)
+//   2. Use exemplars instead of labels for per-tenant drill-down
+//   3. Cap tenant_id labels to top-N tenants by volume, bucket rest as "other"
+// Monitor aibyai_tenant_* series count via `count({__name__=~"aibyai_tenant_.*"})`.
+
 // P4-12: Per-tenant metrics for SLO tracking.
 // Use userId or orgId as the tenant label to enable per-tenant dashboards.
 export const tenantRequestDuration = new client.Histogram({

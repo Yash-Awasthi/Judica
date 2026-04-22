@@ -42,6 +42,14 @@ try {
 }
 if (isolationLevel === "ulimit") {
   logger.warn("Neither bwrap nor unshare available — Python sandbox will use ulimit-only isolation");
+  // H-5 fix: fail loudly in production so operators know isolation is degraded.
+  // Set ALLOW_UNSAFE_SANDBOX=1 to override (e.g. in local dev without bwrap installed).
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_UNSAFE_SANDBOX !== "1") {
+    throw new Error(
+      "CRITICAL: Python sandbox requires bubblewrap (bwrap) or unshare for production use. " +
+      "Install bubblewrap, or set ALLOW_UNSAFE_SANDBOX=1 to acknowledge the degraded security posture."
+    );
+  }
 } else {
   logger.info(`Python sandbox using ${isolationLevel} isolation`);
 }

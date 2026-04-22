@@ -8,6 +8,7 @@ import { eq } from "drizzle-orm";
 import logger from "../lib/logger.js";
 import { encrypt } from "../lib/crypto.js";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
+import { validateSafeUrl } from "../lib/ssrf.js";
 
 const addProviderBody = z.object({
   name: z.string().min(1),
@@ -65,6 +66,16 @@ const providersPlugin: FastifyPluginAsync = async (fastify) => {
     try {
       const userId = request.userId!;
       const { name, type, apiKey, model, baseUrl, provider: providerIdentifier } = parsed.data;
+
+      // R2-10: Validate baseUrl against SSRF before storing
+      if (baseUrl) {
+        try {
+          await validateSafeUrl(baseUrl);
+        } catch {
+          reply.code(400);
+          return { error: "baseUrl points to a restricted or private address", code: "SSRF_BLOCKED" };
+        }
+      }
 
       const encryptedKey = encrypt(apiKey);
 

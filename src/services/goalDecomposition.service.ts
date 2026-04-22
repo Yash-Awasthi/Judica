@@ -2,6 +2,14 @@ import { routeAndCollect } from "../router/index.js";
 import { mlWorker } from "../lib/ml/ml_worker.js";
 import logger from "../lib/logger.js";
 
+/** Sanitize user input before interpolation into LLM prompts */
+function sanitizeForPrompt(text: string): string {
+  return text
+    .replace(/\b(system|assistant|user|human)\s*:/gi, (_m, role) => `${role as string} -`)
+    .replace(/ignore\s+(all\s+)?previous\s+instructions/gi, "[filtered]")
+    .replace(/you\s+are\s+now\b/gi, "[filtered]");
+}
+
 /**
  * Goal Decomposition Engine: breaks high-level objectives into a
  * Directed Acyclic Graph (DAG) of subtasks with dependencies.
@@ -31,7 +39,7 @@ export interface TaskDAG {
  * Decompose a high-level goal into a DAG of subtasks using LLM.
  */
 export async function decomposeGoal(goal: string, context?: string): Promise<TaskDAG> {
-  const contextBlock = context ? `\nContext: ${context.substring(0, 2000)}` : "";
+  const contextBlock = context ? `\nContext: ${sanitizeForPrompt(context.substring(0, 2000))}` : "";
 
   try {
     const result = await routeAndCollect({
@@ -55,7 +63,7 @@ export async function decomposeGoal(goal: string, context?: string): Promise<Tas
 Dependencies should reference task IDs. Tasks with no dependencies can run in parallel.
 Only output valid JSON, no explanation.
 
-Goal: ${goal}${contextBlock}`,
+Goal: ${sanitizeForPrompt(goal.substring(0, 2000))}${contextBlock}`,
         },
       ],
       temperature: 0,
@@ -82,7 +90,7 @@ Goal: ${goal}${contextBlock}`,
       createdAt: new Date().toISOString(),
     };
   } catch (err) {
-    logger.error({ err, goal }, "Goal decomposition failed");
+    logger.error({ err, goal: goal.substring(0, 100) }, "Goal decomposition failed");
     throw err;
   }
 }
@@ -238,7 +246,7 @@ export async function runMCTS(
   branches = 5,
   context?: string
 ): Promise<MCTSResult> {
-  const contextBlock = context ? `\nContext: ${context.substring(0, 1500)}` : "";
+  const contextBlock = context ? `\nContext: ${sanitizeForPrompt(context.substring(0, 1500))}` : "";
 
   // ── Step 1: Generate an ideal reference answer (anchor for scoring) ────
   let referenceText: string;
@@ -248,14 +256,14 @@ export async function runMCTS(
       messages: [
         {
           role: "user",
-          content: `Give the single most accurate and complete answer to the following in 2–3 sentences:\n\n${problem}${contextBlock}`,
+          content: `Give the single most accurate and complete answer to the following in 2–3 sentences:\n\n${sanitizeForPrompt(problem.substring(0, 2000))}${contextBlock}`,
         },
       ],
       temperature: 0,
     });
     referenceText = ref.text;
   } catch (err) {
-    logger.error({ err, problem }, "MCTS: reference answer generation failed");
+    logger.error({ err, problem: problem.substring(0, 100) }, "MCTS: reference answer generation failed");
     throw err;
   }
 
@@ -272,7 +280,7 @@ export async function runMCTS(
         },
         {
           role: "user",
-          content: `Reason through the following problem step-by-step and give your best answer:\n\n${problem}${contextBlock}`,
+          content: `Reason through the following problem step-by-step and give your best answer:\n\n${sanitizeForPrompt(problem.substring(0, 2000))}${contextBlock}`,
         },
       ],
       temperature: 0.7 + i * 0.05, // slight temperature spread for diversity
@@ -317,6 +325,10 @@ export async function runMCTS(
 
   const surviving = scoredBranches.filter((b) => !b.pruned);
   const prunedCount = scoredBranches.length - surviving.length;
+
+  if (scoredBranches.length === 0) {
+    throw new Error("MCTS failed: all reasoning branches failed to generate");
+  }
 
   const bestBranch = surviving.length > 0 ? surviving[0] : scoredBranches[0];
 

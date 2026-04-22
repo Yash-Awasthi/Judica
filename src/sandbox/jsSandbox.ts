@@ -70,7 +70,7 @@ export async function executeJS(code: string, timeout: number = 5000): Promise<S
           'JSON', 'Math',
           'parseInt', 'parseFloat', 'isNaN', 'isFinite',
           'encodeURI', 'decodeURI', 'encodeURIComponent', 'decodeURIComponent',
-          'ArrayBuffer', 'SharedArrayBuffer', 'DataView',
+          'ArrayBuffer', 'DataView',
           'Int8Array', 'Uint8Array', 'Uint8ClampedArray',
           'Int16Array', 'Uint16Array', 'Int32Array', 'Uint32Array',
           'Float32Array', 'Float64Array', 'BigInt64Array', 'BigUint64Array',

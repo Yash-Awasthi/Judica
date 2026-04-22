@@ -21,7 +21,8 @@ const envSchema = z.object({
   PORT: z.coerce.number().int().positive().max(65535).default(3000),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
-  RATE_LIMIT_MAX: z.coerce.number().int().positive().default(10),
+  // P40-05: Add upper bound on rate limit to prevent accidental disabling
+  RATE_LIMIT_MAX: z.coerce.number().int().positive().max(10000).default(10),
   ALLOWED_ORIGINS: z.string().optional(),
   TAVILY_API_KEY: z.string().optional(),
   SYSTEM_PROMPT: z.string().optional(),
