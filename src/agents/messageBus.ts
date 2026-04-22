@@ -6,6 +6,9 @@ const MAX_MESSAGES = 500;
 // P19-09: Maximum messages per agent inbox to prevent unbounded memory growth
 const MAX_INBOX_SIZE = 200;
 
+// P51-02: Maximum messages per agent inbox to prevent unbounded growth
+const MAX_INBOX_SIZE = 200;
+
 export interface Message {
   id: string;
   from: string;
