@@ -55,6 +55,17 @@ const MAX_STREAMS = 1000;
 const streams = new Map<string, StreamInfo>();
 const artifactStore = new Map<string, Artifact[]>();
 
+const MAX_STREAMS = 10_000;
+const MAX_ARTIFACTS_PER_STREAM = 5_000;
+const STREAM_CLEANUP_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+
+// Automatic periodic cleanup of completed streams older than 1 hour
+const _cleanupInterval = setInterval(() => {
+  cleanupStreams(3600_000); // 1 hour for completed streams
+}, STREAM_CLEANUP_INTERVAL_MS);
+
+if (_cleanupInterval.unref) _cleanupInterval.unref();
+
 // ─── Redis Stream Helpers ───────────────────────────────────────────────────
 
 const STREAM_PREFIX = "artifact_stream:";
@@ -88,22 +99,14 @@ export function createStream(userId: number, title: string, agentId?: string): s
 
   const id = `stream_${crypto.randomBytes(8).toString("hex")}`;
 
-  // P24-04: Enforce stream map cap — evict oldest completed stream
+  // Enforce stream cap — clean up old streams first
   if (streams.size >= MAX_STREAMS) {
-    let evicted = false;
-    for (const [sid, s] of streams) {
-      if (s.isComplete) {
-        streams.delete(sid);
-        artifactStore.delete(sid);
-        evicted = true;
-        break;
-      }
-    }
-    if (!evicted) {
-      logger.warn({ maxStreams: MAX_STREAMS }, "Artifact stream limit reached, no completed streams to evict");
+    cleanupStreams(3600_000);
+    if (streams.size >= MAX_STREAMS) {
+      logger.warn({ streamCount: streams.size }, "Stream limit reached, cannot create new stream");
+      return "";
     }
   }
-
   streams.set(id, {
     id,
     userId,
@@ -136,6 +139,10 @@ export async function emitArtifact(
   if (!stream || stream.isComplete) return null;
 
   const artifacts = artifactStore.get(streamId)!;
+  if (artifacts.length >= MAX_ARTIFACTS_PER_STREAM) {
+    logger.warn({ streamId, artifactCount: artifacts.length }, "Artifact limit per stream reached");
+    return null;
+  }
   const artifact: Artifact = {
     id: `artifact_${crypto.randomBytes(6).toString("hex")}`,
     streamId,

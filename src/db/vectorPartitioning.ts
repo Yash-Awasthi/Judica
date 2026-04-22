@@ -19,6 +19,8 @@
  *   - Queries already filter by userId, so partition pruning kicks in
  */
 
+const SAFE_IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_]{0,63}$/;
+
 /**
  * Generate SQL to convert a table to hash-partitioned by userId.
  *

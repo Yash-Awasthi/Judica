@@ -35,19 +35,17 @@ const uploadsPlugin: FastifyPluginAsync = async (fastify) => {
       uploadAttempts.set(key, { count: 1, resetAt: now + UPLOAD_RATE_WINDOW });
     }
 
-    // P24-05: Hard cap with expired-entry cleanup to prevent unbounded map growth
+    // Proactive cleanup: always sweep expired entries when map grows large
     if (uploadAttempts.size > 5000) {
       for (const [k, v] of uploadAttempts) {
         if (now >= v.resetAt) uploadAttempts.delete(k);
       }
-      // If still over limit after cleanup, evict oldest entries
+      // Hard cap: evict oldest entries if still over limit
       if (uploadAttempts.size > 5000) {
+        const entries = [...uploadAttempts.entries()].sort((a, b) => a[1].resetAt - b[1].resetAt);
         const excess = uploadAttempts.size - 5000;
-        let removed = 0;
-        for (const k of uploadAttempts.keys()) {
-          if (removed >= excess) break;
-          uploadAttempts.delete(k);
-          removed++;
+        for (let i = 0; i < excess; i++) {
+          uploadAttempts.delete(entries[i][0]);
         }
       }
     }

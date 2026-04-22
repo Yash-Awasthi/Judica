@@ -154,7 +154,6 @@ export async function detectConflicts(responses: AgentResponse[]): Promise<Confl
   return conflicts.filter((c) => c.severity >= severityThreshold);
 }
 
-// P24-08: Move STOP_WORDS to module level to avoid re-creating Set on every call
 const STOP_WORDS = new Set(["the", "a", "an", "is", "are", "was", "were", "be", "been", "has", "have", "had", "do", "does", "did", "will", "would", "could", "should", "may", "might", "can", "shall", "this", "that", "these", "those", "it", "its", "of", "in", "on", "at", "to", "for", "with", "by", "from", "and", "or", "but", "not", "no"]);
 
 // P8-20: Simple keyword overlap check to pre-filter unlikely-to-conflict pairs
