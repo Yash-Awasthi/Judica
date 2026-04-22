@@ -29,7 +29,11 @@ export interface MCPCallResult {
 
 // ─── Connection Registry ────────────────────────────────────────────────────
 
+// P23-10: Cap connections to prevent unbounded memory growth
+const MAX_MCP_CONNECTIONS = 50;
 const connections = new Map<string, MCPServerConnection>();
+// P23-05: Cap tool cache size
+const MAX_TOOL_CACHE_ENTRIES = 100;
 const toolCache = new Map<string, MCPClientTool[]>();
 
 /**
@@ -116,6 +120,11 @@ export async function discoverTools(
         serverName,
       }));
       toolCache.set(serverName, tools);
+      // P23-05: Evict oldest cache entry if exceeding cap
+      if (toolCache.size > MAX_TOOL_CACHE_ENTRIES) {
+        const oldest = toolCache.keys().next().value;
+        if (oldest !== undefined) toolCache.delete(oldest);
+      }
       logger.info({ serverName, toolCount: tools.length }, "Discovered MCP tools");
       return tools;
     }
