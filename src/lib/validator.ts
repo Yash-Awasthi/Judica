@@ -227,16 +227,11 @@ Respond with ONLY a JSON object:
       
       const jsonMatch = response.text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const validation = JSON.parse(jsonMatch[0]);
-        
-        if (validation.issues && Array.isArray(validation.issues)) {
-          for (const issue of validation.issues) {
-            issues.push({
-              type: issue.type,
-              severity: issue.severity,
-              description: issue.description,
-              suggestion: issue.suggestion
-            });
+        // M-8: validate LLM JSON output against schema before use
+        const parsed = llmIssueListSchema.safeParse(JSON.parse(jsonMatch[0]));
+        if (parsed.success && parsed.data.issues) {
+          for (const issue of parsed.data.issues) {
+            issues.push(issue);
           }
         }
       }
@@ -324,17 +319,11 @@ Respond with ONLY a JSON object:
       
       const jsonMatch = response.text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const factCheck = JSON.parse(jsonMatch[0]);
-        
-        if (factCheck.issues && Array.isArray(factCheck.issues)) {
-          for (const issue of factCheck.issues) {
-            issues.push({
-              type: 'inaccuracy',
-              severity: issue.severity,
-              description: issue.description,
-              location: issue.location,
-              suggestion: issue.suggestion
-            });
+        // M-8: validate LLM JSON output against schema before use
+        const parsed = llmIssueListSchema.safeParse(JSON.parse(jsonMatch[0]));
+        if (parsed.success && parsed.data.issues) {
+          for (const issue of parsed.data.issues) {
+            issues.push({ type: 'inaccuracy', severity: issue.severity, description: issue.description, location: issue.location, suggestion: issue.suggestion });
           }
         }
       }
@@ -380,16 +369,11 @@ Respond with ONLY a JSON object:
       
       const jsonMatch = response.text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const biasCheck = JSON.parse(jsonMatch[0]);
-        
-        if (biasCheck.issues && Array.isArray(biasCheck.issues)) {
-          for (const issue of biasCheck.issues) {
-            issues.push({
-              type: 'bias',
-              severity: issue.severity,
-              description: issue.description,
-              suggestion: issue.suggestion
-            });
+        // M-8: validate LLM JSON output against schema before use
+        const parsed = llmIssueListSchema.safeParse(JSON.parse(jsonMatch[0]));
+        if (parsed.success && parsed.data.issues) {
+          for (const issue of parsed.data.issues) {
+            issues.push({ type: 'bias', severity: issue.severity, description: issue.description, suggestion: issue.suggestion });
           }
         }
       }
@@ -538,12 +522,19 @@ Provide a corrected version that addresses these issues while preserving the cor
   private storeValidationHistory(sessionId: string, result: ValidationResult): void {
     const history = this.validationHistory.get(sessionId) || [];
     history.push(result);
-    
+
     if (history.length > 10) {
       history.shift();
     }
-    
+
     this.validationHistory.set(sessionId, history);
+
+    // L-6: Cap the number of tracked sessions to prevent unbounded memory growth.
+    // Evict the oldest session when the Map exceeds 1000 entries.
+    if (this.validationHistory.size > 1000) {
+      const oldestKey = this.validationHistory.keys().next().value;
+      if (oldestKey !== undefined) this.validationHistory.delete(oldestKey);
+    }
   }
 
   getValidationStats(): {
