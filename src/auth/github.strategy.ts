@@ -53,8 +53,13 @@ export async function githubOAuthPlugin(fastify: FastifyInstance): Promise<void>
       const state = crypto.randomBytes(32).toString("hex");
       return state;
     },
-    checkStateFunction: (_returnedState: string, _callback: (err?: Error) => void) => {
-      // P8-33: @fastify/oauth2 handles state validation internally when generateStateFunction is provided
+    checkStateFunction: (returnedState: string, _callback: (err?: Error) => void) => {
+      // R3-08: Validate returned state has the expected format (64 hex chars = 32 random bytes).
+      // @fastify/oauth2 embeds the state in a signed cookie and compares it internally;
+      // this check rejects obviously malformed/tampered values before that comparison.
+      if (!returnedState || !/^[0-9a-f]{64}$/.test(returnedState)) {
+        return _callback(new Error("Invalid OAuth state parameter"));
+      }
       _callback();
     },
     discovery: {

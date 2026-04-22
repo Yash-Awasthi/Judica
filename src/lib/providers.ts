@@ -135,7 +135,7 @@ export async function askProviderStream(
         const fallback = getFallbackProvider(providerConfig);
         if (fallback) {
           ctx.isFallback = true;
-          return askProviderStream(fallback, messages, onChunk, true, abortSignal);
+          return askProvider(fallback, messages, true, abortSignal, onChunk, ctx);
         }
       }
     }

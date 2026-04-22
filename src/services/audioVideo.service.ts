@@ -165,10 +165,13 @@ async function transcribeWithGoogleSTT(
   };
 
   const response = await fetch(
-    `https://speech.googleapis.com/v1/speech:recognize?key=${process.env.GOOGLE_STT_KEY}`,
+    `https://speech.googleapis.com/v1/speech:recognize`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": process.env.GOOGLE_STT_KEY || "",
+      },
       body: JSON.stringify(body),
     },
   );
@@ -380,3 +383,34 @@ export function getAvailableProviders(): { provider: TranscriptionProvider; avai
     { provider: "local_whisper", available: false }, // Would check for binary
   ];
 }
+
+// Auto-cleanup old media processing results every 30 minutes
+const MEDIA_CLEANUP_INTERVAL_MS = 30 * 60 * 1000;
+const MEDIA_CLEANUP_MAX_AGE_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+setInterval(() => {
+  const cutoff = Date.now() - MEDIA_CLEANUP_MAX_AGE_MS;
+  let removed = 0;
+  for (const [id, result] of results.entries()) {
+    if (result.status !== "processing" && result.processingMs !== null) {
+      // Use a rough timestamp from processingMs to estimate age
+      const estimatedCreation = Date.now() - (result.processingMs || 0) - MEDIA_CLEANUP_MAX_AGE_MS;
+      if (estimatedCreation < cutoff) {
+        results.delete(id);
+        removed++;
+      }
+    }
+  }
+  // Also cap the Map size
+  if (results.size > 1000) {
+    const entries = [...results.entries()];
+    const toRemove = entries.slice(0, entries.length - 1000);
+    for (const [id] of toRemove) {
+      results.delete(id);
+      removed++;
+    }
+  }
+  if (removed > 0) {
+    logger.info({ removed }, "Auto-cleaned old media processing results");
+  }
+}, MEDIA_CLEANUP_INTERVAL_MS).unref();

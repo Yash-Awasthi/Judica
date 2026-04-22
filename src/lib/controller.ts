@@ -14,10 +14,9 @@ export interface ControllerDecision {
  * degradation across subsequent debate rounds.
  */
 // P10-21: Convergence tolerance configurable via env var (default 0.03 = 3% dip tolerance)
-const BLOOM_GATE_TOLERANCE = (() => {
-  const parsed = parseFloat(process.env.BLOOM_GATE_TOLERANCE || "0.03");
-  return Number.isNaN(parsed) ? 0.03 : parsed;
-})();
+// P19-05: Guard against NaN from invalid env var
+const _parsedTolerance = parseFloat(process.env.BLOOM_GATE_TOLERANCE || "0.03");
+const BLOOM_GATE_TOLERANCE = Number.isFinite(_parsedTolerance) && _parsedTolerance >= 0 ? _parsedTolerance : 0.03;
 
 export class DeliberationController {
   private threshold = 0.85;

@@ -6,8 +6,9 @@ import { mlWorker } from "../lib/ml/ml_worker.js";
 import logger from "./logger.js";
 
 // P9-57: Configurable consensus threshold via environment variable
-const parsedThreshold = parseFloat(process.env.CONSENSUS_THRESHOLD || "0.85");
-const CONSENSUS_THRESHOLD = Number.isNaN(parsedThreshold) ? 0.85 : parsedThreshold;
+// P21-02: NaN guard — fall back to 0.85 if env var is non-numeric
+const _parsedConsensus = parseFloat(process.env.CONSENSUS_THRESHOLD || "0.85");
+const CONSENSUS_THRESHOLD = Number.isFinite(_parsedConsensus) && _parsedConsensus > 0 && _parsedConsensus <= 1 ? _parsedConsensus : 0.85;
 
 // P9-60: In-memory similarity cache — avoids recomputing identical pairs across rounds.
 // Keyed by sorted pair hash. Bounded to prevent unbounded growth.
