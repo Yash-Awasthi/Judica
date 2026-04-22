@@ -5,7 +5,10 @@ import logger from "./logger.js";
 import { z } from "zod";
 
 // P10-04: Configurable timeout for adversarial LLM calls
-const ADVERSARIAL_TIMEOUT_MS = parseInt(process.env.ADVERSARIAL_TIMEOUT_MS || "15000", 10);
+const ADVERSARIAL_TIMEOUT_MS = (() => {
+  const parsed = parseInt(process.env.ADVERSARIAL_TIMEOUT_MS || "15000", 10);
+  return Number.isNaN(parsed) ? 15000 : parsed;
+})();
 
 // P10-03: Zod schema for shape validation of parsed output
 const adversarialResponseSchema = z.object({

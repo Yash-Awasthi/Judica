@@ -8,6 +8,7 @@ import redis from "./redis.js";
 import { findConversationById } from "../services/conversation.service.js";
 
 let wss: WebSocketServer | null = null;
+const MAX_MESSAGE_SIZE = 4096;
 // P8-06: Track per-user connection count to prevent FD exhaustion
 const MAX_CONNECTIONS_PER_USER = 10;
 const MAX_CONNECTIONS_GLOBAL = 5000;
@@ -45,7 +46,7 @@ function extractToken(req: IncomingMessage): string | null {
 }
 
 export function initSocket(server: HttpServer): WebSocketServer {
-  wss = new WebSocketServer({ noServer: true });
+  wss = new WebSocketServer({ noServer: true, maxPayload: MAX_MESSAGE_SIZE });
 
   // Handle upgrade with JWT verification
   server.on("upgrade", async (req, socket, head) => {
@@ -125,8 +126,13 @@ export function initSocket(server: HttpServer): WebSocketServer {
     });
 
     ws.on("message", async (raw) => {
+      const rawBuf = Buffer.isBuffer(raw) ? raw : Buffer.from(raw as ArrayBuffer);
+      if (rawBuf.length > MAX_MESSAGE_SIZE) {
+        ws.send(JSON.stringify({ event: "error", data: { message: "Message too large" } }));
+        return;
+      }
       try {
-        const msg = JSON.parse(raw.toString());
+        const msg = JSON.parse(rawBuf.toString());
         if (msg.type === "join:conversation" && msg.conversationId) {
           // Verify the user owns this conversation (or it's public)
           const conversation = await findConversationById(msg.conversationId, ws.userId);

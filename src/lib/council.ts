@@ -38,9 +38,13 @@ export function setCachedPromptResult(key: string, result: string): void {
 }
 
 // P10-46: Simple in-memory deliberation result cache with configurable TTL
-const CACHE_TTL_MS = parseInt(process.env.COUNCIL_CACHE_TTL_MS || "300000", 10); // 5 min default
-const MAX_CACHE_ENTRIES = parseInt(process.env.COUNCIL_CACHE_MAX || "50", 10);
+const _parsedTTL = parseInt(process.env.COUNCIL_CACHE_TTL_MS || "300000", 10);
+const CACHE_TTL_MS = Number.isFinite(_parsedTTL) ? _parsedTTL : 300000; // 5 min default
+const _parsedMaxEntries = parseInt(process.env.COUNCIL_CACHE_MAX || "50", 10);
+const MAX_CACHE_ENTRIES = Number.isFinite(_parsedMaxEntries) ? _parsedMaxEntries : 50;
 const deliberationCache = new Map<string, { result: { verdict: string; opinions: { name: string; opinion: string }[]; metrics: { totalTokens: number; totalCost: number; hallucinationCount: number } }; expiresAt: number }>();
+let cacheWriteCount = 0;
+const CACHE_SWEEP_INTERVAL = 50;
 
 function getCacheKey(messages: Message[], memberNames: string[]): string {
   const content = messages.map(m => m.content).join("|") + "||" + memberNames.sort().join(",");
@@ -204,7 +208,8 @@ export async function* deliberate(
   let totalTokens = 0;
   let totalCost = 0; // P10-26: Aggregate real cost from provider responses
   // P10-127: Per-query cost limit enforcement
-  const MAX_DELIBERATION_COST = parseFloat(process.env.MAX_DELIBERATION_COST || "0") || Infinity;
+  const _parsedCost = parseFloat(process.env.MAX_DELIBERATION_COST || "");
+  const MAX_DELIBERATION_COST = Number.isFinite(_parsedCost) && _parsedCost > 0 ? _parsedCost : Infinity;
 
   for (let r = 1; r <= rounds; r++) {
     // P10-34: Check for cancellation between rounds
@@ -477,6 +482,8 @@ export async function askCouncil(
   if (cached && cached.expiresAt > Date.now()) {
     logger.debug({ cacheKey }, "Council cache hit — returning cached result");
     return cached.result;
+  } else if (cached) {
+    deliberationCache.delete(cacheKey); // Remove stale entry
   }
 
   let verdict = "";
@@ -501,6 +508,13 @@ export async function askCouncil(
     if (firstKey) deliberationCache.delete(firstKey);
   }
   deliberationCache.set(cacheKey, { result, expiresAt: Date.now() + CACHE_TTL_MS });
+  cacheWriteCount++;
+  if (cacheWriteCount % CACHE_SWEEP_INTERVAL === 0) {
+    const now = Date.now();
+    for (const [key, entry] of deliberationCache) {
+      if (entry.expiresAt <= now) deliberationCache.delete(key);
+    }
+  }
 
   return result;
 }

@@ -272,7 +272,8 @@ export async function getUserAuditStats(userId: number, days = 30) {
         eq(auditLogs.userId, userId),
         gte(auditLogs.createdAt, startDate)
       )
-    ) as { id: number; userId: number | null; createdAt: Date; conversationId: string | null; prompt: string; modelName: string; response: string; tokensIn: number; tokensOut: number; latencyMs: number; metadata?: { success?: boolean; requestType?: string; piiDetected?: { prompt?: { found: boolean }; response?: { found: boolean } } } }[];
+    )
+    .limit(10000) as { id: number; userId: number | null; createdAt: Date; conversationId: string | null; prompt: string; modelName: string; response: string; tokensIn: number; tokensOut: number; latencyMs: number; metadata?: { success?: boolean; requestType?: string; piiDetected?: { prompt?: { found: boolean }; response?: { found: boolean } } } }[];
 
   const stats = {
     totalRequests: logs.length,
