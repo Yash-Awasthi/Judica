@@ -158,10 +158,13 @@ export async function federatedSearch(opts: FederatedSearchOptions): Promise<Fed
     query,
     kbId,
     conversationId,
-    limit = 10,
+    // P23-07: Cap limit to prevent excessive DB reads and memory usage
+    limit: rawLimit = 10,
     indexes = ["kb", "repo", "conversation", "fact"],
     perSourceTimeoutMs = 10_000,
   } = opts;
+  const MAX_FEDERATED_LIMIT = 100;
+  const limit = Math.min(Math.max(1, rawLimit), MAX_FEDERATED_LIMIT);
 
   const k = 60; // RRF constant
 
@@ -251,10 +254,13 @@ export async function federatedSearch(opts: FederatedSearchOptions): Promise<Fed
   const allSearchResults = await Promise.all(searches);
 
   // Merge with Reciprocal Rank Fusion
+  // P35-10: Cap scoreMap to prevent unbounded memory growth
+  const MAX_SCORE_MAP = 10_000;
   const scoreMap = new Map<string, { result: FederatedResult; rrfScore: number }>();
 
   for (const { results } of allSearchResults) {
     results.forEach((result, rank) => {
+      if (scoreMap.size >= MAX_SCORE_MAP && !scoreMap.has(result.id)) return;
       const existing = scoreMap.get(result.id);
       const rrfContrib = 1 / (rank + 1 + k);
       if (existing) {

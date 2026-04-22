@@ -220,7 +220,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
           .where(
             and(
               eq(codeRepositories.id, repo_id),
-              eq(codeRepositories.userId, userId!),
+              eq(codeRepositories.userId, userId),
               eq(codeRepositories.indexed, true)
             )
           )
@@ -352,7 +352,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         cacheHit: isCacheHit,
       });
 
-      await updateDailyUsage({ userId: userId!, tokensUsed, isCacheHit });
+      await updateDailyUsage({ userId, tokensUsed, isCacheHit });
     }
 
     // Detect and save artifacts from the verdict
@@ -437,6 +437,12 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         const convo = await findConversationById(effectiveConversationId, userId ?? undefined);
         if (!convo) {
           reply.raw.write(`data: ${JSON.stringify({ type: "error", message: "Conversation not found" })}\n\n`);
+          reply.raw.end();
+          return;
+        }
+        // P8-64: Double-check userId match for authenticated users
+        if (userId && convo.userId && convo.userId !== userId) {
+          reply.raw.write(`data: ${JSON.stringify({ type: "error", message: "Access denied: conversation belongs to another user" })}\n\n`);
           reply.raw.end();
           return;
         }

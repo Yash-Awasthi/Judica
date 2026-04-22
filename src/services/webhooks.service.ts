@@ -46,7 +46,11 @@ export interface WebhookDelivery {
 
 // ─── Webhook Registry ───────────────────────────────────────────────────────
 
+// P23-09: Cap webhook registry to prevent unbounded memory growth
+const MAX_WEBHOOKS = 200;
 const webhooks = new Map<string, WebhookConfig>();
+// P23-02: Cap delivery log to prevent unbounded memory growth
+const MAX_DELIVERY_LOG = 5000;
 const deliveryLog: WebhookDelivery[] = [];
 
 /**
@@ -76,7 +80,8 @@ export function registerWebhook(config: Omit<WebhookConfig, "id" | "createdAt">)
 
   const webhook: WebhookConfig = {
     ...config,
-    id: `wh_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
+    // P23-03: Use crypto.randomUUID for collision-resistant IDs instead of Math.random
+    id: `wh_${randomUUID()}`,
     createdAt: new Date().toISOString(),
   };
   webhooks.set(webhook.id, webhook);
@@ -149,6 +154,10 @@ export async function retryFailedDelivery(
 
   const delivery = await deliverWebhook(wh, payload, fetch as unknown as (url: string, init: RequestInit) => Promise<{ status: number }>);
   deliveryLog.push(delivery);
+  // P23-02: Evict oldest entries when log exceeds cap
+  if (deliveryLog.length > MAX_DELIVERY_LOG) {
+    deliveryLog.splice(0, deliveryLog.length - MAX_DELIVERY_LOG);
+  }
   return delivery;
 }
 

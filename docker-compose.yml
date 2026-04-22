@@ -75,6 +75,8 @@ services:
     command:
       - "redis-server"
       - "--requirepass"
+      # M-6: The 'councilpass' default is only for local dev. Set REDIS_PASSWORD
+      # to a strong random value in production .env (e.g. openssl rand -hex 32).
       - "${REDIS_PASSWORD:-councilpass}"
       - "--appendonly"
       - "yes"
@@ -116,6 +118,9 @@ services:
         condition: service_healthy
     # Runs daily at 2 AM — use: docker compose run db-backup
     # Or schedule via host cron: 0 2 * * * cd /path/to/project && docker compose run --rm db-backup
+    # L-14: Backup files are gzip-compressed but NOT encrypted at rest.
+    # For sensitive deployments, pipe through gpg or use an encrypted volume:
+    #   pg_dump ... | gpg --symmetric --cipher-algo AES256 > /backups/aibyai_$TIMESTAMP.sql.gz.gpg
     entrypoint: >
       sh -c '
         TIMESTAMP=$$(date +%Y%m%d_%H%M%S) &&
@@ -149,7 +154,10 @@ services:
     ports:
       - "127.0.0.1:3001:3000"
     environment:
-      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD}
+      # M-7: GRAFANA_PASSWORD must be set explicitly in .env — if unset Grafana falls
+      # back to its built-in default 'admin' password which must be changed on first login.
+      # Set GRAFANA_PASSWORD in your .env file before running in production.
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?GRAFANA_PASSWORD must be set in .env (see .env.example)}
       - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
     volumes:
       - grafana_data:/var/lib/grafana
