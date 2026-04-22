@@ -6,11 +6,18 @@ const templatesPlugin: FastifyPluginAsync = async (fastify) => {
     return TEMPLATES;
   });
 
-  fastify.get<{ Params: { id: string } }>("/:id", async (request, reply) => {
+  fastify.get<{ Params: { id: string } }>("/:id", {
+    schema: {
+      params: {
+        type: "object",
+        properties: { id: { type: "string", minLength: 1, maxLength: 64, pattern: "^[a-z0-9_-]+$" } },
+        required: ["id"],
+      },
+    },
+  }, async (request, reply) => {
     const template = TEMPLATES.find(t => t.id === request.params.id);
     if (!template) {
-      reply.code(404);
-      return { error: "Template not found" };
+      return reply.code(404).send({ error: "Template not found" });
     }
     return template;
   });

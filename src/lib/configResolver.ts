@@ -59,7 +59,8 @@ export function validateUserConfig(
     // P10-18: Deduplicate by (name + model) pair, not just name.
     // Same provider with different models (e.g., openai/gpt-4o and openai/gpt-4o-mini)
     // should be treated as distinct providers.
-    const nameModelPairs = config.providers.map(p => `${p.name}:${(p as any).model || ""}`);
+    // P22-09: Replace unsafe (as any) cast with proper type access
+    const nameModelPairs = config.providers.map(p => `${p.name}:${(p as UserProviderConfig & { model?: string }).model || ""}`);
     const duplicates = nameModelPairs.filter((pair, index) => nameModelPairs.indexOf(pair) !== index);
     if (duplicates.length > 0) {
       errors.push(`Duplicate provider configurations: ${[...new Set(duplicates)].join(", ")}`);

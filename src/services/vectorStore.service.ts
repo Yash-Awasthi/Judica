@@ -23,6 +23,11 @@ function safeVectorLiteral(vec: number[]): string {
 
 export { safeVectorLiteral };
 
+const MAX_SEARCH_LIMIT = 100;
+function clampLimit(limit: number): number {
+  return Math.max(1, Math.min(limit, MAX_SEARCH_LIMIT));
+}
+
 export interface MemoryChunk {
   id: string;
   content: string;
@@ -60,9 +65,7 @@ export async function searchSimilar(
   kbId?: string | null,
   limit: number = 5
 ): Promise<MemoryChunk[]> {
-  // P36-08: Validate and cap limit parameter
-  if (!Number.isFinite(limit) || limit < 1) limit = 5;
-  limit = Math.min(limit, 100);
+  limit = clampLimit(limit);
   const queryEmbedding = await embed(query);
   const vectorStr = safeVectorLiteral(queryEmbedding);
 
@@ -97,6 +100,7 @@ export async function keywordSearch(
   kbId?: string | null,
   limit: number = 10
 ): Promise<MemoryChunk[]> {
+  limit = clampLimit(limit);
   const kbCondition = kbId ? sql`AND "kbId" = ${kbId}` : sql``;
 
   const results = await db.execute(sql`
@@ -119,6 +123,7 @@ export async function hybridSearch(
   kbId?: string | null,
   limit: number = 5
 ): Promise<MemoryChunk[]> {
+  limit = clampLimit(limit);
   const k = 60; // RRF constant
 
   const [vectorResults, kwResults] = await Promise.all([
@@ -231,6 +236,15 @@ export async function enrichWithParentContext(chunks: MemoryChunk[]): Promise<Me
 // embedding for retrieval. This bridges the gap between short queries
 // and longer documents, improving recall on abstract queries.
 
+/** Sanitize user input before interpolation into LLM prompts */
+function sanitizeQuery(text: string): string {
+  return text
+    .substring(0, 2000)
+    .replace(/\b(system|assistant|user|human)\s*:/gi, (_match, role) => `${role as string} -`)
+    .replace(/ignore\s+(all\s+)?previous\s+instructions/gi, "[filtered]")
+    .replace(/you\s+are\s+now\b/gi, "[filtered]");
+}
+
 async function generateHypotheticalDocument(query: string): Promise<string> {
   try {
     const result = await routeAndCollect({
@@ -238,7 +252,7 @@ async function generateHypotheticalDocument(query: string): Promise<string> {
       messages: [
         {
           role: "user",
-          content: `Write a short, factual paragraph (3-5 sentences) that directly answers this question. Do not include disclaimers or hedging — just provide a confident, informative answer as if it were from a knowledge base document.\n\nQuestion: ${query}`,
+          content: `Write a short, factual paragraph (3-5 sentences) that directly answers this question. Do not include disclaimers or hedging — just provide a confident, informative answer as if it were from a knowledge base document.\n\nQuestion: ${sanitizeQuery(query)}`,
         },
       ],
       temperature: 0,
@@ -261,6 +275,7 @@ export async function hydeSearch(
   kbId?: string | null,
   limit: number = 5,
 ): Promise<MemoryChunk[]> {
+  limit = clampLimit(limit);
   const hypotheticalDoc = await generateHypotheticalDocument(query);
   const hydeEmbedding = await embed(hypotheticalDoc);
   const vectorStr = safeVectorLiteral(hydeEmbedding);
@@ -292,6 +307,7 @@ export async function enhancedHybridSearch(
   limit: number = 5,
   useHyde: boolean = false,
 ): Promise<MemoryChunk[]> {
+  limit = clampLimit(limit);
   const k = 60;
 
   const searches: Promise<MemoryChunk[]>[] = [

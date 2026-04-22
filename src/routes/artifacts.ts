@@ -88,6 +88,17 @@ const artifactsPlugin: FastifyPluginAsync = async (fastify) => {
     const { id } = request.params as { id: string };
     const body = request.body as { name?: string; content?: string };
 
+    if (body.name !== undefined) {
+      if (typeof body.name !== "string" || body.name.length > 500) {
+        throw new AppError(400, "name must be a string of at most 500 characters", "INVALID_NAME");
+      }
+    }
+    if (body.content !== undefined) {
+      if (typeof body.content !== "string" || body.content.length > 500_000) {
+        throw new AppError(400, "content must be a string of at most 500000 characters", "INVALID_CONTENT");
+      }
+    }
+
     const existing = await db
       .select()
       .from(artifacts)

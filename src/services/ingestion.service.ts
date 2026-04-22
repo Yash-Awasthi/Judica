@@ -31,6 +31,8 @@ export async function ingestDocument(
   }
   logger.info({ docId, filename, chunkCount: hierarchicalChunks.length }, "Starting document ingestion (hierarchical)");
 
+  let failedChunks = 0;
+
   for (let i = 0; i < hierarchicalChunks.length; i += BATCH_SIZE) {
     const batch = hierarchicalChunks.slice(i, i + BATCH_SIZE);
 
@@ -39,35 +41,39 @@ export async function ingestDocument(
 
     for (let idx = 0; idx < batch.length; idx++) {
       const chunk = batch[idx];
+      try {
+        if (chunk.level === "child" && chunk.parentContent) {
+          // Check if we already stored this parent
+          const parentKey = chunk.parentContent.substring(0, 100);
+          if (!parentIds.has(parentKey)) {
+            const parentId = await storeChunk(
+              userId,
+              kbId,
+              chunk.parentContent,
+              i + idx,
+              filename,
+              undefined,
+            );
+            parentIds.set(parentKey, parentId);
+          }
 
-      if (chunk.level === "child" && chunk.parentContent) {
-        // Check if we already stored this parent
-        const parentKey = chunk.parentContent.substring(0, 100);
-        if (!parentIds.has(parentKey)) {
-          const parentId = await storeChunk(
+          // Store child with parent reference
+          await storeChunk(
             userId,
             kbId,
-            chunk.parentContent,
+            chunk.content,
             i + idx,
             filename,
             undefined,
+            parentIds.get(parentKey),
           );
-          parentIds.set(parentKey, parentId);
+        } else {
+          // Standalone parent chunk (small enough to not need hierarchy)
+          await storeChunk(userId, kbId, chunk.content, i + idx, filename);
         }
-
-        // Store child with parent reference
-        await storeChunk(
-          userId,
-          kbId,
-          chunk.content,
-          i + idx,
-          filename,
-          undefined,
-          parentIds.get(parentKey),
-        );
-      } else {
-        // Standalone parent chunk (small enough to not need hierarchy)
-        await storeChunk(userId, kbId, chunk.content, i + idx, filename);
+      } catch (err) {
+        failedChunks++;
+        logger.warn({ docId, chunkIndex: i + idx, err: (err as Error).message }, "Failed to store chunk — skipping");
       }
     }
 
@@ -76,10 +82,17 @@ export async function ingestDocument(
     }
   }
 
+  const successCount = hierarchicalChunks.length - failedChunks;
+  const indexed = successCount > 0;
+
   await db.update(kbDocuments)
-    .set({ chunkCount: hierarchicalChunks.length, indexed: true, indexedAt: new Date() })
+    .set({ chunkCount: successCount, indexed, indexedAt: indexed ? new Date() : null })
     .where(eq(kbDocuments.id, docId));
 
-  logger.info({ docId, filename, chunkCount: hierarchicalChunks.length }, "Document ingestion complete (hierarchical)");
-  return hierarchicalChunks.length;
+  if (failedChunks > 0) {
+    logger.warn({ docId, filename, failedChunks, totalChunks: hierarchicalChunks.length }, "Document ingestion completed with failures");
+  }
+
+  logger.info({ docId, filename, chunkCount: successCount }, "Document ingestion complete (hierarchical)");
+  return successCount;
 }

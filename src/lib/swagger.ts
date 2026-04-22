@@ -59,6 +59,9 @@ export async function registerSwagger(fastify: FastifyInstance): Promise<void> {
         { name: "Templates", description: "Council templates" },
         { name: "Memory", description: "Memory backend configuration" },
       ],
+      security: [
+        { bearerAuth: [] },
+      ],
     },
   });
 
