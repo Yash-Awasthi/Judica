@@ -252,9 +252,14 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
         // Token was already consumed — replay attack. Look up user from family mapping.
         const familyUserId = await redis.get(`refresh_family:${tokenHash}`);
         if (familyUserId) {
+          // P31-02: NaN guard on familyUserId parse
           const userId = parseInt(familyUserId, 10);
-          logger.warn({ userId }, "Refresh token replay detected — revoking all sessions for user");
-          await db.delete(refreshTokens).where(eq(refreshTokens.userId, userId));
+          if (!Number.isFinite(userId) || userId <= 0) {
+            logger.warn({ familyUserId }, "Refresh token replay — invalid userId in family mapping");
+          } else {
+            logger.warn({ userId }, "Refresh token replay detected — revoking all sessions for user");
+            await db.delete(refreshTokens).where(eq(refreshTokens.userId, userId));
+          }
         } else {
           logger.warn("Refresh token replay detected — user unknown");
         }
