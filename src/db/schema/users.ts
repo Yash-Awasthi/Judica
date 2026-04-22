@@ -10,6 +10,7 @@ import {
   uniqueIndex,
   index,
 } from "drizzle-orm/pg-core";
+import { councilConfigs } from "./auth.js";
 
 // P8-39: Standardize ID types — use UUID primary keys throughout.
 // Existing serial IDs retained for backward compatibility; new tables should use uuid().
@@ -20,7 +21,8 @@ export const users = pgTable("User", {
   // P8-38: email must be NOT NULL — nullable + unique allows multiple NULLs in PostgreSQL
   email: text("email").notNull().unique(),
   username: text("username").notNull().unique(),
-  passwordHash: text("passwordHash").notNull(),
+  // P56-05: Nullable for OAuth users (github/google). Required for password auth — enforce in app layer.
+  passwordHash: text("passwordHash"),
   // P8-34: Explicit auth method flag instead of relying on empty passwordHash
   authMethod: text("authMethod", { enum: ["password", "github", "google"] }).default("password").notNull(),
   customInstructions: text("customInstructions").default("").notNull(),
@@ -116,7 +118,8 @@ export const userArchetypes = pgTable(
     userId: integer("userId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    councilConfigId: integer("councilConfigId"),
+    // P56-04: Add FK to council configs
+    councilConfigId: integer("councilConfigId").references(() => councilConfigs.id, { onDelete: "set null" }),
     archetypeId: text("archetypeId").default("").notNull(),
     name: text("name").notNull(),
     thinkingStyle: text("thinkingStyle").notNull(),

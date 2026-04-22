@@ -21,10 +21,12 @@ export const codeHandler: NodeHandler = async (ctx) => {
   }
 
   // P10-96: Inject upstream node inputs into execution context
-  const inputContext = JSON.stringify(ctx.inputs);
+  // R2-03: Use JSON.stringify() for the Python literal — this produces a valid JSON string
+  // with all special characters properly escaped, preventing quote-based injection.
+  const inputJson = JSON.stringify(ctx.inputs);
   const contextPreamble = language === "python"
-    ? `import json\n__inputs__ = json.loads('${inputContext.replace(/'/g, "\\'")}')\n`
-    : `const __inputs__ = ${inputContext};\n`;
+    ? `import json\n__inputs__ = json.loads(${JSON.stringify(inputJson)})\n`
+    : `const __inputs__ = ${inputJson};\n`;
 
   const fullCode = contextPreamble + code;
 

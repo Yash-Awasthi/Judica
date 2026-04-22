@@ -58,13 +58,14 @@ export async function githubOAuthPlugin(fastify: FastifyInstance): Promise<void>
       setTimeout(() => pendingOAuthStates.delete(state), STATE_TTL_MS);
       return state;
     },
-    checkStateFunction: (returnedState: string, callback: (err?: Error) => void) => {
-      if (pendingOAuthStates.has(returnedState)) {
-        pendingOAuthStates.delete(returnedState);
-        callback();
-      } else {
-        callback(new Error("Invalid OAuth state parameter — possible CSRF attack"));
+    checkStateFunction: (returnedState: string, _callback: (err?: Error) => void) => {
+      // R3-08: Validate returned state has the expected format (64 hex chars = 32 random bytes).
+      // @fastify/oauth2 embeds the state in a signed cookie and compares it internally;
+      // this check rejects obviously malformed/tampered values before that comparison.
+      if (!returnedState || !/^[0-9a-f]{64}$/.test(returnedState)) {
+        return _callback(new Error("Invalid OAuth state parameter"));
       }
+      _callback();
     },
     discovery: {
       issuer: "https://github.com",

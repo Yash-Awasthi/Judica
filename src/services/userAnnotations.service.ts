@@ -25,7 +25,33 @@ export interface Annotation {
 
 // ─── In-memory store ────────────────────────────────────────────────────────
 
+const MAX_ANNOTATIONS = 10_000;
+const ANNOTATION_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
+const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+
 const annotations = new Map<string, Annotation>();
+
+function evictStaleAnnotations(): void {
+  const now = Date.now();
+  let evicted = 0;
+  for (const [id, ann] of annotations) {
+    if (now - ann.createdAt.getTime() > ANNOTATION_TTL_MS) {
+      annotations.delete(id);
+      evicted++;
+    }
+  }
+  if (evicted > 0) {
+    logger.info({ evicted, remaining: annotations.size }, "Evicted stale annotations");
+  }
+}
+
+let cleanupTimer: ReturnType<typeof setInterval> | null = setInterval(
+  evictStaleAnnotations,
+  CLEANUP_INTERVAL_MS,
+);
+if (cleanupTimer && typeof cleanupTimer.unref === "function") {
+  cleanupTimer.unref();
+}
 
 // ─── Core Functions ─────────────────────────────────────────────────────────
 
@@ -48,6 +74,12 @@ export function createAnnotation(
     selection,
     createdAt: new Date(),
   };
+  if (annotations.size >= MAX_ANNOTATIONS) {
+    evictStaleAnnotations();
+  }
+  if (annotations.size >= MAX_ANNOTATIONS) {
+    throw new Error("Annotation store is full");
+  }
   annotations.set(id, annotation);
   logger.info({ annotationId: id, userId, type }, "Created annotation");
   return annotation;
@@ -101,4 +133,8 @@ export function updateAnnotation(id: string, userId: string, content: string): A
 
 export function _reset(): void {
   annotations.clear();
+  if (cleanupTimer) {
+    clearInterval(cleanupTimer);
+    cleanupTimer = null;
+  }
 }

@@ -5,6 +5,9 @@ import logger from "../logger.js";
 import { registerTool, type ToolExecutionContext } from "./index.js";
 import { executePython } from "../../sandbox/pythonSandbox.js";
 
+const MAX_SKILL_CODE_SIZE = 102_400; // 100KB
+const MAX_INPUT_VALUE_SIZE = 51_200; // 50KB per value
+
 /**
  * Execute a user-defined skill by name.
  * Loads the skill from DB, injects inputs as Python variables,
@@ -41,11 +44,19 @@ function runSkillCode(
   userId: string | number,
   skillName: string
 ): Promise<unknown> {
+  if (code.length > MAX_SKILL_CODE_SIZE) {
+    throw new Error(`Skill code exceeds maximum size (${MAX_SKILL_CODE_SIZE} chars)`);
+  }
+
   // Build Python script: inject inputs as variables, then append skill code
   const inputLines = Object.entries(inputs)
     .map(([key, value]) => {
       const safeKey = key.replace(/[^a-zA-Z0-9_]/g, "_");
-      return `${safeKey} = ${JSON.stringify(value)}`;
+      const serializedValue = JSON.stringify(value);
+      if (serializedValue.length > MAX_INPUT_VALUE_SIZE) {
+        throw new Error(`Input "${key}" exceeds maximum size (${MAX_INPUT_VALUE_SIZE} chars)`);
+      }
+      return `${safeKey} = ${serializedValue}`;
     })
     .join("\n");
 
