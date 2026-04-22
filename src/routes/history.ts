@@ -145,8 +145,8 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
       .where(
         and(
           eq(chats.conversationId, id),
-          // P39-05: Safe parseInt with bounds check to prevent integer overflow
-          lte(chats.id, Math.min(Number.isFinite(Number(toChatId)) ? Number(toChatId) : 0, 2147483647))
+          // P30-09: NaN guard on toChatId numeric conversion
+          lte(chats.id, Number.isFinite(Number(toChatId)) ? Number(toChatId) : 0)
         )
       )
       .orderBy(asc(chats.createdAt))
@@ -198,7 +198,8 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
       .select()
       .from(chats)
       .where(eq(chats.conversationId, id))
-      .orderBy(asc(chats.createdAt));
+      .orderBy(asc(chats.createdAt))
+      .limit(200);
 
     return {
       ...conversation,

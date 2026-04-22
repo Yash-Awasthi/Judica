@@ -212,8 +212,8 @@ export class DeliberationOrchestrator {
         memberName: member.name,
         text: result.text,
         usage: result.usage,
-        // P8-18: Track resolved model so reliability system can attribute correctly
-        resolvedModel: (result as any).resolvedModel || member.model || "auto",
+        // P5-09: Use typed interface instead of unsafe any cast
+        resolvedModel: (result as { resolvedModel?: string }).resolvedModel || member.model || "auto",
       };
     });
 

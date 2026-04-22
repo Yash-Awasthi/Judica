@@ -52,7 +52,6 @@ export async function fastifyOrgIsolation(request: FastifyRequest, _reply: Fasti
 export async function fastifyRequireOrg(request: FastifyRequest, reply: FastifyReply) {
   if (!request.orgId) {
     logger.warn({ userId: request.userId, url: request.url }, "Request without org context");
-    reply.code(403).send({ error: "Organization context required" });
-    return;
+    return reply.code(403).send({ error: "Organization context required" });
   }
 }

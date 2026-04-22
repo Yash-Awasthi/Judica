@@ -1,4 +1,5 @@
 import logger from "../lib/logger.js";
+import { validateSafeUrl } from "../lib/ssrf.js";
 
 /**
  * MCP Client Mode: allows agents to call external MCP servers
@@ -33,8 +34,13 @@ const toolCache = new Map<string, MCPClientTool[]>();
 
 /**
  * Register an external MCP server connection.
+ * R3-06: Validate URL against SSRF before storing — MCP servers with HTTP/SSE
+ * transport could otherwise be pointed at internal services.
  */
-export function addConnection(conn: MCPServerConnection): void {
+export async function addConnection(conn: MCPServerConnection): Promise<void> {
+  if (conn.transport === "http" || conn.transport === "sse") {
+    await validateSafeUrl(conn.url);
+  }
   connections.set(conn.name, conn);
   toolCache.delete(conn.name); // Invalidate cache
   logger.info({ serverName: conn.name, transport: conn.transport }, "MCP server connection added");
