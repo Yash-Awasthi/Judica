@@ -93,6 +93,7 @@ const mockStatSync = vi.fn(() => ({ size: 12345 }));
 const mockExistsSync = vi.fn(() => true);
 const mockCreateWriteStream = vi.fn(() => "write-stream");
 const mockCreateReadStream = vi.fn(() => "read-stream");
+const mockRealpathSync = vi.fn((p: string) => p);
 
 vi.mock("fs", () => ({
   default: {
@@ -101,12 +102,14 @@ vi.mock("fs", () => ({
     existsSync: (...args: any[]) => mockExistsSync(...args),
     createWriteStream: (...args: any[]) => mockCreateWriteStream(...args),
     createReadStream: (...args: any[]) => mockCreateReadStream(...args),
+    realpathSync: (...args: any[]) => mockRealpathSync(...args),
   },
   mkdirSync: (...args: any[]) => mockMkdirSync(...args),
   statSync: (...args: any[]) => mockStatSync(...args),
   existsSync: (...args: any[]) => mockExistsSync(...args),
   createWriteStream: (...args: any[]) => mockCreateWriteStream(...args),
   createReadStream: (...args: any[]) => mockCreateReadStream(...args),
+  realpathSync: (...args: any[]) => mockRealpathSync(...args),
 }));
 
 vi.mock("stream/promises", () => ({
