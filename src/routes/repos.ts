@@ -115,7 +115,9 @@ const reposPlugin: FastifyPluginAsync = async (fastify) => {
       return { error: "Repository not found" };
     }
 
-    await db.delete(codeRepositories).where(eq(codeRepositories.id, id));
+    await db.delete(codeRepositories).where(and(eq(codeRepositories.id, id), eq(codeRepositories.userId, userId)));
+    // R4-01: Include userId in DELETE WHERE clause — the prior ownership check is a
+    // read-then-delete TOCTOU; using a scoped WHERE is the authoritative guard.
     return { message: "Repository deleted" };
   });
 };

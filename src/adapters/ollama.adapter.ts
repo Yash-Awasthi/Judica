@@ -162,6 +162,14 @@ export class OllamaAdapter implements IProviderAdapter {
   }
 
   async listModels(): Promise<string[]> {
+    // R3-10: Apply same SSRF guard as generate() — listModels() makes a real HTTP
+    // request and must not be pointed at internal services.
+    const parsedUrl = new URL(this.baseUrl);
+    const hostname = parsedUrl.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "0.0.0.0";
+    if (!isLocalhost) {
+      try { await validateSafeUrl(this.baseUrl); } catch { return []; }
+    }
     try {
       const res = await fetch(`${this.baseUrl}/api/tags`, {
         signal: AbortSignal.timeout(5000),
@@ -175,6 +183,13 @@ export class OllamaAdapter implements IProviderAdapter {
   }
 
   async isAvailable(): Promise<boolean> {
+    // R3-10: Same SSRF guard as generate() and listModels().
+    const parsedUrl = new URL(this.baseUrl);
+    const hostname = parsedUrl.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+    const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "0.0.0.0";
+    if (!isLocalhost) {
+      try { await validateSafeUrl(this.baseUrl); } catch { return false; }
+    }
     try {
       const res = await fetch(`${this.baseUrl}/api/tags`, {
         signal: AbortSignal.timeout(5000),

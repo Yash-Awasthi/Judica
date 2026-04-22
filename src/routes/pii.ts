@@ -28,6 +28,10 @@ const piiPlugin: FastifyPluginAsync = async (fastify) => {
         return { error: "Text is required" };
       }
 
+      if (text.length > 100_000) {
+        throw new AppError(400, "Text must be under 100,000 characters", "PII_TEXT_TOO_LONG");
+      }
+
       const detection = detectPII(text);
 
       const riskWeights: Record<string, number> = {
