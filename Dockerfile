@@ -27,6 +27,9 @@ RUN npm run build
 RUN mkdir /app/prod_modules && cp package*.json /app/prod_modules/ && cd /app/prod_modules && npm ci --omit=dev
 
 # 2. Production Stage
+# L-13: Alpine is used for compatibility with native modules (argon2, isolated-vm) that require glibc/musl.
+# For further hardening, consider switching to a distroless Node image (e.g. gcr.io/distroless/nodejs22-debian12)
+# once native module compatibility is confirmed — distroless omits the shell and reduces attack surface.
 FROM node:22-alpine@sha256:8ea2348b068a9544dae7317b4f3aafcdc032df1647bb7d768a05a5cad1a7683f AS runner
 
 WORKDIR /app

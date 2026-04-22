@@ -5,24 +5,35 @@ export const conditionHandler: NodeHandler = async (ctx) => {
   const operator = (ctx.nodeData.operator as string) || "equals";
   const compareTo = ctx.nodeData.compare_to;
 
+  // P44-01: Cap string lengths before comparison to prevent DoS
+  const strValue = String(value ?? "").slice(0, 100_000);
+  const strCompare = String(compareTo ?? "").slice(0, 100_000);
+
   let result: boolean;
 
   switch (operator) {
     case "equals":
-      result = String(value) === String(compareTo);
+      result = strValue === strCompare;
       break;
     case "not_equals":
-      result = String(value) !== String(compareTo);
+      result = strValue !== strCompare;
       break;
     case "contains":
-      result = String(value).includes(String(compareTo));
+      result = strValue.includes(strCompare);
       break;
-    case "gt":
-      result = Number(value) > Number(compareTo);
+    case "gt": {
+      // P44-02: NaN guard on numeric comparisons
+      const numVal = Number(value);
+      const numCmp = Number(compareTo);
+      result = Number.isFinite(numVal) && Number.isFinite(numCmp) ? numVal > numCmp : false;
       break;
-    case "lt":
-      result = Number(value) < Number(compareTo);
+    }
+    case "lt": {
+      const numVal = Number(value);
+      const numCmp = Number(compareTo);
+      result = Number.isFinite(numVal) && Number.isFinite(numCmp) ? numVal < numCmp : false;
       break;
+    }
     case "is_empty":
       result = value === undefined || value === null || value === "" ||
         (Array.isArray(value) && value.length === 0);
