@@ -55,9 +55,9 @@ export const askSchema = z
     maxTokens: z.number().int().min(256).max(8192).optional(),
     rounds: z.number().int().min(1).max(5).default(1),
     anonymous: z.boolean().default(false),
-    context: z.string().max(100000).optional(),
+    context: z.string().max(20000).optional(),  // M-3: reduced from 100000 to limit prompt injection payload size
     upload_ids: z.array(z.string()).max(10).optional(),
-    kb_id: z.string().optional(),
+    kb_id: z.string().uuid("kb_id must be a valid UUID").optional(),  // M-3: enforce UUID format
     userConfig: z.object({
       providers: z.array(z.object({
         name: z.string(),

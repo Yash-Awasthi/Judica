@@ -23,9 +23,21 @@ function getMasterKey(customKey?: string): Buffer {
     throw new Error("CRITICAL: MASTER_ENCRYPTION_KEY environment variable is not set");
   }
 
-  const ikm = Buffer.from(keyStr, "hex").length === 32
-    ? Buffer.from(keyStr, "hex")
-    : Buffer.from(keyStr, "utf8");
+  const hexBuf = Buffer.from(keyStr, "hex");
+  if (hexBuf.length === 32) {
+    // Preferred: 64-character hex-encoded key (32 bytes)
+    return crypto.hkdfSync("sha256", hexBuf, HKDF_SALT, HKDF_INFO, 32) as unknown as Buffer;
+  }
+
+  // M-1 fix: enforce minimum byte length before accepting a utf8 key as IKM.
+  // Without this check any short/weak string was silently accepted.
+  const ikm = Buffer.from(keyStr, "utf8");
+  if (ikm.length < 32) {
+    throw new Error(
+      "MASTER_ENCRYPTION_KEY must be a 64-character hex string (32 bytes) " +
+      "or a UTF-8 string of at least 32 bytes"
+    );
+  }
 
   return crypto.hkdfSync("sha256", ikm, HKDF_SALT, HKDF_INFO, 32) as unknown as Buffer;
 }
@@ -103,7 +115,7 @@ export function decrypt(encryptedText: string, customKey?: string, aad?: string)
     return decrypted;
   } catch (err) {
     logger.error({ err: (err as Error).message }, "Decryption failed");
-    throw new Error("Failed to decrypt sensitive data - check MASTER_ENCRYPTION_KEY", { cause: err });
+    throw new Error("Failed to decrypt sensitive data", { cause: err });
   }
 }
 
