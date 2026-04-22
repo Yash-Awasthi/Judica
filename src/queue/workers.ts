@@ -106,9 +106,10 @@ export function startWorkers() {
 
     // P4-16: Track job lag (time spent waiting in queue before pickup)
     worker.on("active", (job) => {
-      if (job?.processedOn && job?.timestamp) {
+      // P44-05: NaN guard on job timestamp metrics
+      if (job?.processedOn && job?.timestamp && Number.isFinite(job.processedOn) && Number.isFinite(job.timestamp)) {
         const lagMs = job.processedOn - job.timestamp;
-        queueJobLag.observe({ queue: worker.name }, lagMs / 1000);
+        if (lagMs >= 0) queueJobLag.observe({ queue: worker.name }, lagMs / 1000);
       }
     });
   }

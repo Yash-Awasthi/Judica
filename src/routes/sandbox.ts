@@ -16,6 +16,8 @@ const MAX_CONCURRENT_PER_USER = 3; // P1-22: cap concurrent sandbox executions
 const inflightMap = new Map<string, number>();
 
 // P1-21: Redis-backed rate limiter with in-memory fallback
+// P44-06: Cap memoryBuckets to prevent unbounded growth
+const MAX_MEMORY_BUCKETS = 10_000;
 const memoryBuckets = new Map<string, { count: number; resetAt: number }>();
 
 async function sandboxRateLimiter(request: FastifyRequest, reply: FastifyReply) {
@@ -41,6 +43,12 @@ async function sandboxRateLimiter(request: FastifyRequest, reply: FastifyReply) 
   const now = Date.now();
   let bucket = memoryBuckets.get(key);
   if (!bucket || now >= bucket.resetAt) {
+    // P44-06: Evict expired entries when nearing cap
+    if (memoryBuckets.size >= MAX_MEMORY_BUCKETS) {
+      for (const [k, v] of memoryBuckets) {
+        if (now >= v.resetAt) memoryBuckets.delete(k);
+      }
+    }
     bucket = { count: 0, resetAt: now + 60_000 };
     memoryBuckets.set(key, bucket);
   }

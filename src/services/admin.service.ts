@@ -50,9 +50,10 @@ export class AdminService {
       .from(usageLogs);
 
     return {
-      totalUsers: Number(userCount.value),
-      totalConversations: Number(convCount.value),
-      totalMessages: Number(msgCount.value),
+      // P44-08: NaN-safe Number() conversions on SQL aggregation results
+      totalUsers: Number(userCount.value) || 0,
+      totalConversations: Number(convCount.value) || 0,
+      totalMessages: Number(msgCount.value) || 0,
       totalTokens: (Number(tokenStats.totalPrompt) || 0) + (Number(tokenStats.totalCompletion) || 0),
     };
   }
@@ -140,13 +141,15 @@ export class AdminService {
     .leftJoin(users, eq(adminAuditLogs.adminId, users.id))
     .where(whereClause)
     .orderBy(desc(adminAuditLogs.createdAt))
-    .limit(params.limit || 50)
-    .offset(params.offset || 0);
+    // P44-09: Cap limit/offset to prevent unbounded DB queries
+    .limit(Math.min(params.limit || 50, 1000))
+    .offset(Math.min(params.offset || 0, 100_000));
 
-    return { 
-      logs, 
+    const safeLimit = Math.max(Math.min(params.limit || 50, 1000), 1);
+    return {
+      logs,
       total: Number(countResult?.count || 0),
-      page: Math.floor((params.offset || 0) / (params.limit || 50)) + 1
+      page: Math.floor((params.offset || 0) / safeLimit) + 1
     };
   }
 
@@ -188,13 +191,15 @@ export class AdminService {
       .from(users)
       .where(whereClause)
       .orderBy(sortFn)
-      .limit(params.limit || 50)
-      .offset(params.offset || 0);
+      // P44-10: Cap limit/offset to prevent unbounded DB queries
+      .limit(Math.min(params.limit || 50, 1000))
+      .offset(Math.min(params.offset || 0, 100_000));
 
-    return { 
-      users: allUsers, 
+    const safeLimit = Math.max(Math.min(params.limit || 50, 1000), 1);
+    return {
+      users: allUsers,
       total: Number(countResult?.count || 0),
-      page: Math.floor((params.offset || 0) / (params.limit || 50)) + 1 
+      page: Math.floor((params.offset || 0) / safeLimit) + 1
     };
   }
 
