@@ -135,9 +135,6 @@ export async function runResearch(
       subQuestions = [query];
     }
 
-    // Limit to 5 sub-questions
-    subQuestions = subQuestions.slice(0, 5);
-
     const steps: ResearchStep[] = subQuestions.map((q) => ({
       question: q,
       status: "pending",

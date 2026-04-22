@@ -160,6 +160,11 @@ export async function visualizeDeliberation(
 ): Promise<VisualOutput[]> {
   const outputs: VisualOutput[] = [];
 
+  // P28-08: Cap opinions array to prevent unbounded output and sanitize topic for Mermaid
+  const MAX_OPINIONS = 50;
+  const safeOpinions = opinions.slice(0, MAX_OPINIONS);
+  const safeTopic = topic.substring(0, 40).replace(/[()]/g, "");
+
   // 1. Generate a Mermaid mindmap of agent positions
   // P34-06: Cap opinions array to prevent unbounded rendering
   const cappedOpinions = opinions.slice(0, 50);
