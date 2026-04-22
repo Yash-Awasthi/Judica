@@ -1,6 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { mockUser } from "~/lib/mock-data";
 import { cn } from "~/lib/utils";
+import { useTheme } from "~/context/ThemeContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -65,7 +66,10 @@ function GoogleIcon() {
 export default function ProfilePage() {
   const [name, setName] = useState(mockUser.name);
   const [customInstructions, setCustomInstructions] = useState(mockUser.customInstructions);
-  const [theme, setTheme] = useState<"auto" | "light" | "dark">(mockUser.theme);
+  const { theme: currentTheme, setTheme: applyTheme } = useTheme();
+  const [themeSelection, setThemeSelection] = useState<"auto" | "light" | "dark">(
+    currentTheme === "dark" ? "dark" : currentTheme === "light" ? "light" : "auto"
+  );
   const [defaultPreset, setDefaultPreset] = useState(mockUser.defaultPreset);
   const [defaultRounds, setDefaultRounds] = useState(String(mockUser.defaultRounds));
   const [maxAgents, setMaxAgents] = useState(String(mockUser.maxAgents));
@@ -212,12 +216,20 @@ export default function ProfilePage() {
               ).map(({ value, label, icon: Icon }) => (
                 <Button
                   key={value}
-                  variant={theme === value ? "secondary" : "outline"}
+                  variant={themeSelection === value ? "secondary" : "outline"}
                   size="sm"
-                  onClick={() => setTheme(value)}
+                  onClick={() => {
+                    setThemeSelection(value);
+                    if (value === "auto") {
+                      const prefersDark = typeof window !== "undefined" && window.matchMedia("(prefers-color-scheme: dark)").matches;
+                      applyTheme(prefersDark ? "dark" : "light");
+                    } else {
+                      applyTheme(value);
+                    }
+                  }}
                   className={cn(
                     "flex-1",
-                    theme === value && "ring-2 ring-primary/30 border-primary/50"
+                    themeSelection === value && "ring-2 ring-primary/30 border-primary/50"
                   )}
                 >
                   <Icon className="size-3.5 mr-1.5" />

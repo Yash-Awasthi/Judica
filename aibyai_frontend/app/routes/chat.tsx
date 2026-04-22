@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import { useNavigate } from "react-router";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -11,6 +12,7 @@ import {
   SelectValue,
 } from "~/components/ui/select";
 import { ScrollArea } from "~/components/ui/scroll-area";
+import { useSidebar } from "~/components/ui/sidebar";
 import {
   Dialog,
   DialogContent,
@@ -38,6 +40,7 @@ import {
   Coins,
   Menu,
   PanelRight,
+  PanelLeft,
   Download,
   Share2,
   Paperclip,
@@ -209,6 +212,13 @@ function CustomMemberDialog({ open, onClose, onAdd }: CustomMemberDialogProps) {
   const [systemPrompt, setSystemPrompt] = useState("");
   const [model, setModel] = useState("gpt-4o");
   const [temperature, setTemperature] = useState(0.7);
+  const navigate = useNavigate();
+
+  const handleArchetypeSelect = (archetype: typeof BUILT_IN_ARCHETYPES[0]) => {
+    setName(archetype.name);
+    setDescription(archetype.description);
+    setModel(archetype.model);
+  };
 
   const handleSubmit = () => {
     if (!name.trim()) return;
@@ -228,6 +238,26 @@ function CustomMemberDialog({ open, onClose, onAdd }: CustomMemberDialogProps) {
           <DialogTitle>Create Custom Council Member</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
+          <div className="space-y-1.5">
+            <label className="text-sm font-medium">Start from Archetype</label>
+            <Select onValueChange={(v) => {
+              const arch = BUILT_IN_ARCHETYPES.find(a => a.name === v);
+              if (arch) handleArchetypeSelect(arch);
+            }}>
+              <SelectTrigger>
+                <SelectValue placeholder="Pick an archetype (optional)" />
+              </SelectTrigger>
+              <SelectContent>
+                {BUILT_IN_ARCHETYPES.map((a) => (
+                  <SelectItem key={a.name} value={a.name}>
+                    <div className="flex flex-col">
+                      <span className="text-xs font-medium">{a.name}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Name *</label>
             <Input
@@ -256,7 +286,17 @@ function CustomMemberDialog({ open, onClose, onAdd }: CustomMemberDialogProps) {
           </div>
           <div className="space-y-1.5">
             <label className="text-sm font-medium">Model</label>
-            <Select value={model} onValueChange={setModel}>
+            <Select
+              value={model}
+              onValueChange={(v) => {
+                if (v === "__add_model__") {
+                  onClose();
+                  navigate("/language-models");
+                  return;
+                }
+                setModel(v);
+              }}
+            >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
@@ -266,6 +306,12 @@ function CustomMemberDialog({ open, onClose, onAdd }: CustomMemberDialogProps) {
                     {m.label}
                   </SelectItem>
                 ))}
+                <SelectItem value="__add_model__">
+                  <span className="flex items-center gap-1.5 text-primary">
+                    <Plus className="size-3" />
+                    Add Model...
+                  </span>
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -307,13 +353,16 @@ export default function ChatPage() {
   const [inputValue, setInputValue] = useState("");
   const [councilMembers, setCouncilMembers] = useState<CouncilMember[]>(defaultMembers);
 
-  // Panel visibility
-  const [historyOpen, setHistoryOpen] = useState(true);
-  const [configOpen, setConfigOpen] = useState(true);
+  // Panel visibility — initial state deferred to layout effect
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [configOpen, setConfigOpen] = useState(false);
   // Mobile overlay state
   const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false);
   const [mobileCouncilOpen, setMobileCouncilOpen] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+
+  // Main sidebar (root layout)
+  const { toggleSidebar, open: mainSidebarOpen } = useSidebar();
 
   const [isStreaming, setIsStreaming] = useState(false);
   const [currentGroupId, setCurrentGroupId] = useState<string | null>(null);
@@ -340,6 +389,89 @@ export default function ChatPage() {
     window.addEventListener("resize", check);
     return () => window.removeEventListener("resize", check);
   }, []);
+
+  // Responsive layout stages:
+  // <640: too narrow — only one panel visible at a time (overlays)
+  // 640-1024: 1st stage — two panels max (history+chat default)
+  // 1024-1400: 2nd stage — three panels max
+  // >1400: 3rd stage — all four panels
+  const [layoutStage, setLayoutStage] = useState(3);
+  const [layoutInitialized, setLayoutInitialized] = useState(false);
+
+  useEffect(() => {
+    const updateLayout = () => {
+      const w = window.innerWidth;
+      let stage: number;
+      if (w < 640) stage = 0;
+      else if (w < 1024) stage = 1;
+      else if (w < 1400) stage = 2;
+      else stage = 3;
+      setLayoutStage(stage);
+
+      if (!layoutInitialized) {
+        // Set initial panel state based on width
+        if (stage === 0) {
+          setHistoryOpen(false);
+          setConfigOpen(false);
+          setIsMobile(true);
+        } else if (stage === 1) {
+          setHistoryOpen(true);
+          setConfigOpen(false);
+        } else if (stage === 2) {
+          setHistoryOpen(true);
+          setConfigOpen(true);
+        } else {
+          setHistoryOpen(true);
+          setConfigOpen(true);
+        }
+        setLayoutInitialized(true);
+      }
+    };
+    updateLayout();
+    window.addEventListener("resize", updateLayout);
+    return () => window.removeEventListener("resize", updateLayout);
+  }, [layoutInitialized]);
+
+  // Auto-manage panel visibility when resizing DOWN (close panels that don't fit)
+  useEffect(() => {
+    if (!layoutInitialized) return;
+    if (layoutStage === 0) {
+      setHistoryOpen(false);
+      setConfigOpen(false);
+    } else if (layoutStage === 1 && historyOpen && configOpen) {
+      // Can only show 2 panels, default to keeping history
+      setConfigOpen(false);
+    }
+  }, [layoutStage, layoutInitialized]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Enforce max panels when toggling
+  const toggleHistory = () => {
+    if (layoutStage === 0) {
+      setMobileHistoryOpen(true);
+      return;
+    }
+    setHistoryOpen(prev => {
+      const next = !prev;
+      if (next && layoutStage === 1) {
+        setConfigOpen(false); // Only 2 panels at stage 1
+      }
+      return next;
+    });
+  };
+
+  const toggleCouncil = () => {
+    if (layoutStage === 0) {
+      setMobileCouncilOpen(true);
+      return;
+    }
+    setConfigOpen(prev => {
+      const next = !prev;
+      if (next && layoutStage === 1) {
+        setHistoryOpen(false); // Only 2 panels at stage 1
+      }
+      return next;
+    });
+  };
 
   const filteredConversations = conversations.filter((c) =>
     c.title.toLowerCase().includes(searchQuery.toLowerCase())
@@ -575,7 +707,7 @@ export default function ChatPage() {
             setSelectedConvId(null);
             setMessageGroups([]);
             setStreamingOpinions({});
-            if (isMobile) setMobileHistoryOpen(false);
+            if (layoutStage === 0) setMobileHistoryOpen(false);
           }}
         >
           <Plus className="size-3.5" />
@@ -599,7 +731,7 @@ export default function ChatPage() {
               setSelectedConvId(conv.id);
               setMessageGroups([]);
               setStreamingOpinions({});
-              if (isMobile) setMobileHistoryOpen(false);
+              if (layoutStage === 0) setMobileHistoryOpen(false);
             }}
             className={`w-full text-left px-3 py-3 border-b border-border/50 hover:bg-muted/50 transition-colors ${
               selectedConvId === conv.id ? "bg-muted" : ""
@@ -701,7 +833,13 @@ export default function ChatPage() {
                 </div>
                 <Select
                   value={member.model}
-                  onValueChange={(v) => updateMember(member.id, "model", v)}
+                  onValueChange={(v) => {
+                    if (v === "__add_model__") {
+                      window.location.href = "/language-models";
+                      return;
+                    }
+                    updateMember(member.id, "model", v);
+                  }}
                   disabled={isStreaming}
                 >
                   <SelectTrigger className="h-7 text-xs">
@@ -713,6 +851,12 @@ export default function ChatPage() {
                         {m.label}
                       </SelectItem>
                     ))}
+                    <SelectItem value="__add_model__" className="text-xs">
+                      <span className="flex items-center gap-1.5 text-primary">
+                        <Plus className="size-3" />
+                        Add Model...
+                      </span>
+                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -742,8 +886,8 @@ export default function ChatPage() {
 
   return (
     <div className="flex-1 flex overflow-hidden relative">
-      {/* ── Mobile History Overlay ── */}
-      {isMobile && mobileHistoryOpen && (
+      {/* ── Mobile History Overlay (stage 0 only) ── */}
+      {layoutStage === 0 && mobileHistoryOpen && (
         <div className="fixed inset-0 z-40 flex">
           <div className="w-72 bg-background border-r border-border flex flex-col h-full shadow-xl">
             <div className="p-3 border-b border-border flex items-center justify-between">
@@ -758,8 +902,8 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* ── Mobile Council Overlay ── */}
-      {isMobile && mobileCouncilOpen && (
+      {/* ── Mobile Council Overlay (stage 0 only) ── */}
+      {layoutStage === 0 && mobileCouncilOpen && (
         <div className="fixed inset-0 z-40 flex justify-end">
           <div className="flex-1 bg-black/40" onClick={() => setMobileCouncilOpen(false)} />
           <div className="w-72 bg-background border-l border-border flex flex-col h-full shadow-xl">
@@ -778,8 +922,8 @@ export default function ChatPage() {
         </div>
       )}
 
-      {/* ── Left: History Panel (desktop) ── */}
-      {!isMobile && (
+      {/* ── Left: History Panel (desktop, stages 1+) ── */}
+      {layoutStage >= 1 && (
         <div
           className={`border-r border-border flex flex-col shrink-0 transition-all duration-200 overflow-hidden ${
             historyOpen ? "w-64" : "w-0"
@@ -796,28 +940,26 @@ export default function ChatPage() {
         {/* Chat header */}
         <div className="border-b border-border px-4 py-2 flex items-center gap-2 shrink-0">
           {/* Left controls */}
-          <div className="flex items-center gap-1.5">
-            {isMobile ? (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="size-8"
-                onClick={() => setMobileHistoryOpen(true)}
-                title="Chat history"
-              >
-                <Menu className="size-4" />
-              </Button>
-            ) : (
-              <Button
-                variant={historyOpen ? "secondary" : "ghost"}
-                size="icon"
-                className="size-8"
-                onClick={() => setHistoryOpen((v) => !v)}
-                title={historyOpen ? "Hide history" : "Show history"}
-              >
-                {historyOpen ? <ChevronLeft className="size-4" /> : <Menu className="size-4" />}
-              </Button>
-            )}
+          <div className="flex items-center gap-1">
+            {/* Main sidebar toggle */}
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-8"
+              onClick={toggleSidebar}
+              title={mainSidebarOpen ? "Hide main panel" : "Show main panel"}
+            >
+              <PanelLeft className="size-4" />
+            </Button>
+            <Button
+              variant={historyOpen ? "secondary" : "ghost"}
+              size="icon"
+              className="size-8"
+              onClick={toggleHistory}
+              title={historyOpen ? "Hide history" : "Show history"}
+            >
+              {historyOpen ? <ChevronLeft className="size-4" /> : <Menu className="size-4" />}
+            </Button>
           </div>
 
           {/* Title area */}
@@ -881,28 +1023,16 @@ export default function ChatPage() {
             >
               <Share2 className="size-4" />
             </Button>
-            {isMobile ? (
+            {!configOpen && (
               <Button
                 variant="outline"
                 size="sm"
                 className="gap-1.5 h-8 text-xs"
-                onClick={() => setMobileCouncilOpen(true)}
+                onClick={toggleCouncil}
               >
                 <Users className="size-3.5" />
                 Council
-              </Button>
-            ) : (
-              <Button
-                variant={configOpen ? "secondary" : "outline"}
-                size="sm"
-                className="gap-1.5 h-8 text-xs"
-                onClick={() => setConfigOpen((v) => !v)}
-              >
-                <Users className="size-3.5" />
-                Council
-                {!configOpen && (
-                  <Badge variant="outline" className="text-[10px] ml-0.5">{councilMembers.length}</Badge>
-                )}
+                <Badge variant="outline" className="text-[10px] ml-0.5">{councilMembers.length}</Badge>
               </Button>
             )}
           </div>
@@ -1092,8 +1222,8 @@ export default function ChatPage() {
         </div>
       </div>
 
-      {/* ── Right: Council Config (desktop) ── */}
-      {!isMobile && (
+      {/* ── Right: Council Config (desktop, stages 1+) ── */}
+      {layoutStage >= 1 && (
         <div
           className={`border-l border-border flex flex-col shrink-0 transition-all duration-200 overflow-hidden ${
             configOpen ? "w-72" : "w-0"
@@ -1104,6 +1234,19 @@ export default function ChatPage() {
               <Users className="size-4 text-muted-foreground" />
               <span className="text-sm font-medium">Council</span>
               <Badge variant="outline" className="text-[10px]">{councilMembers.length}</Badge>
+              <div className="flex-1" />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-7"
+                onClick={() => {
+                  setConfigOpen(false);
+                  setMobileCouncilOpen(false);
+                }}
+                title="Hide council panel"
+              >
+                <ChevronRight className="size-4" />
+              </Button>
             </div>
             {CouncilPanelContent}
           </div>

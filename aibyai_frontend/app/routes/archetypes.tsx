@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
@@ -17,7 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { Users, Plus, MoreHorizontal, Eye, Pencil, Trash2 } from "lucide-react";
+import { Users, Plus, MoreHorizontal, Eye, Pencil, Trash2, ExternalLink } from "lucide-react";
 
 type Archetype = {
   id: string;
@@ -169,6 +170,7 @@ interface ArchetypeDialogProps {
 
 function ArchetypeDialog({ open, onOpenChange, onSave, initial, title }: ArchetypeDialogProps) {
   const [form, setForm] = useState<FormState>(initial ?? defaultFormState);
+  const navigate = useNavigate();
 
   // Reset form when dialog opens with new data
   const handleOpenChange = (o: boolean) => {
@@ -255,12 +257,20 @@ function ArchetypeDialog({ open, onOpenChange, onSave, initial, title }: Archety
               <select
                 id="arch-model"
                 value={form.model}
-                onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
+                onChange={(e) => {
+                  if (e.target.value === "__add_model__") {
+                    onOpenChange(false);
+                    navigate("/language-models");
+                    return;
+                  }
+                  setForm((f) => ({ ...f, model: e.target.value }));
+                }}
                 className="w-full h-9 text-sm bg-background border border-border rounded-md px-3 text-foreground"
               >
                 {modelOptions.map((m) => (
                   <option key={m.value} value={m.value}>{m.label}</option>
                 ))}
+                <option value="__add_model__">+ Add Model...</option>
               </select>
             </div>
 
@@ -400,7 +410,7 @@ export default function ArchetypesPage() {
           {archetypes.map((arch) => (
             <Card
               key={arch.id}
-              className={`cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all border ${arch.color}`}
+              className={`group cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all border ${arch.color}`}
             >
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between">
@@ -423,37 +433,34 @@ export default function ArchetypesPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end" className="w-40">
-                      {arch.isCustom ? (
-                        <>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setEditTarget(arch);
-                            }}
-                          >
-                            <Pencil className="size-3.5 mr-2" />
-                            Edit
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDelete(arch.id);
-                            }}
-                            className="text-destructive focus:text-destructive"
-                          >
-                            <Trash2 className="size-3.5 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </>
-                      ) : (
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setViewTarget(arch);
+                        }}
+                      >
+                        <Eye className="size-3.5 mr-2" />
+                        View Details
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditTarget(arch);
+                        }}
+                      >
+                        <Pencil className="size-3.5 mr-2" />
+                        Edit
+                      </DropdownMenuItem>
+                      {arch.isCustom && (
                         <DropdownMenuItem
                           onClick={(e) => {
                             e.stopPropagation();
-                            setViewTarget(arch);
+                            handleDelete(arch.id);
                           }}
+                          className="text-destructive focus:text-destructive"
                         >
-                          <Eye className="size-3.5 mr-2" />
-                          View Details
+                          <Trash2 className="size-3.5 mr-2" />
+                          Delete
                         </DropdownMenuItem>
                       )}
                     </DropdownMenuContent>

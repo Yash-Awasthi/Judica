@@ -1,10 +1,17 @@
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
 import { BarChart3, Users, MessageSquare, Coins, DollarSign } from "lucide-react";
 
 // ─── Lazy-load all Recharts components (avoids SSR issues) ────────────────────
 
 const LazyCharts = lazy(() => import("~/components/analytics-charts"));
+
+// Client-only wrapper to prevent SSR of Recharts
+function ClientOnly({ children, fallback }: { children: React.ReactNode; fallback: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+  return mounted ? <>{children}</> : <>{fallback}</>;
+}
 
 // ─── Mock Data ────────────────────────────────────────────────────────────────
 
@@ -52,8 +59,8 @@ export default function AdminAnalyticsPage() {
           })}
         </div>
 
-        {/* All charts are lazy-loaded to avoid Recharts SSR issues */}
-        <Suspense
+        {/* All charts are lazy-loaded and client-only to avoid Recharts SSR issues */}
+        <ClientOnly
           fallback={
             <div className="space-y-4">
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -88,8 +95,10 @@ export default function AdminAnalyticsPage() {
             </div>
           }
         >
-          <LazyCharts />
-        </Suspense>
+          <Suspense fallback={<div className="h-[200px] bg-muted/30 rounded animate-pulse" />}>
+            <LazyCharts />
+          </Suspense>
+        </ClientOnly>
       </div>
     </div>
   );
