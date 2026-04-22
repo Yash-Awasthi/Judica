@@ -160,8 +160,14 @@ function initBuiltinAdapters(): void {
   // P4-19: Additional providers — Azure OpenAI, Bedrock-proxy, Vertex-proxy, Fireworks, Together, DeepInfra.
   // All are OpenAI-compatible endpoints; users just need to set the env var.
   // Azure OpenAI uses a custom base URL with deployment names as model IDs.
+  // P19-04: Validate AZURE_OPENAI_ENDPOINT to prevent SSRF via env-var injection
+  const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT || "https://YOUR_RESOURCE.openai.azure.com/openai/deployments";
+  const isAzureEndpointSafe = /^https:\/\/[a-z0-9-]+\.openai\.azure\.com\b/i.test(azureEndpoint);
+  if (process.env.AZURE_OPENAI_ENDPOINT && !isAzureEndpointSafe) {
+    logger.warn({ endpoint: azureEndpoint.slice(0, 60) }, "AZURE_OPENAI_ENDPOINT rejected — must be https://*.openai.azure.com");
+  }
   const extraProviders: Array<{ id: string; envKey: string; baseUrl: string }> = [
-    { id: "azure-openai", envKey: "AZURE_OPENAI_API_KEY", baseUrl: process.env.AZURE_OPENAI_ENDPOINT || "https://YOUR_RESOURCE.openai.azure.com/openai/deployments" },
+    { id: "azure-openai", envKey: "AZURE_OPENAI_API_KEY", baseUrl: isAzureEndpointSafe ? azureEndpoint : "https://YOUR_RESOURCE.openai.azure.com/openai/deployments" },
     { id: "fireworks", envKey: "FIREWORKS_API_KEY", baseUrl: "https://api.fireworks.ai/inference/v1" },
     { id: "together", envKey: "TOGETHER_API_KEY", baseUrl: "https://api.together.xyz/v1" },
     { id: "deepinfra", envKey: "DEEPINFRA_API_KEY", baseUrl: "https://api.deepinfra.com/v1/openai" },
