@@ -48,6 +48,8 @@ export const marketplaceReviews = pgTable(
     userId: integer("userId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
+    // P55-06: Rating must be 1-5. Enforce in application layer (routes/marketplace.ts).
+    // DB CHECK: ALTER TABLE "MarketplaceReview" ADD CONSTRAINT rating_range CHECK (rating >= 1 AND rating <= 5);
     rating: integer("rating").notNull(),
     comment: text("comment"),
     createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
