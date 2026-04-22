@@ -194,7 +194,8 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
       .select()
       .from(chats)
       .where(eq(chats.conversationId, id))
-      .orderBy(asc(chats.createdAt));
+      .orderBy(asc(chats.createdAt))
+      .limit(200);
 
     return {
       ...conversation,
