@@ -136,6 +136,7 @@ function createFastifyInstance(): any {
     post: register("POST"),
     put: register("PUT"),
     delete: register("DELETE"),
+    register: vi.fn().mockResolvedValue(undefined),
   };
 }
 
