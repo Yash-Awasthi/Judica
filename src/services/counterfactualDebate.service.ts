@@ -49,8 +49,9 @@ Be rigorous and specific. Do not simply say "it could be wrong" — explain exac
 export function evaluateRobustness(rounds: DebateRound[]): number {
   if (rounds.length === 0) return 0.5;
 
-  const forStrengths = rounds.filter((r) => r.position === "for").map((r) => r.strength);
-  const againstStrengths = rounds.filter((r) => r.position === "against").map((r) => r.strength);
+  // P36-03: Filter NaN/Infinity strength values before arithmetic
+  const forStrengths = rounds.filter((r) => r.position === "for").map((r) => r.strength).filter(Number.isFinite);
+  const againstStrengths = rounds.filter((r) => r.position === "against").map((r) => r.strength).filter(Number.isFinite);
 
   const avgFor = forStrengths.length > 0
     ? forStrengths.reduce((a, b) => a + b, 0) / forStrengths.length
