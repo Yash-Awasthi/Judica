@@ -88,12 +88,14 @@ vi.mock("crypto", async () => {
   };
 });
 
-const mockMkdirSync = vi.fn();
-const mockStatSync = vi.fn(() => ({ size: 12345 }));
-const mockExistsSync = vi.fn(() => true);
-const mockCreateWriteStream = vi.fn(() => "write-stream");
-const mockCreateReadStream = vi.fn(() => "read-stream");
-const mockRealpathSync = vi.fn((p: string) => p);
+const { mockMkdirSync, mockStatSync, mockExistsSync, mockCreateWriteStream, mockCreateReadStream, mockRealpathSync } = vi.hoisted(() => ({
+  mockMkdirSync: vi.fn(),
+  mockStatSync: vi.fn(() => ({ size: 12345 })),
+  mockExistsSync: vi.fn(() => true),
+  mockCreateWriteStream: vi.fn(() => "write-stream"),
+  mockCreateReadStream: vi.fn(() => "read-stream"),
+  mockRealpathSync: vi.fn((p: string) => p),
+}));
 
 vi.mock("fs", () => ({
   default: {

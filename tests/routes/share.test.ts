@@ -119,6 +119,10 @@ vi.mock("crypto", () => ({
   randomUUID: vi.fn(() => "mock-uuid"),
 }));
 
+vi.mock("@fastify/rate-limit", () => ({
+  default: vi.fn(),
+}));
+
 // ---- helpers to capture registered route handlers ----
 
 const registeredRoutes: Record<string, { handler: Function; preHandler?: Function }> = {};
