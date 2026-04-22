@@ -60,13 +60,16 @@ export const readWebpageTool: ToolInstance = {
       }
 
       const html = await res.text();
+      if (html.length > 5 * 1024 * 1024) {
+        return "Error: page too large (>5MB)";
+      }
 
       const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
       let content = bodyMatch ? bodyMatch[1] : html;
 
       // Strip HTML tags safely (handles multi-line, nested tags)
-      content = content.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
-      content = content.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "");
+      content = content.replace(/<script\b[\s\S]*?<\/script>/gi, "");
+      content = content.replace(/<style\b[\s\S]*?<\/style>/gi, "");
 
       const text = content
         .replace(/<[^>]+>/g, " ")

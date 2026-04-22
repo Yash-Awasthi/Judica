@@ -87,7 +87,13 @@ async function sweepRedisKeys(): Promise<number> {
 
     for (const key of keys) {
       const ttl = await redis.pttl(key);
-      if (ttl === -1 || ttl <= 0) {
+      // TTL -1 = no expiration (persistent key, do NOT delete)
+      // TTL -2 = key doesn't exist (skip)
+      // TTL  0 = actively expiring
+      if (ttl === -2 || ttl === -1) {
+        continue;
+      }
+      if (ttl === 0) {
         await redis.del(key);
         swept++;
       }

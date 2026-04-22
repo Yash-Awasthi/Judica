@@ -41,6 +41,8 @@ export interface ValidationRule {
   check: (content: string, context: unknown) => ValidationIssue | null;
 }
 
+const MAX_VALIDATION_HISTORY = 500;
+
 export class ColdValidator {
   private config: ValidatorConfig;
   private validationHistory: Map<string, ValidationResult[]> = new Map();
@@ -222,9 +224,10 @@ Respond with ONLY a JSON object:
       
       const jsonMatch = response.text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const validation = JSON.parse(jsonMatch[0]);
-        
-        if (validation.issues && Array.isArray(validation.issues)) {
+        let validation;
+        try { validation = JSON.parse(jsonMatch[0]); } catch { validation = null; }
+
+        if (validation && validation.issues && Array.isArray(validation.issues)) {
           for (const issue of validation.issues) {
             issues.push({
               type: issue.type,
@@ -315,9 +318,10 @@ Respond with ONLY a JSON object:
       
       const jsonMatch = response.text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const factCheck = JSON.parse(jsonMatch[0]);
-        
-        if (factCheck.issues && Array.isArray(factCheck.issues)) {
+        let factCheck;
+        try { factCheck = JSON.parse(jsonMatch[0]); } catch { factCheck = null; }
+
+        if (factCheck && factCheck.issues && Array.isArray(factCheck.issues)) {
           for (const issue of factCheck.issues) {
             issues.push({
               type: 'inaccuracy',
@@ -368,9 +372,10 @@ Respond with ONLY a JSON object:
       
       const jsonMatch = response.text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const biasCheck = JSON.parse(jsonMatch[0]);
-        
-        if (biasCheck.issues && Array.isArray(biasCheck.issues)) {
+        let biasCheck;
+        try { biasCheck = JSON.parse(jsonMatch[0]); } catch { biasCheck = null; }
+
+        if (biasCheck && biasCheck.issues && Array.isArray(biasCheck.issues)) {
           for (const issue of biasCheck.issues) {
             issues.push({
               type: 'bias',
@@ -521,13 +526,18 @@ Provide a corrected version that addresses these issues while preserving the cor
   }
 
   private storeValidationHistory(sessionId: string, result: ValidationResult): void {
+    if (this.validationHistory.size >= MAX_VALIDATION_HISTORY) {
+      const oldest = this.validationHistory.keys().next().value;
+      if (oldest !== undefined) this.validationHistory.delete(oldest);
+    }
+
     const history = this.validationHistory.get(sessionId) || [];
     history.push(result);
-    
+
     if (history.length > 10) {
       history.shift();
     }
-    
+
     this.validationHistory.set(sessionId, history);
   }
 

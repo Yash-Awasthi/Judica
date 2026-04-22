@@ -10,7 +10,8 @@ import logger from "./logger.js";
 import type { Provider } from "./providers.js";
 
 // P10-75: Configurable max reasoning output length
-const MAX_REASONING_LENGTH = parseInt(process.env.MAX_REASONING_OUTPUT_CHARS || "10000", 10);
+const _parsed_max = parseInt(process.env.MAX_REASONING_OUTPUT_CHARS || "10000", 10);
+const MAX_REASONING_LENGTH = Number.isNaN(_parsed_max) ? 10000 : _parsed_max;
 
 // P10-78: Track reasoning mode costs for billing
 let _lastReasoningUsage = { promptTokens: 0, completionTokens: 0 };

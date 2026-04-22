@@ -13,6 +13,12 @@
 
 import logger from "./logger.js";
 
+/** Maximum size of a single artifact (50 MB). */
+const MAX_ARTIFACT_SIZE = 50 * 1024 * 1024; // 50MB
+
+/** Maximum total number of artifacts stored in memory. */
+const MAX_ARTIFACTS = 10_000;
+
 export interface ArtifactStore {
   readonly name: string;
 
@@ -38,6 +44,18 @@ class InMemoryArtifactStore implements ArtifactStore {
   private store = new Map<string, Map<string, Buffer>>();
 
   async put(streamId: string, artifactId: string, data: Buffer | string): Promise<void> {
+    const size = Buffer.isBuffer(data) ? data.byteLength : Buffer.byteLength(data);
+    if (size > MAX_ARTIFACT_SIZE) {
+      throw new Error(`Artifact exceeds maximum size of ${MAX_ARTIFACT_SIZE} bytes (got ${size})`);
+    }
+
+    // Count total artifacts across all streams.
+    let totalArtifacts = 0;
+    for (const m of this.store.values()) totalArtifacts += m.size;
+    if (totalArtifacts >= MAX_ARTIFACTS) {
+      throw new Error(`Artifact store limit reached (max ${MAX_ARTIFACTS} artifacts)`);
+    }
+
     if (!this.store.has(streamId)) this.store.set(streamId, new Map());
     this.store.get(streamId)!.set(artifactId, Buffer.from(data));
   }
