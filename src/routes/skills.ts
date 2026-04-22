@@ -80,9 +80,24 @@ const skillsPlugin: FastifyPluginAsync = async (fastify) => {
     };
 
     const updateData: Record<string, unknown> = {};
-    if (name !== undefined) updateData.name = name.trim();
-    if (description !== undefined) updateData.description = description.trim();
-    if (code !== undefined) updateData.code = code;
+    if (name !== undefined) {
+      if (typeof name !== "string" || name.trim().length > 200) {
+        throw new AppError(400, "Name must be a string under 200 characters", "NAME_TOO_LONG");
+      }
+      updateData.name = name.trim();
+    }
+    if (description !== undefined) {
+      if (typeof description !== "string" || description.trim().length > 2000) {
+        throw new AppError(400, "Description must be a string under 2,000 characters", "DESCRIPTION_TOO_LONG");
+      }
+      updateData.description = description.trim();
+    }
+    if (code !== undefined) {
+      if (typeof code !== "string" || code.length > 50_000) {
+        throw new AppError(400, "Code must be a string under 50,000 characters", "CODE_TOO_LONG");
+      }
+      updateData.code = code;
+    }
     if (parameters !== undefined) updateData.parameters = parameters;
     if (active !== undefined) updateData.active = active;
 

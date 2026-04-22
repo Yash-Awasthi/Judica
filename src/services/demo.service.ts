@@ -36,10 +36,12 @@ export function getDemoConfig(): DemoConfig {
  * Format demo metadata for README or API response.
  */
 export function formatDemoSection(config: DemoConfig): string {
+  // P30-08: Escape markdown special characters in URLs to prevent injection
+  const escMd = (s: string) => s.replace(/[[\]()]/g, "\\$&");
   let output = `## Demo\n\n`;
-  output += `**Live:** [${config.url}](${config.url})\n\n`;
+  output += `**Live:** [${escMd(config.url)}](${escMd(config.url)})\n\n`;
   if (config.videoUrl) {
-    output += `**Video walkthrough:** [Watch demo](${config.videoUrl})\n\n`;
+    output += `**Video walkthrough:** [Watch demo](${escMd(config.videoUrl)})\n\n`;
   }
   output += `${config.description}\n\n### Features\n\n`;
   output += config.features.map((f) => `- ${f}`).join("\n");

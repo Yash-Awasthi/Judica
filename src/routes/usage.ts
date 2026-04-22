@@ -4,6 +4,13 @@ import { usageLogs } from "../db/schema/users.js";
 import { eq, and, gte, lte, sum, count, avg, sql, desc } from "drizzle-orm";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 
+function parseDate(value: string | undefined): Date | null {
+  if (!value) return null;
+  const d = new Date(value);
+  if (isNaN(d.getTime())) return null;
+  return d;
+}
+
 const usagePlugin: FastifyPluginAsync = async (fastify) => {
   fastify.get(
     "/",
@@ -18,8 +25,14 @@ const usagePlugin: FastifyPluginAsync = async (fastify) => {
 
       // Build where conditions
       const conditions = [eq(usageLogs.userId, userId)];
-      if (start_date) conditions.push(gte(usageLogs.createdAt, new Date(start_date)));
-      if (end_date) conditions.push(lte(usageLogs.createdAt, new Date(end_date)));
+      if (start_date) {
+        const d = parseDate(start_date);
+        if (d) conditions.push(gte(usageLogs.createdAt, d));
+      }
+      if (end_date) {
+        const d = parseDate(end_date);
+        if (d) conditions.push(lte(usageLogs.createdAt, d));
+      }
 
       const whereClause = and(...conditions);
 

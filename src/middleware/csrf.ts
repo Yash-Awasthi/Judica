@@ -38,8 +38,20 @@ export async function fastifyCsrfProtection(request: FastifyRequest, reply: Fast
   // P4-01: Defense-in-depth — validate Origin header when present
   const origin = request.headers.origin;
   if (origin) {
-    const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(origin);
-    if (!ALLOWED_ORIGINS_LIST.includes(origin) && !isLocal) {
+    const allowedOrigins = process.env.ALLOWED_ORIGINS
+      ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
+      : ["http://localhost:3000", "http://localhost:5173"];
+    // R2-10: Use URL parsing for localhost check — startsWith("http://localhost:") could be
+    // bypassed with "http://localhost.attacker.com" depending on other checks.
+    let isLocal = false;
+    try {
+      const originUrl = new URL(origin);
+      isLocal = (originUrl.hostname === "localhost" || originUrl.hostname === "127.0.0.1") &&
+                (originUrl.protocol === "http:" || originUrl.protocol === "https:");
+    } catch {
+      // Malformed Origin — treat as not local
+    }
+    if (!allowedOrigins.includes(origin) && !isLocal) {
       reply.code(403).send({ error: "CSRF validation failed. Origin not allowed." });
       return;
     }

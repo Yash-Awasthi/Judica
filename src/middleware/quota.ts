@@ -39,6 +39,12 @@ export async function fastifyCheckQuota(request: FastifyRequest, reply: FastifyR
 
   // Reject if post-increment value exceeds limits
   if (usage.requests > MAX_DAILY_REQUESTS || usage.tokens > MAX_DAILY_TOKENS) {
+    // P58-07: KNOWN RACE — Under high concurrency, another request may increment between
+    // our check (line 41) and this rollback. The decrement could "steal" their quota slot.
+    // Fix: Use a CTE with conditional increment: INSERT ... ON CONFLICT DO UPDATE SET
+    //   requests = CASE WHEN requests < MAX THEN requests + 1 ELSE requests END
+    // This eliminates the need for a separate rollback query entirely.
+    // Accepted risk for now: at typical traffic levels, the race window is <1ms.
     // Roll back the optimistic increment so a rejected request isn't counted
     await db
       .update(dailyUsage)

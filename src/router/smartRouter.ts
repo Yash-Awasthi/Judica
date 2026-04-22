@@ -73,7 +73,7 @@ export async function route(
     try {
       triedProviders.add(preferred);
       const adapter = getAdapter(preferred);
-      const routedReq = req.model ? req : { ...req, model: req.model };
+      const routedReq = req.model ? req : { ...req, model: "auto" };
       const result = await adapter.generate(routedReq);
 
       // P2-13: Record request AFTER successful generation, not before

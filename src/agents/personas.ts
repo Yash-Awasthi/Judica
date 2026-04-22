@@ -27,7 +27,7 @@ export interface PersonaDefinition {
   tools?: string[];
 }
 
-export const BUILT_IN_PERSONAS: PersonaDefinition[] = [
+export const BUILT_IN_PERSONAS: readonly PersonaDefinition[] = [
   {
     id: "research_scientist",
     name: "Research Scientist",
@@ -88,4 +88,8 @@ export const BUILT_IN_PERSONAS: PersonaDefinition[] = [
     domain: "medicine",
     isBuiltIn: true,
   },
-];
+] as const;
+
+// Freeze to prevent runtime mutation of built-in personas
+Object.freeze(BUILT_IN_PERSONAS);
+for (const p of BUILT_IN_PERSONAS) Object.freeze(p);

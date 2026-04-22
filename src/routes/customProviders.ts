@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from "fastify";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { encrypt } from "../lib/crypto.js";
+import { validateSafeUrl } from "../lib/ssrf.js";
 import { registerAdapter, deregisterAdapter, listAvailableProviders, getAdapterOrNull } from "../adapters/registry.js";
 import { CustomAdapter, type CustomProviderConfig } from "../adapters/custom.adapter.js";
 import { db } from "../lib/drizzle.js";
@@ -137,8 +138,15 @@ const customProvidersPlugin: FastifyPluginAsync = async (fastify) => {
 
     const updateData: Record<string, unknown> = {};
     if (name) updateData.name = name;
-    if (base_url) updateData.baseUrl = base_url;
-    if (auth_type) updateData.authType = auth_type;
+    if (base_url) {
+      // R2-04: Re-validate base_url on update — initial POST validates but PUT did not
+      try {
+        await validateSafeUrl(base_url);
+      } catch {
+        throw new AppError(400, "base_url points to a restricted or private address", "SSRF_BLOCKED");
+      }
+      updateData.baseUrl = base_url;
+    }
     if (auth_key) updateData.authKey = encrypt(auth_key);
     if (auth_header_name !== undefined) updateData.authHeaderName = auth_header_name;
     if (capabilities) updateData.capabilities = capabilities;

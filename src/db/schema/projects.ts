@@ -23,7 +23,8 @@ export const projects = pgTable(
     defaultCouncilComposition: jsonb("defaultCouncilComposition"),
     defaultSystemPrompt: text("defaultSystemPrompt"),
     createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
-    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).notNull(),
+    // P60-02: Add defaultNow to prevent insert failures when updatedAt is omitted
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
     deletedAt: timestamp("deletedAt", { mode: "date", withTimezone: true }),
   },
   (table) => [

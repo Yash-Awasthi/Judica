@@ -15,7 +15,7 @@ try {
   });
 
   rateLimitRedisClient.on("ready", () => { redisReady = true; });
-  rateLimitRedisClient.on("error", () => { redisReady = false; });
+  rateLimitRedisClient.on("error", (err) => { redisReady = false; logger.warn({ err: err.message }, "Rate limit Redis error"); });
   rateLimitRedisClient.on("close", () => { redisReady = false; });
 
   rateLimitRedisClient.connect().catch(() => {
@@ -41,7 +41,11 @@ export function isRateLimitRedisHealthy(): boolean {
 export async function cleanupRateLimitRedis(): Promise<void> {
   if (rateLimitRedisClient) {
     try {
-      await rateLimitRedisClient.quit();
+      // P58-01: Timeout quit to prevent blocking shutdown if Redis is hung
+      await Promise.race([
+        rateLimitRedisClient.quit(),
+        new Promise(resolve => setTimeout(resolve, 3000)),
+      ]);
     } catch { /* ignore */ }
   }
 }

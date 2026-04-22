@@ -54,17 +54,9 @@ export function fastifyErrorHandler(error: FastifyError | Error, request: Fastif
     return;
   }
 
-  // P8-50: Handle ZodError by name check to support plain objects from serialization boundaries
-  if (error instanceof ZodError || (error as any).name === "ZodError") {
-    // P52-05: Sanitize issues to prevent arbitrary data exposure from spoofed ZodError objects
-    const rawIssues = (error as any).issues;
-    const details = Array.isArray(rawIssues)
-      ? rawIssues.map((i: any) => ({
-          field: Array.isArray(i?.path) ? i.path.join(".") : "unknown",
-          message: typeof i?.message === "string" ? i.message : "Validation error",
-        }))
-      : [{ field: "unknown", message: "Validation failed" }];
-    const body: Record<string, unknown> = { error: "Validation failed", details };
+  // P40-09: Safer ZodError detection — verify issues is an array before sending
+  if (error instanceof ZodError || ((error as any).name === "ZodError" && Array.isArray((error as any).issues))) {
+    const body: Record<string, unknown> = { error: "Validation failed", details: (error as any).issues };
     if (requestId !== undefined) body.requestId = requestId;
     reply.code(400).send(body);
     return;
@@ -74,7 +66,8 @@ export function fastifyErrorHandler(error: FastifyError | Error, request: Fastif
 
   // P4-09: Report unhandled errors to Sentry if configured
   if (sentryReportError) {
-    sentryReportError(error instanceof Error ? error : new Error(String(error)), {
+    // P40-06: Cap error string to prevent unbounded memory in Sentry reports
+    sentryReportError(error instanceof Error ? error : new Error(String(error).slice(0, 2000)), {
       requestId,
       url: request.url,
       method: request.method,
@@ -82,8 +75,9 @@ export function fastifyErrorHandler(error: FastifyError | Error, request: Fastif
     });
   }
 
-  // In development, return the actual error message; in production, return a generic message.
-  const message = env.NODE_ENV === "production" ? "Internal server error" : error.message || "Internal server error";
+  // P40-07: Cap error message length even in development to prevent oversized responses
+  const rawMessage = error.message || "Internal server error";
+  const message = env.NODE_ENV === "production" ? "Internal server error" : rawMessage.slice(0, 2000);
   const body: Record<string, unknown> = {
     error: message,
     code: "INTERNAL_ERROR",
