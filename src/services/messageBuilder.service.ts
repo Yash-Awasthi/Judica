@@ -18,6 +18,11 @@ export interface FileContext {
  */
 export async function loadFileContext(uploadIds: string[], userId: number): Promise<FileContext> {
   if (!uploadIds || uploadIds.length === 0) return { text_documents: [], image_blocks: [] };
+  // P26-06: Cap uploadIds array to prevent unbounded DB queries
+  const MAX_UPLOAD_IDS = 50;
+  if (uploadIds.length > MAX_UPLOAD_IDS) {
+    uploadIds = uploadIds.slice(0, MAX_UPLOAD_IDS);
+  }
 
   const results = await db.select().from(uploads).where(
     and(

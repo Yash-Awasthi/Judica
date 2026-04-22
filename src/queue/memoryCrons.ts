@@ -9,11 +9,17 @@ import logger from "../lib/logger.js";
 import { isNull, lt, or, eq, count, sql } from "drizzle-orm";
 
 // P10-64: Externalized compaction thresholds via environment/config
-const SUMMARIZATION_INTERVAL_MS = parseInt(process.env.MEMORY_SUMMARIZATION_INTERVAL_MS || "3600000", 10); // 1 hour
-const COMPACTION_INTERVAL_MS = parseInt(process.env.MEMORY_COMPACTION_INTERVAL_MS || "604800000", 10); // 1 week
-const MIN_MESSAGES_FOR_SUMMARIZATION = parseInt(process.env.MEMORY_MIN_MESSAGES || "30", 10);
-const MIN_MEMORIES_FOR_COMPACTION = parseInt(process.env.MEMORY_MIN_MEMORIES || "50", 10);
-const COMPACTION_BATCH_SIZE = parseInt(process.env.MEMORY_COMPACTION_BATCH_SIZE || "100", 10); // P10-62: Bounded query
+// P53-06: NaN guards for all parseInt calls
+const _parsedSummarizationInterval = parseInt(process.env.MEMORY_SUMMARIZATION_INTERVAL_MS || "3600000", 10);
+const SUMMARIZATION_INTERVAL_MS = Number.isNaN(_parsedSummarizationInterval) ? 3600000 : _parsedSummarizationInterval; // 1 hour
+const _parsedCompactionInterval = parseInt(process.env.MEMORY_COMPACTION_INTERVAL_MS || "604800000", 10);
+const COMPACTION_INTERVAL_MS = Number.isNaN(_parsedCompactionInterval) ? 604800000 : _parsedCompactionInterval; // 1 week
+const _parsedMinMessages = parseInt(process.env.MEMORY_MIN_MESSAGES || "30", 10);
+const MIN_MESSAGES_FOR_SUMMARIZATION = Number.isNaN(_parsedMinMessages) ? 30 : _parsedMinMessages;
+const _parsedMinMemories = parseInt(process.env.MEMORY_MIN_MEMORIES || "50", 10);
+const MIN_MEMORIES_FOR_COMPACTION = Number.isNaN(_parsedMinMemories) ? 50 : _parsedMinMemories;
+const _parsedBatchSize = parseInt(process.env.MEMORY_COMPACTION_BATCH_SIZE || "100", 10);
+const COMPACTION_BATCH_SIZE = Number.isNaN(_parsedBatchSize) ? 100 : _parsedBatchSize; // P10-62: Bounded query
 
 let summarizationTimer: ReturnType<typeof setTimeout> | null = null;
 let compactionTimer: ReturnType<typeof setTimeout> | null = null;
@@ -23,6 +29,8 @@ let summarizationRunning = false;
 let compactionRunning = false;
 // P10-63: Track last summarized conversation to avoid re-processing
 const summarizedSessions = new Set<string>();
+// P53-06: Cap summarizedSessions to prevent unbounded growth
+const MAX_SUMMARIZED_SESSIONS = 50_000;
 
 async function runAutoSummarization(): Promise<void> {
   // P10-65: Prevent overlapping invocations
