@@ -47,6 +47,7 @@ const mockPrompt = "What is the meaning of life?";
 
 function mockFetchEmbedding(embedding: number[] = [0.1, 0.2, 0.3]) {
   (global.fetch as any).mockResolvedValue({
+    ok: true,
     json: vi.fn().mockResolvedValue({ data: [{ embedding }] }),
   });
 }
@@ -184,7 +185,7 @@ describe("Cache module", () => {
   // setCachedResponse
   // ---------------------------------------------------------------
   describe("setCachedResponse", () => {
-    it("calls setSemantic and redis.set with the correct cache entry", async () => {
+    it("calls redis.set first, then setSemantic with the correct cache entry", async () => {
       const verdict = "approved";
       const opinions = [{ agent: "a1", opinion: "looks good" }];
 
@@ -197,17 +198,17 @@ describe("Cache module", () => {
         metadata: { prompt: mockPrompt.slice(0, 500) },
       };
 
+      expect(redisBackend.set).toHaveBeenCalledWith(
+        expectedKey,
+        expectedEntry,
+        24 * 60 * 60 * 1000
+      );
+
       expect(postgresBackend.setSemantic).toHaveBeenCalledWith(
         expectedKey,
         mockPrompt,
         expectedEntry,
         expect.any(Array), // embedding
-        24 * 60 * 60 * 1000
-      );
-
-      expect(redisBackend.set).toHaveBeenCalledWith(
-        expectedKey,
-        expectedEntry,
         24 * 60 * 60 * 1000
       );
     });
@@ -224,6 +225,7 @@ describe("Cache module", () => {
         // Simulate network latency so both callers overlap
         await new Promise((r) => setTimeout(r, 20));
         return {
+          ok: true,
           json: vi.fn().mockResolvedValue({ data: [{ embedding: [1, 2, 3] }] }),
         };
       });

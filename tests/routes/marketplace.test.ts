@@ -322,8 +322,8 @@ describe("GET / (list marketplace items)", () => {
       createReply()
     );
 
-    // parseInt("-5") = -5, Math.max(1, -5) = 1
-    expect(result.limit).toBe(1);
+    // parseInt("-5") = -5, which is not > 0, so falls back to default 20
+    expect(result.limit).toBe(20);
   });
 
   it("treats limit=0 as NaN fallback to 20", async () => {
@@ -996,6 +996,7 @@ describe("POST /:id/install (install item)", () => {
       description: "A prompt",
       content: { text: "Hello world", name: "Prompt Name" },
       downloads: 6,
+      published: true,
     };
     setupInstallMock(item);
 
@@ -1015,6 +1016,7 @@ describe("POST /:id/install (install item)", () => {
       description: "A workflow",
       content: { definition: { steps: [] } },
       downloads: 3,
+      published: true,
     };
     setupInstallMock(item);
 
@@ -1033,6 +1035,7 @@ describe("POST /:id/install (install item)", () => {
       description: "A persona",
       content: { systemPrompt: "You are helpful", temperature: 0.5 },
       downloads: 1,
+      published: true,
     };
     setupInstallMock(item);
 
@@ -1051,6 +1054,7 @@ describe("POST /:id/install (install item)", () => {
       description: "A tool",
       content: { code: "console.log('hi')", parameters: { input: "string" } },
       downloads: 0,
+      published: true,
     };
     setupInstallMock(item);
 
@@ -1069,6 +1073,7 @@ describe("POST /:id/install (install item)", () => {
       description: "A tool without code",
       content: { description: "no code here" },
       downloads: 0,
+      published: true,
     };
     setupInstallMock(item);
 
@@ -1100,6 +1105,7 @@ describe("POST /:id/install (install item)", () => {
       description: "desc",
       content: { text: "hello" },
       downloads: 1,
+      published: true,
     };
 
     mockDb.update = vi.fn(() =>
@@ -1124,6 +1130,7 @@ describe("POST /:id/install (install item)", () => {
       description: "D",
       content: {},
       downloads: 5,
+      published: true,
     };
     setupInstallMock(item);
 
@@ -1208,9 +1215,15 @@ describe("POST /:id/reviews (add review)", () => {
     const mockItem = { id: "item-1" };
     const createdReview = { id: "test-uuid", itemId: "item-1", rating: 4, comment: "Great!" };
 
-    mockDb.select = vi.fn(() =>
-      chainable({ limit: vi.fn().mockResolvedValue([mockItem]) })
-    );
+    let selectCallIndex = 0;
+    mockDb.select = vi.fn(() => {
+      selectCallIndex++;
+      if (selectCallIndex === 1) {
+        return chainable({ limit: vi.fn().mockResolvedValue([mockItem]) });
+      }
+      // duplicate review check — no existing review
+      return chainable({ limit: vi.fn().mockResolvedValue([]) });
+    });
     mockDb.insert = vi.fn(() =>
       chainable({ returning: vi.fn().mockResolvedValue([createdReview]) })
     );
@@ -1233,9 +1246,15 @@ describe("POST /:id/reviews (add review)", () => {
     const mockItem = { id: "item-1" };
     const createdReview = { id: "test-uuid", rating: 5, comment: null };
 
-    mockDb.select = vi.fn(() =>
-      chainable({ limit: vi.fn().mockResolvedValue([mockItem]) })
-    );
+    let selectCallIndex = 0;
+    mockDb.select = vi.fn(() => {
+      selectCallIndex++;
+      if (selectCallIndex === 1) {
+        return chainable({ limit: vi.fn().mockResolvedValue([mockItem]) });
+      }
+      // duplicate review check — no existing review
+      return chainable({ limit: vi.fn().mockResolvedValue([]) });
+    });
     mockDb.insert = vi.fn(() =>
       chainable({ returning: vi.fn().mockResolvedValue([createdReview]) })
     );
@@ -1314,9 +1333,15 @@ describe("POST /:id/reviews (add review)", () => {
     const mockItem = { id: "item-1" };
     const createdReview = { id: "test-uuid", rating: 4 };
 
-    mockDb.select = vi.fn(() =>
-      chainable({ limit: vi.fn().mockResolvedValue([mockItem]) })
-    );
+    let selectCallIndex = 0;
+    mockDb.select = vi.fn(() => {
+      selectCallIndex++;
+      if (selectCallIndex === 1) {
+        return chainable({ limit: vi.fn().mockResolvedValue([mockItem]) });
+      }
+      // duplicate review check — no existing review
+      return chainable({ limit: vi.fn().mockResolvedValue([]) });
+    });
     mockDb.insert = vi.fn(() =>
       chainable({ returning: vi.fn().mockResolvedValue([createdReview]) })
     );
@@ -1337,9 +1362,15 @@ describe("POST /:id/reviews (add review)", () => {
   it("propagates db errors during insert", async () => {
     const mockItem = { id: "item-1" };
 
-    mockDb.select = vi.fn(() =>
-      chainable({ limit: vi.fn().mockResolvedValue([mockItem]) })
-    );
+    let selectCallIndex = 0;
+    mockDb.select = vi.fn(() => {
+      selectCallIndex++;
+      if (selectCallIndex === 1) {
+        return chainable({ limit: vi.fn().mockResolvedValue([mockItem]) });
+      }
+      // duplicate review check — no existing review
+      return chainable({ limit: vi.fn().mockResolvedValue([]) });
+    });
     mockDb.insert = vi.fn(() =>
       chainable({ returning: vi.fn().mockRejectedValue(new Error("insert failed")) })
     );

@@ -64,6 +64,10 @@ vi.mock("../../src/lib/logger.js", () => ({
   },
 }));
 
+vi.mock("../../src/lib/ssrf.js", () => ({
+  validateSafeUrl: vi.fn().mockResolvedValue(undefined),
+}));
+
 // ---- helpers to capture registered route handlers ----
 
 const registeredRoutes: Record<string, { handler: Function; preHandler?: Function }> = {};

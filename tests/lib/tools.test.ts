@@ -69,32 +69,22 @@ describe("tools/index", () => {
 
     it("returns failure message for non-JSON that fails to parse", () => {
       const result = validateToolResult("this is plain text that is not json");
-      expect(result).toBe("[Tool execution failed - please try again]");
+      // Plain text doesn't start with { or [, not empty, under 2000 chars -> passes through
+      expect(result).toBe("this is plain text that is not json");
     });
 
     it("returns malformed JSON message for invalid JSON starting with { or [", () => {
       const result = validateToolResult("{not valid json}");
-      // First JSON.parse succeeds on "{not valid json}" — actually it won't,
-      // so it hits the catch and returns failure. Let's use a value that passes
-      // the first parse but fails the second trimmed parse.
-      // Actually: "{not valid json}" will fail JSON.parse in the first try block,
-      // so it returns "[Tool execution failed - please try again]".
-      // For the malformed branch we need something that passes the first JSON.parse
-      // but has a trimmed version that starts with { and fails the second parse.
-      // That's tricky since the same string is parsed both times.
-      // The malformed branch is only reachable if the first JSON.parse succeeds
-      // (result is NOT an object with error) and then the trimmed result starts
-      // with { or [ but fails JSON.parse. Since the first parse already succeeded,
-      // the second should too. This branch handles whitespace edge cases.
-      // Let's just verify the first-parse failure path instead.
-      expect(result).toBe("[Tool execution failed - please try again]");
+      // JSON.parse fails in first try (not an object with error), continues.
+      // Trimmed starts with {, second JSON.parse fails -> malformed
+      expect(result).toBe("[Tool returned malformed data - please try again]");
     });
 
     it('returns empty result message for ""', () => {
-      // Empty string fails JSON.parse first, so it returns the failure message.
-      // Actually let's check the code flow: JSON.parse("") throws, so catch returns failure.
+      // Empty string fails JSON.parse first, continues.
+      // Doesn't start with { or [. Then !result is true -> empty result
       const result = validateToolResult("");
-      expect(result).toBe("[Tool execution failed - please try again]");
+      expect(result).toBe("[Tool returned no data - verify query and try again]");
     });
 
     it('returns empty result message for "[]"', () => {

@@ -4,7 +4,12 @@ import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 const mockReturning = vi.fn();
 const mockDeleteWhere = vi.fn().mockReturnValue({ returning: mockReturning });
 const mockDelete = vi.fn().mockReturnValue({ where: mockDeleteWhere });
+const mockSelectLimit = vi.fn();
 const mockSelectWhere = vi.fn();
+// By default, mockSelectWhere returns an object with .limit and .then (thenable).
+// Tests that end at .where() set mockSelectWhere.mockResolvedValue(...)
+// Tests that chain .limit() set mockSelectLimit accordingly.
+mockSelectWhere.mockReturnValue({ limit: mockSelectLimit });
 const mockSelectFrom = vi.fn().mockReturnValue({ where: mockSelectWhere });
 const mockSelect = vi.fn().mockReturnValue({ from: mockSelectFrom });
 
@@ -18,8 +23,10 @@ vi.mock("../../src/lib/drizzle.js", () => ({
 // ── Mock drizzle-orm ─────────────────────────────────────────────────────────
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((a: any, b: any) => ({ field: a, value: b })),
+  and: vi.fn((...args: any[]) => args),
   count: vi.fn(() => "count_agg"),
   sql: vi.fn(),
+  relations: vi.fn(() => ({})),
 }));
 
 // ── Mock db schemas ──────────────────────────────────────────────────────────
@@ -479,6 +486,12 @@ describe("DELETE /backend", () => {
 
 // ── POST /summarize/:conversationId ──────────────────────────────────────────
 describe("POST /summarize/:conversationId", () => {
+  beforeEach(() => {
+    // The summarize handler calls db.select().from().where().limit(1)
+    mockSelectWhere.mockReturnValue({ limit: mockSelectLimit });
+    mockSelectLimit.mockResolvedValue([{ id: "conv-123" }]);
+  });
+
   it("summarizes the given conversation", async () => {
     const summaryData = { topic: "AI", keyPoints: ["point1"] };
     mockSummarizeSession.mockResolvedValue(summaryData);

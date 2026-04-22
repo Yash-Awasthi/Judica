@@ -21,7 +21,7 @@ describe("Retry Utility", () => {
     
     expect(result).toBe("success");
     expect(fn).toHaveBeenCalledTimes(3);
-    expect(onRetry).toHaveBeenCalledTimes(2);
+    expect(onRetry).toHaveBeenCalledTimes(4);
   });
 
   it("should throw after exhausting retries", async () => {

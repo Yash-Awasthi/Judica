@@ -18,6 +18,8 @@ const mockLimit = vi.fn();
 const mockValues = vi.fn();
 const mockReturning = vi.fn();
 
+const mockOnConflictDoNothing = vi.fn();
+
 vi.mock("../../src/lib/drizzle.js", () => ({
   db: {
     select: () => ({ from: mockFrom }),
@@ -27,7 +29,8 @@ vi.mock("../../src/lib/drizzle.js", () => ({
 
 mockFrom.mockReturnValue({ where: mockWhere });
 mockWhere.mockReturnValue({ limit: mockLimit });
-mockValues.mockReturnValue({ returning: mockReturning });
+mockValues.mockReturnValue({ returning: mockReturning, onConflictDoNothing: mockOnConflictDoNothing });
+mockOnConflictDoNothing.mockReturnValue({ returning: mockReturning });
 
 vi.mock("../../src/db/schema/users.js", () => ({
   users: { email: "email" },
@@ -53,7 +56,8 @@ describe("createGoogleStrategy", () => {
     vi.clearAllMocks();
     mockFrom.mockReturnValue({ where: mockWhere });
     mockWhere.mockReturnValue({ limit: mockLimit });
-    mockValues.mockReturnValue({ returning: mockReturning });
+    mockValues.mockReturnValue({ returning: mockReturning, onConflictDoNothing: mockOnConflictDoNothing });
+    mockOnConflictDoNothing.mockReturnValue({ returning: mockReturning });
   });
 
   it("returns a strategy when credentials are configured", () => {

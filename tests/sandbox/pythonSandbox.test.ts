@@ -2,16 +2,16 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 import { EventEmitter } from "events";
 
 // Use vi.hoisted so these fns exist before the hoisted vi.mock factories run.
-const { mockSpawn, mockExecSync, mockWriteFileSync, mockMkdirSync, mockRmSync } = vi.hoisted(() => ({
+const { mockSpawn, mockExecSync, mockMkdtemp, mockWriteFile, mockRm } = vi.hoisted(() => ({
   mockSpawn: vi.fn(),
   // Make execSync throw for bwrap/unshare so isolationLevel defaults to "ulimit" (python3)
   mockExecSync: vi.fn().mockImplementation((cmd: string) => {
     if (cmd === "bwrap --version" || cmd === "unshare --help") throw new Error("not found");
     return "";
   }),
-  mockWriteFileSync: vi.fn(),
-  mockMkdirSync: vi.fn(),
-  mockRmSync: vi.fn(),
+  mockMkdtemp: vi.fn().mockResolvedValue("/tmp/sandbox_abcdef0123456789"),
+  mockWriteFile: vi.fn().mockResolvedValue(undefined),
+  mockRm: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock("child_process", () => ({
@@ -21,13 +21,19 @@ vi.mock("child_process", () => ({
 
 vi.mock("fs", () => ({
   default: {
-    writeFileSync: mockWriteFileSync,
-    mkdirSync: mockMkdirSync,
-    rmSync: mockRmSync,
+    promises: {
+      mkdtemp: mockMkdtemp,
+      writeFile: mockWriteFile,
+      rm: mockRm,
+    },
+    openSync: vi.fn(() => 3),
+    closeSync: vi.fn(),
   },
-  writeFileSync: mockWriteFileSync,
-  mkdirSync: mockMkdirSync,
-  rmSync: mockRmSync,
+  promises: {
+    mkdtemp: mockMkdtemp,
+    writeFile: mockWriteFile,
+    rm: mockRm,
+  },
 }));
 
 vi.mock("crypto", () => ({
@@ -70,9 +76,17 @@ function makeFakeProc() {
   return proc;
 }
 
+/** Flush pending microtasks so async mkdtemp/writeFile resolve before we emit on proc. */
+function flush() {
+  return new Promise<void>((r) => setTimeout(r, 0));
+}
+
 describe("pythonSandbox – executePython", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    mockMkdtemp.mockResolvedValue("/tmp/sandbox_abcdef0123456789");
+    mockWriteFile.mockResolvedValue(undefined);
+    mockRm.mockResolvedValue(undefined);
   });
 
   it("returns stdout output on successful execution", async () => {
@@ -80,6 +94,7 @@ describe("pythonSandbox – executePython", () => {
     mockSpawn.mockReturnValue(proc);
 
     const promise = executePython('print("hello")');
+    await flush();
 
     proc.stdout.emit("data", Buffer.from("hello\n"));
     proc.emit("close", 0);
@@ -96,6 +111,7 @@ describe("pythonSandbox – executePython", () => {
     mockSpawn.mockReturnValue(proc);
 
     const promise = executePython("import nonexistent");
+    await flush();
 
     proc.stderr.emit("data", Buffer.from("ModuleNotFoundError: No module named 'nonexistent'\n"));
     proc.emit("close", 1);
@@ -110,6 +126,7 @@ describe("pythonSandbox – executePython", () => {
     mockSpawn.mockReturnValue(proc);
 
     const promise = executePython("import sys; sys.exit(1)");
+    await flush();
 
     proc.emit("close", 1);
 
@@ -123,6 +140,7 @@ describe("pythonSandbox – executePython", () => {
     mockSpawn.mockReturnValue(proc);
 
     const promise = executePython("print(1)");
+    await flush();
 
     proc.emit("error", new Error("spawn python3 ENOENT"));
 
@@ -136,23 +154,24 @@ describe("pythonSandbox – executePython", () => {
     mockSpawn.mockReturnValue(proc);
 
     const promise = executePython("x = 1");
+    await flush();
 
     proc.emit("close", 0);
     await promise;
 
-    // Should create a sandbox directory
-    expect(mockMkdirSync).toHaveBeenCalledTimes(1);
-    const dirPath = mockMkdirSync.mock.calls[0][0] as string;
-    expect(dirPath).toMatch(/sandbox_/);
+    // Should create a sandbox directory via mkdtemp
+    expect(mockMkdtemp).toHaveBeenCalledTimes(1);
+    const mkdtempArg = mockMkdtemp.mock.calls[0][0] as string;
+    expect(mkdtempArg).toMatch(/sandbox_/);
 
     // Should write the script file inside the sandbox directory
-    expect(mockWriteFileSync).toHaveBeenCalledTimes(1);
-    const writtenPath = mockWriteFileSync.mock.calls[0][0] as string;
+    expect(mockWriteFile).toHaveBeenCalledTimes(1);
+    const writtenPath = mockWriteFile.mock.calls[0][0] as string;
     expect(writtenPath).toMatch(/sandbox_.*[/\\]script\.py$/);
 
-    // Should clean up with rmSync (recursive directory removal)
-    expect(mockRmSync).toHaveBeenCalledTimes(1);
-    expect(mockRmSync.mock.calls[0][0]).toBe(dirPath);
+    // Should clean up with rm (recursive directory removal)
+    expect(mockRm).toHaveBeenCalledTimes(1);
+    expect(mockRm.mock.calls[0][0]).toBe("/tmp/sandbox_abcdef0123456789");
   });
 
   it("cleans up sandbox directory even when execution errors", async () => {
@@ -160,11 +179,12 @@ describe("pythonSandbox – executePython", () => {
     mockSpawn.mockReturnValue(proc);
 
     const promise = executePython("bad code");
+    await flush();
 
     proc.emit("error", new Error("spawn failed"));
     await promise;
 
-    expect(mockRmSync).toHaveBeenCalledTimes(1);
+    expect(mockRm).toHaveBeenCalledTimes(1);
   });
 
   it("prepends sandbox preamble with import restrictions and network blocking", async () => {
@@ -172,11 +192,12 @@ describe("pythonSandbox – executePython", () => {
     mockSpawn.mockReturnValue(proc);
 
     const promise = executePython("print(1)");
+    await flush();
 
     proc.emit("close", 0);
     await promise;
 
-    const writtenContent = mockWriteFileSync.mock.calls[0][1] as string;
+    const writtenContent = mockWriteFile.mock.calls[0][1] as string;
     // Should contain network blocking (carried over from original)
     expect(writtenContent).toContain("_BlockedSocket");
     expect(writtenContent).toContain("Network access is disabled in sandbox");
@@ -198,6 +219,7 @@ describe("pythonSandbox – executePython", () => {
     mockSpawn.mockReturnValue(proc);
 
     const promise = executePython("pass");
+    await flush();
 
     proc.emit("close", 0);
     await promise;
@@ -214,6 +236,7 @@ describe("pythonSandbox – executePython", () => {
     mockSpawn.mockReturnValue(proc);
 
     const promise = executePython("pass");
+    await flush();
 
     proc.emit("close", 0);
     await promise;
@@ -232,6 +255,7 @@ describe("pythonSandbox – executePython", () => {
     mockSpawn.mockReturnValue(proc);
 
     const promise = executePython("pass");
+    await flush();
 
     proc.emit("close", 0);
     await promise;

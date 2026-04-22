@@ -406,7 +406,7 @@ describe("Auth Routes Plugin", () => {
 
       expect(jwt.decode).toHaveBeenCalledWith("mock-jwt-token");
       expect(redis.set).toHaveBeenCalledWith(
-        "revoked:mock-jwt-token",
+        "revoked:mock-token-hash",
         "1",
         expect.objectContaining({ EX: expect.any(Number) }),
       );

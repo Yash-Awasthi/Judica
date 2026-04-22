@@ -1,27 +1,30 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// Mock DNS lookup - use promisify-compatible format
-vi.mock("dns", () => ({
-  default: {
-    lookup: vi.fn((hostname: string, options: any, callback?: Function) => {
-        // Handle both (hostname, options, callback) and (hostname, callback) signatures
-        const cb = callback || options;
-        if (hostname === "example.com") {
-            cb(null, [{ address: "93.184.216.34", family: 4 }]);
-        } else if (hostname === "internal.server") {
-            cb(null, [{ address: "192.168.1.100", family: 4 }]);
-        } else if (hostname === "localhost") {
-            cb(null, [{ address: "127.0.0.1", family: 4 }]);
-        } else if (hostname === "unresolvable") {
-            cb(new Error("ENOTFOUND"), null);
-        } else if (hostname === "ipv6-test.com") {
-            cb(null, [{ address: "::1", family: 6 }]);
-        } else {
-            cb(null, [{ address: "8.8.8.8", family: 4 }]);
-        }
-    }),
-  },
-}));
+// Mock DNS lookup - source uses dns.promises.lookup with { all: true }
+vi.mock("dns", () => {
+  const lookupFn = async (hostname: string, _options?: any) => {
+    if (hostname === "example.com") {
+      return [{ address: "93.184.216.34", family: 4 }];
+    } else if (hostname === "internal.server") {
+      return [{ address: "192.168.1.100", family: 4 }];
+    } else if (hostname === "localhost") {
+      return [{ address: "127.0.0.1", family: 4 }];
+    } else if (hostname === "unresolvable") {
+      throw new Error("ENOTFOUND");
+    } else if (hostname === "ipv6-test.com") {
+      return [{ address: "::1", family: 6 }];
+    } else {
+      return [{ address: "8.8.8.8", family: 4 }];
+    }
+  };
+
+  return {
+    default: {
+      promises: { lookup: vi.fn(lookupFn) },
+      lookup: vi.fn(),
+    },
+  };
+});
 
 describe("SSRF", () => {
     beforeEach(() => {

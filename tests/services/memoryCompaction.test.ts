@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const mockSelect = vi.fn();
 const mockFrom = vi.fn();
 const mockWhere = vi.fn();
+const mockLimit = vi.fn();
 const mockDeleteWhere = vi.fn();
 const mockDelete = vi.fn();
 const mockExecute = vi.fn();
@@ -105,8 +106,9 @@ beforeEach(() => {
   // Default: db.execute() for TTL expiry step
   mockExecute.mockResolvedValue({ rowCount: 0 });
 
-  // Default: db.select().from().where() chain
-  mockWhere.mockResolvedValue([]);
+  // Default: db.select().from().where().limit() chain
+  mockLimit.mockResolvedValue([]);
+  mockWhere.mockReturnValue({ limit: mockLimit });
   mockFrom.mockReturnValue({ where: mockWhere });
   mockSelect.mockReturnValue({ from: mockFrom });
 
@@ -126,7 +128,7 @@ describe("compact()", () => {
 
   describe("early return when fewer than 10 old memories", () => {
     it("returns zeroes when there are 0 old memories", async () => {
-      mockWhere.mockResolvedValue([]);
+      mockLimit.mockResolvedValue([]);
 
       const result = await compact(1);
 
@@ -139,7 +141,7 @@ describe("compact()", () => {
       const nineMemories = Array.from({ length: 9 }, (_, i) =>
         makeMemory(`m${i}`, `memory ${i}`)
       );
-      mockWhere.mockResolvedValue(nineMemories);
+      mockLimit.mockResolvedValue(nineMemories);
 
       const result = await compact(42);
 
@@ -156,7 +158,7 @@ describe("compact()", () => {
       const mems = Array.from({ length: 10 }, (_, i) =>
         makeMemory(`m${i}`, `content ${i}`)
       );
-      mockWhere.mockResolvedValue(mems);
+      mockLimit.mockResolvedValue(mems);
       // Each call returns a unique-enough vector so nothing clusters
       mockEmbed.mockImplementation(async () => unitVector(8, Math.floor(Math.random() * 8)));
 
@@ -172,7 +174,7 @@ describe("compact()", () => {
       const mems = Array.from({ length: 10 }, (_, i) =>
         makeMemory(`m${i}`, `content ${i}`, { embedding: existingEmb })
       );
-      mockWhere.mockResolvedValue(mems);
+      mockLimit.mockResolvedValue(mems);
 
       await compact(1);
 
@@ -197,7 +199,7 @@ describe("compact()", () => {
           makeMemory(`b${i}`, `topic B memory ${i}`, { embedding: embB })
         ),
       ];
-      mockWhere.mockResolvedValue(mems);
+      mockLimit.mockResolvedValue(mems);
 
       const result = await compact(1);
 
@@ -213,7 +215,7 @@ describe("compact()", () => {
       const mems = Array.from({ length: 10 }, (_, i) =>
         makeMemory(`m${i}`, `unique topic ${i}`, { embedding: unitVector(16, i) })
       );
-      mockWhere.mockResolvedValue(mems);
+      mockLimit.mockResolvedValue(mems);
 
       const result = await compact(1);
 
@@ -236,7 +238,7 @@ describe("compact()", () => {
         ),
         makeMemory("outlier", "different topic", { embedding: embOutlier }),
       ];
-      mockWhere.mockResolvedValue(mems);
+      mockLimit.mockResolvedValue(mems);
 
       const result = await compact(1);
 
@@ -260,7 +262,7 @@ describe("compact()", () => {
           makeMemory(`g2_${i}`, `group2 ${i}`, { embedding: emb2 })
         ),
       ];
-      mockWhere.mockResolvedValue(mems);
+      mockLimit.mockResolvedValue(mems);
 
       const result = await compact(1);
 
@@ -278,7 +280,7 @@ describe("compact()", () => {
       const mems = Array.from({ length: 10 }, (_, i) =>
         makeMemory(`m${i}`, `fact about dogs ${i}`, { embedding: emb })
       );
-      mockWhere.mockResolvedValue(mems);
+      mockLimit.mockResolvedValue(mems);
 
       await compact(1);
 
@@ -298,7 +300,7 @@ describe("compact()", () => {
       const mems = Array.from({ length: 10 }, (_, i) =>
         makeMemory(`m${i}`, longContent, { embedding: emb })
       );
-      mockWhere.mockResolvedValue(mems);
+      mockLimit.mockResolvedValue(mems);
 
       await compact(1);
 
@@ -321,7 +323,7 @@ describe("compact()", () => {
       const mems = Array.from({ length: 10 }, (_, i) =>
         makeMemory(`m${i}`, `content ${i}`, { embedding: emb, kbId: "kb-42" })
       );
-      mockWhere.mockResolvedValue(mems);
+      mockLimit.mockResolvedValue(mems);
       mockRouteAndCollect.mockResolvedValue({ text: "synthesized text" });
 
       await compact(7);
@@ -342,7 +344,7 @@ describe("compact()", () => {
       const mems = Array.from({ length: 10 }, (_, i) =>
         makeMemory(`m${i}`, `content ${i}`, { embedding: emb })
       );
-      mockWhere.mockResolvedValue(mems);
+      mockLimit.mockResolvedValue(mems);
 
       await compact(1);
 
@@ -357,7 +359,7 @@ describe("compact()", () => {
       const mems = Array.from({ length: 10 }, (_, i) =>
         makeMemory(`m${i}`, `content ${i}`, { embedding: emb })
       );
-      mockWhere.mockResolvedValue(mems);
+      mockLimit.mockResolvedValue(mems);
 
       await compact(1);
 
@@ -381,7 +383,7 @@ describe("compact()", () => {
           makeMemory(`b${i}`, `cluster B ${i}`, { embedding: embB })
         ),
       ];
-      mockWhere.mockResolvedValue(mems);
+      mockLimit.mockResolvedValue(mems);
 
       await compact(1);
 
@@ -400,7 +402,7 @@ describe("compact()", () => {
       const mems = Array.from({ length: 10 }, (_, i) =>
         makeMemory(`m${i}`, "a]".repeat(20), { embedding: emb })
       );
-      mockWhere.mockResolvedValue(mems);
+      mockLimit.mockResolvedValue(mems);
       // Compacted text is short: 20 chars -> 5 tokens
       mockRouteAndCollect.mockResolvedValue({ text: "short summary of 20c" });
 
@@ -419,7 +421,7 @@ describe("compact()", () => {
       const mems = Array.from({ length: 10 }, (_, i) =>
         makeMemory(`m${i}`, "ab", { embedding: emb })
       );
-      mockWhere.mockResolvedValue(mems);
+      mockLimit.mockResolvedValue(mems);
       // Return a very long synthesis
       mockRouteAndCollect.mockResolvedValue({ text: "x".repeat(10000) });
 
@@ -440,7 +442,7 @@ describe("compact()", () => {
           makeMemory(`b${i}`, `B-${i}`, { embedding: embB })
         ),
       ];
-      mockWhere.mockResolvedValue(mems);
+      mockLimit.mockResolvedValue(mems);
 
       const result = await compact(1);
 
@@ -459,7 +461,7 @@ describe("compact()", () => {
         makeMemory("out1", "outlier 1", { embedding: unitVector(16, 10) }),
         makeMemory("out2", "outlier 2", { embedding: unitVector(16, 11) }),
       ];
-      mockWhere.mockResolvedValue(mems);
+      mockLimit.mockResolvedValue(mems);
 
       const result = await compact(1);
 
@@ -476,7 +478,7 @@ describe("compact()", () => {
       const mems = Array.from({ length: 10 }, (_, i) =>
         makeMemory(`m${i}`, `content ${i}`, { embedding: emb })
       );
-      mockWhere.mockResolvedValue(mems);
+      mockLimit.mockResolvedValue(mems);
 
       const result = await compact(1);
 
@@ -486,7 +488,7 @@ describe("compact()", () => {
     });
 
     it("passes correct userId to db.select query chain", async () => {
-      mockWhere.mockResolvedValue([]);
+      mockLimit.mockResolvedValue([]);
 
       await compact(999);
 
@@ -505,7 +507,7 @@ describe("compact()", () => {
           makeMemory(`without${i}`, `no embedding ${i}`)
         ),
       ];
-      mockWhere.mockResolvedValue(mems);
+      mockLimit.mockResolvedValue(mems);
       // embed() returns same vector -> everything clusters together
       mockEmbed.mockResolvedValue(emb);
 

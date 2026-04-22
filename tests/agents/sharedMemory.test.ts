@@ -35,7 +35,8 @@ describe("Shared Memory Agent Utility", () => {
     vi.mocked(db.select).mockReturnValue({
       from: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
-      orderBy: vi.fn().mockResolvedValue([{ id: "1" }])
+      orderBy: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([{ id: "1" }])
     } as any);
 
     const facts = await getFacts("c1");
@@ -89,7 +90,8 @@ describe("Shared Memory Agent Utility", () => {
     vi.mocked(db.select).mockReturnValue({
       from: vi.fn().mockReturnThis(),
       where: vi.fn().mockReturnThis(),
-      orderBy: vi.fn().mockResolvedValue([
+      orderBy: vi.fn().mockReturnThis(),
+      limit: vi.fn().mockResolvedValue([
         { type: "fact", confidence: 0.9, content: "f1", confirmedBy: ["a1", "a2"], disputedBy: [] },
         { type: "decision", confidence: 0.8, content: "d1", confirmedBy: ["a1"], disputedBy: ["a2"] }
       ])

@@ -39,6 +39,7 @@ vi.mock("drizzle-orm", () => ({
 
 vi.mock("../../src/middleware/fastifyAuth.js", () => ({
   fastifyRequireAuth: vi.fn(),
+  fastifyRequireAdmin: vi.fn(),
 }));
 
 vi.mock("../../src/middleware/errorHandler.js", () => ({
@@ -160,8 +161,8 @@ describe("route registration", () => {
     expect(registeredRoutes["DELETE /jobs/:queueName/:jobId"]).toBeDefined();
   });
 
-  it("sets onRequest hook for GET /stats with admin role check", () => {
-    expect(registeredRoutes["GET /stats"].onRequest).toBeDefined();
+  it("sets preHandler hook for GET /stats with admin role check", () => {
+    expect(registeredRoutes["GET /stats"].preHandler).toBeDefined();
   });
 
   it("sets preHandler for GET /jobs/:queueName/:jobId with admin role check", () => {
@@ -548,87 +549,32 @@ describe("DELETE /jobs/:queueName/:jobId", () => {
 });
 
 // ================================================================
-// fastifyRequireRole middleware
+// fastifyRequireAdmin middleware
 // ================================================================
-describe("fastifyRequireRole middleware", () => {
-  it("calls fastifyRequireAuth first, then checks role via DB", async () => {
-    const { fastifyRequireAuth } = await import("../../src/middleware/fastifyAuth.js");
-
-    // Set up DB mock to return admin user
-    const chain = chainable({
-      limit: vi.fn().mockResolvedValue([{ role: "admin" }]),
-    });
-    mockDb.select = vi.fn(() => chain);
-
-    const preHandler = registeredRoutes["GET /jobs/:queueName/:jobId"].preHandler!;
-    const request = createRequest({ userId: 42 });
-    const reply = createReply();
-
-    await preHandler(request, reply);
-
-    expect(fastifyRequireAuth).toHaveBeenCalledWith(request, reply);
-    expect(mockDb.select).toHaveBeenCalled();
-    // Should not send error since user is admin
-    expect(reply.code).not.toHaveBeenCalled();
+describe("fastifyRequireAdmin middleware", () => {
+  it("uses fastifyRequireAdmin as preHandler for GET /stats", async () => {
+    const { fastifyRequireAdmin } = await import("../../src/middleware/fastifyAuth.js");
+    expect(registeredRoutes["GET /stats"].preHandler).toBe(fastifyRequireAdmin);
   });
 
-  it("returns 401 when userId is missing after auth", async () => {
-    const preHandler = registeredRoutes["GET /jobs/:queueName/:jobId"].preHandler!;
-    const request = createRequest();
-    request.userId = undefined;
-    const reply = createReply();
-
-    await preHandler(request, reply);
-
-    expect(reply.code).toHaveBeenCalledWith(401);
-    expect(reply.send).toHaveBeenCalledWith({ error: "Not authenticated" });
+  it("uses fastifyRequireAdmin as preHandler for GET /jobs/:queueName/:jobId", async () => {
+    const { fastifyRequireAdmin } = await import("../../src/middleware/fastifyAuth.js");
+    expect(registeredRoutes["GET /jobs/:queueName/:jobId"].preHandler).toBe(fastifyRequireAdmin);
   });
 
-  it("returns 403 when user role does not match", async () => {
-    const chain = chainable({
-      limit: vi.fn().mockResolvedValue([{ role: "member" }]),
-    });
-    mockDb.select = vi.fn(() => chain);
-
-    const preHandler = registeredRoutes["GET /jobs/:queueName/:jobId"].preHandler!;
-    const request = createRequest({ userId: 5 });
-    const reply = createReply();
-
-    await preHandler(request, reply);
-
-    expect(reply.code).toHaveBeenCalledWith(403);
-    expect(reply.send).toHaveBeenCalledWith({ error: "Insufficient permissions" });
+  it("uses fastifyRequireAdmin as preHandler for DELETE /jobs/:queueName/:jobId", async () => {
+    const { fastifyRequireAdmin } = await import("../../src/middleware/fastifyAuth.js");
+    expect(registeredRoutes["DELETE /jobs/:queueName/:jobId"].preHandler).toBe(fastifyRequireAdmin);
   });
 
-  it("returns 403 when user is not found in DB", async () => {
-    const chain = chainable({
-      limit: vi.fn().mockResolvedValue([]),
-    });
-    mockDb.select = vi.fn(() => chain);
-
-    const preHandler = registeredRoutes["GET /jobs/:queueName/:jobId"].preHandler!;
-    const request = createRequest({ userId: 999 });
-    const reply = createReply();
-
-    await preHandler(request, reply);
-
-    expect(reply.code).toHaveBeenCalledWith(403);
-    expect(reply.send).toHaveBeenCalledWith({ error: "Insufficient permissions" });
+  it("fastifyRequireAdmin is a function", async () => {
+    const { fastifyRequireAdmin } = await import("../../src/middleware/fastifyAuth.js");
+    expect(fastifyRequireAdmin).toBeInstanceOf(Function);
   });
 
-  it("skips role check when reply is already sent after auth", async () => {
-    const { fastifyRequireAuth } = await import("../../src/middleware/fastifyAuth.js");
-    (fastifyRequireAuth as any).mockImplementation((_req: any, rep: any) => {
-      rep.sent = true;
-    });
-
-    const preHandler = registeredRoutes["DELETE /jobs/:queueName/:jobId"].preHandler!;
-    const request = createRequest({ userId: 1 });
-    const reply = createReply();
-
-    await preHandler(request, reply);
-
-    // Should bail out early, not query DB
-    expect(mockDb.select).not.toHaveBeenCalled();
+  it("all admin routes have preHandler defined", () => {
+    expect(registeredRoutes["GET /stats"].preHandler).toBeDefined();
+    expect(registeredRoutes["GET /jobs/:queueName/:jobId"].preHandler).toBeDefined();
+    expect(registeredRoutes["DELETE /jobs/:queueName/:jobId"].preHandler).toBeDefined();
   });
 });

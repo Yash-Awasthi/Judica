@@ -1,19 +1,23 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import fs from "fs";
 
-vi.mock("fs", () => ({
-  default: {
-    statSync: vi.fn(),
-  },
-  statSync: vi.fn(),
+const { mockAssertFileSizeLimit } = vi.hoisted(() => ({
+  mockAssertFileSizeLimit: vi.fn(),
 }));
 
-const mockReadFile = vi.fn();
+vi.mock("../../src/processors/types.js", async (importOriginal) => {
+  const orig = await importOriginal<typeof import("../../src/processors/types.js")>();
+  return {
+    ...orig,
+    assertFileSizeLimit: mockAssertFileSizeLimit,
+  };
+});
+
+const mockXlsxReadFile = vi.fn();
 const mockWorksheets: any[] = [];
 
 vi.mock("exceljs", () => {
   class MockWorkbook {
-    xlsx = { readFile: (...args: any[]) => mockReadFile(...args) };
+    xlsx = { readFile: (...args: any[]) => mockXlsxReadFile(...args) };
     get worksheets() {
       return mockWorksheets;
     }
@@ -25,19 +29,17 @@ vi.mock("exceljs", () => {
   };
 });
 
-const mockedFs = vi.mocked(fs);
-
 import { processXLSX } from "../../src/processors/xlsx.processor.js";
 
 describe("processXLSX", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockedFs.statSync.mockReturnValue({ size: 1024 } as any);
+    mockAssertFileSizeLimit.mockImplementation(() => {});
     mockWorksheets.length = 0;
   });
 
   it("should return spreadsheet with single sheet content", async () => {
-    mockReadFile.mockResolvedValue(undefined);
+    mockXlsxReadFile.mockResolvedValue(undefined);
     mockWorksheets.push({
       name: "Sheet1",
       eachRow: (cb: any) => {
@@ -56,7 +58,7 @@ describe("processXLSX", () => {
   });
 
   it("should handle multiple sheets", async () => {
-    mockReadFile.mockResolvedValue(undefined);
+    mockXlsxReadFile.mockResolvedValue(undefined);
     mockWorksheets.push(
       {
         name: "Data",
@@ -85,7 +87,7 @@ describe("processXLSX", () => {
   });
 
   it("should separate sheets with double newline", async () => {
-    mockReadFile.mockResolvedValue(undefined);
+    mockXlsxReadFile.mockResolvedValue(undefined);
     mockWorksheets.push(
       {
         name: "A",
@@ -111,7 +113,9 @@ describe("processXLSX", () => {
   });
 
   it("should throw when file exceeds size limit", async () => {
-    mockedFs.statSync.mockReturnValue({ size: 200 * 1024 * 1024 } as any);
+    mockAssertFileSizeLimit.mockImplementation(() => {
+      throw new Error("File too large for processing: 200.0MB exceeds the 100MB limit");
+    });
 
     await expect(processXLSX("/tmp/huge.xlsx")).rejects.toThrow(
       /File too large/
