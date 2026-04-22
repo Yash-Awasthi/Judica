@@ -18,6 +18,7 @@ export const codeRepositories = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     source: text("source").notNull(),
+    // P60-07: Validate against SSRF at ingestion time (see src/lib/ssrf.ts)
     repoUrl: text("repoUrl"),
     name: text("name").notNull(),
     indexed: boolean("indexed").default(false).notNull(),
@@ -26,6 +27,7 @@ export const codeRepositories = pgTable(
   },
   (table) => [
     index("CodeRepository_userId_idx").on(table.userId),
+    index("CodeRepository_indexed_idx").on(table.indexed),
   ],
 );
 

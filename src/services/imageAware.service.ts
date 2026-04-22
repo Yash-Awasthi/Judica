@@ -1,6 +1,14 @@
 import { routeAndCollect } from "../router/index.js";
 import logger from "../lib/logger.js";
 
+/** Sanitize user-controlled text before interpolation into LLM prompts */
+function sanitizeForPrompt(text: string): string {
+  return text
+    .replace(/\b(system|assistant|user|human)\s*:/gi, (_m, role) => `${role as string} -`)
+    .replace(/ignore\s+(all\s+)?previous\s+instructions/gi, "[filtered]")
+    .replace(/you\s+are\s+now\b/gi, "[filtered]");
+}
+
 /**
  * Image-Aware Agents: analyse images, screenshots, and diagrams
  * within council deliberation context.
@@ -46,7 +54,7 @@ export async function analyzeImage(
   context?: string,
 ): Promise<ImageAnalysis> {
   try {
-    const contextPrompt = context ? `\nContext: ${context}` : "";
+    const contextPrompt = context ? `\nContext: ${sanitizeForPrompt(context.substring(0, 2000))}` : "";
 
     const result = await routeAndCollect({
       model: "auto",
@@ -118,8 +126,10 @@ export async function crossModalAnalysis(
   inputs: MultiModalInput[],
   question: string,
 ): Promise<CrossModalInsight[]> {
-  // P32-08: Cap inputs array to prevent unbounded processing
-  if (inputs.length > 20) inputs = inputs.slice(0, 20);
+  // P29-10: Cap inputs array to prevent unbounded LLM prompt size
+  const MAX_INPUTS = 20;
+  if (inputs.length > MAX_INPUTS) inputs = inputs.slice(0, MAX_INPUTS);
+
   try {
     const inputDescriptions = inputs
       .map((input, i) => {
@@ -136,7 +146,7 @@ export async function crossModalAnalysis(
       messages: [
         {
           role: "user",
-          content: `Analyze these multi-modal inputs together to answer: ${question}
+          content: `Analyze these multi-modal inputs together to answer: ${sanitizeForPrompt(question.substring(0, 2000))}
 
 Inputs:
 ${inputDescriptions}

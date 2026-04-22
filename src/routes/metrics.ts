@@ -140,6 +140,8 @@ const metricsPlugin: FastifyPluginAsync = async (fastify) => {
       }
 
       // Fetch related chats for this conversation
+      // R4-04: Scope to userId to prevent IDOR — a conversation's ID alone is
+      // not a sufficient authorization check since chats table is keyed separately.
       const chatRows = await db
         .select({
           tokensUsed: chats.tokensUsed,
@@ -147,7 +149,7 @@ const metricsPlugin: FastifyPluginAsync = async (fastify) => {
           createdAt: chats.createdAt,
         })
         .from(chats)
-        .where(eq(chats.conversationId, String(id)));
+        .where(and(eq(chats.conversationId, String(id)), eq(chats.userId, userId)));
 
       const totalTokens = chatRows.reduce((s, c) => s + (Number(c.tokensUsed) || 0), 0);
       const avgDuration =

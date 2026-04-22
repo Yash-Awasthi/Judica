@@ -116,9 +116,13 @@ Return ONLY the JSON array.`,
   // Deduplicate by description similarity (simple substring match)
   const unique: EdgeCase[] = [];
   for (const ec of allEdgeCases) {
-    const isDuplicate = unique.some(
-      (u) => u.description.toLowerCase().includes(ec.description.toLowerCase().substring(0, 30))
-    );
+    const isDuplicate = unique.some((u) => {
+      const existingLower = u.description.toLowerCase();
+      const newLower = ec.description.toLowerCase();
+      const prefix = Math.min(60, newLower.length);
+      return existingLower.includes(newLower.substring(0, prefix))
+        || newLower.includes(existingLower.substring(0, prefix));
+    });
     if (!isDuplicate) {
       unique.push(ec);
     }

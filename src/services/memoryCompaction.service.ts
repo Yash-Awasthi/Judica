@@ -66,7 +66,8 @@ export async function compact(userId: number): Promise<CompactionResult> {
         eq(memories.userId, userId),
         lt(memories.createdAt, sevenDaysAgo)
       )
-    );
+    )
+    .limit(500);
 
   if (oldMemories.length < 10) {
     return { originalCount: 0, compactedCount: 0, tokensSaved: 0, expiredCount };

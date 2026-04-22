@@ -46,6 +46,11 @@ export async function setBackend(
   type: string,
   config: Record<string, unknown>
 ): Promise<void> {
+  const VALID_BACKEND_TYPES = ["local", "qdrant", "getzep", "google_drive"];
+  if (!VALID_BACKEND_TYPES.includes(type)) {
+    throw new Error(`Invalid backend type: ${type}. Must be one of: ${VALID_BACKEND_TYPES.join(", ")}`);
+  }
+
   const encrypted = encryptConfig(JSON.stringify(config));
 
   await db

@@ -1,6 +1,11 @@
 import { routeAndCollect } from "../router/index.js";
 import logger from "../lib/logger.js";
 
+/** Sanitize language identifier for safe interpolation into markdown code fences */
+function sanitizeLanguage(lang: string): string {
+  return lang.replace(/[^a-zA-Z0-9_+-]/g, "").substring(0, 30);
+}
+
 /**
  * Refactoring Assistant: analyses code for improvement opportunities,
  * generates before/after diffs, and performs safety analysis.
@@ -90,7 +95,7 @@ Return a JSON array:
 }]
 
 Code:
-\`\`\`${language}
+\`\`\`${sanitizeLanguage(language)}
 ${code.substring(0, 4000)}
 \`\`\`
 
@@ -139,7 +144,7 @@ Refactoring: ${opportunity.type} — ${opportunity.description}
 Location: lines ${opportunity.location.startLine}-${opportunity.location.endLine}
 
 Original code:
-\`\`\`${language}
+\`\`\`${sanitizeLanguage(language)}
 ${code.substring(0, 4000)}
 \`\`\`
 
@@ -187,12 +192,12 @@ export async function analyzeSafety(
           content: `Analyze the safety of this code refactoring.
 
 Original:
-\`\`\`${language}
+\`\`\`${sanitizeLanguage(language)}
 ${originalCode.substring(0, 3000)}
 \`\`\`
 
 Refactored:
-\`\`\`${language}
+\`\`\`${sanitizeLanguage(language)}
 ${refactoredCode.substring(0, 3000)}
 \`\`\`
 
