@@ -50,6 +50,24 @@ const PII_PATTERNS: { type: string; pattern: RegExp; severity: 'low' | 'medium' 
     // P10-67: Reduce false positives — require context words nearby
     validate: (m) => m.length >= 8 && m.length <= 11
   },
+  // L-2: Add IBAN pattern for international bank account detection
+  {
+    type: "iban",
+    pattern: /\b[A-Z]{2}\d{2}[A-Z0-9]{4,30}\b/g,
+    severity: "high",
+    // Basic IBAN length check (15-34 chars) and mod-97 checksum
+    validate: (m) => {
+      if (m.length < 15 || m.length > 34) return false;
+      // Rearrange: move first 4 chars to end, convert letters to numbers, mod 97
+      const rearranged = (m.slice(4) + m.slice(0, 4)).toUpperCase();
+      const numeric = rearranged.replace(/[A-Z]/g, (c) => String(c.charCodeAt(0) - 55));
+      let remainder = 0;
+      for (const chunk of numeric.match(/.{1,9}/g) ?? []) {
+        remainder = parseInt(String(remainder) + chunk, 10) % 97;
+      }
+      return remainder === 1;
+    }
+  },
 
   { type: "email", pattern: /[a-zA-Z0-9._%+-]{1,64}@[a-zA-Z0-9.-]{1,255}\.[a-zA-Z]{2,}/g, severity: "medium" },
   {
@@ -145,8 +163,15 @@ export function detectPII(text: string): PIIDetection {
 
   const recommendations = generateRecommendations(types, matches);
 
-  // P10-70: Log when false positive rate might be high
+  // P10-70: Log when PII density is high (may indicate over-detection / false positive risk)
   const normalizedRiskScore = Math.min(riskScore, 100);
+  const wordCount = text.split(/\s+/).filter(Boolean).length;
+  if (wordCount > 0 && matches.length / wordCount > 0.1) {
+    // More than 10% of words are flagged — likely high false-positive rate or genuine data dump
+    import("./logger.js").then(({ default: logger }) => {
+      logger.warn({ matchCount: matches.length, wordCount, riskScore: normalizedRiskScore }, "High PII density detected — review for false positives");
+    }).catch(() => {});
+  }
 
   return {
     found: matches.length > 0,

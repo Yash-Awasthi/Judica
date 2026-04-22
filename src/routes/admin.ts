@@ -10,6 +10,12 @@ import { AdminService } from "../services/admin.service.js";
 import { AppError } from "../middleware/errorHandler.js";
 import redis from "../lib/redis.js";
 
+/** Parse a value to an integer, returning `fallback` when the result is NaN. */
+function safeInt(value: string | number | undefined, fallback: number): number {
+  const n = typeof value === 'number' ? value : parseInt(String(value), 10);
+  return Number.isNaN(n) ? fallback : n;
+}
+
 const adminPlugin: FastifyPluginAsync = async (fastify) => {
   await fastify.register(fastifyRateLimit, { max: 60, timeWindow: "1 minute" });
   // All routes in this plugin require admin role
@@ -21,6 +27,13 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
     const id = parseInt(raw, 10);
     if (Number.isNaN(id)) throw new AppError(400, "Invalid ID: must be a numeric value");
     return id;
+  }
+
+  function safeDate(value: string | undefined): Date | undefined {
+    if (!value) return undefined;
+    const d = new Date(value);
+    if (isNaN(d.getTime())) throw new AppError(400, `Invalid date: ${value}`);
+    return d;
   }
 
   // ─── USER MANAGEMENT ───────────────────────────────────────────────────────
@@ -255,10 +268,10 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
     const { actionType, limit, offset, startDate, endDate } = request.query as { actionType?: string; limit?: string; offset?: string; startDate?: string; endDate?: string };
     const logs = await AdminService.getAuditLogs({
       actionType,
-      limit: limit ? parseInt(limit) : 50,
-      offset: offset ? parseInt(offset) : 0,
-      startDate: startDate ? new Date(startDate) : undefined,
-      endDate: endDate ? new Date(endDate) : undefined,
+      limit: safeInt(limit, 50),
+      offset: safeInt(offset, 0),
+      startDate: safeDate(startDate),
+      endDate: safeDate(endDate),
     });
     return logs;
   });
@@ -302,10 +315,12 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
       limit?: string;
     };
 
-    const limit = Math.min(parseInt(rawLimit || "10000", 10), 50_000);
+    const limit = Math.min(safeInt(rawLimit, 10_000), 50_000);
     const conditions = [];
-    if (from) conditions.push(gte(auditLogs.createdAt, new Date(from)));
-    if (to) conditions.push(lte(auditLogs.createdAt, new Date(to)));
+    const fromDate = safeDate(from);
+    const toDate = safeDate(to);
+    if (fromDate) conditions.push(gte(auditLogs.createdAt, fromDate));
+    if (toDate) conditions.push(lte(auditLogs.createdAt, toDate));
 
     const filename = `audit-export-${new Date().toISOString().split("T")[0]}.jsonl`;
 
@@ -356,10 +371,12 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
       limit?: string;
     };
 
-    const limit = Math.min(parseInt(rawLimit || "5000", 10), 10_000);
+    const limit = Math.min(safeInt(rawLimit, 5_000), 10_000);
     const conditions = [];
-    if (from) conditions.push(gte(auditLogs.createdAt, new Date(from)));
-    if (to) conditions.push(lte(auditLogs.createdAt, new Date(to)));
+    const fromDate = safeDate(from);
+    const toDate = safeDate(to);
+    if (fromDate) conditions.push(gte(auditLogs.createdAt, fromDate));
+    if (toDate) conditions.push(lte(auditLogs.createdAt, toDate));
 
     const rows = await db
       .select()

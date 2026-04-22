@@ -52,8 +52,10 @@ export function sanitizeForPrompt(text: string): string {
   return text
     // Neutralize role-switching attempts
     .replace(/^(system|assistant|user)\s*:/gim, "[$1]:")
-    // Escape markdown code blocks that could confuse prompt parsing
-    .replace(/```/g, "\\`\\`\\`")
+    // L-4: Escape markdown code block fences without breaking legitimate content.
+    // Replace ``` with a visually equivalent but non-functional sequence so
+    // the LLM won't interpret it as a code fence boundary.
+    .replace(/`{3,}/g, (m) => "`".repeat(m.length - 1) + "\u200B`")
     // Strip ANSI escape sequences
     // eslint-disable-next-line no-control-regex
     .replace(/\x1b\[[0-9;]*m/g, "");
@@ -98,9 +100,13 @@ export function sanitizeCodeOutput(output: string): string {
   // Cap length to prevent DoS
   const capped = output.length > 1_000_000 ? output.slice(0, 1_000_000) : output;
   return capped
-    // Neutralize template-like patterns in output
+    // Neutralize Handlebars/Mustache template delimiters
     .replace(/\{\{/g, "{ {")
-    .replace(/\}\}/g, "} }");
+    .replace(/\}\}/g, "} }")
+    // L-4: Neutralize additional template syntaxes to prevent injection into template nodes
+    .replace(/\$\{/g, "$ {")      // JS template literals
+    .replace(/<%/g, "< %")        // EJS / ERB
+    .replace(/#\{/g, "# {");      // Ruby interpolation
 }
 
 /**

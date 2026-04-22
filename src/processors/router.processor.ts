@@ -1,3 +1,4 @@
+import path from "path";
 import { processPDF } from "./pdf.processor.js";
 import { processDOCX } from "./docx.processor.js";
 import { processXLSX } from "./xlsx.processor.js";
@@ -16,6 +17,12 @@ interface UploadRecord {
 
 export async function processFile(upload: UploadRecord): Promise<ProcessedFile> {
   const { mimeType, storagePath } = upload;
+
+  // Prevent path traversal
+  const normalizedPath = path.resolve(storagePath);
+  if (normalizedPath !== storagePath && !normalizedPath.startsWith(path.resolve("."))) {
+    throw new Error("Invalid file path");
+  }
 
   if (mimeType === "application/pdf") {
     return processPDF(storagePath);
@@ -49,6 +56,6 @@ export async function processFile(upload: UploadRecord): Promise<ProcessedFile> 
   try {
     return processTXT(storagePath);
   } catch {
-    throw new Error(`Unsupported file type: ${mimeType}`);
+    throw new Error(`Unsupported file type: ${mimeType.replace(/[^\x20-\x7E]/g, "").slice(0, 100)}`);
   }
 }
