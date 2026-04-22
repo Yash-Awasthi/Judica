@@ -67,6 +67,7 @@ interface MemberResponse {
 
 
 const HUMAN_GATE_TIMEOUT_MS = 5 * 60 * 1000;
+const MAX_PENDING_GATES = 100;
 // P8-19: Redis key prefix for persisted gate state
 const GATE_REDIS_PREFIX = "human_gate:";
 
@@ -212,8 +213,8 @@ export class DeliberationOrchestrator {
         memberName: member.name,
         text: result.text,
         usage: result.usage,
-        // P8-18: Track resolved model so reliability system can attribute correctly
-        resolvedModel: (result as any).resolvedModel || member.model || "auto",
+        // P5-09: Use typed interface instead of unsafe any cast
+        resolvedModel: (result as { resolvedModel?: string }).resolvedModel || member.model || "auto",
       };
     });
 
@@ -396,6 +397,18 @@ export class DeliberationOrchestrator {
           pendingHumanGates.delete(gateId);
         }
       }, HUMAN_GATE_TIMEOUT_MS);
+      if (pendingHumanGates.size >= MAX_PENDING_GATES) {
+        // Evict oldest gate
+        const oldestId = pendingHumanGates.keys().next().value;
+        if (oldestId !== undefined) {
+          const oldest = pendingHumanGates.get(oldestId);
+          if (oldest) {
+            clearTimeout(oldest.timer);
+            oldest.resolve("Dismiss conflicts and synthesize");
+          }
+          pendingHumanGates.delete(oldestId);
+        }
+      }
       pendingHumanGates.set(gateId, { resolve: gateResolve, promise: gatePromise, timer: gateTimer, createdAt: Date.now() });
 
       yield {

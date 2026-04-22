@@ -64,7 +64,7 @@ export async function askOpenAI(
     }
     const nextMessages: Message[] = [...normMessages, { role: 'assistant' as const, content: msg.content || '' }];
     for (const tc of msg.tool_calls) {
-      const result = await callTool({ id: tc.id, name: tc.function.name, arguments: JSON.parse(tc.function.arguments) });
+      const result = await callTool({ id: tc.id, name: tc.function.name, arguments: (() => { try { return JSON.parse(tc.function.arguments); } catch { return {}; } })() });
       const safeResult = `[UNTRUSTED TOOL OUTPUT]\n${result}\n[/UNTRUSTED TOOL OUTPUT]`;
       nextMessages.push({ role: "tool", tool_call_id: tc.id, name: tc.function.name, content: safeResult });
     }
@@ -203,7 +203,7 @@ export async function streamOpenAI(
       } as unknown as Message
     ];
     for (const tc of finalToolCalls) {
-      const result = await callTool({ id: tc.id, name: tc.name, arguments: JSON.parse(tc.args) });
+      const result = await callTool({ id: tc.id, name: tc.name, arguments: (() => { try { return JSON.parse(tc.args); } catch { return {}; } })() });
       const safeResult = `[UNTRUSTED TOOL OUTPUT]\n${result.result}\n[/UNTRUSTED TOOL OUTPUT]`;
       nextMessages.push({ role: "tool", tool_call_id: tc.id, name: tc.name, content: safeResult });
     }

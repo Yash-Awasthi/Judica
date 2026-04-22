@@ -31,6 +31,8 @@ export interface PresenceState {
 
 // ─── In-memory store ────────────────────────────────────────────────────────
 
+// P23-08: Cap presence map to prevent unbounded memory growth from many sessions
+const MAX_PRESENCE_ENTRIES = 10_000;
 // Key: `${sessionId}:${userId}`
 const presenceMap = new Map<string, PresenceState>();
 const typingTimers = new Map<string, ReturnType<typeof setTimeout>>();
@@ -48,6 +50,10 @@ export function updatePresence(
 ): PresenceState {
   const k = key(sessionId, userId);
   const existing = presenceMap.get(k);
+  // P35-06: Enforce presence map cap
+  if (!existing && presenceMap.size >= MAX_PRESENCE_ENTRIES) {
+    throw new Error("Presence map full — too many active sessions");
+  }
   const updated: PresenceState = {
     userId,
     sessionId,
@@ -57,6 +63,11 @@ export function updatePresence(
     metadata: state.metadata ?? existing?.metadata ?? { color: "#000000", name: userId },
   };
   presenceMap.set(k, updated);
+  // P23-08: Evict oldest entries when map exceeds cap
+  if (presenceMap.size > MAX_PRESENCE_ENTRIES) {
+    const oldest = presenceMap.keys().next().value;
+    if (oldest !== undefined) presenceMap.delete(oldest);
+  }
   logger.debug({ userId, sessionId }, "Updated presence");
   return updated;
 }
@@ -159,3 +170,10 @@ export function _reset(): void {
   typingTimers.clear();
   presenceMap.clear();
 }
+
+// Auto-cleanup stale presence entries every 30 seconds
+const PRESENCE_CLEANUP_INTERVAL_MS = 30_000;
+
+setInterval(() => {
+  cleanupStale(60_000); // Remove entries inactive for more than 1 minute
+}, PRESENCE_CLEANUP_INTERVAL_MS).unref();

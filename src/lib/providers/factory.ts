@@ -14,13 +14,18 @@ export function createProvider(config: ProviderConfig): BaseProvider {
 
   // P0-17: Try to decrypt the API key if it looks encrypted
   if (decryptedConfig.apiKey) {
-    try {
-      decryptedConfig.apiKey = decrypt(decryptedConfig.apiKey);
-    } catch (err) {
-      logger.warn({
-        provider: config.name,
-        err: (err as Error).message
-      }, "Just-in-time decryption failed (might be raw)");
+    // Only attempt decryption if the key appears to be encrypted
+    // Raw API keys follow known formats: sk-..., gsk_..., key-..., etc.
+    const looksRaw = /^(sk-|gsk_|key-|xai-|AIza|ghp_|glpat-)/.test(decryptedConfig.apiKey);
+    if (!looksRaw) {
+      try {
+        decryptedConfig.apiKey = decrypt(decryptedConfig.apiKey);
+      } catch (err) {
+        throw new ProviderConfigError(
+          `Failed to decrypt API key for provider "${config.name}": ${(err as Error).message}. ` +
+          `If the key is not encrypted, ensure it starts with a known prefix (sk-, gsk_, etc.)`
+        );
+      }
     }
   }
 
@@ -39,6 +44,9 @@ export function createProvider(config: ProviderConfig): BaseProvider {
       case "claude":
       case "deepseek":
       case "gemini":    return new RPAProvider(decryptedConfig);
+      // P37-09: Log unknown provider values that fall through the switch
+      default:
+        logger.warn({ provider: decryptedConfig.provider }, "Unknown provider value — falling through to type-based resolution");
     }
   }
 

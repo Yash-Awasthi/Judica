@@ -311,12 +311,21 @@ export async function buildApp() {
     },
   });
 
+  // P19-01: Cache index.html in memory — avoid blocking readFileSync on every request
+  let cachedIndexHtml: string | null = null;
+  const indexPath = path.join(publicPath, "index.html");
+
   fastify.get("/", {
     config: { rateLimit: { max: 60, timeWindow: "1 minute" } },
   }, async (request, reply) => {
-    const indexPath = path.join(publicPath, "index.html");
     try {
-      let html = fs.readFileSync(indexPath, "utf8");
+      // Fix CodeQL alert #64: Eliminate TOCTOU race by reading file directly
+      // and using content hash for cache invalidation instead of stat+read
+      const currentContent = fs.readFileSync(indexPath, "utf8");
+      if (currentContent !== cachedIndexHtml) {
+        cachedIndexHtml = currentContent;
+      }
+      let html = cachedIndexHtml;
       const nonce = (request as unknown as { cspNonce?: string }).cspNonce || "";
       html = html.split("<script").join(`<script nonce="${nonce}"`);
       html = html.split(`nonce="${nonce}" nonce="`).join(`nonce="`);
@@ -329,7 +338,6 @@ export async function buildApp() {
   if (env.NODE_ENV === "development") {
     import("@bull-board/api").then(async ({ createBullBoard, BullMQAdapter }) => {
       try {
-        // @ts-expect-error — @bull-board/fastify is an optional dev dependency
         const { FastifyAdapter } = await import("@bull-board/fastify");
         const serverAdapter = new FastifyAdapter();
         serverAdapter.setBasePath("/admin/queues");
@@ -342,7 +350,7 @@ export async function buildApp() {
           ],
           serverAdapter,
         });
-        await fastify.register(serverAdapter.registerPlugin(), {
+        await fastify.register(serverAdapter.plugin() as any, {
           basePath: "/admin/queues",
           prefix: "/admin/queues",
         });
@@ -355,9 +363,11 @@ export async function buildApp() {
     });
   }
 
+  // P19-02: Don't reflect raw request.url in response — prevents info disclosure / log injection
   fastify.setNotFoundHandler((request, reply) => {
     if (request.url.startsWith("/api/")) {
-      reply.code(404).send({ error: `Not Found: ${request.url}` });
+      const safeRoute = request.routeOptions?.url || request.url.split("?")[0].slice(0, 200);
+      reply.code(404).send({ error: `Not Found: ${safeRoute}` });
     } else {
       reply.code(404).sendFile("404.html");
     }

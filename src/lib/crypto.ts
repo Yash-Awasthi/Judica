@@ -12,7 +12,9 @@ const HKDF_SALT = Buffer.from("aibyai-encryption-v1", "utf8");
 const HKDF_INFO = Buffer.from("aes-256-gcm-key", "utf8");
 
 // P0-21: Support multiple key versions for rotation
-const CURRENT_KEY_VERSION = parseInt(process.env.CURRENT_ENCRYPTION_VERSION || "1", 10);
+const _parsedKeyVersion = parseInt(process.env.CURRENT_ENCRYPTION_VERSION || "1", 10);
+// P29-01: NaN guard on key version parse
+const CURRENT_KEY_VERSION = Number.isFinite(_parsedKeyVersion) && _parsedKeyVersion >= 1 ? _parsedKeyVersion : 1;
 
 // P0-14: Use HKDF-SHA256 instead of raw sha256 for key derivation
 function getMasterKey(customKey?: string): Buffer {
@@ -21,9 +23,21 @@ function getMasterKey(customKey?: string): Buffer {
     throw new Error("CRITICAL: MASTER_ENCRYPTION_KEY environment variable is not set");
   }
 
-  const ikm = Buffer.from(keyStr, "hex").length === 32
-    ? Buffer.from(keyStr, "hex")
-    : Buffer.from(keyStr, "utf8");
+  const hexBuf = Buffer.from(keyStr, "hex");
+  if (hexBuf.length === 32) {
+    // Preferred: 64-character hex-encoded key (32 bytes)
+    return crypto.hkdfSync("sha256", hexBuf, HKDF_SALT, HKDF_INFO, 32) as unknown as Buffer;
+  }
+
+  // M-1 fix: enforce minimum byte length before accepting a utf8 key as IKM.
+  // Without this check any short/weak string was silently accepted.
+  const ikm = Buffer.from(keyStr, "utf8");
+  if (ikm.length < 32) {
+    throw new Error(
+      "MASTER_ENCRYPTION_KEY must be a 64-character hex string (32 bytes) " +
+      "or a UTF-8 string of at least 32 bytes"
+    );
+  }
 
   return crypto.hkdfSync("sha256", ikm, HKDF_SALT, HKDF_INFO, 32) as unknown as Buffer;
 }
@@ -58,13 +72,17 @@ export function decrypt(encryptedText: string, customKey?: string, aad?: string)
 
     // P0-16: Support both legacy (iv:tag:ct) and new JSON envelope format
     if (encryptedText.startsWith("{")) {
-      const envelope = JSON.parse(encryptedText) as { v: number; kv?: number; iv: string; tag: string; ct: string };
+      const envelope = JSON.parse(encryptedText) as Record<string, unknown>;
+      // P29-02: Validate envelope properties before use
+      if (typeof envelope.iv !== "string" || typeof envelope.tag !== "string" || typeof envelope.ct !== "string") {
+        throw new Error("Invalid encrypted envelope: missing iv, tag, or ct");
+      }
       ivHex = envelope.iv;
       tagHex = envelope.tag;
       encryptedData = envelope.ct;
       // P0-21: If key version differs from current and no custom key provided,
       // try PREVIOUS_ENCRYPTION_KEY for older versions
-      if (!customKey && envelope.kv && envelope.kv !== CURRENT_KEY_VERSION) {
+      if (!customKey && typeof envelope.kv === "number" && envelope.kv !== CURRENT_KEY_VERSION) {
         const prevKey = process.env.PREVIOUS_ENCRYPTION_KEY;
         if (prevKey) {
           customKey = prevKey;
@@ -72,6 +90,8 @@ export function decrypt(encryptedText: string, customKey?: string, aad?: string)
       }
     } else {
       // Legacy format: iv:tag:ct
+      // L-1: Warn so operators know to migrate to the JSON envelope format
+      logger.warn("Decrypting legacy iv:tag:ct format — consider re-encrypting with current version");
       [ivHex, tagHex, encryptedData] = encryptedText.split(":");
     }
 
@@ -79,8 +99,15 @@ export function decrypt(encryptedText: string, customKey?: string, aad?: string)
       throw new Error("Invalid encrypted text format");
     }
 
+    // P45-02: Validate hex string lengths before buffer conversion (IV=12 bytes=24 hex, tag=16 bytes=32 hex)
+    if (ivHex.length !== 24 || tagHex.length !== 32) {
+      throw new Error("Invalid encrypted text format (bad IV/tag length)");
+    }
     const iv = Buffer.from(ivHex, "hex");
     const tag = Buffer.from(tagHex, "hex");
+    // P33-10: Validate IV and auth tag lengths for AES-256-GCM
+    if (iv.length !== 12) throw new Error("Invalid IV length: expected 12 bytes");
+    if (tag.length !== 16) throw new Error("Invalid auth tag length: expected 16 bytes");
     const key = getMasterKey(customKey);
     const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
 
@@ -97,7 +124,7 @@ export function decrypt(encryptedText: string, customKey?: string, aad?: string)
     return decrypted;
   } catch (err) {
     logger.error({ err: (err as Error).message }, "Decryption failed");
-    throw new Error("Failed to decrypt sensitive data - check MASTER_ENCRYPTION_KEY", { cause: err });
+    throw new Error("Failed to decrypt sensitive data", { cause: err });
   }
 }
 
@@ -116,7 +143,7 @@ export function isEncrypted(value: string): boolean {
   // Legacy format: 24-char hex iv : 32-char hex tag : hex ciphertext
   const parts = value.split(":");
   if (parts.length === 3) {
-    return /^[0-9a-f]{24}$/.test(parts[0]) && /^[0-9a-f]{32}$/.test(parts[1]) && /^[0-9a-f]+$/.test(parts[2]);
+    return /^[0-9a-f]{24}$/.test(parts[0]) && /^[0-9a-f]{32}$/.test(parts[1]) && parts[2].length <= 1_000_000 && /^[0-9a-f]+$/.test(parts[2]);
   }
   return false;
 }

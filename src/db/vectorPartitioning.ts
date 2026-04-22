@@ -19,6 +19,8 @@
  *   - Queries already filter by userId, so partition pruning kicks in
  */
 
+const SAFE_IDENTIFIER = /^[a-zA-Z_][a-zA-Z0-9_]{0,63}$/;
+
 /**
  * Generate SQL to convert a table to hash-partitioned by userId.
  *
@@ -30,12 +32,27 @@
  * 5. Migrate data
  * 6. Drop old table
  */
+
+function assertSafeIdentifier(value: string, label: string): void {
+  if (!SAFE_IDENTIFIER.test(value)) {
+    throw new Error(`${label} contains invalid characters: ${value.slice(0, 30)}`);
+  }
+}
+
 export function generatePartitionMigration(
   tableName: string,
   partitionCount: number = 16,
   vectorColumn: string = "embedding",
   _vectorDimensions: number = 1536,
 ): string {
+  // Validate table name to prevent SQL injection in DDL
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/.test(tableName)) {
+    throw new Error(`Invalid table name: must be a valid SQL identifier`);
+  }
+  if (!Number.isInteger(partitionCount) || partitionCount < 1 || partitionCount > 256) {
+    throw new Error(`Invalid partitionCount: must be between 1 and 256`);
+  }
+
   const lines: string[] = [
     `-- P4-50: Partition ${tableName} by userId for HNSW index sharding`,
     `-- Run this migration when ${tableName} exceeds ~500K rows`,
@@ -76,6 +93,10 @@ export function generatePartitionMigration(
  * Generate SQL to check partition sizes and index health.
  */
 export function generatePartitionHealthCheck(tableName: string): string {
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/.test(tableName)) {
+    throw new Error(`Invalid table name: must be a valid SQL identifier`);
+  }
+
   return [
     `-- Check partition sizes for ${tableName}`,
     `SELECT`,

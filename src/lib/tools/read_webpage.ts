@@ -54,19 +54,38 @@ export const readWebpageTool: ToolInstance = {
         return `Error: Failed to fetch webpage. HTTP Status ${res ? res.status : 'Unknown'}`;
       }
 
-      const contentLength = res.headers.get("content-length");
-      if (contentLength && parseInt(contentLength, 10) > 5 * 1024 * 1024) {
-        return "Error: Response exceeds 5MB size limit";
+      const MAX_BODY_SIZE = 5 * 1024 * 1024; // 5MB
+
+      // Read body with size limit
+      const reader = res.body?.getReader();
+      if (!reader) {
+        return "Error: No response body";
       }
 
-      const html = await res.text();
+      const chunks: Uint8Array[] = [];
+      let totalSize = 0;
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        totalSize += value.length;
+        if (totalSize > MAX_BODY_SIZE) {
+          reader.cancel();
+          return "Error: Response exceeds 5MB size limit";
+        }
+        chunks.push(value);
+      }
+
+      const html = new TextDecoder().decode(
+        chunks.length === 1 ? chunks[0] : Buffer.concat(chunks)
+      );
 
       const bodyMatch = html.match(/<body[^>]*>([\s\S]*?)<\/body>/i);
       let content = bodyMatch ? bodyMatch[1] : html;
 
-      // Strip HTML tags safely (handles multi-line, nested tags)
-      content = content.replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "");
-      content = content.replace(/<style\b[^<]*(?:(?!<\/style>)<[^<]*)*<\/style>/gi, "");
+      // Strip HTML tags safely — P45-10: Use non-backtracking regex to prevent ReDoS
+      content = content.replace(/<script\b[\s\S]*?<\/script>/gi, "");
+      content = content.replace(/<style\b[\s\S]*?<\/style>/gi, "");
 
       const text = content
         .replace(/<[^>]+>/g, " ")

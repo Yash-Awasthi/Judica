@@ -4,11 +4,17 @@ import { db } from "../lib/drizzle.js";
 import { users } from "../db/schema/users.js";
 import { customProviders } from "../db/schema/council.js";
 import { auditLogs } from "../db/schema/conversations.js";
-import { desc, sql, gte, lte } from "drizzle-orm";
+import { desc, sql, gte, lte, count, inArray, ne, and } from "drizzle-orm";
 import { fastifyRequireAdmin } from "../middleware/fastifyAuth.js";
 import { AdminService } from "../services/admin.service.js";
 import { AppError } from "../middleware/errorHandler.js";
 import redis from "../lib/redis.js";
+
+/** Parse a value to an integer, returning `fallback` when the result is NaN. */
+function safeInt(value: string | number | undefined, fallback: number): number {
+  const n = typeof value === 'number' ? value : parseInt(String(value), 10);
+  return Number.isNaN(n) ? fallback : n;
+}
 
 const adminPlugin: FastifyPluginAsync = async (fastify) => {
   await fastify.register(fastifyRateLimit, { max: 60, timeWindow: "1 minute" });
@@ -21,6 +27,13 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
     const id = parseInt(raw, 10);
     if (Number.isNaN(id)) throw new AppError(400, "Invalid ID: must be a numeric value");
     return id;
+  }
+
+  function safeDate(value: string | undefined): Date | undefined {
+    if (!value) return undefined;
+    const d = new Date(value);
+    if (isNaN(d.getTime())) throw new AppError(400, `Invalid date: ${value}`);
+    return d;
   }
 
   // ─── USER MANAGEMENT ───────────────────────────────────────────────────────
@@ -42,10 +55,15 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
       : "createdAt";
     const safeSortOrder = sortOrder === "asc" ? "asc" : "desc";
 
+    // P42-01: NaN-safe parseInt with upper bounds on limit/offset
+    const safeLimit = Math.min(Math.max(1, Number.isFinite(parseInt(String(limit), 10)) ? parseInt(String(limit), 10) : 20), 200);
+    const safeOffset = Math.max(0, Number.isFinite(parseInt(String(offset), 10)) ? parseInt(String(offset), 10) : 0);
+
     return AdminService.getUsers({
       search,
-      limit: parseInt(String(limit)),
-      offset: parseInt(String(offset)),
+      // P30-01: Cap query limit to prevent unbounded user listing
+      limit: Math.min(Math.max(1, parseInt(String(limit), 10) || 20), 100),
+      offset: Math.max(0, parseInt(String(offset), 10) || 0),
       sortBy: safeSortBy,
       sortOrder: safeSortOrder
     });
@@ -79,13 +97,14 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(400, `Role must be: ${validRoles.join(", ")}`);
     }
 
-    // P1-17: Prevent demotion that would leave zero admins
+    // R2-06: Count admins/owners directly in DB — previous code fetched at most
+    // 1000 users which would give a wrong count on large installations.
     const currentUser = await AdminService.getUserDetail(parseId(id));
     if (currentUser && (currentUser.role === "admin" || currentUser.role === "owner") && role !== "admin" && role !== "owner") {
-      const { users: allUsers } = await AdminService.getUsers({ limit: 1000, offset: 0 });
-      const adminCount = allUsers.filter((u: { role: string; id: number }) =>
-        (u.role === "admin" || u.role === "owner") && u.id !== parseId(id)
-      ).length;
+      const [{ value: adminCount }] = await db
+        .select({ value: count() })
+        .from(users)
+        .where(and(inArray(users.role, ["admin", "owner"]), ne(users.id, parseId(id))));
       if (adminCount === 0) {
         throw new AppError(400, "Cannot demote: at least one admin/owner must remain");
       }
@@ -138,8 +157,11 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.post("/groups", async (request, reply) => {
     const { name, description } = request.body as { name?: string; description?: string };
     if (!name) throw new AppError(400, "Group name is required");
+    // P42-04: Cap group name and description length
+    if (name.length > 100) throw new AppError(400, "Group name must be ≤ 100 characters");
+    const safeDescription = description ? description.slice(0, 1000) : undefined;
     
-    const group = await AdminService.createGroup(name, description, request.userId!);
+    const group = await AdminService.createGroup(name, safeDescription, request.userId!);
     reply.code(201);
     return { success: true, group };
   });
@@ -234,7 +256,9 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   // GET /analytics/daily-volume — time-series usage data
   fastify.get("/analytics/daily-volume", async (request, _reply) => {
     const { days = 30 } = request.query as { days?: string | number };
-    const data = await AdminService.getUsageAnalytics(parseInt(String(days)));
+    // P30-02: NaN guard on days parameter
+    const daysNum = parseInt(String(days), 10);
+    const data = await AdminService.getUsageAnalytics(Number.isFinite(daysNum) && daysNum > 0 ? Math.min(daysNum, 365) : 30);
     return { data };
   });
 
@@ -249,12 +273,15 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   // GET /audit-log — view administrative actions
   fastify.get("/audit-log", async (request, _reply) => {
     const { actionType, limit, offset, startDate, endDate } = request.query as { actionType?: string; limit?: string; offset?: string; startDate?: string; endDate?: string };
+    // P42-03: NaN-safe parseInt with bounds on audit log pagination
+    const auditLimit = Math.min(Math.max(1, limit && Number.isFinite(parseInt(limit, 10)) ? parseInt(limit, 10) : 50), 500);
+    const auditOffset = Math.max(0, offset && Number.isFinite(parseInt(offset, 10)) ? parseInt(offset, 10) : 0);
     const logs = await AdminService.getAuditLogs({
       actionType,
-      limit: limit ? parseInt(limit) : 50,
-      offset: offset ? parseInt(offset) : 0,
-      startDate: startDate ? new Date(startDate) : undefined,
-      endDate: endDate ? new Date(endDate) : undefined,
+      limit: safeInt(limit, 50),
+      offset: safeInt(offset, 0),
+      startDate: safeDate(startDate),
+      endDate: safeDate(endDate),
     });
     return logs;
   });
@@ -298,10 +325,12 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
       limit?: string;
     };
 
-    const limit = Math.min(parseInt(rawLimit || "10000", 10), 50_000);
+    const limit = Math.min(safeInt(rawLimit, 10_000), 50_000);
     const conditions = [];
-    if (from) conditions.push(gte(auditLogs.createdAt, new Date(from)));
-    if (to) conditions.push(lte(auditLogs.createdAt, new Date(to)));
+    const fromDate = safeDate(from);
+    const toDate = safeDate(to);
+    if (fromDate) conditions.push(gte(auditLogs.createdAt, fromDate));
+    if (toDate) conditions.push(lte(auditLogs.createdAt, toDate));
 
     const filename = `audit-export-${new Date().toISOString().split("T")[0]}.jsonl`;
 
@@ -352,10 +381,12 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
       limit?: string;
     };
 
-    const limit = Math.min(parseInt(rawLimit || "5000", 10), 10_000);
+    const limit = Math.min(safeInt(rawLimit, 5_000), 10_000);
     const conditions = [];
-    if (from) conditions.push(gte(auditLogs.createdAt, new Date(from)));
-    if (to) conditions.push(lte(auditLogs.createdAt, new Date(to)));
+    const fromDate = safeDate(from);
+    const toDate = safeDate(to);
+    if (fromDate) conditions.push(gte(auditLogs.createdAt, fromDate));
+    if (toDate) conditions.push(lte(auditLogs.createdAt, toDate));
 
     const rows = await db
       .select()

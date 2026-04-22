@@ -10,10 +10,14 @@ import logger from "../lib/logger.js";
 
 const DEFAULT_NODE_TIMEOUT_MS = 60_000; // 60s per node
 // P10-88: Configurable HITL gate timeout (default 24 hours)
-const GATE_TIMEOUT_MS = parseInt(process.env.WORKFLOW_GATE_TIMEOUT_MS || "86400000", 10);
+// P22-04: NaN guards — fall back to defaults if env vars are non-numeric
+const _parsedGateTimeout = parseInt(process.env.WORKFLOW_GATE_TIMEOUT_MS || "86400000", 10);
+const GATE_TIMEOUT_MS = Number.isFinite(_parsedGateTimeout) && _parsedGateTimeout > 0 ? _parsedGateTimeout : 86400000;
 // P10-134: Global workflow execution budget
-const MAX_WORKFLOW_DURATION_MS = parseInt(process.env.WORKFLOW_MAX_DURATION_MS || "3600000", 10); // 1h default
-const MAX_WORKFLOW_COST_USD = parseFloat(process.env.WORKFLOW_MAX_COST_USD || "0") || Infinity;
+const _parsedWfDuration = parseInt(process.env.WORKFLOW_MAX_DURATION_MS || "3600000", 10);
+const MAX_WORKFLOW_DURATION_MS = Number.isFinite(_parsedWfDuration) && _parsedWfDuration > 0 ? _parsedWfDuration : 3600000; // 1h default
+const _parsedWfCost = parseFloat(process.env.WORKFLOW_MAX_COST_USD || "0");
+const MAX_WORKFLOW_COST_USD = Number.isFinite(_parsedWfCost) && _parsedWfCost > 0 ? _parsedWfCost : Infinity;
 
 interface PendingGate {
   resolve: (choice: string) => void;
@@ -264,7 +268,7 @@ export class WorkflowExecutor {
           if (recoveryHandler) {
             const recoveryCtx: NodeContext = {
               inputs: {
-                prompt: `A workflow node failed. Rewrite the inputs to fix the problem.\n\nNode type: ${node.type}\nOriginal inputs: ${JSON.stringify(nodeInputs, null, 2)}\nError: ${error}\n\nReturn a JSON object with corrected input values.`,
+                prompt: `A workflow node failed. Rewrite the inputs to fix the problem.\n\nNode type: ${String(node.type).replace(/[^a-zA-Z0-9_.-]/g, "")}\nOriginal inputs: ${JSON.stringify(nodeInputs, null, 2).slice(0, 2000)}\nError: ${String(error).slice(0, 500)}\n\nReturn a JSON object with corrected input values.`,
               },
               nodeData: {
                 model: node.data.model || "auto",
@@ -460,7 +464,12 @@ export class WorkflowExecutor {
           if (pred.targetHandle) {
             nodeInputs[pred.targetHandle] = predOutput;
           } else {
-            Object.assign(nodeInputs, predOutput);
+            // R3-01: Filter forbidden keys before Object.assign to prevent prototype pollution
+            // via crafted workflow node outputs containing __proto__ / constructor keys.
+            const MERGE_FORBIDDEN = new Set(["__proto__", "constructor", "prototype", "__defineGetter__", "__defineSetter__"]);
+            for (const [k, v] of Object.entries(predOutput as Record<string, unknown>)) {
+              if (!MERGE_FORBIDDEN.has(k)) nodeInputs[k] = v;
+            }
           }
         }
       }

@@ -22,6 +22,12 @@ export interface UsageUpdateInput {
 export async function updateDailyUsage(input: UsageUpdateInput): Promise<void> {
   const { userId, tokensUsed, isCacheHit } = input;
 
+  // P38-08: Validate tokensUsed is a non-negative finite number
+  if (!Number.isFinite(tokensUsed) || tokensUsed < 0) {
+    logger.warn({ userId, tokensUsed }, "Invalid tokensUsed value — skipping usage update");
+    return;
+  }
+
   if (!isCacheHit && tokensUsed > 0) {
     const today = new Date();
     today.setUTCHours(0, 0, 0, 0);
@@ -85,10 +91,11 @@ export async function getUsageStats(userId: number): Promise<{
     }).from(dailyUsage)
       .where(eq(dailyUsage.userId, userId));
 
+    // P24-09: Use Math.max(0, ...) to ensure non-negative values from DB aggregates
     return {
-      totalTokens: Number(result.totalTokens) || 0,
-      totalRequests: Number(result.totalRequests) || 0,
-      daysActive: Number(result.daysActive) || 0,
+      totalTokens: Math.max(0, Number(result.totalTokens) || 0),
+      totalRequests: Math.max(0, Number(result.totalRequests) || 0),
+      daysActive: Math.max(0, Number(result.daysActive) || 0),
     };
   } catch (err) {
     logger.error({ err, userId }, "Failed to get usage stats");

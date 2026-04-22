@@ -5,6 +5,19 @@ import { askProvider } from "./providers.js";
 import type { Provider, Message } from "./providers.js";
 import type { AgentOutput } from "./schemas.js";
 import logger from "./logger.js";
+import { sanitizeForPrompt } from "./sanitize.js";
+import { z } from "zod";
+
+const llmIssueListSchema = z.object({
+  issues: z.array(z.object({
+    type: z.enum(["hallucination", "inconsistency", "inaccuracy", "bias", "incomplete", "safety", "format"]).default("inconsistency"),
+    severity: z.enum(["low", "medium", "high"]),
+    description: z.string(),
+    location: z.string().optional(),
+    suggestion: z.string().optional(),
+  })).optional(),
+  overall_quality: z.number().optional(),
+});
 
 export interface ValidationResult {
   isValid: boolean;
@@ -40,6 +53,8 @@ export interface ValidationRule {
   description: string;
   check: (content: string, context: unknown) => ValidationIssue | null;
 }
+
+const MAX_VALIDATION_HISTORY = 500;
 
 export class ColdValidator {
   private config: ValidatorConfig;
@@ -192,11 +207,15 @@ export class ColdValidator {
     const issues: ValidationIssue[] = [];
 
     try {
+      // H-2 fix: sanitize untrusted inputs before embedding in LLM prompt
+      const safeQuestion = sanitizeForPrompt(question);
+      const safeVerdict = sanitizeForPrompt(verdict);
+
       const validationPrompt = `You are a content validator. Analyze this Q&A pair for quality issues:
 
-QUESTION: ${question}
+QUESTION: ${safeQuestion}
 
-VERDICT: ${verdict}
+VERDICT: ${safeVerdict}
 
 Check for:
 1. Answer relevance to the question
@@ -209,7 +228,7 @@ Respond with ONLY a JSON object:
   "issues": [
     {
       "type": "inconsistency|inaccuracy|incomplete",
-      "severity": "low|medium|high", 
+      "severity": "low|medium|high",
       "description": "Detailed description of the issue",
       "suggestion": "How to fix it"
     }
@@ -222,16 +241,11 @@ Respond with ONLY a JSON object:
       
       const jsonMatch = response.text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const validation = JSON.parse(jsonMatch[0]);
-        
-        if (validation.issues && Array.isArray(validation.issues)) {
-          for (const issue of validation.issues) {
-            issues.push({
-              type: issue.type,
-              severity: issue.severity,
-              description: issue.description,
-              suggestion: issue.suggestion
-            });
+        // M-8: validate LLM JSON output against schema before use
+        const parsed = llmIssueListSchema.safeParse(JSON.parse(jsonMatch[0]));
+        if (parsed.success && parsed.data.issues) {
+          for (const issue of parsed.data.issues) {
+            issues.push(issue);
           }
         }
       }
@@ -285,11 +299,15 @@ Respond with ONLY a JSON object:
     const issues: ValidationIssue[] = [];
 
     try {
+      // H-2 fix: sanitize before embedding in LLM prompt
+      const safeQuestion = sanitizeForPrompt(question);
+      const safeVerdict = sanitizeForPrompt(verdict);
+
       const factCheckPrompt = `You are a fact checker. Identify any potential factual inaccuracies in this response:
 
-QUESTION: ${question}
+QUESTION: ${safeQuestion}
 
-VERDICT: ${verdict}
+VERDICT: ${safeVerdict}
 
 Look for:
 1. Incorrect dates, numbers, or statistics
@@ -315,17 +333,11 @@ Respond with ONLY a JSON object:
       
       const jsonMatch = response.text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const factCheck = JSON.parse(jsonMatch[0]);
-        
-        if (factCheck.issues && Array.isArray(factCheck.issues)) {
-          for (const issue of factCheck.issues) {
-            issues.push({
-              type: 'inaccuracy',
-              severity: issue.severity,
-              description: issue.description,
-              location: issue.location,
-              suggestion: issue.suggestion
-            });
+        // M-8: validate LLM JSON output against schema before use
+        const parsed = llmIssueListSchema.safeParse(JSON.parse(jsonMatch[0]));
+        if (parsed.success && parsed.data.issues) {
+          for (const issue of parsed.data.issues) {
+            issues.push({ type: 'inaccuracy', severity: issue.severity, description: issue.description, location: issue.location, suggestion: issue.suggestion });
           }
         }
       }
@@ -340,9 +352,12 @@ Respond with ONLY a JSON object:
     const issues: ValidationIssue[] = [];
 
     try {
+      // H-2 fix: sanitize before embedding in LLM prompt
+      const safeVerdict = sanitizeForPrompt(verdict);
+
       const biasPrompt = `You are a bias detector. Analyze this response for potential biases:
 
-VERDICT: ${verdict}
+VERDICT: ${safeVerdict}
 
 Check for:
 1. Political or ideological bias
@@ -368,16 +383,11 @@ Respond with ONLY a JSON object:
       
       const jsonMatch = response.text.match(/\{[\s\S]*\}/);
       if (jsonMatch) {
-        const biasCheck = JSON.parse(jsonMatch[0]);
-        
-        if (biasCheck.issues && Array.isArray(biasCheck.issues)) {
-          for (const issue of biasCheck.issues) {
-            issues.push({
-              type: 'bias',
-              severity: issue.severity,
-              description: issue.description,
-              suggestion: issue.suggestion
-            });
+        // M-8: validate LLM JSON output against schema before use
+        const parsed = llmIssueListSchema.safeParse(JSON.parse(jsonMatch[0]));
+        if (parsed.success && parsed.data.issues) {
+          for (const issue of parsed.data.issues) {
+            issues.push({ type: 'bias', severity: issue.severity, description: issue.description, suggestion: issue.suggestion });
           }
         }
       }
@@ -492,7 +502,7 @@ Respond with ONLY a JSON object:
   }
 
   private async attemptCorrection(verdict: string, issues: ValidationIssue[]): Promise<string | undefined> {
-    const correctableIssues = issues.filter(i => 
+    const correctableIssues = issues.filter(i =>
       i.severity === 'low' && (i.type === 'format' || i.type === 'incomplete')
     );
 
@@ -501,9 +511,12 @@ Respond with ONLY a JSON object:
     }
 
     try {
+      // H-2 fix: sanitize verdict before embedding in LLM prompt
+      const safeVerdict = sanitizeForPrompt(verdict);
+
       const correctionPrompt = `Improve this verdict by addressing these minor issues:
 
-VERDICT: ${verdict}
+VERDICT: ${safeVerdict}
 
 ISSUES TO FIX:
 ${correctableIssues.map(i => `- ${i.description}: ${i.suggestion}`).join('\n')}
@@ -521,14 +534,26 @@ Provide a corrected version that addresses these issues while preserving the cor
   }
 
   private storeValidationHistory(sessionId: string, result: ValidationResult): void {
+    if (this.validationHistory.size >= MAX_VALIDATION_HISTORY) {
+      const oldest = this.validationHistory.keys().next().value;
+      if (oldest !== undefined) this.validationHistory.delete(oldest);
+    }
+
     const history = this.validationHistory.get(sessionId) || [];
     history.push(result);
-    
+
     if (history.length > 10) {
       history.shift();
     }
-    
+
     this.validationHistory.set(sessionId, history);
+
+    // L-6: Cap the number of tracked sessions to prevent unbounded memory growth.
+    // Evict the oldest session when the Map exceeds 1000 entries.
+    if (this.validationHistory.size > 1000) {
+      const oldestKey = this.validationHistory.keys().next().value;
+      if (oldestKey !== undefined) this.validationHistory.delete(oldestKey);
+    }
   }
 
   getValidationStats(): {

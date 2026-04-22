@@ -91,8 +91,15 @@ Return ONLY the JSON array.`,
 
         const match = result.text.match(/\[[\s\S]*?\]/);
         if (match) {
-          const cases = JSON.parse(match[0]) as Omit<EdgeCase, "suggestedBy">[];
-          return cases.map((c) => ({ ...c, suggestedBy: perspective.name }));
+          // P32-01: Safe JSON.parse with try-catch on LLM output
+          let cases: Omit<EdgeCase, "suggestedBy">[];
+          try {
+            cases = JSON.parse(match[0]) as Omit<EdgeCase, "suggestedBy">[];
+          } catch {
+            return [];
+          }
+          if (!Array.isArray(cases)) return [];
+          return cases.slice(0, 50).map((c) => ({ ...c, suggestedBy: perspective.name }));
         }
         return [];
       } catch (err) {
@@ -102,16 +109,25 @@ Return ONLY the JSON array.`,
     })
   );
 
+  // P28-07: Cap total edge cases to prevent unbounded accumulation from LLM
+  const MAX_EDGE_CASES = 100;
   for (const cases of results) {
-    allEdgeCases.push(...cases);
+    for (const c of cases) {
+      if (allEdgeCases.length >= MAX_EDGE_CASES) break;
+      allEdgeCases.push(c);
+    }
   }
 
   // Deduplicate by description similarity (simple substring match)
   const unique: EdgeCase[] = [];
   for (const ec of allEdgeCases) {
-    const isDuplicate = unique.some(
-      (u) => u.description.toLowerCase().includes(ec.description.toLowerCase().substring(0, 30))
-    );
+    const isDuplicate = unique.some((u) => {
+      const existingLower = u.description.toLowerCase();
+      const newLower = ec.description.toLowerCase();
+      const prefix = Math.min(60, newLower.length);
+      return existingLower.includes(newLower.substring(0, prefix))
+        || newLower.includes(existingLower.substring(0, prefix));
+    });
     if (!isDuplicate) {
       unique.push(ec);
     }
@@ -172,7 +188,13 @@ Return ONLY the JSON array.`,
 
     const match = result.text.match(/\[[\s\S]*\]/);
     if (match) {
-      return JSON.parse(match[0]) as GeneratedTest[];
+      // P32-02: Safe JSON.parse with try-catch + cap on LLM output
+      try {
+        const tests = JSON.parse(match[0]) as GeneratedTest[];
+        return Array.isArray(tests) ? tests.slice(0, 100) : [];
+      } catch {
+        return [];
+      }
     }
     return [];
   } catch (err) {

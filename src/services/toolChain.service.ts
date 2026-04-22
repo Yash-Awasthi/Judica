@@ -1,3 +1,4 @@
+import crypto from "crypto";
 import { routeAndCollect } from "../router/index.js";
 import logger from "../lib/logger.js";
 
@@ -185,6 +186,17 @@ export async function executeChain(
   chain: ToolChain,
   options?: { continueOnError?: boolean; onStep?: (result: ToolStepResult) => void },
 ): Promise<ToolChainResult> {
+  const MAX_CHAIN_STEPS = 20;
+  if (chain.steps.length > MAX_CHAIN_STEPS) {
+    return {
+      chainId: chain.id,
+      results: [],
+      finalOutput: "",
+      totalDurationMs: 0,
+      success: false,
+    };
+  }
+
   const results: ToolStepResult[] = [];
   let previousOutput: string | undefined;
   const startTime = Date.now();
@@ -254,8 +266,18 @@ Task: ${description}`,
 
   const parsed = JSON.parse(match[0]) as { name: string; steps: ToolStep[] };
 
+  // Validate parsed chain
+  if (!Array.isArray(parsed.steps) || parsed.steps.length > 20) {
+    throw new Error("Generated chain has too many steps (max 20)");
+  }
+  for (const step of parsed.steps) {
+    if (!step.id || !step.tool || !step.input) {
+      throw new Error("Invalid step in generated chain");
+    }
+  }
+
   return {
-    id: `chain_${Date.now()}`,
+    id: `chain_${crypto.randomUUID()}`, // P27-10: Use crypto.randomUUID instead of timestamp
     name: parsed.name,
     steps: parsed.steps,
     createdAt: new Date().toISOString(),

@@ -36,11 +36,16 @@ export interface MiddlewareHook {
 // ─── Middleware Registry ────────────────────────────────────────────────────
 
 const hooks = new Map<string, MiddlewareHook>();
+// P37-05: Cap hooks map to prevent unbounded memory growth
+const MAX_HOOKS = 500;
 
 /**
  * Register a middleware hook.
  */
 export function registerMiddleware(hook: Omit<MiddlewareHook, "enabled"> & { enabled?: boolean }): void {
+  if (!hooks.has(hook.name) && hooks.size >= MAX_HOOKS) {
+    throw new Error(`Middleware hook limit reached (max ${MAX_HOOKS})`);
+  }
   hooks.set(hook.name, { ...hook, enabled: hook.enabled !== false });
   logger.info({ name: hook.name, stage: hook.stage, priority: hook.priority }, "Middleware registered");
 }
@@ -121,9 +126,9 @@ export function piiRedactionMiddleware(): MiddlewareHook {
 
       if (typeof data.content === "string") {
         let content = data.content;
-        // Redact emails
+        // P37-06: Use simpler, non-backtracking email regex to prevent ReDoS
         content = content.replace(
-          /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
+          /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z]{2,})+\b/g,
           "[EMAIL_REDACTED]",
         );
         // Redact phone numbers (basic patterns)

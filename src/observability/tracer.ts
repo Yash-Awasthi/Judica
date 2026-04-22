@@ -5,6 +5,9 @@ import logger from "../lib/logger.js";
 import { env } from "../config/env.js";
 import { calculateCost } from "../lib/cost.js";
 
+// P51-10: Cap trace steps to prevent unbounded memory growth on long-running workflows
+const MAX_TRACE_STEPS = 500;
+
 // P4-08: Log OTEL endpoint availability at startup
 if (env.OTEL_EXPORTER_OTLP_ENDPOINT) {
   logger.info({ endpoint: env.OTEL_EXPORTER_OTLP_ENDPOINT }, "OTEL exporter endpoint configured");
@@ -83,6 +86,11 @@ export function addStep(
   ctx: TraceContext,
   step: Omit<TraceStep, "latencyMs"> & { latencyMs?: number }
 ): void {
+  // P41-01: Cap steps array to prevent unbounded memory growth
+  if (ctx.steps.length >= 1000) {
+    logger.warn({ traceId: ctx.id, steps: ctx.steps.length }, "Trace step limit reached — dropping step");
+    return;
+  }
   // P9-103: Use -1 to indicate missing instrumentation (not 0 which looks healthy)
   const latencyMs = step.latencyMs ?? -1;
   if (latencyMs < 0) {
@@ -98,19 +106,31 @@ export function addStep(
 // The returned promise resolves immediately with the traceId; DB write happens async.
 export function endTrace(ctx: TraceContext): string {
   const totalLatencyMs = Date.now() - ctx.startTime;
-  const totalTokens = ctx.steps.reduce((sum, s) => sum + (s.tokens ?? 0), 0);
+  // P41-02: Filter out NaN token values before summing
+  const totalTokens = ctx.steps.reduce((sum, s) => {
+    const t = s.tokens ?? 0;
+    return sum + (Number.isFinite(t) ? t : 0);
+  }, 0);
 
   // P9-105: Use the canonical cost calculator from lib/cost.ts instead of a separate formula.
   // Aggregate input/output tokens across steps for accurate per-model pricing.
+  // P41-10: Guard each calculateCost result against NaN before accumulating
   let totalCostUsd = 0;
   for (const step of ctx.steps) {
+    let stepCost = 0;
     if (step.model && (step.inputTokens || step.outputTokens)) {
       // P9-102: Use per-token granularity when available
-      totalCostUsd += calculateCost("unknown", step.model, step.inputTokens ?? 0, step.outputTokens ?? 0);
+      stepCost = calculateCost("unknown", step.model, step.inputTokens ?? 0, step.outputTokens ?? 0);
     } else if (step.tokens) {
       // Fallback: assume 60/40 input/output split for legacy steps without granularity
-      totalCostUsd += calculateCost("unknown", step.model ?? "unknown", Math.round(step.tokens * 0.6), Math.round(step.tokens * 0.4));
+      stepCost = calculateCost("unknown", step.model ?? "unknown", Math.round(step.tokens * 0.6), Math.round(step.tokens * 0.4));
     }
+    if (Number.isFinite(stepCost)) totalCostUsd += stepCost;
+  }
+
+  // P51-10: Guard against NaN propagation from cost calculation
+  if (!Number.isFinite(totalCostUsd)) {
+    totalCostUsd = 0;
   }
 
   // P9-99: Fire-and-forget — don't await DB write on the request path
@@ -219,5 +239,23 @@ async function sendToLangfuse(
   } catch (err) {
     // P9-101: Log export failures instead of silently dropping them
     logger.warn({ err: (err as Error).message, traceId }, "Langfuse export failed — trace saved to DB only");
+  }
+}
+
+/**
+ * P20-09: Graceful shutdown hook for Langfuse client.
+ * Call this during process shutdown to flush pending traces and release resources.
+ */
+export async function shutdownTracer(): Promise<void> {
+  if (!langfuseInstance) return;
+  try {
+    const client = langfuseInstance as LangfuseClient;
+    await (client.flushAsync?.() ?? Promise.resolve());
+    logger.info("Langfuse client flushed on shutdown");
+  } catch (err) {
+    logger.warn({ err: (err as Error).message }, "Langfuse flush on shutdown failed");
+  } finally {
+    langfuseInstance = null;
+    langfuseInitAttempted = false;
   }
 }

@@ -46,7 +46,7 @@ export async function runCounterfactualDebate(
     },
   ];
 
-  const counterRes = await askProviderStream(provider, counterMessages, () => {}, false);
+  const counterRes = await askProviderStream(provider, counterMessages, () => {}, false, AbortSignal.timeout(60_000));
   const counterfactualArgument = counterRes.text;
 
   // Step 2: Ask the agent to defend its original position
@@ -58,17 +58,19 @@ export async function runCounterfactualDebate(
     },
   ];
 
-  const rebuttalRes = await askProviderStream(provider, rebuttalMessages, () => {}, false);
+  const rebuttalRes = await askProviderStream(provider, rebuttalMessages, () => {}, false, AbortSignal.timeout(60_000));
   const rebuttal = rebuttalRes.text;
 
   // Step 3: Extract robustness score from rebuttal
   const confidenceMatch = rebuttal.match(/(?:confidence|rating|score)[:\s]*([01](?:\.\d+)?)/i);
-  const robustnessScore = confidenceMatch ? parseFloat(confidenceMatch[1]) : 0.5;
+  // P20-04: NaN guard — parseFloat can return NaN if regex captures non-numeric text
+  const _parsedRobustness = confidenceMatch ? parseFloat(confidenceMatch[1]) : 0.5;
+  const robustnessScore = Number.isFinite(_parsedRobustness) ? _parsedRobustness : 0.5;
 
   // Step 4: Extract concessions
   const concessions: string[] = [];
   const concessionPatterns = [
-    /(?:I concede|the critic is right|I agree with|fair point|valid criticism)[^.]*\./gi,
+    /(?:I concede|the critic is right|I agree with|fair point|valid criticism)[^.]{0,200}\./gi,
   ];
   for (const pattern of concessionPatterns) {
     const matches = rebuttal.match(pattern);

@@ -18,6 +18,11 @@ export interface FileContext {
  */
 export async function loadFileContext(uploadIds: string[], userId: number): Promise<FileContext> {
   if (!uploadIds || uploadIds.length === 0) return { text_documents: [], image_blocks: [] };
+  // P26-06: Cap uploadIds array to prevent unbounded DB queries
+  const MAX_UPLOAD_IDS = 50;
+  if (uploadIds.length > MAX_UPLOAD_IDS) {
+    uploadIds = uploadIds.slice(0, MAX_UPLOAD_IDS);
+  }
 
   const results = await db.select().from(uploads).where(
     and(
@@ -28,9 +33,12 @@ export async function loadFileContext(uploadIds: string[], userId: number): Prom
 
   const text_documents: string[] = [];
   const image_blocks: FileContext["image_blocks"] = [];
+  // P38-07: Cap image blocks to prevent unbounded base64 memory consumption
+  const MAX_IMAGE_BLOCKS = 20;
 
   for (const upload of results) {
     if (upload.mimeType.startsWith("image/") && upload.storagePath) {
+      if (image_blocks.length >= MAX_IMAGE_BLOCKS) break;
       // Validate storagePath stays within the uploads directory (prevent path traversal)
       const baseDir = path.resolve(process.env.UPLOAD_DIR || "./uploads");
       const targetPath = path.resolve(baseDir, upload.storagePath);

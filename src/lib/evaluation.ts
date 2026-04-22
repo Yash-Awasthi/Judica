@@ -195,10 +195,15 @@ function calculateQuality(outputs: AgentOutput[]): number {
 }
 
 // P10-48: Configurable efficiency baselines via environment variables
-const OPTIMAL_DURATION_PER_AGENT_MS = parseInt(process.env.EVAL_OPTIMAL_DURATION_PER_AGENT_MS || "10000", 10);
-const OPTIMAL_TOKENS_PER_AGENT = parseInt(process.env.EVAL_OPTIMAL_TOKENS_PER_AGENT || "1000", 10);
+const _parsedDuration = parseInt(process.env.EVAL_OPTIMAL_DURATION_PER_AGENT_MS || "10000", 10);
+const _parsedTokens = parseInt(process.env.EVAL_OPTIMAL_TOKENS_PER_AGENT || "1000", 10);
+// P29-07: NaN guards on env var parses
+const OPTIMAL_DURATION_PER_AGENT_MS = Number.isFinite(_parsedDuration) && _parsedDuration > 0 ? _parsedDuration : 10000;
+const OPTIMAL_TOKENS_PER_AGENT = Number.isFinite(_parsedTokens) && _parsedTokens > 0 ? _parsedTokens : 1000;
 
 function calculateEfficiency(totalTokens: number, agentCount: number, duration: number): number {
+  // P29-08: Guard against division by zero when agentCount is 0
+  if (agentCount <= 0) return 0;
   const tokensPerAgent = totalTokens / agentCount;
 
   const optimalDuration = agentCount * OPTIMAL_DURATION_PER_AGENT_MS;
@@ -223,9 +228,10 @@ function extractKeywords(text: string): string[] {
   return [...new Set(words)].slice(0, 20);
 }
 
+const STOP_WORDS = new Set(['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'what', 'which', 'who', 'when', 'where', 'why', 'how', 'not', 'no', 'yes', 'if', 'then', 'else', 'because', 'since', 'until', 'while', 'during', 'before', 'after', 'above', 'below', 'under', 'over', 'between', 'among', 'through', 'against', 'without', 'within', 'upon', 'about', 'along', 'around', 'behind', 'beyond', 'inside', 'outside', 'toward', 'towards', 'into', 'onto', 'off']);
+
 function isStopWord(word: string): boolean {
-  const stopWords = new Set(['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'what', 'which', 'who', 'when', 'where', 'why', 'how', 'not', 'no', 'yes', 'if', 'then', 'else', 'because', 'since', 'until', 'while', 'during', 'before', 'after', 'above', 'below', 'under', 'over', 'between', 'among', 'through', 'against', 'without', 'within', 'upon', 'about', 'along', 'around', 'behind', 'beyond', 'inside', 'outside', 'toward', 'towards', 'into', 'onto', 'off']);
-  return stopWords.has(word);
+  return STOP_WORDS.has(word);
 }
 
 function generateRecommendations(criteria: EvaluationCriteria): string[] {
@@ -324,7 +330,8 @@ export async function getUserEvaluationMetrics(userId: number, days: number = 30
         gte(evaluations.timestamp, startDate)
       )
     )
-    .orderBy(asc(evaluations.timestamp));
+    .orderBy(asc(evaluations.timestamp))
+    .limit(1000);
 
   if (results.length === 0) {
     return {

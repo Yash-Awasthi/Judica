@@ -1,4 +1,5 @@
 import logger from "../lib/logger.js";
+import { validateSafeUrl } from "../lib/ssrf.js";
 
 /**
  * MCP Client Mode: allows agents to call external MCP servers
@@ -28,13 +29,22 @@ export interface MCPCallResult {
 
 // ─── Connection Registry ────────────────────────────────────────────────────
 
+// P23-10: Cap connections to prevent unbounded memory growth
+const MAX_MCP_CONNECTIONS = 50;
 const connections = new Map<string, MCPServerConnection>();
+// P23-05: Cap tool cache size
+const MAX_TOOL_CACHE_ENTRIES = 100;
 const toolCache = new Map<string, MCPClientTool[]>();
 
 /**
  * Register an external MCP server connection.
+ * R3-06: Validate URL against SSRF before storing — MCP servers with HTTP/SSE
+ * transport could otherwise be pointed at internal services.
  */
-export function addConnection(conn: MCPServerConnection): void {
+export async function addConnection(conn: MCPServerConnection): Promise<void> {
+  if (conn.transport === "http" || conn.transport === "sse") {
+    await validateSafeUrl(conn.url);
+  }
   connections.set(conn.name, conn);
   toolCache.delete(conn.name); // Invalidate cache
   logger.info({ serverName: conn.name, transport: conn.transport }, "MCP server connection added");
@@ -105,11 +115,17 @@ export async function discoverTools(
     const data = await response.json() as { result?: { tools: { name: string; description: string; inputSchema: Record<string, unknown> }[] } };
 
     if (data.result?.tools) {
-      const tools: MCPClientTool[] = data.result.tools.map((t) => ({
+      // P35-05: Cap discovered tools to prevent unbounded cache growth
+      const tools: MCPClientTool[] = data.result.tools.slice(0, 500).map((t) => ({
         ...t,
         serverName,
       }));
       toolCache.set(serverName, tools);
+      // P23-05: Evict oldest cache entry if exceeding cap
+      if (toolCache.size > MAX_TOOL_CACHE_ENTRIES) {
+        const oldest = toolCache.keys().next().value;
+        if (oldest !== undefined) toolCache.delete(oldest);
+      }
       logger.info({ serverName, toolCount: tools.length }, "Discovered MCP tools");
       return tools;
     }

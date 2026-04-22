@@ -37,16 +37,26 @@ export function createGoogleStrategy() {
           return done(null, existing as Record<string, unknown>);
         }
 
+        const sanitizedUsername = (profile.displayName || email.split("@")[0]).replace(/[^a-zA-Z0-9_]/g, "_").slice(0, 30);
+
         const [user] = await db
           .insert(users)
           .values({
-            email: email ?? undefined,
+            email,
             username: profile.displayName || email.split("@")[0],
             passwordHash: "", // OAuth user, no password
             authMethod: "google",
             role: "member",
           })
+          .onConflictDoNothing()
           .returning();
+
+        if (!user) {
+          // Race condition: user was created by another request, fetch it
+          const [existing] = await db.select().from(users).where(eq(users.email, email)).limit(1);
+          if (existing) return done(null, existing as Record<string, unknown>);
+          return done(new Error("Failed to create user account"));
+        }
 
         done(null, user as Record<string, unknown>);
       } catch (err) {

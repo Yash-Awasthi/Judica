@@ -1,6 +1,11 @@
 import { routeAndCollect } from "../router/index.js";
 import logger from "../lib/logger.js";
 
+/** Sanitize language identifier for safe interpolation into markdown code fences */
+function sanitizeLanguage(lang: string): string {
+  return lang.replace(/[^a-zA-Z0-9_+-]/g, "").substring(0, 30);
+}
+
 /**
  * Refactoring Assistant: analyses code for improvement opportunities,
  * generates before/after diffs, and performs safety analysis.
@@ -90,7 +95,7 @@ Return a JSON array:
 }]
 
 Code:
-\`\`\`${language}
+\`\`\`${sanitizeLanguage(language)}
 ${code.substring(0, 4000)}
 \`\`\`
 
@@ -102,7 +107,13 @@ Return ONLY the JSON array.`,
 
     const match = result.text.match(/\[[\s\S]*\]/);
     if (match) {
-      return JSON.parse(match[0]) as RefactoringOpportunity[];
+      // P32-09: Safe JSON.parse with try-catch + cap results
+      try {
+        const opps = JSON.parse(match[0]) as RefactoringOpportunity[];
+        return Array.isArray(opps) ? opps.slice(0, 50) : [];
+      } catch {
+        return [];
+      }
     }
     return [];
   } catch (err) {
@@ -133,7 +144,7 @@ Refactoring: ${opportunity.type} — ${opportunity.description}
 Location: lines ${opportunity.location.startLine}-${opportunity.location.endLine}
 
 Original code:
-\`\`\`${language}
+\`\`\`${sanitizeLanguage(language)}
 ${code.substring(0, 4000)}
 \`\`\`
 
@@ -181,12 +192,12 @@ export async function analyzeSafety(
           content: `Analyze the safety of this code refactoring.
 
 Original:
-\`\`\`${language}
+\`\`\`${sanitizeLanguage(language)}
 ${originalCode.substring(0, 3000)}
 \`\`\`
 
 Refactored:
-\`\`\`${language}
+\`\`\`${sanitizeLanguage(language)}
 ${refactoredCode.substring(0, 3000)}
 \`\`\`
 
@@ -256,7 +267,8 @@ export async function refactorCode(
   // Limit to top N by severity
   const severityOrder: Record<string, number> = { critical: 0, warning: 1, suggestion: 2 };
   opportunities.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
-  const maxOps = options?.maxOpportunities ?? 5;
+  // P28-10: Hard cap maxOpportunities to prevent unbounded parallel LLM calls
+  const maxOps = Math.min(options?.maxOpportunities ?? 5, 20);
   opportunities = opportunities.slice(0, maxOps);
 
   // Step 2: Generate diffs for each opportunity

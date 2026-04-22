@@ -66,6 +66,8 @@ export interface TranscriptionOptions {
 
 // ─── Store ──────────────────────────────────────────────────────────────────
 
+// P25-05: Cap results Map to prevent unbounded memory growth
+const MAX_MEDIA_RESULTS = 500;
 const results = new Map<string, MediaProcessingResult>();
 
 // ─── Transcription Providers ────────────────────────────────────────────────
@@ -136,7 +138,8 @@ async function transcribeWithWhisper(
     start: s.start,
     end: s.end,
     text: s.text.trim(),
-    confidence: s.avg_logprob ? Math.exp(s.avg_logprob) : 0.9,
+    // P25-06: Clamp confidence to [0, 1] range — Math.exp of negative logprob can exceed 1
+    confidence: s.avg_logprob ? Math.min(1, Math.max(0, Math.exp(s.avg_logprob))) : 0.9,
   }));
 
   return {
@@ -165,10 +168,13 @@ async function transcribeWithGoogleSTT(
   };
 
   const response = await fetch(
-    `https://speech.googleapis.com/v1/speech:recognize?key=${process.env.GOOGLE_STT_KEY}`,
+    `https://speech.googleapis.com/v1/speech:recognize`,
     {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Goog-Api-Key": process.env.GOOGLE_STT_KEY || "",
+      },
       body: JSON.stringify(body),
     },
   );
@@ -283,6 +289,16 @@ export async function processMedia(
     processingMs: null,
   };
 
+  // P25-05: Evict oldest completed result if map is full
+  if (results.size >= MAX_MEDIA_RESULTS) {
+    for (const [rid, r] of results) {
+      if (r.status === "completed" || r.status === "failed") {
+        results.delete(rid);
+        break;
+      }
+    }
+  }
+
   results.set(id, result);
 
   try {
@@ -380,3 +396,34 @@ export function getAvailableProviders(): { provider: TranscriptionProvider; avai
     { provider: "local_whisper", available: false }, // Would check for binary
   ];
 }
+
+// Auto-cleanup old media processing results every 30 minutes
+const MEDIA_CLEANUP_INTERVAL_MS = 30 * 60 * 1000;
+const MEDIA_CLEANUP_MAX_AGE_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+setInterval(() => {
+  const cutoff = Date.now() - MEDIA_CLEANUP_MAX_AGE_MS;
+  let removed = 0;
+  for (const [id, result] of results.entries()) {
+    if (result.status !== "processing" && result.processingMs !== null) {
+      // Use a rough timestamp from processingMs to estimate age
+      const estimatedCreation = Date.now() - (result.processingMs || 0) - MEDIA_CLEANUP_MAX_AGE_MS;
+      if (estimatedCreation < cutoff) {
+        results.delete(id);
+        removed++;
+      }
+    }
+  }
+  // Also cap the Map size
+  if (results.size > 1000) {
+    const entries = [...results.entries()];
+    const toRemove = entries.slice(0, entries.length - 1000);
+    for (const [id] of toRemove) {
+      results.delete(id);
+      removed++;
+    }
+  }
+  if (removed > 0) {
+    logger.info({ removed }, "Auto-cleaned old media processing results");
+  }
+}, MEDIA_CLEANUP_INTERVAL_MS).unref();

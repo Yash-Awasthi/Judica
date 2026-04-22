@@ -38,12 +38,17 @@ export function setCachedPromptResult(key: string, result: string): void {
 }
 
 // P10-46: Simple in-memory deliberation result cache with configurable TTL
-const CACHE_TTL_MS = parseInt(process.env.COUNCIL_CACHE_TTL_MS || "300000", 10); // 5 min default
-const MAX_CACHE_ENTRIES = parseInt(process.env.COUNCIL_CACHE_MAX || "50", 10);
+const _parsedTTL = parseInt(process.env.COUNCIL_CACHE_TTL_MS || "300000", 10);
+const CACHE_TTL_MS = Number.isFinite(_parsedTTL) ? _parsedTTL : 300000; // 5 min default
+const _parsedMaxEntries = parseInt(process.env.COUNCIL_CACHE_MAX || "50", 10);
+const MAX_CACHE_ENTRIES = Number.isFinite(_parsedMaxEntries) ? _parsedMaxEntries : 50;
 const deliberationCache = new Map<string, { result: { verdict: string; opinions: { name: string; opinion: string }[]; metrics: { totalTokens: number; totalCost: number; hallucinationCount: number } }; expiresAt: number }>();
+let cacheWriteCount = 0;
+const CACHE_SWEEP_INTERVAL = 50;
 
 function getCacheKey(messages: Message[], memberNames: string[]): string {
-  const content = messages.map(m => m.content).join("|") + "||" + memberNames.sort().join(",");
+  // P30-10: Use slice to avoid mutating caller's array with sort()
+  const content = messages.map(m => m.content).join("|") + "||" + [...memberNames].sort().join(",");
   return createHash("sha256").update(content).digest("hex").slice(0, 32);
 }
 
@@ -110,9 +115,12 @@ export async function prepareCouncilMembers(members: CouncilMemberInput[], summo
       let configData: { customArchetypes?: Archetype[] };
       try {
         configData = JSON.parse(decrypt(config.config as string));
-      } catch {
-        // Fallback: if stored as plaintext (legacy), use directly
-        configData = config.config as { customArchetypes?: Archetype[] };
+      } catch (err) {
+        // R2-07: Do NOT silently fall back to plaintext — a decryption failure could
+        // mean tampering or key mismatch. Log and skip user archetypes rather than
+        // trusting potentially manipulated plaintext.
+        logger.error({ err: (err as Error).message, userId }, "Failed to decrypt council config — skipping custom archetypes");
+        configData = {};
       }
       const customs = configData.customArchetypes || [];
       customs.forEach((a) => {
@@ -204,7 +212,9 @@ export async function* deliberate(
   let totalTokens = 0;
   let totalCost = 0; // P10-26: Aggregate real cost from provider responses
   // P10-127: Per-query cost limit enforcement
-  const MAX_DELIBERATION_COST = parseFloat(process.env.MAX_DELIBERATION_COST || "0") || Infinity;
+  // P34-01: NaN-safe parseFloat — NaN bypasses cost limit comparison
+  const _parsedCost = parseFloat(process.env.MAX_DELIBERATION_COST || "0");
+  const MAX_DELIBERATION_COST = Number.isFinite(_parsedCost) && _parsedCost > 0 ? _parsedCost : Infinity;
 
   for (let r = 1; r <= rounds; r++) {
     // P10-34: Check for cancellation between rounds
@@ -312,7 +322,9 @@ export async function* deliberate(
           yield { type: "status", round: r, message: "Round discarded: No improvement in quality/consensus. Reverting to previous best." };
         } else {
           // P10-29: Update best opinions when round is accepted
-          const roundMaxScore = Math.max(...currentScored.map(s => s.scores.final), 0);
+          // P34-02: NaN-safe Math.max — filter NaN scores before comparison
+          const finalScores = currentScored.map(s => s.scores.final).filter(Number.isFinite);
+          const roundMaxScore = finalScores.length > 0 ? Math.max(...finalScores) : 0;
           if (roundMaxScore > bestRoundScore) {
             bestRoundScore = roundMaxScore;
             bestOpinions = [...opinions];
@@ -336,8 +348,11 @@ export async function* deliberate(
         }
         const conflicts: Array<{ agentA: string; agentB: string }> = [];
         const concessions: string[] = [];
+        // P34-03: Cap conflicts/concessions arrays to prevent unbounded growth
+        const MAX_CONFLICTS = 500;
         for (const review of reviews) {
           for (const flaw of review.identified_flaws) {
+            if (conflicts.length >= MAX_CONFLICTS) break;
             conflicts.push({ agentA: review.reviewer, agentB: flaw.target });
           }
           if (review.identified_flaws.length === 0) {
@@ -477,6 +492,8 @@ export async function askCouncil(
   if (cached && cached.expiresAt > Date.now()) {
     logger.debug({ cacheKey }, "Council cache hit — returning cached result");
     return cached.result;
+  } else if (cached) {
+    deliberationCache.delete(cacheKey); // Remove stale entry
   }
 
   let verdict = "";
@@ -501,6 +518,13 @@ export async function askCouncil(
     if (firstKey) deliberationCache.delete(firstKey);
   }
   deliberationCache.set(cacheKey, { result, expiresAt: Date.now() + CACHE_TTL_MS });
+  cacheWriteCount++;
+  if (cacheWriteCount % CACHE_SWEEP_INTERVAL === 0) {
+    const now = Date.now();
+    for (const [key, entry] of deliberationCache) {
+      if (entry.expiresAt <= now) deliberationCache.delete(key);
+    }
+  }
 
   return result;
 }

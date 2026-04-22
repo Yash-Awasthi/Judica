@@ -82,8 +82,8 @@ async function sweepContextSummaries(): Promise<number> {
 
 async function sweepRedisKeys(): Promise<number> {
   try {
-    const keys = await redis.keys("cache:*");
     let swept = 0;
+    const keys = await redis.keys("cache:*");
 
     for (const key of keys) {
       const ttl = await redis.pttl(key);

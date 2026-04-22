@@ -28,8 +28,11 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
       limit = "20",
     } = request.query as Record<string, string>;
 
-    const pageNum = Math.max(1, parseInt(page) || 1);
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
+    // P31-06: NaN-safe parseInt with explicit radix
+    const _pageRaw = parseInt(page, 10);
+    const _limitRaw = parseInt(limit, 10);
+    const pageNum = Number.isFinite(_pageRaw) && _pageRaw > 0 ? _pageRaw : 1;
+    const limitNum = Number.isFinite(_limitRaw) && _limitRaw > 0 ? Math.min(_limitRaw, 100) : 20;
     const skip = (pageNum - 1) * limitNum;
 
     const conditions = [eq(marketplaceItems.published, true)];
@@ -39,7 +42,8 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     if (tags) {
-      const tagList = tags.split(",").map((t) => t.trim());
+      // P37-01: Cap tags to prevent unbounded array in SQL query
+      const tagList = tags.split(",").map((t) => t.trim()).slice(0, 20);
       conditions.push(
         sql`${marketplaceItems.tags} && ARRAY[${sql.join(tagList.map(t => sql`${t}`), sql`,`)}]::text[]`
       );
@@ -222,7 +226,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
       .from(users)
       .where(eq(users.id, request.userId!))
       .limit(1);
-    if (item.authorId !== request.userId && user?.role !== "admin") {
+    if (item.authorId !== request.userId && user?.role !== "admin" && user?.role !== "owner") {
       throw new AppError(403, "Not authorized to delete this item", "FORBIDDEN");
     }
 
@@ -244,6 +248,12 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
 
     if (!item) {
       throw new AppError(404, "Item not found", "ITEM_NOT_FOUND");
+    }
+
+    // R2-11: Only allow installation of published items — unpublished items are
+    // drafts/private and should not be installable by other users
+    if (!item.published) {
+      throw new AppError(403, "This item is not available for installation", "ITEM_NOT_PUBLISHED");
     }
 
     const content = item.content as Record<string, unknown>;
@@ -365,8 +375,9 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
   fastify.post("/:id/reviews", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const { id: itemId } = request.params as { id: string };
     const { rating, comment } = request.body as { rating?: number; comment?: string };
+    const safeComment = typeof comment === "string" ? comment.slice(0, 2000) : "";
 
-    if (!rating || rating < 1 || rating > 5) {
+    if (rating === null || rating === undefined || typeof rating !== 'number' || rating < 1 || rating > 5) {
       throw new AppError(400, "Rating must be between 1 and 5", "INVALID_RATING");
     }
 
@@ -379,6 +390,22 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(404, "Item not found", "ITEM_NOT_FOUND");
     }
 
+    if (item.authorId === request.userId) {
+      throw new AppError(403, "Cannot review your own item", "SELF_REVIEW");
+    }
+
+    const [existingReview] = await db
+      .select({ id: marketplaceReviews.id })
+      .from(marketplaceReviews)
+      .where(and(
+        eq(marketplaceReviews.itemId, itemId),
+        eq(marketplaceReviews.userId, request.userId!)
+      ))
+      .limit(1);
+    if (existingReview) {
+      throw new AppError(409, "You have already reviewed this item", "DUPLICATE_REVIEW");
+    }
+
     const [review] = await db
       .insert(marketplaceReviews)
       .values({
@@ -386,7 +413,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
         itemId,
         userId: request.userId!,
         rating: Math.round(rating),
-        comment: comment || null,
+        comment: safeComment,
       })
       .returning();
 

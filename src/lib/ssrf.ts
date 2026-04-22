@@ -1,9 +1,6 @@
 import dns from "dns";
 import net from "net";
 import { URL } from "url";
-import { promisify } from "util";
-
-const lookup = promisify(dns.lookup);
 
 // P0-26: Allowed ports whitelist
 const ALLOWED_PORTS = new Set([80, 443, 8080, 8443]);
@@ -64,7 +61,12 @@ async function safeLookup(hostname: string): Promise<dns.LookupAddress[]> {
   const timeout = setTimeout(() => controller.abort(), DNS_TIMEOUT_MS);
 
   try {
-    const result = await lookup(hostname, { all: true });
+    // H-1 fix: pass signal to dns.promises.lookup so the abort actually cancels
+    // the in-flight query (Node 18+ / Node 22 supports AbortSignal here).
+    const result = await dns.promises.lookup(hostname, {
+      all: true,
+      signal: controller.signal,
+    } as dns.LookupAllOptions & { signal: AbortSignal });
     return result;
   } finally {
     clearTimeout(timeout);
@@ -108,13 +110,23 @@ export async function validateSafeUrlWithIP(urlInput: string, options?: { allowL
     throw new Error("Protocol must be http: or https:");
   }
 
+  // H-1 fix: reject userinfo components to prevent parser-confusion attacks
+  // e.g. http://user@attacker.com@127.0.0.1/ being parsed differently across runtimes
+  if (url.username || url.password) {
+    throw new Error("URL must not contain userinfo components");
+  }
+
   // P0-26: Port whitelist
   const port = url.port ? parseInt(url.port, 10) : (url.protocol === "https:" ? 443 : 80);
   if (!ALLOWED_PORTS.has(port)) {
     throw new Error(`Port ${port} is not allowed. Permitted: ${[...ALLOWED_PORTS].join(", ")}`);
   }
 
-  const hostname = url.hostname.toLowerCase().replace(/^\[|\]$/g, "");
+  const hostname = url.hostname.toLowerCase()
+    // Strip IPv6 brackets
+    .replace(/^\[|\]$/g, "")
+    // L-3: Strip IPv6 zone ID (e.g. fe80::1%eth0) before validation to prevent bypass
+    .replace(/%[a-zA-Z0-9._~-]+$/, "");
 
   // P0-22: Proper localhost check via parsed hostname
   if (!options?.allowLocalhost && isLocalhostHostname(hostname)) {

@@ -65,11 +65,39 @@ export interface GateResult {
 
 // ─── In-memory store (upgradeable to DB when infra available) ───────────────
 
+// P25-07: Cap gates Map to prevent unbounded memory growth
+const MAX_GATES = 5000;
 const gates = new Map<string, Gate>();
 const pendingCallbacks = new Map<string, {
   resolve: (result: GateResult) => void;
   timer: ReturnType<typeof setTimeout>;
 }>();
+
+const GATE_CLEANUP_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+
+// Automatic cleanup of resolved/expired gates older than 1 hour
+const _gateCleanupInterval = setInterval(() => {
+  const cutoff = Date.now() - 3600_000;
+  for (const [id, gate] of gates) {
+    if (gate.status !== "pending" && gate.createdAt.getTime() < cutoff) {
+      gates.delete(id);
+      pendingCallbacks.delete(id);
+    }
+  }
+  // Hard cap: remove oldest non-pending gates
+  if (gates.size > MAX_GATES) {
+    const resolved = [...gates.entries()]
+      .filter(([, g]) => g.status !== "pending")
+      .sort((a, b) => a[1].createdAt.getTime() - b[1].createdAt.getTime());
+    const excess = gates.size - MAX_GATES;
+    for (let i = 0; i < Math.min(excess, resolved.length); i++) {
+      gates.delete(resolved[i][0]);
+      pendingCallbacks.delete(resolved[i][0]);
+    }
+  }
+}, GATE_CLEANUP_INTERVAL_MS);
+
+if (_gateCleanupInterval.unref) _gateCleanupInterval.unref();
 
 // ─── Core Functions ─────────────────────────────────────────────────────────
 
@@ -102,6 +130,16 @@ export function createGate(
     resolvedAt: null,
     expiresAt: new Date(Date.now() + timeoutMs),
   };
+
+  // P25-07: Evict oldest resolved gate if map is full
+  if (gates.size >= MAX_GATES) {
+    for (const [gid, g] of gates) {
+      if (g.status !== "pending") {
+        gates.delete(gid);
+        break;
+      }
+    }
+  }
 
   gates.set(id, gate);
 
@@ -280,3 +318,13 @@ export function cleanupExpiredGates(maxAgeMs: number = 86400_000): number {
   }
   return removed;
 }
+
+// Auto-cleanup expired/resolved gates every 15 minutes
+const GATE_CLEANUP_MAX_AGE_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+setInterval(() => {
+  const removed = cleanupExpiredGates(GATE_CLEANUP_MAX_AGE_MS);
+  if (removed > 0) {
+    logger.info({ removed }, "Auto-cleaned expired HITL gates");
+  }
+}, GATE_CLEANUP_INTERVAL_MS).unref();

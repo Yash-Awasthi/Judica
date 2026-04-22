@@ -34,7 +34,7 @@ export async function getBackend(userId: number): Promise<MemoryBackendConfig | 
   if (!backend || !backend.active) return null;
 
   try {
-    const config = JSON.parse(decryptConfig(backend.config));
+    const config = JSON.parse(decryptConfig(backend.config as string));
     return { type: backend.type as MemoryBackendConfig["type"], ...config };
   } catch {
     return null;
@@ -46,6 +46,11 @@ export async function setBackend(
   type: string,
   config: Record<string, unknown>
 ): Promise<void> {
+  const VALID_BACKEND_TYPES = ["local", "qdrant", "getzep", "google_drive"];
+  if (!VALID_BACKEND_TYPES.includes(type)) {
+    throw new Error(`Invalid backend type: ${type}. Must be one of: ${VALID_BACKEND_TYPES.join(", ")}`);
+  }
+
   const encrypted = encryptConfig(JSON.stringify(config));
 
   await db
@@ -134,6 +139,9 @@ export async function routedSearch(
   kbId?: string,
   limit: number = 5
 ): Promise<Array<{ content: string; score: number; source?: string }>> {
+  // P26-03: Cap limit to prevent unbounded query results
+  limit = Math.min(Math.max(1, limit), 100);
+
   const backend = await getBackend(userId);
 
   if (!backend || backend.type === "local") {

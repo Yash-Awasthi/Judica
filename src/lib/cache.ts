@@ -28,7 +28,8 @@ interface CacheMessage {
 }
 
 // P9-17: Externalize semantic similarity threshold to env
-const SEMANTIC_THRESHOLD = Number((env as any).SEMANTIC_CACHE_THRESHOLD) || 0.15;
+const _parsedThreshold = Number(process.env.SEMANTIC_CACHE_THRESHOLD);
+const SEMANTIC_THRESHOLD = Number.isFinite(_parsedThreshold) ? _parsedThreshold : 0.15;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 // P9-12: Bounded lock map with TTL eviction — prevents unbounded growth under burst traffic
@@ -127,6 +128,11 @@ async function getEmbedding(text: string): Promise<number[] | null> {
         model: "text-embedding-3-small",
       }),
     });
+    if (!res.ok) {
+      const errorBody = await res.text().catch(() => "unknown");
+      logger.warn({ status: res.status, errorBody }, "OpenAI embeddings API returned error");
+      return null;
+    }
     const data: EmbeddingResponse = await res.json() as EmbeddingResponse;
     if (data.data?.[0]?.embedding) {
       return data.data[0].embedding;
