@@ -49,7 +49,7 @@ vi.mock("../../src/lib/drizzle.js", () => ({
 }));
 
 vi.mock("../../src/db/schema/auth.js", () => ({
-  revokedTokens: { token: "revokedTokens.token" },
+  revokedTokens: { tokenHash: "revokedTokens.tokenHash" },
   refreshTokens: {},
   councilConfigs: {},
 }));

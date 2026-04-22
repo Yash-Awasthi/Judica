@@ -72,9 +72,11 @@ const exportPlugin: FastifyPluginAsync = async (fastify) => {
           },
         };
 
+        // P5-10: Sanitize id in Content-Disposition to prevent header injection
+        const safeId = String(id).replace(/[^a-zA-Z0-9_-]/g, "_");
         reply.header(
           "Content-Disposition",
-          `attachment; filename="conversation-${id}.json"`,
+          `attachment; filename="conversation-${safeId}.json"`,
         );
         reply.type("application/json");
         return exportData;
@@ -95,11 +97,14 @@ const exportPlugin: FastifyPluginAsync = async (fastify) => {
       try {
         const userId = request.userId!;
 
+        // P5-01: Limit export to most recent 200 conversations to prevent OOM on large accounts
+        const MAX_EXPORT_CONVERSATIONS = 200;
         const convRows = await db
           .select()
           .from(conversations)
           .where(eq(conversations.userId, userId))
-          .orderBy(desc(conversations.createdAt));
+          .orderBy(desc(conversations.createdAt))
+          .limit(MAX_EXPORT_CONVERSATIONS);
 
         // Fetch chats for every conversation in one query, then group
         const convIds = convRows.map((c) => c.id);

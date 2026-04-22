@@ -17,10 +17,13 @@ const kbPlugin: FastifyPluginAsync = async (fastify) => {
       .select()
       .from(knowledgeBases)
       .where(eq(knowledgeBases.userId, request.userId!))
-      .orderBy(desc(knowledgeBases.createdAt));
+      .orderBy(desc(knowledgeBases.createdAt))
+      .limit(200);
 
+    // P30-06: Cap parallel queries to prevent DB connection pool exhaustion
+    const MAX_KB_ENRICHMENT = 100;
     const result = await Promise.all(
-      kbs.map(async (kb) => {
+      kbs.slice(0, MAX_KB_ENRICHMENT).map(async (kb) => {
         const [docCount] = await db
           .select({ value: count() })
           .from(kbDocuments)
@@ -89,7 +92,8 @@ const kbPlugin: FastifyPluginAsync = async (fastify) => {
       })
       .from(kbDocuments)
       .where(eq(kbDocuments.kbId, kb.id))
-      .orderBy(desc(kbDocuments.createdAt));
+      .orderBy(desc(kbDocuments.createdAt))
+      .limit(500);
 
     const [chunkCount] = await db
       .select({ value: count() })
@@ -179,7 +183,8 @@ const kbPlugin: FastifyPluginAsync = async (fastify) => {
       .select()
       .from(kbDocuments)
       .where(eq(kbDocuments.kbId, kb.id))
-      .orderBy(desc(kbDocuments.createdAt));
+      .orderBy(desc(kbDocuments.createdAt))
+      .limit(500);
 
     return { documents: docs };
   });

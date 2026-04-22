@@ -198,6 +198,11 @@ export async function scaffoldProject(
 ): Promise<ScaffoldResult> {
   logger.info({ projectName, descLength: description.length }, "Starting project scaffolding");
 
+  // Validate project name to prevent command injection in setup instructions
+  if (!/^[a-zA-Z0-9_-]{1,64}$/.test(projectName)) {
+    throw new Error("Invalid project name: must contain only letters, numbers, hyphens, and underscores (max 64 chars)");
+  }
+
   // Step 1: Generate schema
   const schema = await generateSchema(description);
 
@@ -290,10 +295,8 @@ function generateSetupInstructions(
   schema: ScaffoldSchema,
   deps: { production: string[]; development: string[] },
 ): string[] {
-  // P26-01: Sanitize projectName and dependency names before interpolating into shell commands
-  const safeName = shellSafe(projectName);
-  const safeProdDeps = deps.production.map(shellSafe);
-  const safeDevDeps = deps.development.map(shellSafe);
+  // Double-check project name is safe for shell commands
+  const safeName = projectName.replace(/[^a-zA-Z0-9_-]/g, '_');
 
   const steps: string[] = [
     `mkdir ${safeName} && cd ${safeName}`,

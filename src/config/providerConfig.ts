@@ -129,6 +129,12 @@ export async function loadProviderConfig(): Promise<ProviderRegistryConfig> {
 
   try {
     const fs = await import('fs/promises');
+    // P22-10: Cap config file read to 1MB to prevent memory exhaustion from malformed path
+    const stat = await fs.stat(configPath);
+    if (stat.size > 1_000_000) {
+      logger.warn({ configPath, size: stat.size }, "Provider config file too large (>1MB), using defaults");
+      return DEFAULT_PROVIDER_CONFIG;
+    }
     const configData = await fs.readFile(configPath, 'utf-8');
     const config = JSON.parse(configData) as ProviderRegistryConfig;
     

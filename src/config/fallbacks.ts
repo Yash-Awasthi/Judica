@@ -33,7 +33,9 @@ export function getFallbackProvider(original: Provider): Provider | null {
 
   return {
     ...original,
-    ...fallbackData,
-    name: `${original.name} (Emergency Fallback: ${fallbackData.model})`,
-  } as Provider;
+    type: fallbackData.type ?? original.type,
+    model: fallbackData.model ?? original.model,
+    apiKey: fallbackData.apiKey ?? original.apiKey,
+    name: `${original.name} (Emergency Fallback: ${fallbackData.model ?? "unknown"})`,
+  };
 }

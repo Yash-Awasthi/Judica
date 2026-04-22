@@ -46,28 +46,9 @@ export async function setBackend(
   type: string,
   config: Record<string, unknown>
 ): Promise<void> {
-  // P26-07: Validate backend type against allowed enum values
-  const VALID_TYPES = ["local", "qdrant", "getzep", "google_drive"];
-  if (!VALID_TYPES.includes(type)) {
-    throw new Error(`Invalid memory backend type: ${type}. Must be one of: ${VALID_TYPES.join(", ")}`);
-  }
-
-  // P26-03: Validate backend URL against SSRF if provided
-  if (config.url && typeof config.url === "string") {
-    try {
-      const url = new URL(config.url);
-      const hostname = url.hostname.toLowerCase();
-      if (
-        hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" ||
-        hostname === "0.0.0.0" || hostname.endsWith(".internal") ||
-        hostname === "metadata.google.internal" || hostname.startsWith("169.254.")
-      ) {
-        throw new Error(`Backend URL targets a restricted hostname: ${hostname}`);
-      }
-    } catch (err) {
-      if ((err as Error).message.includes("restricted")) throw err;
-      throw new Error(`Invalid backend URL: ${(config.url as string).slice(0, 100)}`);
-    }
+  const VALID_BACKEND_TYPES = ["local", "qdrant", "getzep", "google_drive"];
+  if (!VALID_BACKEND_TYPES.includes(type)) {
+    throw new Error(`Invalid backend type: ${type}. Must be one of: ${VALID_BACKEND_TYPES.join(", ")}`);
   }
 
   const encrypted = encryptConfig(JSON.stringify(config));

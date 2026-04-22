@@ -155,7 +155,9 @@ export async function resolveProvider(provider: {
   const model = provider.model?.toLowerCase() || "";
   const configs = await getProviderConfig();
   
-  const matchingConfig = configs.find(config => model.includes(config.pattern));
+  const matchingConfig = configs.find(
+    config => typeof config.pattern === "string" && config.pattern !== "" && model.includes(config.pattern)
+  );
 
   if (matchingConfig) {
     if (!resolvedBaseUrl && matchingConfig.baseUrl) {
@@ -181,6 +183,17 @@ export async function loadProviderRegistry(): Promise<ProviderRegistry> {
     const configPath = fileURLToPath(CONFIG_URL);
     const fs = await import("fs/promises");
     const data = await fs.readFile(configPath, "utf-8");
+
+    const MAX_CONFIG_SIZE = 1 * 1024 * 1024; // 1 MB
+    if (Buffer.byteLength(data, "utf-8") > MAX_CONFIG_SIZE) {
+      logger.warn(
+        { size: Buffer.byteLength(data, "utf-8"), maxSize: MAX_CONFIG_SIZE },
+        "Provider registry config file exceeds 1 MB size limit, using defaults"
+      );
+      cachedRegistry = DEFAULT_REGISTRY;
+      return cachedRegistry;
+    }
+
     const parsed = JSON.parse(data) as ProviderRegistry;
     
     if (!validateRegistry(parsed)) {

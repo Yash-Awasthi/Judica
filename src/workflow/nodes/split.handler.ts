@@ -18,7 +18,7 @@ export const splitHandler: NodeHandler = async (ctx) => {
     source = ctx.inputs["data"] ?? Object.values(ctx.inputs)[0];
   }
 
-  // P10-115: Return flat output keys (not wrapped in {outputs}) to match executor expectations
+  // P59-07: Return result wrapped in {outputs} to match executor's output extraction
   const result: Record<string, unknown> = {};
 
   if (Array.isArray(source) && keys.length > 0) {
