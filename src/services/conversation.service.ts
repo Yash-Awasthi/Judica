@@ -134,12 +134,18 @@ export async function createChat(input: CreateChatInput, generateEmbedding: bool
   }
 }
 
-export async function getRecentHistory(conversationId: string): Promise<Message[]> {
+// R4-05: Accept optional userId so callers can scope history to the authenticated user.
+// lib/history.ts has the same function with optional userId — keep both in sync.
+export async function getRecentHistory(conversationId: string, userId?: number): Promise<Message[]> {
   try {
+    const whereClause = userId
+      ? and(eq(chats.conversationId, conversationId), eq(chats.userId, userId))
+      : eq(chats.conversationId, conversationId);
+
     const result = await db
       .select()
       .from(chats)
-      .where(eq(chats.conversationId, conversationId))
+      .where(whereClause)
       .orderBy(asc(chats.createdAt))
       .limit(20);
 
@@ -379,7 +385,7 @@ export function formatContextForInjection(context: RelevantContext[]): string {
 
 export async function generateConversationSummary(conversationId: string, userId: number) {
   try {
-    const history = await getRecentHistory(conversationId);
+    const history = await getRecentHistory(conversationId, userId); // R4-05: pass userId for ownership scoping
     if (history.length === 0) {
       throw new AppError(400, "No history found to summarize");
     }
