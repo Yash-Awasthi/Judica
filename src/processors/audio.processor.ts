@@ -1,4 +1,6 @@
 import fs from "fs/promises";
+import path from "path";
+import os from "os";
 import FormData from "form-data";
 // node-fetch not needed — Node 18+ has native fetch
 import type { ProcessedFile } from "./types.js";
@@ -14,8 +16,16 @@ const WHISPER_MAX_BYTES = 25 * 1024 * 1024; // Whisper hard limit: 25 MB
 export async function processAudio(filePath: string, mimeType: string): Promise<ProcessedFile> {
   assertFileSizeLimit(filePath);
 
+  // Reject files that live in the OS temp directory — guarding against symlink attacks
+  // on paths created without O_EXCL (CodeQL js/insecure-temporary-file)
+  const resolvedPath = path.resolve(filePath);
+  const tmpDir = path.resolve(os.tmpdir());
+  if (resolvedPath.startsWith(tmpDir + path.sep) || resolvedPath === tmpDir) {
+    throw new Error("Audio file must not reside in the OS temp directory");
+  }
+
   // Open file descriptor once to avoid TOCTOU race between stat and read
-  const fh = await fs.open(filePath, "r");
+  const fh = await fs.open(resolvedPath, "r");
   try {
     const stat = await fh.stat();
     if (stat.size > WHISPER_MAX_BYTES) {
