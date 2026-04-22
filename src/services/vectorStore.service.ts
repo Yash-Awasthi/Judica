@@ -56,6 +56,8 @@ export async function searchSimilar(
   kbId?: string | null,
   limit: number = 5
 ): Promise<MemoryChunk[]> {
+  // P42-08: Bounds on limit to prevent excessive DB retrieval
+  const safeLimit = Math.min(Math.max(1, Number.isFinite(limit) ? limit : 5), 100);
   const queryEmbedding = await embed(query);
   const vectorStr = safeVectorLiteral(queryEmbedding);
 
@@ -67,7 +69,7 @@ export async function searchSimilar(
     FROM "Memory"
     WHERE "userId" = ${userId} ${kbCondition}
     ORDER BY score DESC
-    LIMIT ${limit}
+    LIMIT ${safeLimit}
   `);
 
   // Refresh lastAccessedAt for accessed memories (fire-and-forget)
@@ -90,6 +92,8 @@ export async function keywordSearch(
   kbId?: string | null,
   limit: number = 10
 ): Promise<MemoryChunk[]> {
+  // P42-09: Bounds on limit to prevent excessive DB retrieval
+  const safeLimit = Math.min(Math.max(1, Number.isFinite(limit) ? limit : 10), 100);
   const kbCondition = kbId ? sql`AND "kbId" = ${kbId}` : sql``;
 
   const results = await db.execute(sql`
@@ -99,7 +103,7 @@ export async function keywordSearch(
     WHERE "userId" = ${userId} ${kbCondition}
       AND "tsv" @@ plainto_tsquery('english', ${query})
     ORDER BY score DESC
-    LIMIT ${limit}
+    LIMIT ${safeLimit}
   `);
 
   return results.rows as unknown as MemoryChunk[];

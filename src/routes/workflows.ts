@@ -294,7 +294,8 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
       try {
         for await (const event of executor.run(inputs || {})) {
           const entry = activeRuns.get(run.id);
-          if (entry) entry.events.push(event);
+          // P42-10: Cap events array to prevent unbounded memory growth
+          if (entry && entry.events.length < 10_000) entry.events.push(event);
 
           if (event.type === "workflow_complete") {
             await db

@@ -55,7 +55,8 @@ const SIMPLE_INDICATORS = [
  * Classify query complexity and return optimal retrieval parameters.
  */
 export function classifyQueryComplexity(query: string): QueryComplexity {
-  const trimmed = query.trim();
+  // P42-07: Cap query length before regex matching to prevent ReDoS
+  const trimmed = query.trim().slice(0, 2000);
   const wordCount = trimmed.split(/\s+/).length;
   const questionMarks = (trimmed.match(/\?/g) || []).length;
   const clauses = trimmed.split(/[,;]/).length;
@@ -122,9 +123,11 @@ export function classifyQueryComplexity(query: string): QueryComplexity {
  * Get adaptive k for RAG retrieval, with optional override.
  */
 export function getAdaptiveK(query: string, overrideK?: number): { k: number; useHyde: boolean; complexity: QueryComplexity } {
+  // P42-06: Cap overrideK to prevent excessive retrieval
   if (overrideK !== undefined && overrideK > 0) {
+    const safeK = Math.min(overrideK, 100);
     const complexity = classifyQueryComplexity(query);
-    return { k: overrideK, useHyde: complexity.useHyde, complexity };
+    return { k: safeK, useHyde: complexity.useHyde, complexity };
   }
 
   const complexity = classifyQueryComplexity(query);
