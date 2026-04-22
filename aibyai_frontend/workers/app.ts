@@ -1,13 +1,24 @@
 import { createRequestHandler } from "react-router";
+// import { routeAgentRequest } from "agents";
 
+// Export Durable Objects so Cloudflare can instantiate them
+// Add new DOs here after creating them in workers/
 export { ExampleDO } from "./example-do";
 export { LocalDataProxyService } from "./data-proxy";
+// export { ChatSessionsDO } from "./chat-sessions";
+// export { Chat } from "./chat";
 
+/**
+ * Augment AppLoadContext to include Cloudflare bindings.
+ * Access in loaders/actions via: context.cloudflare.env.BINDING_NAME
+ */
 declare module "react-router" {
   export interface AppLoadContext {
     cloudflare: {
       env: Env;
       ctx: ExecutionContext;
+      // Uncomment when enabling AI chat (see CLAUDE.md):
+      // ownerId: string;
     };
   }
 }
@@ -17,68 +28,51 @@ const requestHandler = createRequestHandler(
   import.meta.env.MODE
 );
 
+/**
+ * Parse a named cookie from a Cookie header string.
+ */
+function getCookie(request: Request, name: string): string | undefined {
+  const header = request.headers.get("Cookie") ?? "";
+  const match = header.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+  return match?.[1];
+}
+
 export default {
   async fetch(request, env, ctx) {
-    const url = new URL(request.url);
-
-    // Proxy /api/* requests to the configured backend URL
-    if (url.pathname.startsWith("/api/")) {
-      const backendUrl = (env as any).BACKEND_URL as string | undefined;
-
-      if (!backendUrl) {
-        return new Response(
-          JSON.stringify({
-            error: "Backend not configured",
-            message:
-              "Set the BACKEND_URL environment variable to your aibyai backend URL (e.g. https://api.yourdomain.com)",
-          }),
-          { status: 503, headers: { "Content-Type": "application/json" } }
-        );
-      }
-
-      const targetUrl = new URL(url.pathname + url.search, backendUrl);
-      const proxyRequest = new Request(targetUrl.toString(), {
-        method: request.method,
-        headers: request.headers,
-        body:
-          request.method !== "GET" && request.method !== "HEAD"
-            ? request.body
-            : undefined,
-      });
-
-      try {
-        const response = await fetch(proxyRequest);
-        const newResponse = new Response(response.body, response);
-        newResponse.headers.set("Access-Control-Allow-Origin", url.origin);
-        newResponse.headers.set(
-          "Access-Control-Allow-Credentials",
-          "true"
-        );
-        return newResponse;
-      } catch (err) {
-        return new Response(
-          JSON.stringify({ error: "Upstream error", message: String(err) }),
-          { status: 502, headers: { "Content-Type": "application/json" } }
-        );
-      }
+    /* Uncomment to enable Agents SDK routing (WebSocket for Chat DO)
+    const agentResponse = await routeAgentRequest(request, env);
+    if (agentResponse) {
+      return agentResponse;
     }
+    */
 
-    // Handle CORS preflight
-    if (request.method === "OPTIONS") {
-      return new Response(null, {
-        headers: {
-          "Access-Control-Allow-Origin": url.origin,
-          "Access-Control-Allow-Methods": "GET,POST,PUT,DELETE,PATCH,OPTIONS",
-          "Access-Control-Allow-Headers":
-            "Content-Type,Authorization,X-Requested-With",
-          "Access-Control-Allow-Credentials": "true",
-          "Access-Control-Max-Age": "86400",
-        },
-      });
+    /* Uncomment to enable anonymous chat sessions (chat-owner cookie):
+    let ownerId = getCookie(request, "chat-owner");
+    const needsCookie = !ownerId;
+    if (!ownerId) {
+      ownerId = crypto.randomUUID();
     }
+    */
 
+    // Handle all requests with React Router SSR
     return requestHandler(request, {
       cloudflare: { env, ctx },
     });
+
+    /* Uncomment (and remove the plain return above) to set the chat-owner
+       cookie on new visitors:
+    const response = await requestHandler(request, {
+      cloudflare: { env, ctx, ownerId },
+    });
+    if (needsCookie) {
+      const newResponse = new Response(response.body, response);
+      newResponse.headers.append(
+        "Set-Cookie",
+        `chat-owner=${ownerId}; Path=/; HttpOnly; SameSite=Lax; Max-Age=31536000`
+      );
+      return newResponse;
+    }
+    return response;
+    */
   },
 } satisfies ExportedHandler<Env>;

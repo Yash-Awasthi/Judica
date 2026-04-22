@@ -1,358 +1,388 @@
-import { useState, useEffect, useRef, useCallback, lazy, Suspense } from "react";
-import {
-  Code2,
-  Plus,
-  Save,
-  Play,
-  Trash2,
-  Tag,
-  FileText,
-} from "lucide-react";
-import gsap from "gsap";
+import { lazy, Suspense, useState, useCallback } from 'react';
+import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
-import { Badge } from "~/components/ui/badge";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from "~/components/ui/dialog";
-import { api } from "~/lib/api";
-import { useAuth } from "~/context/AuthContext";
-import { useTheme } from "~/context/ThemeContext";
+  FileText,
+  Plus,
+  Search,
+  Save,
+  Trash2,
+  GitCommit,
+  Tag,
+  ChevronDown,
+} from "lucide-react";
 
-const Editor = lazy(() => import("@monaco-editor/react"));
+const MonacoEditor = lazy(() => import('@monaco-editor/react'));
 
-interface Prompt {
-  id: string;
-  name: string;
-  content: string;
-  version: number;
-  model: string;
-  tags: string[];
+const mockPrompts = [
+  {
+    id: "p1",
+    name: "System Architect",
+    version: 4,
+    model: "gpt-4o",
+    tags: ["system", "architecture"],
+    content: "You are The Architect, a systems-thinking AI archetype.\n\n## Role\nAnalyze complex systems and identify structural patterns, dependencies, and potential failure modes.\n\n## Instructions\n- Break down the problem into components\n- Identify interfaces between components\n- Evaluate scalability and maintainability\n- Consider {{context}} when analyzing\n\n## Output Format\n1. System Overview\n2. Component Analysis\n3. Dependency Map\n4. Recommendations",
+  },
+  {
+    id: "p2",
+    name: "Code Reviewer",
+    version: 7,
+    model: "claude-sonnet-4-6",
+    tags: ["code", "review"],
+    content: "You are a senior code reviewer.\n\n## Review Checklist\n- [ ] Correctness: Does the code do what it's supposed to?\n- [ ] Performance: Are there any O(n²) or worse algorithms?\n- [ ] Security: Any injection vectors, XSS, or auth issues?\n- [ ] Style: Does it follow {{project_style_guide}}?\n\n## Severity Levels\n- 🔴 Critical: Must fix before merge\n- 🟡 Warning: Should fix, but not blocking\n- 🟢 Suggestion: Nice to have improvement",
+  },
+  {
+    id: "p3",
+    name: "Research Synthesis",
+    version: 2,
+    model: "gpt-4o",
+    tags: ["research", "analysis"],
+    content: "Synthesize research from multiple sources into a coherent analysis.\n\n## Process\n1. Gather key findings from each source\n2. Identify common themes and contradictions\n3. Weight evidence by source reliability\n4. Generate synthesis with citations\n\n## Variables\n- Topic: {{topic}}\n- Sources: {{source_list}}\n- Depth: {{analysis_depth}}",
+  },
+  {
+    id: "p4",
+    name: "Debate Moderator",
+    version: 3,
+    model: "gemini-2.5-pro",
+    tags: ["debate", "moderation"],
+    content: "You moderate multi-agent debates.\n\n## Rules\n1. Each agent gets equal speaking time\n2. Encourage constructive disagreement\n3. Synthesize a verdict when consensus emerges\n4. Flag logical fallacies\n\n## Format\nRound {{round_number}} of {{total_rounds}}\nTopic: {{debate_topic}}",
+  },
+  {
+    id: "p5",
+    name: "Creative Brainstorm",
+    version: 1,
+    model: "claude-sonnet-4-6",
+    tags: ["creative", "ideas"],
+    content: "Generate creative solutions using divergent thinking.\n\n## Techniques\n- SCAMPER method\n- Random association\n- Constraint removal\n- Cross-domain analogy\n\n## Challenge\n{{challenge_description}}\n\n## Output\nGenerate 10 ideas, ranked by novelty and feasibility.",
+  },
+];
+
+type Prompt = typeof mockPrompts[0];
+
+const MODELS = [
+  "gpt-4o",
+  "gpt-4o-mini",
+  "claude-sonnet-4-6",
+  "claude-haiku",
+  "gemini-2.5-pro",
+];
+
+function extractVariables(content: string): string[] {
+  const matches = content.match(/\{\{([^}]+)\}\}/g);
+  if (!matches) return [];
+  return [...new Set(matches.map((m) => m.replace(/\{\{|\}\}/g, '').trim()))];
 }
 
 export default function PromptsPage() {
-  const { user } = useAuth();
-  const { theme } = useTheme();
-  const [prompts, setPrompts] = useState<Prompt[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [selected, setSelected] = useState<Prompt | null>(null);
-  const [editorContent, setEditorContent] = useState("");
-  const [model, setModel] = useState("gpt-4");
-  const [tagsInput, setTagsInput] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [createOpen, setCreateOpen] = useState(false);
-  const [newName, setNewName] = useState("");
-  const listRef = useRef<HTMLDivElement>(null);
+  const [prompts, setPrompts] = useState<Prompt[]>(mockPrompts);
+  const [selectedId, setSelectedId] = useState<string>(mockPrompts[0].id);
+  const [search, setSearch] = useState('');
+  const [editedContent, setEditedContent] = useState<Record<string, string>>({});
+  const [editedModel, setEditedModel] = useState<Record<string, string>>({});
+  const [showModelDropdown, setShowModelDropdown] = useState(false);
 
-  const fetchPrompts = useCallback(async () => {
-    try {
-      const data = await api.get<Prompt[]>("/prompts");
-      setPrompts(data);
-    } catch {
-      // silent
-    } finally {
-      setLoading(false);
-    }
+  const selectedPrompt = prompts.find((p) => p.id === selectedId) || null;
+
+  const currentContent = selectedId
+    ? (editedContent[selectedId] ?? selectedPrompt?.content ?? '')
+    : '';
+
+  const currentModel = selectedId
+    ? (editedModel[selectedId] ?? selectedPrompt?.model ?? 'gpt-4o')
+    : 'gpt-4o';
+
+  const variables = extractVariables(currentContent);
+
+  const filteredPrompts = prompts.filter((p) =>
+    p.name.toLowerCase().includes(search.toLowerCase()) ||
+    p.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()))
+  );
+
+  const handleContentChange = useCallback((value: string) => {
+    if (!selectedId) return;
+    setEditedContent((prev) => ({ ...prev, [selectedId]: value }));
+  }, [selectedId]);
+
+  const handleModelChange = useCallback((model: string) => {
+    if (!selectedId) return;
+    setEditedModel((prev) => ({ ...prev, [selectedId]: model }));
+    setShowModelDropdown(false);
+  }, [selectedId]);
+
+  const handleSave = useCallback(() => {
+    if (!selectedId) return;
+    setPrompts((prev) =>
+      prev.map((p) => {
+        if (p.id !== selectedId) return p;
+        return {
+          ...p,
+          content: editedContent[selectedId] ?? p.content,
+          model: editedModel[selectedId] ?? p.model,
+          version: p.version + 1,
+        };
+      })
+    );
+    setEditedContent((prev) => {
+      const next = { ...prev };
+      delete next[selectedId];
+      return next;
+    });
+    setEditedModel((prev) => {
+      const next = { ...prev };
+      delete next[selectedId];
+      return next;
+    });
+  }, [selectedId, editedContent, editedModel]);
+
+  const handleDelete = useCallback(() => {
+    if (!selectedId) return;
+    const remaining = prompts.filter((p) => p.id !== selectedId);
+    setPrompts(remaining);
+    setSelectedId(remaining[0]?.id || '');
+  }, [selectedId, prompts]);
+
+  const handleNewPrompt = useCallback(() => {
+    const newPrompt: Prompt = {
+      id: `p-${Date.now()}`,
+      name: "Untitled Prompt",
+      version: 1,
+      model: "gpt-4o",
+      tags: [],
+      content: "# New Prompt\n\nDescribe the role and instructions here.\n\n## Variables\n- Input: {{input}}",
+    };
+    setPrompts((prev) => [newPrompt, ...prev]);
+    setSelectedId(newPrompt.id);
   }, []);
 
-  useEffect(() => {
-    fetchPrompts();
-  }, [fetchPrompts]);
-
-  useEffect(() => {
-    if (!loading && listRef.current) {
-      gsap.fromTo(
-        listRef.current,
-        { opacity: 0, x: -12 },
-        { opacity: 1, x: 0, duration: 0.35, ease: "power2.out" }
-      );
-    }
-  }, [loading]);
-
-  function selectPrompt(p: Prompt) {
-    setSelected(p);
-    setEditorContent(p.content);
-    setModel(p.model);
-    setTagsInput(p.tags.join(", "));
-  }
-
-  async function handleCreate() {
-    if (!newName.trim()) return;
-    try {
-      const created = await api.post<Prompt>("/prompts", {
-        name: newName.trim(),
-        content: "",
-        model: "gpt-4",
-        tags: [],
-      });
-      setCreateOpen(false);
-      setNewName("");
-      await fetchPrompts();
-      selectPrompt(created);
-    } catch {
-      // silent
-    }
-  }
-
-  async function handleSave() {
-    if (!selected) return;
-    setSaving(true);
-    try {
-      const tags = tagsInput
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean);
-      await api.put(`/prompts/${selected.id}`, {
-        content: editorContent,
-        model,
-        tags,
-      });
-      await fetchPrompts();
-    } catch {
-      // silent
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function handleDelete(id: string) {
-    try {
-      await api.del(`/prompts/${id}`);
-      if (selected?.id === id) {
-        setSelected(null);
-        setEditorContent("");
-      }
-      await fetchPrompts();
-    } catch {
-      // silent
-    }
-  }
-
-  // Detect {{variable}} patterns
-  const variables = Array.from(
-    new Set(editorContent.match(/\{\{(\w+)\}\}/g)?.map((m) => m.slice(2, -2)) ?? [])
+  const hasUnsavedChanges = selectedId && (
+    (editedContent[selectedId] !== undefined && editedContent[selectedId] !== selectedPrompt?.content) ||
+    (editedModel[selectedId] !== undefined && editedModel[selectedId] !== selectedPrompt?.model)
   );
 
   return (
-    <div className="flex h-full overflow-hidden">
-      {/* Left sidebar - prompt list */}
-      <div
-        ref={listRef}
-        className="w-72 shrink-0 border-r bg-card/50 flex flex-col"
-      >
-        <div className="flex items-center justify-between px-4 py-3 border-b">
-          <h2 className="text-sm font-semibold">Prompts</h2>
-          <Button size="icon-xs" onClick={() => setCreateOpen(true)}>
-            <Plus className="size-3" />
-          </Button>
+    <div className="flex-1 flex overflow-hidden">
+      {/* Left sidebar */}
+      <div className="w-64 border-r border-border flex flex-col bg-background shrink-0">
+        {/* Sidebar header */}
+        <div className="p-3 border-b border-border space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText className="size-4 text-muted-foreground" />
+              <span className="text-sm font-semibold">Prompts</span>
+              <Badge variant="secondary" className="text-[10px] h-4 px-1.5">
+                {prompts.length}
+              </Badge>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="size-6"
+              onClick={handleNewPrompt}
+              title="New prompt"
+            >
+              <Plus className="size-3.5" />
+            </Button>
+          </div>
+          <div className="relative">
+            <Search className="absolute left-2 top-1/2 -translate-y-1/2 size-3 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search prompts..."
+              className="h-7 pl-6 text-xs"
+            />
+          </div>
         </div>
+
+        {/* Prompt list */}
         <ScrollArea className="flex-1">
-          <div className="p-2 space-y-0.5">
-            {loading
-              ? Array.from({ length: 4 }).map((_, i) => (
-                  <div
-                    key={i}
-                    className="h-14 rounded-lg bg-muted/50 animate-pulse mb-1"
-                  />
-                ))
-              : prompts.map((p) => (
-                  <button
-                    key={p.id}
-                    onClick={() => selectPrompt(p)}
-                    className={`w-full text-left rounded-lg px-3 py-2.5 text-sm transition-colors group ${
-                      selected?.id === p.id
-                        ? "bg-accent text-accent-foreground"
-                        : "hover:bg-muted/50"
-                    }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium truncate">{p.name}</span>
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleDelete(p.id);
-                        }}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="size-3" />
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-2 mt-1">
-                      <Badge variant="secondary" className="text-[10px] h-4">
-                        {p.model}
-                      </Badge>
-                      <span className="text-[10px] text-muted-foreground">
-                        v{p.version}
-                      </span>
-                    </div>
-                    {p.tags.length > 0 && (
-                      <div className="flex gap-1 mt-1 flex-wrap">
-                        {p.tags.slice(0, 3).map((t) => (
-                          <span
-                            key={t}
-                            className="text-[9px] text-muted-foreground bg-muted rounded px-1"
-                          >
-                            {t}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </button>
-                ))}
-            {!loading && prompts.length === 0 && (
-              <div className="text-center py-8 text-xs text-muted-foreground">
-                <FileText className="size-8 mx-auto mb-2 opacity-40" />
-                No prompts yet
-              </div>
+          <div className="p-1.5 space-y-0.5">
+            {filteredPrompts.length === 0 && (
+              <p className="text-xs text-muted-foreground text-center py-6">No prompts found</p>
             )}
+            {filteredPrompts.map((prompt) => {
+              const isSelected = prompt.id === selectedId;
+              const isDirty = editedContent[prompt.id] !== undefined || editedModel[prompt.id] !== undefined;
+              return (
+                <button
+                  key={prompt.id}
+                  onClick={() => setSelectedId(prompt.id)}
+                  className={`w-full text-left px-3 py-2.5 rounded-md transition-colors ${
+                    isSelected
+                      ? 'bg-primary/10 text-foreground'
+                      : 'hover:bg-muted text-foreground'
+                  }`}
+                >
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <span className="text-xs font-medium truncate flex-1">{prompt.name}</span>
+                    <Badge
+                      variant="outline"
+                      className="text-[9px] h-4 px-1 shrink-0 gap-0.5"
+                    >
+                      <GitCommit className="size-2" />
+                      v{prompt.version}
+                    </Badge>
+                    {isDirty && (
+                      <span className="size-1.5 rounded-full bg-orange-400 shrink-0" title="Unsaved changes" />
+                    )}
+                  </div>
+                  <div className="flex items-center gap-1 flex-wrap">
+                    {prompt.tags.slice(0, 2).map((tag) => (
+                      <span
+                        key={tag}
+                        className="text-[9px] text-muted-foreground bg-muted px-1 rounded"
+                      >
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </ScrollArea>
       </div>
 
-      {/* Right side - editor */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {selected ? (
+      {/* Main editor area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {selectedPrompt ? (
           <>
-            {/* Toolbar */}
-            <div className="flex items-center gap-2 border-b px-4 py-2">
-              <h3 className="text-sm font-medium truncate">{selected.name}</h3>
-              <div className="flex-1" />
-              <select
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                className="h-7 rounded-lg border border-input bg-transparent px-2 text-xs outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50"
-              >
-                <option value="gpt-4">GPT-4</option>
-                <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                <option value="claude-sonnet">Claude Sonnet</option>
-                <option value="claude-opus">Claude Opus</option>
-              </select>
+            {/* Top bar */}
+            <div className="h-12 border-b border-border flex items-center px-4 gap-3 bg-background shrink-0">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <FileText className="size-4 text-muted-foreground shrink-0" />
+                <span className="text-sm font-medium truncate">{selectedPrompt.name}</span>
+                <Badge variant="outline" className="text-[10px] shrink-0 gap-0.5">
+                  <GitCommit className="size-2.5" />
+                  v{selectedPrompt.version}
+                </Badge>
+              </div>
+
+              {/* Tags */}
+              <div className="hidden md:flex items-center gap-1">
+                <Tag className="size-3 text-muted-foreground" />
+                {selectedPrompt.tags.map((tag) => (
+                  <Badge key={tag} variant="secondary" className="text-[10px] h-5">
+                    {tag}
+                  </Badge>
+                ))}
+              </div>
+
+              {/* Model selector */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowModelDropdown((v) => !v)}
+                  className="flex items-center gap-1.5 h-7 px-2.5 rounded-md border border-border text-xs hover:bg-muted transition-colors"
+                >
+                  <span className="text-muted-foreground">Model:</span>
+                  <span className="font-medium">{currentModel}</span>
+                  <ChevronDown className="size-3 text-muted-foreground" />
+                </button>
+                {showModelDropdown && (
+                  <div className="absolute right-0 top-full mt-1 bg-popover border border-border rounded-md shadow-lg z-50 min-w-40 py-1">
+                    {MODELS.map((m) => (
+                      <button
+                        key={m}
+                        onClick={() => handleModelChange(m)}
+                        className={`w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors ${
+                          m === currentModel ? 'text-primary font-medium' : ''
+                        }`}
+                      >
+                        {m}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               <Button
-                variant="outline"
+                variant="ghost"
                 size="sm"
-                onClick={handleSave}
-                disabled={saving}
+                className="h-7 gap-1.5 text-xs text-destructive hover:text-destructive"
+                onClick={handleDelete}
               >
-                <Save className="size-3.5 mr-1" />
-                {saving ? "Saving..." : "Save"}
+                <Trash2 className="size-3.5" />
+                Delete
               </Button>
-              <Button size="sm">
-                <Play className="size-3.5 mr-1" />
-                Run
+              <Button
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                onClick={handleSave}
+                disabled={!hasUnsavedChanges}
+              >
+                <Save className="size-3.5" />
+                Save{hasUnsavedChanges ? ' *' : ''}
               </Button>
             </div>
 
-            {/* Monaco editor */}
-            <div className="flex-1 min-h-0">
-              <Suspense
-                fallback={
-                  <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
-                    Loading editor...
-                  </div>
-                }
-              >
-                <Editor
+            {/* Monaco Editor */}
+            <div className="flex-1 overflow-hidden">
+              <Suspense fallback={
+                <div className="flex-1 flex items-center justify-center text-muted-foreground h-full">
+                  Loading editor...
+                </div>
+              }>
+                <MonacoEditor
                   height="100%"
                   language="markdown"
-                  theme={theme === "dark" ? "vs-dark" : "vs"}
-                  value={editorContent}
-                  onChange={(v) => setEditorContent(v ?? "")}
+                  theme="vs-dark"
+                  value={currentContent}
+                  onChange={(value) => handleContentChange(value || "")}
                   options={{
-                    fontSize: 14,
-                    lineHeight: 1.6,
-                    wordWrap: "on",
                     minimap: { enabled: false },
-                    padding: { top: 16 },
+                    fontSize: 14,
+                    wordWrap: "on",
+                    lineNumbers: "on",
                     scrollBeyondLastLine: false,
-                    renderLineHighlight: "none",
+                    padding: { top: 16 },
                   }}
                 />
               </Suspense>
             </div>
 
-            {/* Bottom panel - variables & tags */}
-            <div className="border-t bg-card/50 px-4 py-3 space-y-3">
-              {variables.length > 0 && (
-                <div>
-                  <Label className="text-xs text-muted-foreground mb-2">
-                    Variables
-                  </Label>
-                  <div className="grid grid-cols-2 gap-2 mt-1">
-                    {variables.map((v) => (
-                      <div key={v} className="flex items-center gap-2">
-                        <Badge variant="outline" className="text-[10px] shrink-0">
-                          {`{{${v}}}`}
-                        </Badge>
-                        <Input
-                          placeholder={`Value for ${v}...`}
-                          className="h-6 text-xs"
-                        />
-                      </div>
-                    ))}
-                  </div>
+            {/* Variable bar at bottom */}
+            {variables.length > 0 && (
+              <div className="h-10 border-t border-border flex items-center px-4 gap-2 bg-muted/30 shrink-0">
+                <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold shrink-0">
+                  Variables
+                </span>
+                <div className="flex items-center gap-1.5 overflow-x-auto">
+                  {variables.map((v) => (
+                    <Badge
+                      key={v}
+                      variant="outline"
+                      className="text-[10px] h-5 shrink-0 font-mono border-orange-500/40 text-orange-400 bg-orange-500/5"
+                    >
+                      {`{{${v}}}`}
+                    </Badge>
+                  ))}
                 </div>
-              )}
-              <div className="flex items-center gap-2">
-                <Tag className="size-3 text-muted-foreground" />
-                <Input
-                  placeholder="Tags (comma separated)"
-                  value={tagsInput}
-                  onChange={(e) => setTagsInput(e.target.value)}
-                  className="h-6 text-xs flex-1"
-                />
               </div>
-            </div>
+            )}
           </>
         ) : (
-          <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
-            <div className="rounded-2xl bg-muted/50 p-6 mb-4">
-              <Code2 className="size-12 text-muted-foreground" />
+          <div className="flex-1 flex items-center justify-center">
+            <div className="text-center space-y-2">
+              <FileText className="size-10 text-muted-foreground mx-auto" />
+              <p className="text-sm text-muted-foreground">Select a prompt to edit</p>
+              <Button size="sm" onClick={handleNewPrompt} className="gap-1.5">
+                <Plus className="size-3.5" />
+                New Prompt
+              </Button>
             </div>
-            <h3 className="text-lg font-medium">Prompts IDE</h3>
-            <p className="text-sm text-muted-foreground mt-1 max-w-sm">
-              Select a prompt from the sidebar or create a new one to start
-              editing.
-            </p>
           </div>
         )}
       </div>
 
-      {/* Create dialog */}
-      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>New Prompt</DialogTitle>
-            <DialogDescription>
-              Create a new prompt template.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-1.5">
-            <Label htmlFor="prompt-name">Name</Label>
-            <Input
-              id="prompt-name"
-              placeholder="My Prompt"
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleCreate()}
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleCreate} disabled={!newName.trim()}>
-              Create
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Click outside to close model dropdown */}
+      {showModelDropdown && (
+        <div
+          className="fixed inset-0 z-40"
+          onClick={() => setShowModelDropdown(false)}
+        />
+      )}
     </div>
   );
 }

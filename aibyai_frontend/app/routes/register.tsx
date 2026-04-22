@@ -1,86 +1,69 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router";
 import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
+import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { useAuth } from "~/context/AuthContext";
+import { Loader2 } from "lucide-react";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
-  const { register } = useAuth();
   const [username, setUsername] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError("");
 
     if (password !== confirmPassword) {
-      setError("Passwords do not match");
+      setError("Passwords do not match.");
       return;
     }
 
-    if (password.length < 8) {
-      setError("Password must be at least 8 characters");
-      return;
-    }
-
-    setLoading(true);
+    setIsLoading(true);
     try {
-      await register(username, email, password);
-      navigate("/dashboard", { replace: true });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed");
+      // Demo mode: simulate registration delay
+      await new Promise((res) => setTimeout(res, 800));
+      navigate("/login");
     } finally {
-      setLoading(false);
+      setIsLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background p-4">
-      <div className="w-full max-w-sm">
-        {/* Logo */}
-        <div className="flex items-center justify-center gap-2 mb-8">
-          <div className="relative flex items-center justify-center w-10 h-10 rounded-xl bg-primary/10">
-            <span className="text-base font-bold text-primary">ai</span>
-            <div className="absolute inset-0 rounded-xl bg-primary/20 blur-sm animate-[glow-pulse_3s_ease-in-out_infinite]" />
+      <div className="w-full max-w-sm space-y-6">
+        {/* Branding */}
+        <div className="text-center space-y-2">
+          <div className="flex items-center justify-center gap-2">
+            <span className="text-2xl font-bold tracking-tight">
+              ai<span className="text-emerald-400">by</span>ai
+            </span>
           </div>
-          <span className="font-display text-2xl font-semibold tracking-tight">
-            aibyai
-          </span>
+          <p className="text-sm text-muted-foreground">Create your account</p>
         </div>
 
-        <Card className="border-border/50">
-          <CardHeader className="text-center pb-4">
-            <CardTitle className="text-xl">Create an account</CardTitle>
-            <CardDescription>Get started with aibyai</CardDescription>
+        <Card>
+          <CardHeader className="pb-4">
+            <p className="text-sm font-medium text-center">Get started for free</p>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <div className="rounded-md bg-destructive/10 border border-destructive/20 px-3 py-2 text-sm text-destructive">
-                  {error}
-                </div>
-              )}
-
               <div className="space-y-2">
                 <Label htmlFor="username">Username</Label>
                 <Input
                   id="username"
-                  type="text"
                   placeholder="Choose a username"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
-                  required
                   autoComplete="username"
+                  required
                 />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -89,49 +72,54 @@ export default function RegisterPage() {
                   placeholder="you@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  required
                   autoComplete="email"
+                  required
                 />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <Input
                   id="password"
                   type="password"
-                  placeholder="At least 8 characters"
+                  placeholder="Create a password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={8}
                   autoComplete="new-password"
+                  required
                 />
               </div>
-
               <div className="space-y-2">
-                <Label htmlFor="confirm-password">Confirm Password</Label>
+                <Label htmlFor="confirmPassword">Confirm Password</Label>
                 <Input
-                  id="confirm-password"
+                  id="confirmPassword"
                   type="password"
                   placeholder="Confirm your password"
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  required
                   autoComplete="new-password"
+                  required
                 />
               </div>
 
-              <Button type="submit" className="w-full" disabled={loading}>
-                {loading ? "Creating account..." : "Create account"}
+              {error && (
+                <p className="text-xs text-red-400">{error}</p>
+              )}
+
+              <Button type="submit" className="w-full" disabled={isLoading}>
+                {isLoading ? (
+                  <>
+                    <Loader2 className="size-4 mr-2 animate-spin" />
+                    Creating account...
+                  </>
+                ) : (
+                  "Create Account"
+                )}
               </Button>
             </form>
 
-            <p className="mt-6 text-center text-sm text-muted-foreground">
+            <p className="text-center text-xs text-muted-foreground">
               Already have an account?{" "}
-              <Link
-                to="/login"
-                className="text-primary hover:underline font-medium"
-              >
+              <Link to="/login" className="text-primary hover:underline">
                 Sign in
               </Link>
             </p>

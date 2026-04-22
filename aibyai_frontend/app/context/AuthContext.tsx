@@ -1,93 +1,67 @@
-import {
-  createContext,
-  useContext,
-  useState,
-  useEffect,
-  useCallback,
-  type ReactNode,
-} from "react";
-import {
-  type User,
-  getToken,
-  setToken,
-  removeToken,
-  getUser,
-  setUser as storeUser,
-  removeUser,
-  clearAuth,
-} from "~/lib/auth";
-import { api } from "~/lib/api";
+import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
+
+interface AuthUser {
+  id: string;
+  username: string;
+  email: string;
+  role: "admin" | "member" | "viewer";
+}
 
 interface AuthContextType {
-  user: User | null;
-  token: string | null;
-  loading: boolean;
-  login(username: string, password: string): Promise<void>;
-  register(username: string, email: string, password: string): Promise<void>;
-  logout(): Promise<void>;
+  user: AuthUser | null;
+  isAuthenticated: boolean;
+  login: (username: string, password: string) => Promise<void>;
+  logout: () => void;
 }
+
+const DEMO_USER: AuthUser = {
+  id: "demo-001",
+  username: "admin",
+  email: "admin@aibyai.dev",
+  role: "admin",
+};
+const DEMO_TOKEN = "demo-token-preview-only";
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<User | null>(null);
-  const [token, setTokenState] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState<AuthUser | null>(null);
 
   useEffect(() => {
-    const storedToken = getToken();
-    const storedUser = getUser();
-    if (storedToken && storedUser) {
-      setTokenState(storedToken);
-      setUser(storedUser);
+    if (typeof window === "undefined") return;
+    const token = localStorage.getItem("aibyai_token");
+    const savedUser = localStorage.getItem("aibyai_user");
+    if (token && savedUser) {
+      try {
+        setUser(JSON.parse(savedUser));
+      } catch {
+        localStorage.removeItem("aibyai_token");
+        localStorage.removeItem("aibyai_user");
+      }
     }
-    setLoading(false);
   }, []);
 
-  const login = useCallback(async (username: string, password: string) => {
-    const data = await api.post<{ token: string; user: User }>(
-      "/auth/login",
-      { username, password }
-    );
-    setToken(data.token);
-    storeUser(data.user);
-    setTokenState(data.token);
-    setUser(data.user);
-  }, []);
+  const login = async (username: string, _password: string) => {
+    // Demo mode: accept any credentials
+    localStorage.setItem("aibyai_token", DEMO_TOKEN);
+    localStorage.setItem("aibyai_user", JSON.stringify(DEMO_USER));
+    setUser(DEMO_USER);
+  };
 
-  const register = useCallback(
-    async (username: string, email: string, password: string) => {
-      const data = await api.post<{ token: string; user: User }>(
-        "/auth/register",
-        { username, email, password }
-      );
-      setToken(data.token);
-      storeUser(data.user);
-      setTokenState(data.token);
-      setUser(data.user);
-    },
-    []
-  );
-
-  const logout = useCallback(async () => {
-    try {
-      await api.post("/auth/logout");
-    } catch {
-      // continue logout even if API fails
-    }
-    clearAuth();
-    setTokenState(null);
+  const logout = () => {
+    localStorage.removeItem("aibyai_token");
+    localStorage.removeItem("aibyai_user");
     setUser(null);
-  }, []);
+  };
 
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, register, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
 }
 
-export function useAuth(): AuthContextType {
+export function useAuth() {
   const ctx = useContext(AuthContext);
   if (!ctx) throw new Error("useAuth must be used within AuthProvider");
   return ctx;

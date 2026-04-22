@@ -1,169 +1,181 @@
-import { useState, useEffect } from "react";
-import { api } from "~/lib/api";
-import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
+import { useState } from "react";
 import { Badge } from "~/components/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "~/components/ui/dialog";
-import { Textarea } from "~/components/ui/textarea";
-import { Label } from "~/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
-import { Store, Search, Star, Download, Plus, Package, BookOpen, GitBranch, Zap } from "lucide-react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "~/components/ui/tabs";
+import { Store, Star, Download, Search } from "lucide-react";
 
-interface MarketplaceAsset {
-  id: string;
-  title: string;
-  type: "prompt" | "workflow" | "persona" | "tool";
-  author: string;
-  downloads: number;
-  rating: number;
-  description: string;
-  tags: string[];
-}
+const mockItems = [
+  {
+    id: "1",
+    name: "The Architect",
+    type: "archetype" as const,
+    author: "aibyai",
+    description: "Systems-level design thinking and architectural analysis",
+    stars: 234,
+    installs: 1847,
+  },
+  {
+    id: "2",
+    name: "Code Review Pipeline",
+    type: "workflow" as const,
+    author: "devtools-co",
+    description: "Automated multi-pass code review with severity scoring",
+    stars: 189,
+    installs: 923,
+  },
+  {
+    id: "3",
+    name: "Research Synthesizer",
+    type: "prompt" as const,
+    author: "ml-research",
+    description: "Structured research gathering and synthesis prompt chain",
+    stars: 156,
+    installs: 672,
+  },
+  {
+    id: "4",
+    name: "The Ethicist",
+    type: "archetype" as const,
+    author: "aibyai",
+    description: "Ethical analysis, bias detection, and fairness evaluation",
+    stars: 201,
+    installs: 1523,
+  },
+  {
+    id: "5",
+    name: "Data Pipeline Builder",
+    type: "workflow" as const,
+    author: "dataeng-team",
+    description: "Visual data pipeline construction with validation steps",
+    stars: 98,
+    installs: 412,
+  },
+  {
+    id: "6",
+    name: "API Generator",
+    type: "skill" as const,
+    author: "apicraft",
+    description: "Generate REST/GraphQL APIs from natural language specifications",
+    stars: 312,
+    installs: 2341,
+  },
+  {
+    id: "7",
+    name: "Debate Moderator",
+    type: "prompt" as const,
+    author: "council-labs",
+    description: "Controls multi-archetype debate flow and consensus building",
+    stars: 87,
+    installs: 345,
+  },
+  {
+    id: "8",
+    name: "Security Scanner",
+    type: "skill" as const,
+    author: "secteam",
+    description: "Automated security vulnerability scanning and reporting",
+    stars: 267,
+    installs: 1892,
+  },
+];
 
-const typeIcons = { prompt: BookOpen, workflow: GitBranch, persona: Package, tool: Zap };
 const typeColors: Record<string, string> = {
-  prompt: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
-  workflow: "bg-violet-500/10 text-violet-400 border-violet-500/20",
-  persona: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
-  tool: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+  archetype: "bg-blue-500/20 text-blue-400",
+  workflow: "bg-green-500/20 text-green-400",
+  prompt: "bg-purple-500/20 text-purple-400",
+  skill: "bg-amber-500/20 text-amber-400",
 };
 
 export default function MarketplacePage() {
-  const [assets, setAssets] = useState<MarketplaceAsset[]>([]);
-  const [myAssets, setMyAssets] = useState<MarketplaceAsset[]>([]);
   const [search, setSearch] = useState("");
-  const [filterType, setFilterType] = useState<string>("all");
-  const [loading, setLoading] = useState(true);
-  const [publishOpen, setPublishOpen] = useState(false);
-  const [publishForm, setPublishForm] = useState({ title: "", description: "", type: "prompt", content: "", tags: "" });
+  const [tab, setTab] = useState("all");
 
-  useEffect(() => {
-    setLoading(true);
-    api.get<MarketplaceAsset[]>("/marketplace").then(setAssets).catch(() => setAssets([])).finally(() => setLoading(false));
-    api.get<MarketplaceAsset[]>("/marketplace?mine=true").then(setMyAssets).catch(() => setMyAssets([]));
-  }, []);
-
-  const filtered = assets.filter((a) => {
-    const matchSearch = a.title.toLowerCase().includes(search.toLowerCase()) || a.description.toLowerCase().includes(search.toLowerCase());
-    const matchType = filterType === "all" || a.type === filterType;
-    return matchSearch && matchType;
+  const filtered = mockItems.filter((item) => {
+    const matchesSearch =
+      !search ||
+      item.name.toLowerCase().includes(search.toLowerCase()) ||
+      item.description.toLowerCase().includes(search.toLowerCase());
+    const matchesTab = tab === "all" || item.type === tab;
+    return matchesSearch && matchesTab;
   });
 
-  async function handlePublish() {
-    try {
-      await api.post("/marketplace", { ...publishForm, tags: publishForm.tags.split(",").map((t) => t.trim()) });
-      setPublishOpen(false);
-      const updated = await api.get<MarketplaceAsset[]>("/marketplace");
-      setAssets(updated);
-    } catch (e) {
-      console.error(e);
-    }
-  }
-
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="flex-1 overflow-y-auto">
+      <div className="max-w-6xl mx-auto p-6 space-y-6">
         <div className="flex items-center gap-3">
-          <Store className="w-6 h-6 text-indigo-400" />
-          <h1 className="text-2xl font-semibold">Marketplace</h1>
+          <Store className="size-6 text-muted-foreground" />
+          <div>
+            <h1 className="text-xl font-semibold">Marketplace</h1>
+            <p className="text-sm text-muted-foreground">
+              Discover and install archetypes, workflows, prompts, and skills
+            </p>
+          </div>
         </div>
-        <Dialog open={publishOpen} onOpenChange={setPublishOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2"><Plus className="w-4 h-4" /> Publish Asset</Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>Publish Asset</DialogTitle></DialogHeader>
-            <div className="space-y-4 mt-2">
-              <div><Label>Title</Label><Input value={publishForm.title} onChange={(e) => setPublishForm((f) => ({ ...f, title: e.target.value }))} placeholder="My awesome prompt" /></div>
-              <div><Label>Type</Label>
-                <Select value={publishForm.type} onValueChange={(v) => setPublishForm((f) => ({ ...f, type: v }))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="prompt">Prompt</SelectItem>
-                    <SelectItem value="workflow">Workflow</SelectItem>
-                    <SelectItem value="persona">Persona</SelectItem>
-                    <SelectItem value="tool">Tool</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              <div><Label>Description</Label><Textarea value={publishForm.description} onChange={(e) => setPublishForm((f) => ({ ...f, description: e.target.value }))} rows={3} /></div>
-              <div><Label>Content (JSON or text)</Label><Textarea value={publishForm.content} onChange={(e) => setPublishForm((f) => ({ ...f, content: e.target.value }))} rows={4} className="font-mono text-sm" /></div>
-              <div><Label>Tags (comma separated)</Label><Input value={publishForm.tags} onChange={(e) => setPublishForm((f) => ({ ...f, tags: e.target.value }))} placeholder="analysis, research, debate" /></div>
-              <Button onClick={handlePublish} className="w-full">Publish</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
 
-      <Tabs defaultValue="browse">
-        <TabsList><TabsTrigger value="browse">Browse</TabsTrigger><TabsTrigger value="mine">My Assets</TabsTrigger></TabsList>
-        <TabsContent value="browse" className="mt-4 space-y-4">
-          <div className="flex gap-3">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-              <Input className="pl-9" placeholder="Search assets..." value={search} onChange={(e) => setSearch(e.target.value)} />
-            </div>
-            <Select value={filterType} onValueChange={setFilterType}>
-              <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Types</SelectItem>
-                <SelectItem value="prompt">Prompts</SelectItem>
-                <SelectItem value="workflow">Workflows</SelectItem>
-                <SelectItem value="persona">Personas</SelectItem>
-                <SelectItem value="tool">Tools</SelectItem>
-              </SelectContent>
-            </Select>
+        <div className="flex items-center gap-4">
+          <div className="relative flex-1 max-w-sm">
+            <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search marketplace..."
+              className="pl-8"
+            />
           </div>
-          {loading ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{Array.from({length:6}).map((_,i) => <div key={i} className="h-40 rounded-lg bg-muted animate-pulse" />)}</div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {filtered.map((asset) => {
-                const Icon = typeIcons[asset.type] ?? Package;
-                return (
-                  <Card key={asset.id} className="hover:border-indigo-500/40 transition-colors">
-                    <CardHeader className="pb-2">
-                      <div className="flex items-start justify-between">
-                        <Badge className={`text-xs border ${typeColors[asset.type]}`}><Icon className="w-3 h-3 mr-1" />{asset.type}</Badge>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground"><Star className="w-3 h-3 fill-amber-400 text-amber-400" />{asset.rating.toFixed(1)}</div>
-                      </div>
-                      <CardTitle className="text-base mt-2">{asset.title}</CardTitle>
-                      <CardDescription className="text-xs">by {asset.author}</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-sm text-muted-foreground line-clamp-2 mb-3">{asset.description}</p>
-                      <div className="flex items-center justify-between">
-                        <div className="flex flex-wrap gap-1">{asset.tags.slice(0,3).map((t) => <Badge key={t} variant="secondary" className="text-xs">{t}</Badge>)}</div>
-                        <div className="flex items-center gap-1 text-xs text-muted-foreground"><Download className="w-3 h-3" />{asset.downloads}</div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-              {filtered.length === 0 && <div className="col-span-3 text-center py-12 text-muted-foreground">No assets found</div>}
-            </div>
-          )}
-        </TabsContent>
-        <TabsContent value="mine" className="mt-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {myAssets.map((asset) => {
-              const Icon = typeIcons[asset.type] ?? Package;
-              return (
-                <Card key={asset.id}>
-                  <CardHeader className="pb-2">
-                    <Badge className={`text-xs border w-fit ${typeColors[asset.type]}`}><Icon className="w-3 h-3 mr-1" />{asset.type}</Badge>
-                    <CardTitle className="text-base">{asset.title}</CardTitle>
+        </div>
+
+        <Tabs value={tab} onValueChange={setTab}>
+          <TabsList>
+            <TabsTrigger value="all">All</TabsTrigger>
+            <TabsTrigger value="archetype">Archetypes</TabsTrigger>
+            <TabsTrigger value="workflow">Workflows</TabsTrigger>
+            <TabsTrigger value="prompt">Prompts</TabsTrigger>
+            <TabsTrigger value="skill">Skills</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value={tab}>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mt-4">
+              {filtered.map((item) => (
+                <Card
+                  key={item.id}
+                  className="cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all"
+                >
+                  <CardHeader>
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-sm">{item.name}</CardTitle>
+                      <Badge className={`text-[10px] ${typeColors[item.type]}`}>
+                        {item.type}
+                      </Badge>
+                    </div>
+                    <CardDescription>{item.description}</CardDescription>
                   </CardHeader>
-                  <CardContent><p className="text-sm text-muted-foreground">{asset.description}</p></CardContent>
+                  <CardContent>
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>by {item.author}</span>
+                      <div className="flex items-center gap-3">
+                        <span className="flex items-center gap-1">
+                          <Star className="size-3" />
+                          {item.stars}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Download className="size-3" />
+                          {item.installs.toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </CardContent>
                 </Card>
-              );
-            })}
-            {myAssets.length === 0 && <div className="col-span-3 text-center py-12 text-muted-foreground">You haven't published anything yet</div>}
-          </div>
-        </TabsContent>
-      </Tabs>
+              ))}
+              {filtered.length === 0 && (
+                <div className="col-span-full text-center py-12 text-muted-foreground">
+                  No items found matching your search.
+                </div>
+              )}
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   );
 }

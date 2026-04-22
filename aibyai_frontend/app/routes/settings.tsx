@@ -1,108 +1,273 @@
 import { useState } from "react";
-import { useAuth } from "~/context/AuthContext";
-import { api } from "~/lib/api";
-import { useTheme } from "~/context/ThemeContext";
-import { Button } from "~/components/ui/button";
-import { Badge } from "~/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Input } from "~/components/ui/input";
-import { Label } from "~/components/ui/label";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "~/components/ui/tabs";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
 import { Switch } from "~/components/ui/switch";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
-import { Settings, User, Database, Palette, Key, Save, Eye, EyeOff } from "lucide-react";
-import { toast } from "sonner";
+import { Label } from "~/components/ui/label";
+import { Button } from "~/components/ui/button";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "~/components/ui/select";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "~/components/ui/collapsible";
+import { Settings, Shield, MessageSquare, Brain, Gauge, ChevronDown } from "lucide-react";
+
+function ToggleRow({
+  label,
+  description,
+  checked,
+  onCheckedChange,
+}: {
+  label: string;
+  description: string;
+  checked: boolean;
+  onCheckedChange: (v: boolean) => void;
+}) {
+  return (
+    <div className="flex items-center justify-between py-4">
+      <div className="space-y-0.5">
+        <Label className="text-sm font-medium">{label}</Label>
+        <p className="text-sm text-muted-foreground">{description}</p>
+      </div>
+      <Switch checked={checked} onCheckedChange={onCheckedChange} />
+    </div>
+  );
+}
 
 export default function SettingsPage() {
-  const { user } = useAuth();
-  const { theme, toggleTheme } = useTheme();
-  const [profileForm, setProfileForm] = useState({ username: user?.username ?? "", email: user?.email ?? "", currentPassword: "", newPassword: "" });
-  const [memoryForm, setMemoryForm] = useState({ type: "local", connectionString: "" });
-  const [showPassword, setShowPassword] = useState(false);
-  const [saving, setSaving] = useState(false);
-
-  async function saveProfile() {
-    setSaving(true);
-    try {
-      await api.put("/auth/profile", { username: profileForm.username, email: profileForm.email });
-      toast.success("Profile updated");
-    } catch (e: any) { toast.error(e.message); } finally { setSaving(false); }
-  }
-
-  async function changePassword() {
-    if (!profileForm.newPassword) return;
-    setSaving(true);
-    try {
-      await api.post("/auth/change-password", { currentPassword: profileForm.currentPassword, newPassword: profileForm.newPassword });
-      toast.success("Password changed");
-      setProfileForm((f) => ({...f, currentPassword: "", newPassword: ""}));
-    } catch (e: any) { toast.error(e.message); } finally { setSaving(false); }
-  }
+  const [autoCouncil, setAutoCouncil] = useState(true);
+  const [debateRound, setDebateRound] = useState(true);
+  const [coldValidator, setColdValidator] = useState(false);
+  const [piiDetection, setPiiDetection] = useState(true);
+  const [autoAnonymize, setAutoAnonymize] = useState(false);
+  const [deliberationMode, setDeliberationMode] = useState("standard");
+  const [enableStreaming, setEnableStreaming] = useState(true);
+  const [showCost, setShowCost] = useState(true);
+  const [memoryBackend, setMemoryBackend] = useState("local");
+  const [quotasOpen, setQuotasOpen] = useState(false);
 
   return (
-    <div className="p-6 space-y-6 max-w-2xl">
-      <div className="flex items-center gap-3"><Settings className="w-6 h-6 text-indigo-400" /><h1 className="text-2xl font-semibold">Settings</h1></div>
+    <div className="flex-1 overflow-y-auto">
+      <div className="max-w-6xl mx-auto p-6 space-y-6">
+        <div className="flex items-center gap-3">
+          <Settings className="size-6 text-muted-foreground" />
+          <div>
+            <h1 className="text-xl font-semibold">Settings</h1>
+            <p className="text-sm text-muted-foreground">
+              Configure your AI council preferences and system behavior
+            </p>
+          </div>
+        </div>
 
-      <Tabs defaultValue="profile">
-        <TabsList><TabsTrigger value="profile"><User className="w-3.5 h-3.5 mr-1.5" />Profile</TabsTrigger><TabsTrigger value="memory"><Database className="w-3.5 h-3.5 mr-1.5" />Memory</TabsTrigger><TabsTrigger value="appearance"><Palette className="w-3.5 h-3.5 mr-1.5" />Appearance</TabsTrigger><TabsTrigger value="keys"><Key className="w-3.5 h-3.5 mr-1.5" />API Keys</TabsTrigger></TabsList>
+        {/* Council Preferences */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Brain className="size-4" />
+              Council Preferences
+            </CardTitle>
+            <CardDescription>
+              Control how the AI council deliberates on your queries
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="divide-y divide-border">
+            <ToggleRow
+              label="Auto-Council Mode"
+              description="Automatically select optimal archetypes for each query"
+              checked={autoCouncil}
+              onCheckedChange={setAutoCouncil}
+            />
+            <ToggleRow
+              label="Enable Debate Round"
+              description="Enable multi-round deliberation between archetypes"
+              checked={debateRound}
+              onCheckedChange={setDebateRound}
+            />
+            <ToggleRow
+              label="Cold Validator"
+              description="Add a critical validator pass after consensus"
+              checked={coldValidator}
+              onCheckedChange={setColdValidator}
+            />
+          </CardContent>
+        </Card>
 
-        <TabsContent value="profile" className="mt-4">
-          <Card>
-            <CardHeader><CardTitle className="text-base">Profile</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div><Label>Username</Label><Input value={profileForm.username} onChange={(e) => setProfileForm((f) => ({...f, username: e.target.value}))} /></div>
-              <div><Label>Email</Label><Input type="email" value={profileForm.email} onChange={(e) => setProfileForm((f) => ({...f, email: e.target.value}))} /></div>
-              <Button onClick={saveProfile} disabled={saving} className="gap-2"><Save className="w-4 h-4"/>Save Profile</Button>
-              <div className="border-t pt-4 space-y-3">
-                <p className="text-sm font-medium">Change Password</p>
-                <div><Label>Current Password</Label><div className="relative"><Input type={showPassword ? "text" : "password"} value={profileForm.currentPassword} onChange={(e) => setProfileForm((f) => ({...f, currentPassword: e.target.value}))} /><Button size="icon" variant="ghost" className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7" onClick={() => setShowPassword(!showPassword)}>{showPassword ? <EyeOff className="w-3.5 h-3.5"/> : <Eye className="w-3.5 h-3.5"/>}</Button></div></div>
-                <div><Label>New Password</Label><Input type="password" value={profileForm.newPassword} onChange={(e) => setProfileForm((f) => ({...f, newPassword: e.target.value}))} /></div>
-                <Button variant="outline" onClick={changePassword} disabled={saving}>Change Password</Button>
+        {/* Privacy & Safety */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Shield className="size-4" />
+              Privacy &amp; Safety
+            </CardTitle>
+            <CardDescription>
+              Manage data protection and safety guardrails
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="divide-y divide-border">
+            <ToggleRow
+              label="PII Detection"
+              description="Scan messages for personally identifiable information"
+              checked={piiDetection}
+              onCheckedChange={setPiiDetection}
+            />
+            <ToggleRow
+              label="Auto-anonymize High Risk"
+              description="Automatically redact detected PII before sending to providers"
+              checked={autoAnonymize}
+              onCheckedChange={setAutoAnonymize}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Chat Preferences */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MessageSquare className="size-4" />
+              Chat Preferences
+            </CardTitle>
+            <CardDescription>
+              Customize your chat experience and display options
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-0 divide-y divide-border">
+            <div className="flex items-center justify-between py-4">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-medium">Default Deliberation Mode</Label>
+                <p className="text-sm text-muted-foreground">
+                  Choose the default reasoning strategy for council sessions
+                </p>
               </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              <Select value={deliberationMode} onValueChange={setDeliberationMode}>
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="standard">Standard</SelectItem>
+                  <SelectItem value="socratic">Socratic</SelectItem>
+                  <SelectItem value="red_blue">Red/Blue Team</SelectItem>
+                  <SelectItem value="hypothesis">Hypothesis</SelectItem>
+                  <SelectItem value="confidence">Confidence</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <ToggleRow
+              label="Enable Streaming"
+              description="Stream archetype responses as they are generated"
+              checked={enableStreaming}
+              onCheckedChange={setEnableStreaming}
+            />
+            <ToggleRow
+              label="Show Cost Per Message"
+              description="Display estimated token cost alongside each response"
+              checked={showCost}
+              onCheckedChange={setShowCost}
+            />
+          </CardContent>
+        </Card>
 
-        <TabsContent value="memory" className="mt-4">
-          <Card>
-            <CardHeader><CardTitle className="text-base">Memory Backend</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div><Label>Backend Type</Label>
-                <Select value={memoryForm.type} onValueChange={(v) => setMemoryForm((f) => ({...f, type: v}))}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent><SelectItem value="local">Local (in-process)</SelectItem><SelectItem value="redis">Redis</SelectItem><SelectItem value="none">Disabled</SelectItem></SelectContent>
-                </Select>
+        {/* Memory Configuration */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Brain className="size-4" />
+              Memory Configuration
+            </CardTitle>
+            <CardDescription>
+              Manage long-term memory storage and retrieval
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between py-2">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-medium">Memory Backend</Label>
+                <p className="text-sm text-muted-foreground">
+                  Select the storage engine for memory chunks
+                </p>
               </div>
-              {memoryForm.type === "redis" && <div><Label>Connection String</Label><Input value={memoryForm.connectionString} onChange={(e) => setMemoryForm((f) => ({...f, connectionString: e.target.value}))} placeholder="redis://localhost:6379" /></div>}
-              <Button className="gap-2"><Save className="w-4 h-4"/>Save Memory Settings</Button>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              <Select value={memoryBackend} onValueChange={setMemoryBackend}>
+                <SelectTrigger className="w-44">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="local">Local</SelectItem>
+                  <SelectItem value="qdrant">Qdrant</SelectItem>
+                  <SelectItem value="getzep">GetZep</SelectItem>
+                  <SelectItem value="google_drive">Google Drive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="rounded-md bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
+              1,247 chunks &bull; ~4.8 MB estimated
+            </div>
+            <div className="flex gap-2">
+              <Button variant="outline" size="sm">
+                Compact Memory
+              </Button>
+              <Button variant="destructive" size="sm">
+                Clear All Memory
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
 
-        <TabsContent value="appearance" className="mt-4">
+        {/* Quotas & Limits */}
+        <Collapsible open={quotasOpen} onOpenChange={setQuotasOpen}>
           <Card>
-            <CardHeader><CardTitle className="text-base">Appearance</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between"><div><p className="text-sm font-medium">Dark Mode</p><p className="text-xs text-muted-foreground">Toggle between dark and light theme</p></div><Switch checked={theme === "dark"} onCheckedChange={toggleTheme} /></div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        <TabsContent value="keys" className="mt-4">
-          <Card>
-            <CardHeader><CardTitle className="text-base">API Keys</CardTitle></CardHeader>
-            <CardContent className="space-y-4">
-              <p className="text-sm text-muted-foreground">API keys are managed by administrators. Contact your admin to obtain or rotate keys.</p>
-              {["OpenAI", "Anthropic", "Google"].map((provider) => (
-                <div key={provider} className="flex items-center justify-between p-3 rounded-lg border">
-                  <div><p className="text-sm font-medium">{provider}</p><p className="text-xs text-muted-foreground font-mono">••••••••••••••••</p></div>
-                  <Badge variant="outline" className="text-xs">Configured</Badge>
+            <CollapsibleTrigger className="w-full">
+              <CardHeader className="cursor-pointer">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="flex items-center gap-2">
+                    <Gauge className="size-4" />
+                    Quotas &amp; Limits
+                  </CardTitle>
+                  <ChevronDown
+                    className={`size-4 text-muted-foreground transition-transform ${
+                      quotasOpen ? "rotate-180" : ""
+                    }`}
+                  />
                 </div>
-              ))}
-            </CardContent>
+                <CardDescription>
+                  View your current usage against daily limits
+                </CardDescription>
+              </CardHeader>
+            </CollapsibleTrigger>
+            <CollapsibleContent>
+              <CardContent className="space-y-5">
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span>Daily Requests</span>
+                    <span className="text-muted-foreground">23 / 100</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all"
+                      style={{ width: "23%" }}
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between text-sm">
+                    <span>Daily Tokens</span>
+                    <span className="text-muted-foreground">247,562 / 1,000,000</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-muted overflow-hidden">
+                    <div
+                      className="h-full rounded-full bg-primary transition-all"
+                      style={{ width: "24.7%" }}
+                    />
+                  </div>
+                </div>
+              </CardContent>
+            </CollapsibleContent>
           </Card>
-        </TabsContent>
-      </Tabs>
+        </Collapsible>
+      </div>
     </div>
   );
 }

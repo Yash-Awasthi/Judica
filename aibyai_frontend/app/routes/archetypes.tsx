@@ -1,124 +1,158 @@
-import { useState, useEffect } from "react";
-import { api } from "~/lib/api";
 import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
-import { Badge } from "~/components/ui/badge";
-import { Input } from "~/components/ui/input";
-import { Textarea } from "~/components/ui/textarea";
-import { Label } from "~/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "~/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "~/components/ui/select";
-import { Slider } from "~/components/ui/slider";
-import { Brain, Plus, Trash2, Edit2, Cpu } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
+import { Users, Plus } from "lucide-react";
 
-interface Archetype {
-  id: string; name: string; description: string;
-  systemPrompt: string; model: string; temperature: number;
-}
-
-const MODELS = ["gpt-4o", "gpt-4-turbo", "gpt-3.5-turbo", "claude-3-5-sonnet-20241022", "claude-3-haiku-20240307", "gemini-1.5-pro"];
-const modelColors: Record<string, string> = { "gpt-4o": "text-emerald-400", "claude-3-5-sonnet-20241022": "text-violet-400", "gemini-1.5-pro": "text-blue-400" };
+const archetypes = [
+  {
+    id: "architect",
+    name: "The Architect",
+    icon: "🏗️",
+    color: "bg-blue-500/20 border-blue-500/30",
+    thinkingStyle: "Systems Design",
+    description: "Approaches problems through systems thinking, focusing on scalability, modularity, and long-term architectural decisions.",
+  },
+  {
+    id: "pragmatist",
+    name: "The Pragmatist",
+    icon: "⚡",
+    color: "bg-amber-500/20 border-amber-500/30",
+    thinkingStyle: "Practical Solutions",
+    description: "Favors battle-tested, production-ready solutions. Prioritizes shipping speed, maintainability, and developer experience.",
+  },
+  {
+    id: "ethicist",
+    name: "The Ethicist",
+    icon: "⚖️",
+    color: "bg-purple-500/20 border-purple-500/30",
+    thinkingStyle: "Ethical Analysis",
+    description: "Evaluates decisions through privacy, fairness, and societal impact lenses. Ensures compliance and responsible AI use.",
+  },
+  {
+    id: "scientist",
+    name: "The Scientist",
+    icon: "🔬",
+    color: "bg-green-500/20 border-green-500/30",
+    thinkingStyle: "Empirical Reasoning",
+    description: "Demands evidence and data. Designs experiments, questions assumptions, and follows the scientific method rigorously.",
+  },
+  {
+    id: "creative",
+    name: "The Creative",
+    icon: "🎨",
+    color: "bg-pink-500/20 border-pink-500/30",
+    thinkingStyle: "Lateral Thinking",
+    description: "Generates unconventional ideas and novel approaches. Excels at brainstorming and breaking out of established patterns.",
+  },
+  {
+    id: "skeptic",
+    name: "The Skeptic",
+    icon: "🔍",
+    color: "bg-red-500/20 border-red-500/30",
+    thinkingStyle: "Critical Analysis",
+    description: "Challenges assumptions, identifies logical fallacies, and stress-tests arguments. The devil's advocate of the council.",
+  },
+  {
+    id: "mentor",
+    name: "The Mentor",
+    icon: "📚",
+    color: "bg-cyan-500/20 border-cyan-500/30",
+    thinkingStyle: "Educational",
+    description: "Explains complex concepts clearly, provides learning paths, and adapts explanations to the audience's knowledge level.",
+  },
+  {
+    id: "strategist",
+    name: "The Strategist",
+    icon: "♟️",
+    color: "bg-indigo-500/20 border-indigo-500/30",
+    thinkingStyle: "Strategic Planning",
+    description: "Thinks in terms of long-term positioning, competitive advantage, and risk-reward trade-offs across multiple time horizons.",
+  },
+  {
+    id: "optimizer",
+    name: "The Optimizer",
+    icon: "📈",
+    color: "bg-emerald-500/20 border-emerald-500/30",
+    thinkingStyle: "Performance Tuning",
+    description: "Focuses on efficiency, performance, and resource optimization. Finds bottlenecks and eliminates waste systematically.",
+  },
+  {
+    id: "historian",
+    name: "The Historian",
+    icon: "📜",
+    color: "bg-orange-500/20 border-orange-500/30",
+    thinkingStyle: "Historical Context",
+    description: "Draws on historical precedents and patterns. Understands why past decisions were made and what can be learned from them.",
+  },
+  {
+    id: "futurist",
+    name: "The Futurist",
+    icon: "🔮",
+    color: "bg-violet-500/20 border-violet-500/30",
+    thinkingStyle: "Forward Thinking",
+    description: "Projects current trends forward, anticipates future challenges, and designs for tomorrow's requirements today.",
+  },
+  {
+    id: "advocate",
+    name: "The Advocate",
+    icon: "🗣️",
+    color: "bg-teal-500/20 border-teal-500/30",
+    thinkingStyle: "User Empathy",
+    description: "Champions the end user's perspective. Ensures solutions are accessible, intuitive, and genuinely solve user problems.",
+  },
+  {
+    id: "guardian",
+    name: "The Guardian",
+    icon: "🛡️",
+    color: "bg-slate-500/20 border-slate-500/30",
+    thinkingStyle: "Security First",
+    description: "Prioritizes security, reliability, and risk mitigation. Identifies vulnerabilities and ensures defense-in-depth.",
+  },
+];
 
 export default function ArchetypesPage() {
-  const [archetypes, setArchetypes] = useState<Archetype[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [open, setOpen] = useState(false);
-  const [editing, setEditing] = useState<Archetype | null>(null);
-  const [form, setForm] = useState({ name: "", description: "", systemPrompt: "", model: "gpt-4o", temperature: 0.7 });
-  const [deleteId, setDeleteId] = useState<string | null>(null);
-
-  useEffect(() => {
-    api.get<Archetype[]>("/archetypes").then(setArchetypes).catch(() => setArchetypes([])).finally(() => setLoading(false));
-  }, []);
-
-  function openCreate() { setEditing(null); setForm({ name: "", description: "", systemPrompt: "", model: "gpt-4o", temperature: 0.7 }); setOpen(true); }
-  function openEdit(a: Archetype) { setEditing(a); setForm({ name: a.name, description: a.description, systemPrompt: a.systemPrompt, model: a.model, temperature: a.temperature }); setOpen(true); }
-
-  async function handleSave() {
-    if (editing) {
-      const updated = await api.put<Archetype>(`/archetypes/${editing.id}`, form);
-      setArchetypes((prev) => prev.map((a) => (a.id === editing.id ? updated : a)));
-    } else {
-      const created = await api.post<Archetype>("/archetypes", form);
-      setArchetypes((prev) => [...prev, created]);
-    }
-    setOpen(false);
-  }
-
-  async function handleDelete(id: string) {
-    await api.del(`/archetypes/${id}`);
-    setArchetypes((prev) => prev.filter((a) => a.id !== id));
-    setDeleteId(null);
-  }
-
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-3"><Brain className="w-6 h-6 text-indigo-400" /><h1 className="text-2xl font-semibold">Archetypes</h1></div>
-        <Button onClick={openCreate} className="gap-2"><Plus className="w-4 h-4" /> New Archetype</Button>
-      </div>
+    <div className="flex-1 overflow-y-auto">
+      <div className="max-w-6xl mx-auto p-6 space-y-6">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Users className="size-6 text-muted-foreground" />
+            <div>
+              <h1 className="text-xl font-semibold">Archetypes</h1>
+              <p className="text-sm text-muted-foreground">
+                AI reasoning personas that bring diverse perspectives to your council
+              </p>
+            </div>
+          </div>
+          <Button size="sm" className="gap-2">
+            <Plus className="size-3.5" />
+            Create Custom
+          </Button>
+        </div>
 
-      {loading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">{Array.from({length:4}).map((_,i) => <div key={i} className="h-36 rounded-lg bg-muted animate-pulse" />)}</div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {archetypes.map((a) => (
-            <Card key={a.id} className="hover:border-indigo-500/40 transition-colors">
-              <CardHeader className="pb-2">
-                <div className="flex items-start justify-between">
-                  <CardTitle className="text-base">{a.name}</CardTitle>
-                  <div className="flex gap-1">
-                    <Button size="icon" variant="ghost" className="w-7 h-7" onClick={() => openEdit(a)}><Edit2 className="w-3.5 h-3.5" /></Button>
-                    <Button size="icon" variant="ghost" className="w-7 h-7 text-destructive hover:text-destructive" onClick={() => setDeleteId(a.id)}><Trash2 className="w-3.5 h-3.5" /></Button>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+          {archetypes.map((arch) => (
+            <Card
+              key={arch.id}
+              className={`cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all border ${arch.color}`}
+            >
+              <CardHeader>
+                <div className="flex items-center gap-2">
+                  <span className="text-2xl">{arch.icon}</span>
+                  <div>
+                    <CardTitle className="text-sm">{arch.name}</CardTitle>
+                    <span className="text-[11px] text-muted-foreground">{arch.thinkingStyle}</span>
                   </div>
-                </div>
-                <div className="flex items-center gap-2 mt-1">
-                  <Cpu className={`w-3.5 h-3.5 ${modelColors[a.model] ?? "text-muted-foreground"}`} />
-                  <Badge variant="secondary" className="text-xs">{a.model}</Badge>
-                  <span className="text-xs text-muted-foreground">temp: {a.temperature}</span>
                 </div>
               </CardHeader>
               <CardContent>
-                <p className="text-sm text-muted-foreground line-clamp-2">{a.description}</p>
-                {a.systemPrompt && <p className="text-xs text-muted-foreground/60 mt-2 font-mono line-clamp-2 bg-muted/50 p-2 rounded">{a.systemPrompt}</p>}
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {arch.description}
+                </p>
               </CardContent>
             </Card>
           ))}
-          {archetypes.length === 0 && (
-            <div className="col-span-3 text-center py-16 text-muted-foreground">
-              <Brain className="w-12 h-12 mx-auto mb-3 opacity-20" />
-              <p>No archetypes yet. Create your first AI persona.</p>
-            </div>
-          )}
         </div>
-      )}
-
-      <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader><DialogTitle>{editing ? "Edit Archetype" : "New Archetype"}</DialogTitle></DialogHeader>
-          <div className="space-y-4 mt-2">
-            <div><Label>Name</Label><Input value={form.name} onChange={(e) => setForm((f) => ({...f, name: e.target.value}))} placeholder="The Analyst" /></div>
-            <div><Label>Description</Label><Input value={form.description} onChange={(e) => setForm((f) => ({...f, description: e.target.value}))} placeholder="Specializes in data analysis..." /></div>
-            <div><Label>System Prompt</Label><Textarea value={form.systemPrompt} onChange={(e) => setForm((f) => ({...f, systemPrompt: e.target.value}))} rows={5} className="font-mono text-sm" placeholder="You are a careful analyst who..." /></div>
-            <div><Label>Model</Label>
-              <Select value={form.model} onValueChange={(v) => setForm((f) => ({...f, model: v}))}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>{MODELS.map((m) => <SelectItem key={m} value={m}>{m}</SelectItem>)}</SelectContent>
-              </Select>
-            </div>
-            <div><Label>Temperature: {form.temperature}</Label><Slider min={0} max={2} step={0.1} value={[form.temperature]} onValueChange={([v]) => setForm((f) => ({...f, temperature: v}))} className="mt-2" /></div>
-            <Button onClick={handleSave} className="w-full">{editing ? "Save Changes" : "Create Archetype"}</Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader><DialogTitle>Delete Archetype?</DialogTitle></DialogHeader>
-          <p className="text-sm text-muted-foreground">This action cannot be undone.</p>
-          <div className="flex gap-3 mt-4"><Button variant="destructive" onClick={() => deleteId && handleDelete(deleteId)}>Delete</Button><Button variant="outline" onClick={() => setDeleteId(null)}>Cancel</Button></div>
-        </DialogContent>
-      </Dialog>
+      </div>
     </div>
   );
 }

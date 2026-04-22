@@ -14,19 +14,51 @@ type Pages = {
   "/": {
     params: {};
   };
-  "/login": {
-    params: {};
-  };
-  "/register": {
-    params: {};
-  };
-  "/dashboard": {
-    params: {};
-  };
   "/chat": {
     params: {};
   };
-  "/projects": {
+  "/chat/:id": {
+    params: {
+      "id": string;
+    };
+  };
+  "/settings": {
+    params: {};
+  };
+  "/profile": {
+    params: {};
+  };
+  "/language-models": {
+    params: {};
+  };
+  "/workflows": {
+    params: {};
+  };
+  "/prompts": {
+    params: {};
+  };
+  "/knowledge-bases": {
+    params: {};
+  };
+  "/marketplace": {
+    params: {};
+  };
+  "/archetypes": {
+    params: {};
+  };
+  "/memory": {
+    params: {};
+  };
+  "/admin/users": {
+    params: {};
+  };
+  "/admin/analytics": {
+    params: {};
+  };
+  "/admin/system": {
+    params: {};
+  };
+  "/admin/audit": {
     params: {};
   };
 };
@@ -34,45 +66,90 @@ type Pages = {
 type RouteFiles = {
   "root.tsx": {
     id: "root";
-    page: "/" | "/login" | "/register" | "/dashboard" | "/chat" | "/projects";
+    page: "/" | "/chat" | "/chat/:id" | "/settings" | "/profile" | "/language-models" | "/workflows" | "/prompts" | "/knowledge-bases" | "/marketplace" | "/archetypes" | "/memory" | "/admin/users" | "/admin/analytics" | "/admin/system" | "/admin/audit";
   };
   "routes/home.tsx": {
     id: "routes/home";
     page: "/";
   };
-  "routes/login.tsx": {
-    id: "routes/login";
-    page: "/login";
-  };
-  "routes/register.tsx": {
-    id: "routes/register";
-    page: "/register";
-  };
-  "components/layout/AppLayout.tsx": {
-    id: "components/layout/AppLayout";
-    page: "/dashboard" | "/chat" | "/projects";
-  };
-  "routes/dashboard.tsx": {
-    id: "routes/dashboard";
-    page: "/dashboard";
-  };
   "routes/chat.tsx": {
     id: "routes/chat";
     page: "/chat";
   };
-  "routes/projects.tsx": {
-    id: "routes/projects";
-    page: "/projects";
+  "routes/chat-detail.tsx": {
+    id: "routes/chat-detail";
+    page: "/chat/:id";
+  };
+  "routes/settings.tsx": {
+    id: "routes/settings";
+    page: "/settings";
+  };
+  "routes/profile.tsx": {
+    id: "routes/profile";
+    page: "/profile";
+  };
+  "routes/language-models.tsx": {
+    id: "routes/language-models";
+    page: "/language-models";
+  };
+  "routes/workflows.tsx": {
+    id: "routes/workflows";
+    page: "/workflows";
+  };
+  "routes/prompts.tsx": {
+    id: "routes/prompts";
+    page: "/prompts";
+  };
+  "routes/knowledge-bases.tsx": {
+    id: "routes/knowledge-bases";
+    page: "/knowledge-bases";
+  };
+  "routes/marketplace.tsx": {
+    id: "routes/marketplace";
+    page: "/marketplace";
+  };
+  "routes/archetypes.tsx": {
+    id: "routes/archetypes";
+    page: "/archetypes";
+  };
+  "routes/memory.tsx": {
+    id: "routes/memory";
+    page: "/memory";
+  };
+  "routes/admin-users.tsx": {
+    id: "routes/admin-users";
+    page: "/admin/users";
+  };
+  "routes/admin-analytics.tsx": {
+    id: "routes/admin-analytics";
+    page: "/admin/analytics";
+  };
+  "routes/admin-system.tsx": {
+    id: "routes/admin-system";
+    page: "/admin/system";
+  };
+  "routes/admin-audit.tsx": {
+    id: "routes/admin-audit";
+    page: "/admin/audit";
   };
 };
 
 type RouteModules = {
   "root": typeof import("./app/root.tsx");
   "routes/home": typeof import("./app/routes/home.tsx");
-  "routes/login": typeof import("./app/routes/login.tsx");
-  "routes/register": typeof import("./app/routes/register.tsx");
-  "components/layout/AppLayout": typeof import("./app/components/layout/AppLayout.tsx");
-  "routes/dashboard": typeof import("./app/routes/dashboard.tsx");
   "routes/chat": typeof import("./app/routes/chat.tsx");
-  "routes/projects": typeof import("./app/routes/projects.tsx");
+  "routes/chat-detail": typeof import("./app/routes/chat-detail.tsx");
+  "routes/settings": typeof import("./app/routes/settings.tsx");
+  "routes/profile": typeof import("./app/routes/profile.tsx");
+  "routes/language-models": typeof import("./app/routes/language-models.tsx");
+  "routes/workflows": typeof import("./app/routes/workflows.tsx");
+  "routes/prompts": typeof import("./app/routes/prompts.tsx");
+  "routes/knowledge-bases": typeof import("./app/routes/knowledge-bases.tsx");
+  "routes/marketplace": typeof import("./app/routes/marketplace.tsx");
+  "routes/archetypes": typeof import("./app/routes/archetypes.tsx");
+  "routes/memory": typeof import("./app/routes/memory.tsx");
+  "routes/admin-users": typeof import("./app/routes/admin-users.tsx");
+  "routes/admin-analytics": typeof import("./app/routes/admin-analytics.tsx");
+  "routes/admin-system": typeof import("./app/routes/admin-system.tsx");
+  "routes/admin-audit": typeof import("./app/routes/admin-audit.tsx");
 };

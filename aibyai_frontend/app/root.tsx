@@ -2,18 +2,57 @@ import {
   isRouteErrorResponse,
   Links,
   Meta,
+  NavLink,
   Outlet,
   Scripts,
   ScrollRestoration,
+  useLocation,
 } from "react-router";
+import {
+  MessageSquare,
+  LayoutDashboard,
+  Brain,
+  GitFork,
+  FileText,
+  Database,
+  Store,
+  Users as UsersIcon,
+  Settings,
+  UserCircle,
+  BarChart3,
+  Server,
+  ScrollText,
+  Hexagon,
+  BookOpen,
+  Wrench,
+  GitBranch,
+  FolderOpen,
+  ClipboardCheck,
+  LogOut,
+} from "lucide-react";
+
+import { TooltipProvider } from "~/components/ui/tooltip";
+import {
+  SidebarProvider,
+  Sidebar,
+  SidebarContent,
+  SidebarGroup,
+  SidebarGroupLabel,
+  SidebarGroupContent,
+  SidebarMenu,
+  SidebarMenuItem,
+  SidebarMenuButton,
+  SidebarFooter,
+  SidebarHeader,
+  SidebarTrigger,
+} from "~/components/ui/sidebar";
+import { mockUser } from "~/lib/mock-data";
 
 import type { Route } from "./+types/root";
 import "./app.css";
-import { AuthProvider } from "~/context/AuthContext";
-import { ThemeProvider } from "~/context/ThemeContext";
-import { Toaster } from "~/components/ui/sonner";
 
 export const links: Route.LinksFunction = () => [
+  { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
   { rel: "preconnect", href: "https://fonts.googleapis.com" },
   {
     rel: "preconnect",
@@ -22,35 +61,61 @@ export const links: Route.LinksFunction = () => [
   },
   {
     rel: "stylesheet",
-    href: "https://fonts.googleapis.com/css2?family=DM+Sans:ital,opsz,wght@0,9..40,100..1000;1,9..40,100..1000&family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
+    href: "https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap",
   },
-  { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
 ];
 
-export function meta() {
-  return [
-    { title: "aibyai - AI Deliberation Platform" },
-    {
-      name: "description",
-      content:
-        "Multi-agent AI deliberation platform for teams. Orchestrate AI conversations, workflows, and knowledge.",
-    },
-    { property: "og:title", content: "aibyai - AI Deliberation Platform" },
-    {
-      property: "og:description",
-      content:
-        "Multi-agent AI deliberation platform for teams. Orchestrate AI conversations, workflows, and knowledge.",
-    },
-    { property: "og:type", content: "website" },
-    { name: "twitter:card", content: "summary_large_image" },
-    { name: "twitter:title", content: "aibyai - AI Deliberation Platform" },
-    {
-      name: "twitter:description",
-      content:
-        "Multi-agent AI deliberation platform for teams.",
-    },
-  ];
-}
+const navGroups = [
+  {
+    label: "Intelligence",
+    items: [
+      { to: "/", icon: LayoutDashboard, label: "Dashboard", end: true },
+      { to: "/chat", icon: MessageSquare, label: "Deliberations" },
+      { to: "/archetypes", icon: Hexagon, label: "Archetypes" },
+    ],
+  },
+  {
+    label: "Automation",
+    items: [
+      { to: "/workflows", icon: GitFork, label: "Workflows" },
+      { to: "/prompts", icon: FileText, label: "Prompts" },
+      { to: "/skills", icon: Wrench, label: "Skills" },
+    ],
+  },
+  {
+    label: "Knowledge",
+    items: [
+      { to: "/knowledge-bases", icon: Database, label: "Knowledge Bases" },
+      { to: "/repos", icon: GitBranch, label: "Repositories" },
+      { to: "/memory", icon: BookOpen, label: "Memory" },
+    ],
+  },
+  {
+    label: "Workspace",
+    items: [
+      { to: "/projects", icon: FolderOpen, label: "Projects" },
+      { to: "/evaluation", icon: ClipboardCheck, label: "Evaluation" },
+      { to: "/marketplace", icon: Store, label: "Marketplace" },
+    ],
+  },
+  {
+    label: "Configuration",
+    items: [
+      { to: "/language-models", icon: Brain, label: "Language Models" },
+      { to: "/settings", icon: Settings, label: "Settings" },
+      { to: "/profile", icon: UserCircle, label: "Profile" },
+    ],
+  },
+  {
+    label: "Admin",
+    items: [
+      { to: "/admin/users", icon: UsersIcon, label: "Users" },
+      { to: "/admin/analytics", icon: BarChart3, label: "Analytics" },
+      { to: "/admin/system", icon: Server, label: "System" },
+      { to: "/admin/audit", icon: ScrollText, label: "Audit Log" },
+    ],
+  },
+];
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
@@ -62,12 +127,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <Links />
       </head>
       <body>
-        <ThemeProvider>
-          <AuthProvider>
-            {children}
-            <Toaster position="bottom-right" />
-          </AuthProvider>
-        </ThemeProvider>
+        {children}
         <ScrollRestoration />
         <Scripts />
       </body>
@@ -75,8 +135,113 @@ export function Layout({ children }: { children: React.ReactNode }) {
   );
 }
 
+function NavItem({
+  item,
+}: {
+  item: { to: string; icon: React.ElementType; label: string; end?: boolean };
+}) {
+  const location = useLocation();
+  const isActive = item.end
+    ? location.pathname === item.to
+    : location.pathname.startsWith(item.to);
+
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton asChild isActive={isActive} tooltip={item.label}>
+        <NavLink to={item.to} end={item.end}>
+          <item.icon className="size-4" />
+          <span>{item.label}</span>
+        </NavLink>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
+  );
+}
+
+function AppSidebar() {
+  return (
+    <Sidebar collapsible="icon">
+      <SidebarHeader className="px-3 py-4">
+        <NavLink to="/" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
+          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground text-xs font-bold">
+            A
+          </div>
+          <span className="text-sm font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
+            AIBYAI
+          </span>
+        </NavLink>
+      </SidebarHeader>
+      <SidebarContent>
+        {navGroups.map((group) => (
+          <SidebarGroup key={group.label}>
+            <SidebarGroupLabel>{group.label}</SidebarGroupLabel>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {group.items.map((item) => (
+                  <NavItem key={item.to} item={item} />
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        ))}
+      </SidebarContent>
+      <SidebarFooter>
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip={mockUser.name}>
+              <NavLink to="/profile" className="flex items-center gap-2">
+                <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground text-[10px] font-medium">
+                  {mockUser.name
+                    .split(" ")
+                    .map((n) => n[0])
+                    .join("")}
+                </div>
+                <div className="flex flex-col group-data-[collapsible=icon]:hidden">
+                  <span className="text-xs font-medium leading-none">
+                    {mockUser.name}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground leading-tight mt-0.5">
+                    {mockUser.role}
+                  </span>
+                </div>
+              </NavLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+          <SidebarMenuItem>
+            <SidebarMenuButton asChild tooltip="Logout">
+              <NavLink to="/login" className="flex items-center gap-2 text-muted-foreground hover:text-foreground">
+                <LogOut className="size-4" />
+                <span className="group-data-[collapsible=icon]:hidden text-xs">Logout</span>
+              </NavLink>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
+    </Sidebar>
+  );
+}
+
 export default function App() {
-  return <Outlet />;
+  const location = useLocation();
+  const isAuthPage = location.pathname === "/login" || location.pathname === "/register";
+
+  if (isAuthPage) {
+    return <Outlet />;
+  }
+
+  return (
+    <TooltipProvider>
+      <SidebarProvider>
+        <AppSidebar />
+        <main className="flex-1 overflow-auto">
+          <div className="flex items-center gap-2 border-b border-border px-4 py-2 md:hidden">
+            <SidebarTrigger />
+            <span className="text-sm font-semibold">AIBYAI</span>
+          </div>
+          <Outlet />
+        </main>
+      </SidebarProvider>
+    </TooltipProvider>
+  );
 }
 
 export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
@@ -96,11 +261,11 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
   }
 
   return (
-    <main className="flex flex-col items-center justify-center min-h-screen p-4 bg-background text-foreground">
-      <h1 className="text-4xl font-bold mb-2">{message}</h1>
-      <p className="text-muted-foreground mb-4">{details}</p>
+    <main className="pt-16 p-4 container mx-auto">
+      <h1>{message}</h1>
+      <p>{details}</p>
       {stack && (
-        <pre className="w-full max-w-2xl p-4 overflow-x-auto rounded-lg bg-muted text-sm">
+        <pre className="w-full p-4 overflow-x-auto">
           <code>{stack}</code>
         </pre>
       )}
