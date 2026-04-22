@@ -64,7 +64,7 @@ async function safeLookup(hostname: string): Promise<dns.LookupAddress[]> {
   const timeout = setTimeout(() => controller.abort(), DNS_TIMEOUT_MS);
 
   try {
-    const result = await lookup(hostname, { all: true });
+    const result = await lookup(hostname, { all: true, signal: controller.signal });
     return result;
   } finally {
     clearTimeout(timeout);

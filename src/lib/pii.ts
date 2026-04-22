@@ -79,7 +79,17 @@ const PII_PATTERNS: { type: string; pattern: RegExp; severity: 'low' | 'medium' 
   { type: "company", pattern: /\b[A-Z][a-z]+(?:\s+[A-Z][a-z]+)*\s+(?:Inc|LLC|Corp|Ltd)\.?\b/g, severity: "low" },
 ];
 
+const MAX_INPUT_LENGTH = 100_000;
+
 export function detectPII(text: string): PIIDetection {
+  if (!text) {
+    return { found: false, types: [], matches: [], anonymized: text ?? '', riskScore: 0, recommendations: [] };
+  }
+
+  if (text.length > MAX_INPUT_LENGTH) {
+    text = text.slice(0, MAX_INPUT_LENGTH);
+  }
+
   const matches: PIIDetection["matches"] = [];
   const types = new Set<string>();
   let riskScore = 0;

@@ -147,6 +147,10 @@ interface SandboxCommand {
   args: string[];
 }
 
+// P1-35: Cap output arrays to prevent Node heap exhaustion (match jsSandbox limits)
+const MAX_OUTPUT_LINES = 1000;
+const MAX_OUTPUT_BYTES = 1_000_000; // 1MB total output cap
+
 function buildCommand(tmpFile: string, tmpDir: string): SandboxCommand {
   if (isolationLevel === "bwrap") {
     // bubblewrap provides the strongest userspace sandboxing:
@@ -210,12 +214,14 @@ export async function executePython(code: string, timeout: number = 10000): Prom
 
   try {
     // Create isolated temp directory
-    fs.mkdirSync(tmpDir, { mode: 0o700 });
-    fs.writeFileSync(tmpFile, SANDBOX_PREAMBLE + "\n" + code, { encoding: "utf-8", mode: 0o600 });
+    await fs.promises.mkdir(tmpDir, { mode: 0o700 });
+    await fs.promises.writeFile(tmpFile, SANDBOX_PREAMBLE + "\n" + code, { encoding: "utf-8", mode: 0o600 });
 
     return await new Promise<SandboxResult>((resolve) => {
       const stdout: string[] = [];
       const stderr: string[] = [];
+      let totalBytes = 0;
+      let outputLimitExceeded = false;
 
       const { cmd, args } = buildCommand(tmpFile, tmpDir);
 
@@ -240,11 +246,35 @@ export async function executePython(code: string, timeout: number = 10000): Prom
       });
 
       proc.stdout.on("data", (data) => {
-        stdout.push(...data.toString().split("\n").filter((l: string) => l.length > 0));
+        if (outputLimitExceeded) return;
+        const lines = data.toString().split("\n").filter((l: string) => l.length > 0);
+        for (const line of lines) {
+          if (stdout.length >= MAX_OUTPUT_LINES || totalBytes >= MAX_OUTPUT_BYTES) {
+            outputLimitExceeded = true;
+            stdout.push("[output truncated — limit exceeded]");
+            proc.kill("SIGKILL");
+            return;
+          }
+          const truncated = line.slice(0, MAX_OUTPUT_BYTES - totalBytes);
+          stdout.push(truncated);
+          totalBytes += truncated.length;
+        }
       });
 
       proc.stderr.on("data", (data) => {
-        stderr.push(...data.toString().split("\n").filter((l: string) => l.length > 0));
+        if (outputLimitExceeded) return;
+        const lines = data.toString().split("\n").filter((l: string) => l.length > 0);
+        for (const line of lines) {
+          if (stderr.length >= MAX_OUTPUT_LINES || totalBytes >= MAX_OUTPUT_BYTES) {
+            outputLimitExceeded = true;
+            stderr.push("[output truncated — limit exceeded]");
+            proc.kill("SIGKILL");
+            return;
+          }
+          const truncated = line.slice(0, MAX_OUTPUT_BYTES - totalBytes);
+          stderr.push(truncated);
+          totalBytes += truncated.length;
+        }
       });
 
       proc.on("close", (exitCode) => {
@@ -265,6 +295,6 @@ export async function executePython(code: string, timeout: number = 10000): Prom
     });
   } finally {
     // Clean up sandbox directory
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* cleanup best-effort */ }
+    try { await fs.promises.rm(tmpDir, { recursive: true, force: true }); } catch { /* cleanup best-effort */ }
   }
 }

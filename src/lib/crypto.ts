@@ -12,7 +12,8 @@ const HKDF_SALT = Buffer.from("aibyai-encryption-v1", "utf8");
 const HKDF_INFO = Buffer.from("aes-256-gcm-key", "utf8");
 
 // P0-21: Support multiple key versions for rotation
-const CURRENT_KEY_VERSION = parseInt(process.env.CURRENT_ENCRYPTION_VERSION || "1", 10);
+const parsedKeyVersion = parseInt(process.env.CURRENT_ENCRYPTION_VERSION || "1", 10);
+const CURRENT_KEY_VERSION = Number.isNaN(parsedKeyVersion) ? 1 : parsedKeyVersion;
 
 // P0-14: Use HKDF-SHA256 instead of raw sha256 for key derivation
 function getMasterKey(customKey?: string): Buffer {

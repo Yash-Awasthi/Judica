@@ -19,6 +19,11 @@ import { eq } from "drizzle-orm";
 import { env } from "../config/env.js";
 import logger from "../lib/logger.js";
 
+// Map of generated OAuth state tokens to their creation timestamps (ms).
+// Used to validate the state parameter on callback and prevent CSRF attacks.
+const STATE_TTL_MS = 10 * 60 * 1000; // 10 minutes
+const pendingStates = new Map<string, number>();
+
 interface GitHubEmail {
   email: string;
   verified: boolean;
@@ -51,11 +56,24 @@ export async function githubOAuthPlugin(fastify: FastifyInstance): Promise<void>
     generateStateFunction: (_request: unknown) => {
       // P8-33: Generate cryptographic state parameter to prevent CSRF on OAuth flow
       const state = crypto.randomBytes(32).toString("hex");
+      pendingStates.set(state, Date.now());
+      // Prune expired states to prevent unbounded growth
+      for (const [key, ts] of pendingStates) {
+        if (Date.now() - ts > STATE_TTL_MS) pendingStates.delete(key);
+      }
       return state;
     },
-    checkStateFunction: (_returnedState: string, _callback: (err?: Error) => void) => {
-      // P8-33: @fastify/oauth2 handles state validation internally when generateStateFunction is provided
-      _callback();
+    checkStateFunction: (returnedState: string, callback: (err?: Error) => void) => {
+      const createdAt = pendingStates.get(returnedState);
+      if (createdAt === undefined) {
+        return callback(new Error("Invalid OAuth state parameter"));
+      }
+      // Remove after use — each state token is single-use
+      pendingStates.delete(returnedState);
+      if (Date.now() - createdAt > STATE_TTL_MS) {
+        return callback(new Error("OAuth state parameter has expired"));
+      }
+      callback();
     },
     discovery: {
       issuer: "https://github.com",
@@ -162,7 +180,7 @@ export function createGitHubStrategy(): GitHubStrategy | null {
           .limit(1);
 
         if (existing) {
-          if (existing.passwordHash && existing.passwordHash !== "") {
+          if (existing.authMethod === "password") {
             return done(new Error("An account with this email already exists from a different sign-in method."));
           }
           return done(null, existing);
@@ -175,6 +193,7 @@ export function createGitHubStrategy(): GitHubStrategy | null {
             username: profile.username || profile.displayName || email.split("@")[0],
             passwordHash: "",
             role: "member",
+            authMethod: "github",
           })
           .returning();
 
