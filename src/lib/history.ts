@@ -71,14 +71,18 @@ export async function getRecentHistory(conversationId: string, userId?: number):
   return budgetedMessages;
 }
 
-export async function getHistoryWithContext(conversationId: string): Promise<Message[]> {
+export async function getHistoryWithContext(conversationId: string, userId?: number): Promise<Message[]> {
   const [summary] = await db.select().from(contextSummaries)
     .where(eq(contextSummaries.conversationId, conversationId))
     .orderBy(desc(contextSummaries.createdAt))
     .limit(1);
 
+  const historyWhereClause = userId
+    ? and(eq(chats.conversationId, conversationId), eq(chats.userId, userId))
+    : eq(chats.conversationId, conversationId);
+
   const recentChats = await db.select().from(chats)
-    .where(eq(chats.conversationId, conversationId))
+    .where(historyWhereClause)
     .orderBy(desc(chats.createdAt))
     .limit(5);
   recentChats.reverse();
@@ -161,8 +165,9 @@ function hasKeywordOverlap(text: string, keywords: string[]): boolean {
   return keywords.some(keyword => lowerText.includes(keyword));
 }
 
+const stopWords = new Set(['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'what', 'which', 'who', 'when', 'where', 'why', 'how', 'not', 'no', 'yes', 'if', 'then', 'else', 'because', 'since', 'until', 'while', 'during', 'before', 'after', 'above', 'below', 'under', 'over', 'between', 'among', 'through', 'against', 'without', 'within', 'upon', 'about', 'along', 'around', 'behind', 'beyond', 'inside', 'outside', 'toward', 'towards', 'into', 'onto', 'onto', 'off']);
+
 function isStopWord(word: string): boolean {
-  const stopWords = new Set(['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'what', 'which', 'who', 'when', 'where', 'why', 'how', 'not', 'no', 'yes', 'if', 'then', 'else', 'because', 'since', 'until', 'while', 'during', 'before', 'after', 'above', 'below', 'under', 'over', 'between', 'among', 'through', 'against', 'without', 'within', 'upon', 'about', 'along', 'around', 'behind', 'beyond', 'inside', 'outside', 'toward', 'towards', 'into', 'onto', 'onto', 'off']);
   return stopWords.has(word);
 }
 
@@ -195,7 +200,8 @@ async function extractRelevantMemories(conversationId: string, keywords: string[
 export async function updateEnhancedContextSummary(conversationId: string): Promise<void> {
   const allChats = await db.select().from(chats)
     .where(eq(chats.conversationId, conversationId))
-    .orderBy(asc(chats.createdAt));
+    .orderBy(asc(chats.createdAt))
+    .limit(1000);
 
   if (allChats.length <= 8) return; // Wait for more substantial conversation
 

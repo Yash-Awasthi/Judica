@@ -6,7 +6,8 @@ import { createHash } from "crypto";
 
 // P10-59: Grounding result cache — keyed by (response_hash, source_hash)
 const groundingCache = new Map<string, { result: GroundingResult; expiresAt: number }>();
-const GROUNDING_CACHE_TTL = parseInt(process.env.GROUNDING_CACHE_TTL_MS || "600000", 10); // 10 min
+const GROUNDING_CACHE_TTL_RAW = parseInt(process.env.GROUNDING_CACHE_TTL_MS || "600000", 10);
+const GROUNDING_CACHE_TTL = Number.isNaN(GROUNDING_CACHE_TTL_RAW) ? 600_000 : GROUNDING_CACHE_TTL_RAW; // 10 min
 const MAX_GROUNDING_CACHE = 200;
 
 function hashContent(content: string): string {
@@ -21,8 +22,12 @@ export class GroundingModule {
     const contextHash = hashContent(context.map(c => c.answer).join("|"));
     const cacheKey = `${responseHash}:${contextHash}`;
     const cached = groundingCache.get(cacheKey);
-    if (cached && cached.expiresAt > Date.now()) {
-      return cached.result;
+    if (cached) {
+      if (cached.expiresAt > Date.now()) {
+        return cached.result;
+      }
+      // TTL expired — remove stale entry
+      groundingCache.delete(cacheKey);
     }
 
     const contextText = context.map((c, i) => `Response ${i+1}: ${c.answer}`).join("\n\n");

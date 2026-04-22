@@ -290,7 +290,7 @@ Do not include any text outside the JSON object.`;
     validatedOpinions.map(o => ({ 
       name: o.name, 
       opinion: o.opinion, 
-      structured: o.structured!,
+      structured: o.structured ?? { answer: '', reasoning: '', key_points: [], assumptions: [], confidence: 0 },
       isFallback: o.isFallback,
       adversarial: (o as unknown as { adversarial?: AdversarialResult }).adversarial,
       grounding: (o as unknown as { grounding?: GroundingResult }).grounding
