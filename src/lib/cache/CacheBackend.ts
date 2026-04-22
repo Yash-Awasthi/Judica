@@ -35,3 +35,13 @@ export interface CacheBackend {
 
   cleanup?(): Promise<void>;
 }
+
+/**
+ * P56-10: TTL validation helper — call at the start of set/setSemantic implementations.
+ * Throws if ttlMs is not a positive finite number.
+ */
+export function validateTtl(ttlMs: number): void {
+  if (!Number.isFinite(ttlMs) || ttlMs <= 0) {
+    throw new RangeError(`Invalid TTL: ${ttlMs}ms — must be a positive finite number`);
+  }
+}

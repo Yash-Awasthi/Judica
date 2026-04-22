@@ -69,6 +69,8 @@ export class OpenAIProvider extends BaseProvider {
         const decoder = new TextDecoder();
         let text = "";
         let buffer = "";
+        // P40-10: Cap buffer to prevent unbounded memory from malicious streams
+        const MAX_BUFFER_SIZE = 10_000_000;
         let streamUsage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null = null;
 
         while (true) {
@@ -76,6 +78,9 @@ export class OpenAIProvider extends BaseProvider {
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
+          if (buffer.length > MAX_BUFFER_SIZE) {
+            throw new Error("SSE buffer exceeded maximum size");
+          }
           let newlineIndex;
           while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
             const line = buffer.slice(0, newlineIndex).trim();
@@ -130,10 +135,13 @@ export class OpenAIProvider extends BaseProvider {
 
         const nextMessages = [...messages, msg];
         for (const tc of msg.tool_calls) {
-          const result = await callTool({ 
-            id: tc.id, 
-            name: tc.function.name, 
-            arguments: (() => { try { return JSON.parse(tc.function.arguments); } catch { return {}; } })()
+          // P40-01: Safe JSON.parse on tool arguments from API response
+          let toolArgs: Record<string, unknown> = {};
+          try { toolArgs = JSON.parse(tc.function.arguments); } catch { /* malformed args */ }
+          const result = await callTool({
+            id: tc.id,
+            name: tc.function.name,
+            arguments: toolArgs
           });
           
           const safeResult = `[UNTRUSTED TOOL OUTPUT]\n${result.result || result}\n[/UNTRUSTED TOOL OUTPUT]`;

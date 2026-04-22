@@ -8,10 +8,19 @@ declare module '@bull-board/api' {
   }
 }
 
+// NOTE: Project uses Fastify; this express stub may be unused. See @bull-board/fastify below.
 declare module '@bull-board/express' {
   export class ExpressAdapter {
     setBasePath(path: string): void;
     getRouter(): unknown;
+  }
+}
+
+// P60-06: The project uses Fastify — add @bull-board/fastify stub
+declare module '@bull-board/fastify' {
+  export class FastifyAdapter {
+    setBasePath(path: string): void;
+    plugin(): unknown;
   }
 }
 

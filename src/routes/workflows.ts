@@ -449,13 +449,14 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
 
     const { choice, nodeId } = request.body as { choice?: string; nodeId?: string };
     if (!choice) throw new AppError(400, "Choice is required", "GATE_CHOICE_REQUIRED");
+    if (!nodeId) throw new AppError(400, "nodeId is required", "GATE_NODE_REQUIRED");
 
     const active = activeRuns.get(run.id);
     if (!active) {
       throw new AppError(400, "No active executor for this run", "GATE_NO_ACTIVE_RUN");
     }
 
-    active.executor.resumeGate(nodeId!, choice);
+    active.executor.resumeGate(nodeId, choice);
     return { success: true };
   });
 };

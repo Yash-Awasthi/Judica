@@ -90,6 +90,10 @@ async function setRedisExpiry(streamId: string): Promise<void> {
  * Create a new artifact stream.
  */
 export function createStream(userId: number, title: string, agentId?: string): string {
+  if (streams.size > 10000) {
+    cleanupStreams(CLEANUP_MAX_AGE_MS);
+  }
+
   const id = `stream_${crypto.randomBytes(8).toString("hex")}`;
 
   // Enforce stream cap — clean up old streams first
@@ -278,6 +282,10 @@ export function formatAsSSE(artifact: Artifact): string {
 /**
  * Clean up old completed streams.
  */
+// Auto-cleanup completed streams every hour to prevent memory leak
+const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+const CLEANUP_MAX_AGE_MS = 4 * 60 * 60 * 1000; // 4 hours
+
 export function cleanupStreams(maxAgeMs: number = 86400_000): number {
   const cutoff = Date.now() - maxAgeMs;
   let removed = 0;
@@ -290,3 +298,10 @@ export function cleanupStreams(maxAgeMs: number = 86400_000): number {
   }
   return removed;
 }
+
+setInterval(() => {
+  const removed = cleanupStreams(CLEANUP_MAX_AGE_MS);
+  if (removed > 0) {
+    logger.info({ removed }, "Auto-cleaned artifact streams");
+  }
+}, CLEANUP_INTERVAL_MS).unref();

@@ -13,7 +13,11 @@ export const vector = customType<{
   },
   fromDriver(value) {
     if (typeof value === "string") {
-      return value.replace(/[[\]]/g, "").split(",").map(Number);
+      const nums = value.replace(/[[\]]/g, "").split(",").map(Number);
+      if (nums.some(n => !Number.isFinite(n))) {
+        throw new Error("Vector contains non-finite values");
+      }
+      return nums;
     }
     return value as number[];
   },

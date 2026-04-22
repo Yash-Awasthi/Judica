@@ -102,11 +102,14 @@ export function getBreaker<T extends (...args: unknown[]) => Promise<unknown>>(
   return wrapBreaker(breaker, provider) as CircuitBreaker<Parameters<T>, ReturnType<T>>;
 }
 
-// P9-11 + P1-11: Runtime guard on fire() return value
+// P9-11 + P1-11: Runtime guard on fire() return value.
+// Override fire() directly on the breaker instance instead of using
+// Object.create() prototype chain, which is fragile (mutations leak,
+// prototype traversal can expose internal state).  Since each breaker
+// is already cached per-key, direct mutation is safe.
 function wrapBreaker(breaker: CircuitBreaker, provider: Pick<Provider, "name">): CircuitBreaker {
   const originalFire = breaker.fire.bind(breaker);
-  const guardedBreaker = Object.create(breaker);
-  guardedBreaker.fire = async function (...args: unknown[]) {
+  breaker.fire = async function (...args: unknown[]) {
     const result = await originalFire(...args);
     // P9-11: Runtime type guard — reject non-Response values
     if (result && typeof result === "object" && "ok" in (result as object)) {
@@ -114,5 +117,5 @@ function wrapBreaker(breaker: CircuitBreaker, provider: Pick<Provider, "name">):
     }
     throw new Error(`CircuitBreaker for ${provider.name} returned non-Response (breaker may be open)`);
   };
-  return guardedBreaker;
+  return breaker;
 }

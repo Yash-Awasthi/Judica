@@ -4,6 +4,7 @@ import {
   timestamp,
   boolean,
   integer,
+  jsonb,
   index,
 } from "drizzle-orm/pg-core";
 import { users } from "./users.js";
@@ -48,7 +49,8 @@ export const memoryBackends = pgTable("MemoryBackend", {
     .unique()
     .references(() => users.id, { onDelete: "cascade" }),
   type: text("type").notNull(),
-  config: text("config").notNull(),
+  // P55-07: Use jsonb for structured config — enables JSON validation and query operators
+  config: jsonb("config").notNull(),
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
 });
