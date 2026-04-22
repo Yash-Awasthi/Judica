@@ -81,6 +81,9 @@ export function decrypt(encryptedText: string, customKey?: string, aad?: string)
 
     const iv = Buffer.from(ivHex, "hex");
     const tag = Buffer.from(tagHex, "hex");
+    // P33-10: Validate IV and auth tag lengths for AES-256-GCM
+    if (iv.length !== 12) throw new Error("Invalid IV length: expected 12 bytes");
+    if (tag.length !== 16) throw new Error("Invalid auth tag length: expected 16 bytes");
     const key = getMasterKey(customKey);
     const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
 

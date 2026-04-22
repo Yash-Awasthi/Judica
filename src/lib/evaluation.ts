@@ -199,6 +199,8 @@ const OPTIMAL_DURATION_PER_AGENT_MS = parseInt(process.env.EVAL_OPTIMAL_DURATION
 const OPTIMAL_TOKENS_PER_AGENT = parseInt(process.env.EVAL_OPTIMAL_TOKENS_PER_AGENT || "1000", 10);
 
 function calculateEfficiency(totalTokens: number, agentCount: number, duration: number): number {
+  // P33-09: Guard against division by zero when agentCount is 0
+  if (agentCount <= 0 || !Number.isFinite(totalTokens) || !Number.isFinite(duration) || duration <= 0) return 0;
   const tokensPerAgent = totalTokens / agentCount;
 
   const optimalDuration = agentCount * OPTIMAL_DURATION_PER_AGENT_MS;

@@ -44,8 +44,9 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
 
     return AdminService.getUsers({
       search,
-      limit: parseInt(String(limit)),
-      offset: parseInt(String(offset)),
+      // P33-01: NaN-safe parseInt with explicit radix and fallback
+      limit: Math.min(Math.max(1, Number.isFinite(parseInt(String(limit), 10)) ? parseInt(String(limit), 10) : 50), 200),
+      offset: Math.max(0, Number.isFinite(parseInt(String(offset), 10)) ? parseInt(String(offset), 10) : 0),
       sortBy: safeSortBy,
       sortOrder: safeSortOrder
     });
@@ -234,7 +235,10 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   // GET /analytics/daily-volume — time-series usage data
   fastify.get("/analytics/daily-volume", async (request, _reply) => {
     const { days = 30 } = request.query as { days?: string | number };
-    const data = await AdminService.getUsageAnalytics(parseInt(String(days)));
+    // P33-02: NaN-safe parseInt with bounds on days parameter
+    const _daysRaw = parseInt(String(days), 10);
+    const safeDays = Number.isFinite(_daysRaw) && _daysRaw > 0 ? Math.min(_daysRaw, 365) : 30;
+    const data = await AdminService.getUsageAnalytics(safeDays);
     return { data };
   });
 
@@ -251,10 +255,11 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
     const { actionType, limit, offset, startDate, endDate } = request.query as { actionType?: string; limit?: string; offset?: string; startDate?: string; endDate?: string };
     const logs = await AdminService.getAuditLogs({
       actionType,
-      limit: limit ? parseInt(limit) : 50,
-      offset: offset ? parseInt(offset) : 0,
-      startDate: startDate ? new Date(startDate) : undefined,
-      endDate: endDate ? new Date(endDate) : undefined,
+      // P33-03: NaN-safe parseInt + validate Date construction
+      limit: Math.min(Math.max(1, Number.isFinite(parseInt(limit || "", 10)) ? parseInt(limit || "", 10) : 50), 500),
+      offset: Math.max(0, Number.isFinite(parseInt(offset || "", 10)) ? parseInt(offset || "", 10) : 0),
+      startDate: startDate && !isNaN(new Date(startDate).getTime()) ? new Date(startDate) : undefined,
+      endDate: endDate && !isNaN(new Date(endDate).getTime()) ? new Date(endDate) : undefined,
     });
     return logs;
   });
@@ -298,10 +303,12 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
       limit?: string;
     };
 
-    const limit = Math.min(parseInt(rawLimit || "10000", 10), 50_000);
+    // P33-04: NaN-safe parseInt + validate Date for export
+    const _limitRaw = parseInt(rawLimit || "10000", 10);
+    const limit = Math.min(Number.isFinite(_limitRaw) ? _limitRaw : 10000, 50_000);
     const conditions = [];
-    if (from) conditions.push(gte(auditLogs.createdAt, new Date(from)));
-    if (to) conditions.push(lte(auditLogs.createdAt, new Date(to)));
+    if (from && !isNaN(new Date(from).getTime())) conditions.push(gte(auditLogs.createdAt, new Date(from)));
+    if (to && !isNaN(new Date(to).getTime())) conditions.push(lte(auditLogs.createdAt, new Date(to)));
 
     const filename = `audit-export-${new Date().toISOString().split("T")[0]}.jsonl`;
 

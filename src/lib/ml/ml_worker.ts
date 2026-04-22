@@ -82,6 +82,16 @@ class MLWorker {
       throw err;
     }
 
+    // P33-05: Cap input text length to prevent subprocess buffer overflow
+    const MAX_TEXT_LEN = 10_000;
+    if (text1.length > MAX_TEXT_LEN) text1 = text1.slice(0, MAX_TEXT_LEN);
+    if (text2.length > MAX_TEXT_LEN) text2 = text2.slice(0, MAX_TEXT_LEN);
+
+    // P33-06: Cap callback queue to prevent unbounded accumulation
+    if (this.callbacks.length >= 100) {
+      throw new Error("ML worker callback queue full — too many concurrent requests");
+    }
+
     await this.init();
 
     if (!this.process || !this.process.stdin) {

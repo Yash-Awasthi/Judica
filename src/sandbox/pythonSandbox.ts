@@ -203,6 +203,9 @@ function buildCommand(tmpFile: string, tmpDir: string): SandboxCommand {
 }
 
 export async function executePython(code: string, timeout: number = 10000): Promise<SandboxResult> {
+  // P33-07: Validate timeout bounds
+  if (!Number.isFinite(timeout) || timeout < 1000) timeout = 1000;
+  if (timeout > 60_000) timeout = 60_000;
   const start = Date.now();
   const sandboxId = crypto.randomBytes(8).toString("hex");
   const tmpDir = path.join(os.tmpdir(), `sandbox_${sandboxId}`);
@@ -239,12 +242,20 @@ export async function executePython(code: string, timeout: number = 10000): Prom
         cwd: tmpDir,
       });
 
+      // P33-08: Cap stdout/stderr arrays to prevent unbounded memory growth
+      const MAX_OUTPUT_LINES = 5000;
       proc.stdout.on("data", (data) => {
-        stdout.push(...data.toString().split("\n").filter((l: string) => l.length > 0));
+        if (stdout.length < MAX_OUTPUT_LINES) {
+          const lines = data.toString().split("\n").filter((l: string) => l.length > 0);
+          stdout.push(...lines.slice(0, MAX_OUTPUT_LINES - stdout.length));
+        }
       });
 
       proc.stderr.on("data", (data) => {
-        stderr.push(...data.toString().split("\n").filter((l: string) => l.length > 0));
+        if (stderr.length < MAX_OUTPUT_LINES) {
+          const lines = data.toString().split("\n").filter((l: string) => l.length > 0);
+          stderr.push(...lines.slice(0, MAX_OUTPUT_LINES - stderr.length));
+        }
       });
 
       proc.on("close", (exitCode) => {
