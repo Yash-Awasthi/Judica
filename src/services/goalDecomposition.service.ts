@@ -66,7 +66,19 @@ Goal: ${goal}${contextBlock}`,
       throw new Error("Failed to parse task decomposition");
     }
 
-    const parsed = JSON.parse(match[0]) as { tasks: Omit<SubTask, "status">[] };
+    // P32-05: Safe JSON.parse with try-catch + cap tasks array
+    let parsed: { tasks: Omit<SubTask, "status">[] };
+    try {
+      parsed = JSON.parse(match[0]) as { tasks: Omit<SubTask, "status">[] };
+    } catch {
+      throw new Error("Failed to parse task decomposition JSON");
+    }
+    if (!Array.isArray(parsed.tasks)) {
+      throw new Error("Invalid task decomposition: tasks is not an array");
+    }
+    if (parsed.tasks.length > 50) {
+      parsed.tasks = parsed.tasks.slice(0, 50);
+    }
 
     const tasks: SubTask[] = parsed.tasks.map((t) => ({
       ...t,
@@ -238,6 +250,8 @@ export async function runMCTS(
   branches = 5,
   context?: string
 ): Promise<MCTSResult> {
+  // P32-06: Cap branches to prevent unbounded LLM calls
+  branches = Math.min(Math.max(1, branches), 20);
   const contextBlock = context ? `\nContext: ${context.substring(0, 1500)}` : "";
 
   // ── Step 1: Generate an ideal reference answer (anchor for scoring) ────

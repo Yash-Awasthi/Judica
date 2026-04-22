@@ -74,7 +74,12 @@ Return ONLY the JSON object.`,
 
     const match = result.text.match(/\{[\s\S]*\}/);
     if (match) {
-      return JSON.parse(match[0]) as ImageAnalysis;
+      // P32-07: Safe JSON.parse with try-catch on LLM output
+      try {
+        return JSON.parse(match[0]) as ImageAnalysis;
+      } catch {
+        return { description: "Unable to parse analysis JSON", elements: [], text: [], relevance: "unknown" };
+      }
     }
     return { description: "Unable to analyze image", elements: [], text: [], relevance: "unknown" };
   } catch (err) {
@@ -113,6 +118,8 @@ export async function crossModalAnalysis(
   inputs: MultiModalInput[],
   question: string,
 ): Promise<CrossModalInsight[]> {
+  // P32-08: Cap inputs array to prevent unbounded processing
+  if (inputs.length > 20) inputs = inputs.slice(0, 20);
   try {
     const inputDescriptions = inputs
       .map((input, i) => {
