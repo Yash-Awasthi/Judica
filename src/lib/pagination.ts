@@ -68,14 +68,15 @@ export function buildOffsetMeta(page: number, limit: number, total: number): Pag
  * Build cursor pagination response metadata.
  */
 export function buildCursorMeta(limit: number, items: unknown[], cursorField?: string): PaginationMeta {
-  const lastItem = items[items.length - 1] as Record<string, unknown> | undefined;
-  const nextCursor = items.length >= limit && lastItem
-    ? String(lastItem[cursorField || "id"] ?? "")
-    : null;
+  const hasMore = items.length >= limit;
+  let nextCursor: string | null = null;
 
-  return {
-    limit,
-    hasMore: items.length >= limit,
-    nextCursor,
-  };
+  if (hasMore && items.length > 0) {
+    const lastItem = items[items.length - 1] as Record<string, unknown>;
+    const cursorValue = lastItem[cursorField || "id"];
+    // P57-07: Guard against undefined/null cursor values producing "undefined" strings
+    nextCursor = cursorValue != null ? String(cursorValue) : null;
+  }
+
+  return { limit, hasMore, nextCursor };
 }

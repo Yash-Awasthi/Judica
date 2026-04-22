@@ -67,7 +67,8 @@ class CalibrationTracker {
       ? this.records.filter((r) => r.model === model)
       : this.records;
 
-    if (filtered.length === 0) return NaN;
+    // P20-06: Return 0 instead of NaN for empty datasets — NaN propagates silently to callers
+    if (filtered.length === 0) return 0;
 
     const sum = filtered.reduce((acc, r) => {
       const outcome = r.correct ? 1 : 0;
@@ -128,8 +129,9 @@ class CalibrationTracker {
       ? this.records.filter((r) => r.model === model)
       : this.records;
 
+    // P20-06: Return 0 instead of NaN — prevents NaN propagation in JSON responses
     if (filtered.length === 0) {
-      return { totalPredictions: 0, brierScore: NaN, avgConfidence: 0, avgAccuracy: 0, overconfidenceGap: 0 };
+      return { totalPredictions: 0, brierScore: 0, avgConfidence: 0, avgAccuracy: 0, overconfidenceGap: 0 };
     }
 
     const avgConf = filtered.reduce((s, r) => s + r.confidence, 0) / filtered.length;

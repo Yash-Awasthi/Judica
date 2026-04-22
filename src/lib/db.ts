@@ -5,7 +5,12 @@ import { env } from "../config/env.js";
 import pg from "pg";
 import logger from "./logger.js";
 
-const dbUrl = new URL(env.DATABASE_URL);
+let dbUrl: URL;
+try {
+  dbUrl = new URL(env.DATABASE_URL);
+} catch {
+  throw new Error(`Invalid DATABASE_URL: cannot parse as URL. Check your .env configuration.`);
+}
 const connectionLimitStr = dbUrl.searchParams.get("connection_limit");
 // P9-44: Guard against NaN — parseInt("abc") returns NaN, which silently uses driver default
 const parsedLimit = connectionLimitStr ? parseInt(connectionLimitStr, 10) : NaN;
@@ -13,9 +18,10 @@ const maxConnections = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedL
 
 // P9-41: Enforce SSL/TLS for non-localhost connections
 const isLocalhost = dbUrl.hostname === "localhost" || dbUrl.hostname === "127.0.0.1";
+// P57-01: Default to validating SSL certs for non-localhost. Set DB_SSL_REJECT_UNAUTHORIZED=false only for self-signed certs.
 const sslConfig = isLocalhost
   ? undefined
-  : { rejectUnauthorized: env.NODE_ENV === "production" };
+  : { rejectUnauthorized: env.DB_SSL_REJECT_UNAUTHORIZED !== "false" };
 
 export const pool = new pg.Pool({
   connectionString: env.DATABASE_URL,

@@ -27,7 +27,9 @@ export async function askGoogle(
     parts: [{ text: m.content }],
   }));
 
-  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${provider.model || "gemini-2.5-flash-preview-05-20"}:generateContent`;
+  // P21-04: Validate model name to prevent URL path injection / SSRF
+  const modelName = (provider.model || "gemini-2.5-flash-preview-05-20").replace(/[^a-zA-Z0-9._-]/g, "");
+  const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
   // P7-41: SSRF validation on strategy-level fetch
   await validateSafeUrl(apiUrl);
 
@@ -96,7 +98,8 @@ export async function streamGoogle(
   onChunk: (chunk: string) => void
 ): Promise<ProviderResult> {
   const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/${provider.model || "gemini-2.5-flash-preview-05-20"}:streamGenerateContent?alt=sse`,
+    // P21-09: Sanitize model name in streaming URL to prevent path injection
+    `https://generativelanguage.googleapis.com/v1beta/models/${(provider.model || "gemini-2.5-flash-preview-05-20").replace(/[^a-zA-Z0-9._-]/g, "")}:streamGenerateContent?alt=sse`,
     {
       method: "POST",
       signal,
@@ -118,6 +121,8 @@ export async function streamGoogle(
   const decoder = new TextDecoder();
   let fullText = "";
   let usage: ProviderResult["usage"];
+  // P21-08: Cap accumulated stream buffer to prevent memory exhaustion
+  const MAX_STREAM_BUFFER = 2_000_000; // ~2MB
   // P1-10: Buffer across reads and split on \n boundary properly
   let buffer = "";
 
@@ -125,6 +130,9 @@ export async function streamGoogle(
     const { done, value } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
+    if (fullText.length > MAX_STREAM_BUFFER) {
+      break;
+    }
     let idx: number;
     while ((idx = buffer.indexOf("\n")) >= 0) {
       const line = buffer.slice(0, idx).trim();

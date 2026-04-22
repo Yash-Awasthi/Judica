@@ -240,10 +240,16 @@ const redisWrapper = {
         p.del(key);
         return this;
       },
-      async exec(): Promise<Array<[null, unknown]>> {
+      async exec(): Promise<Array<[Error | null, unknown]>> {
         try {
           const results = await p.exec();
-          return (results ?? []).map(([err, val]: [unknown, unknown]) => [err, val] as [null, unknown]);
+          if (!results) return [];
+          for (const [err] of results) {
+            if (err) {
+              logger.warn({ err: (err as Error).message }, "Redis pipeline command error");
+            }
+          }
+          return results as Array<[Error | null, unknown]>;
         } catch {
           return [];
         }

@@ -51,46 +51,49 @@ export async function executeJS(code: string, timeout: number = 5000): Promise<S
     // P1-36: Prepend "use strict" to user code for safer execution
     // P7-47: Allowlist of globals — deny everything not explicitly permitted.
     // This prevents access to any new globals added in future Node/V8 versions.
-    // P7-48: Use string concatenation instead of template literal to prevent
-    // user code containing backticks from breaking out of the template.
-    const preamble =
-      '"use strict";\n' +
-      '// P7-47: Remove non-allowlisted globals\n' +
-      '(function() {\n' +
-      '  const ALLOWED_GLOBALS = new Set([\n' +
-      "    'undefined', 'NaN', 'Infinity', 'null',\n" +
-      "    'Object', 'Function', 'Array', 'Number', 'String', 'Boolean', 'Symbol', 'BigInt',\n" +
-      "    'Date', 'RegExp', 'Error', 'TypeError', 'RangeError', 'SyntaxError', 'ReferenceError', 'URIError', 'EvalError',\n" +
-      "    'Map', 'Set', 'WeakMap', 'WeakSet', 'WeakRef',\n" +
-      "    'Promise', 'Proxy', 'Reflect',\n" +
-      "    'JSON', 'Math',\n" +
-      "    'parseInt', 'parseFloat', 'isNaN', 'isFinite',\n" +
-      "    'encodeURI', 'decodeURI', 'encodeURIComponent', 'decodeURIComponent',\n" +
-      "    'ArrayBuffer', 'SharedArrayBuffer', 'DataView',\n" +
-      "    'Int8Array', 'Uint8Array', 'Uint8ClampedArray',\n" +
-      "    'Int16Array', 'Uint16Array', 'Int32Array', 'Uint32Array',\n" +
-      "    'Float32Array', 'Float64Array', 'BigInt64Array', 'BigUint64Array',\n" +
-      "    'globalThis', 'console', '_logCallback',\n" +
-      "    'TextEncoder', 'TextDecoder', 'URL', 'URLSearchParams',\n" +
-      "    'atob', 'btoa', 'structuredClone',\n" +
-      "    'AggregateError', 'FinalizationRegistry',\n" +
-      '  ]);\n' +
-      '  const names = Object.getOwnPropertyNames(globalThis);\n' +
-      '  for (const name of names) {\n' +
-      '    if (!ALLOWED_GLOBALS.has(name)) {\n' +
-      '      try { delete globalThis[name]; } catch {}\n' +
-      '    }\n' +
-      '  }\n' +
-      '})();\n' +
-      'const console = {\n' +
-      '  log: (...args) => _logCallback.applySync(undefined, [args.map(a => {\n' +
-      "    try { return typeof a === 'object' ? JSON.stringify(a) : String(a); }\n" +
-      '    catch { return String(a); }\n' +
-      "  }).join(' ')]),\n" +
-      "  error: (...args) => _logCallback.applySync(undefined, ['ERROR: ' + args.map(a => String(a)).join(' ')]),\n" +
-      "  warn: (...args) => _logCallback.applySync(undefined, ['WARN: ' + args.map(a => String(a)).join(' ')]),\n" +
-      '};\n';
-    const wrappedCode = preamble + '(function() {\n"use strict";\n' + code + '\n})();';
+    const wrappedCode = `
+      "use strict";
+      // P7-47: Remove non-allowlisted globals
+      (function() {
+        const ALLOWED_GLOBALS = new Set([
+          'undefined', 'NaN', 'Infinity', 'null',
+          'Object', 'Function', 'Array', 'Number', 'String', 'Boolean', 'Symbol', 'BigInt',
+          'Date', 'RegExp', 'Error', 'TypeError', 'RangeError', 'SyntaxError', 'ReferenceError', 'URIError', 'EvalError',
+          'Map', 'Set', 'WeakMap', 'WeakSet', 'WeakRef',
+          'Promise', 'Proxy', 'Reflect',
+          'JSON', 'Math',
+          'parseInt', 'parseFloat', 'isNaN', 'isFinite',
+          'encodeURI', 'decodeURI', 'encodeURIComponent', 'decodeURIComponent',
+          'ArrayBuffer', 'DataView',
+          'Int8Array', 'Uint8Array', 'Uint8ClampedArray',
+          'Int16Array', 'Uint16Array', 'Int32Array', 'Uint32Array',
+          'Float32Array', 'Float64Array', 'BigInt64Array', 'BigUint64Array',
+          'globalThis', 'console', '_logCallback',
+          'TextEncoder', 'TextDecoder', 'URL', 'URLSearchParams',
+          'atob', 'btoa', 'structuredClone',
+          'AggregateError', 'FinalizationRegistry',
+        ]);
+        const names = Object.getOwnPropertyNames(globalThis);
+        for (const name of names) {
+          if (!ALLOWED_GLOBALS.has(name)) {
+            try { delete globalThis[name]; } catch {}
+          }
+        }
+      })();
+      const console = {
+        log: (...args) => _logCallback.applySync(undefined, [args.map(a => {
+          try { return typeof a === 'object' ? JSON.stringify(a) : String(a); }
+          catch { return String(a); }
+        }).join(' ')]),
+        error: (...args) => _logCallback.applySync(undefined, ['ERROR: ' + args.map(a => String(a)).join(' ')]),
+        warn: (...args) => _logCallback.applySync(undefined, ['WARN: ' + args.map(a => String(a)).join(' ')]),
+      };
+
+      (function() {
+        "use strict";
+        ${code}
+      })();
+    `;
 
     const script = await isolate.compileScript(wrappedCode);
     await script.run(context, { timeout });

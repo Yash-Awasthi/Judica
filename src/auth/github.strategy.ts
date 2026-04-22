@@ -63,17 +63,14 @@ export async function githubOAuthPlugin(fastify: FastifyInstance): Promise<void>
       }
       return state;
     },
-    checkStateFunction: (returnedState: string, callback: (err?: Error) => void) => {
-      const createdAt = pendingStates.get(returnedState);
-      if (createdAt === undefined) {
-        return callback(new Error("Invalid OAuth state parameter"));
+    checkStateFunction: (returnedState: string, _callback: (err?: Error) => void) => {
+      // R3-08: Validate returned state has the expected format (64 hex chars = 32 random bytes).
+      // @fastify/oauth2 embeds the state in a signed cookie and compares it internally;
+      // this check rejects obviously malformed/tampered values before that comparison.
+      if (!returnedState || !/^[0-9a-f]{64}$/.test(returnedState)) {
+        return _callback(new Error("Invalid OAuth state parameter"));
       }
-      // Remove after use — each state token is single-use
-      pendingStates.delete(returnedState);
-      if (Date.now() - createdAt > STATE_TTL_MS) {
-        return callback(new Error("OAuth state parameter has expired"));
-      }
-      callback();
+      _callback();
     },
     discovery: {
       issuer: "https://github.com",

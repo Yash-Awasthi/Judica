@@ -3,6 +3,8 @@ import logger from "../lib/logger.js";
 
 // P8-26: Maximum messages to retain per deliberation session
 const MAX_MESSAGES = 500;
+// P19-09: Maximum messages per agent inbox to prevent unbounded memory growth
+const MAX_INBOX_SIZE = 200;
 
 export interface Message {
   id: string;
@@ -57,9 +59,12 @@ export class AgentMessageBus {
       return msg;
     }
 
-    // Deliver to inbox
+    // P19-09: Deliver to inbox with size cap
     const inbox = this.inboxes.get(to);
-    if (inbox) inbox.push(msg);
+    if (inbox) {
+      if (inbox.length >= MAX_INBOX_SIZE) inbox.shift();
+      inbox.push(msg);
+    }
 
     // P8-27: Snapshot subscriber list before iterating to prevent iterator invalidation
     const subs = [...(this.subscribers.get(to) || [])];
