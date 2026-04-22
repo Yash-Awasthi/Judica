@@ -27,9 +27,10 @@ export class AnthropicProvider extends BaseProvider {
     await validateSafeUrl(url);
 
     const controller = new AbortController();
+    const onAbort = () => controller.abort();
     if (signal) {
       if (signal.aborted) controller.abort();
-      signal.addEventListener("abort", () => controller.abort());
+      else signal.addEventListener("abort", onAbort, { once: true });
     }
 
     try {
@@ -226,9 +227,11 @@ export class AnthropicProvider extends BaseProvider {
         usage.completionTokens
       );
 
+      signal?.removeEventListener("abort", onAbort);
       return { text, usage, cost, raw: data };
 
     } catch (err) {
+      signal?.removeEventListener("abort", onAbort);
       if ((err as Error).name === "AbortError") {
         logger.warn({ provider: this.name }, "Anthropic call aborted");
         throw err;
