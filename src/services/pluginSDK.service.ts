@@ -55,6 +55,9 @@ export interface LoadedPlugin {
 
 const MAX_PLUGINS = 100;
 const plugins = new Map<string, LoadedPlugin>();
+// P38-09: Cap plugins and tools to prevent unbounded memory growth
+const MAX_PLUGINS = 100;
+const MAX_TOOLS_PER_PLUGIN = 500;
 
 /**
  * Load and register a plugin.

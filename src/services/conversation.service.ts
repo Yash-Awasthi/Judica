@@ -162,6 +162,9 @@ export async function getRecentHistory(conversationId: string, userId?: number):
 }
 
 export async function getConversationList(userId: number, limit: number = 50, offset: number = 0, filters?: { projectId?: string; after?: Date; before?: Date }): Promise<{ data: Conversation[]; total: number }> {
+  // P38-02: Validate limit/offset to prevent negative or oversized queries
+  const safeLimit = Math.min(Math.max(1, Number.isFinite(limit) ? limit : 50), 200);
+  const safeOffset = Math.max(0, Number.isFinite(offset) ? offset : 0);
   try {
     const whereConditions = [eq(conversations.userId, userId)];
     if (filters?.projectId) whereConditions.push(eq(conversations.projectId, filters.projectId));
@@ -173,8 +176,8 @@ export async function getConversationList(userId: number, limit: number = 50, of
         .from(conversations)
         .where(and(...whereConditions))
         .orderBy(desc(conversations.updatedAt))
-        .offset(offset)
-        .limit(limit),
+        .offset(safeOffset)
+        .limit(safeLimit),
       db.select({ count: sql<number>`count(*)` })
         .from(conversations)
         .where(and(...whereConditions))
@@ -306,7 +309,7 @@ export async function retrieveRelevantContext(
           WHERE "conversationId" = ${conversationId}
             AND embedding IS NOT NULL
           ORDER BY embedding <-> ${vectorStr}::vector
-          LIMIT ${maxResults}
+          LIMIT ${safeMaxResults}
         `);
 
         const rows = (result as unknown as { rows: Array<{ question: string; verdict: string; distance?: number }> }).rows;
@@ -351,7 +354,7 @@ export async function retrieveRelevantContext(
     const topResults = scored
       .filter((r: RelevantContext) => r.relevance > 0.1)
       .sort((a: RelevantContext, b: RelevantContext) => b.relevance - a.relevance)
-      .slice(0, maxResults);
+      .slice(0, safeMaxResults);
 
     logger.debug({
       conversationId,
@@ -433,7 +436,16 @@ Respond ONLY with a JSON object in this format:
       throw new Error("Failed to extract JSON from AI response");
     }
 
-    const summaryData = JSON.parse(jsonMatch[0]);
+    // P38-01: Safe JSON.parse with validation
+    let summaryData: Record<string, unknown>;
+    try {
+      summaryData = JSON.parse(jsonMatch[0]);
+    } catch {
+      throw new Error("Failed to parse summary JSON from AI response");
+    }
+    if (typeof summaryData !== "object" || summaryData === null || Array.isArray(summaryData)) {
+      throw new Error("Summary JSON is not an object");
+    }
     summaryData.lastUpdated = new Date().toISOString();
 
     const [updated] = await db
