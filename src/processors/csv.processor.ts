@@ -16,7 +16,14 @@ export async function processCSV(filePath: string): Promise<ProcessedFile> {
   const headers = Object.keys(limited[0]);
   const headerRow = `| ${headers.join(" | ")} |`;
   const separator = `| ${headers.map(() => "---").join(" | ")} |`;
-  const dataRows = limited.map((r) => `| ${headers.map((h) => String(r[h] ?? "")).join(" | ")} |`);
+  // R4-06: Neutralize spreadsheet formula injection. Cells starting with =, +, -, @,
+  // or \t are interpreted as formulas by Excel/LibreOffice if the Markdown is later
+  // pasted into a spreadsheet. Prefix such cells with a single quote to defuse them.
+  function sanitizeCell(val: string): string {
+    return /^[=+\-@\t]/.test(val) ? `'${val}` : val;
+  }
+
+  const dataRows = limited.map((r) => `| ${headers.map((h) => sanitizeCell(String(r[h] ?? ""))).join(" | ")} |`);
 
   const text = [headerRow, separator, ...dataRows].join("\n");
   return { type: "spreadsheet", text, metadata: { rows: rows.length, truncated: rows.length > 500 } };

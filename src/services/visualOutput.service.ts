@@ -1,6 +1,11 @@
 import { routeAndCollect } from "../router/index.js";
 import logger from "../lib/logger.js";
 
+/** Escape special Mermaid characters to prevent syntax breakage */
+function sanitizeMermaid(text: string): string {
+  return text.replace(/[()[\]{}<>#&;`]/g, " ").replace(/\s+/g, " ").trim();
+}
+
 /**
  * Visual Output Generation: generates Mermaid diagrams,
  * data visualization descriptions, and structured visual content
@@ -153,8 +158,8 @@ export async function visualizeDeliberation(
   // 1. Generate a Mermaid mindmap of agent positions
   const mindmapContent = [
     "mindmap",
-    `  root((${safeTopic}))`,
-    ...safeOpinions.map((o) => `    ${o.agent}\n      ${o.position.substring(0, 50)}`),
+    `  root((${sanitizeMermaid(topic.substring(0, 40))}))`,
+    ...opinions.map((o) => `    ${sanitizeMermaid(o.agent)}\n      ${sanitizeMermaid(o.position.substring(0, 50))}`),
   ].join("\n");
 
   outputs.push({

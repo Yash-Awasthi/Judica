@@ -5,6 +5,16 @@ export class OpenAIAdapter extends OpenAICompatibleAdapter {
   readonly providerId: string;
 
   constructor(apiKey: string, baseUrl = "https://api.openai.com/v1", providerId = "openai") {
+    // P60-01: Validate baseUrl to prevent SSRF via custom provider configuration
+    let parsed: URL;
+    try {
+      parsed = new URL(baseUrl);
+    } catch {
+      throw new Error(`Invalid OpenAI base URL: ${baseUrl}`);
+    }
+    if (!["http:", "https:"].includes(parsed.protocol)) {
+      throw new Error(`Unsupported protocol in OpenAI base URL: ${parsed.protocol}`);
+    }
     super(apiKey, baseUrl);
     this.providerId = providerId;
   }

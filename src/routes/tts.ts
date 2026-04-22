@@ -24,6 +24,10 @@ const ttsPlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     const API_KEY = env.XIAOMI_MIMO_API_KEY || env.OPENAI_API_KEY;
+    if (!API_KEY) {
+      reply.code(503);
+      return { error: "TTS not configured (no API key)" };
+    }
 
     const attemptTTS = async (url: string, payload: Record<string, unknown>) => {
       const response = await fetch(url, {
@@ -32,7 +36,8 @@ const ttsPlugin: FastifyPluginAsync = async (fastify) => {
           "Authorization": `Bearer ${API_KEY}`,
           "Content-Type": "application/json"
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify(payload),
+        signal: AbortSignal.timeout(30_000),
       });
       if (!response.ok) {
         throw new Error(await response.text());

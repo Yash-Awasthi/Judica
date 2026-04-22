@@ -27,7 +27,7 @@ const PROTOTYPE_POLLUTION_KEYS = new Set([
  * Prevents pollution from propagating through workflow state.
  */
 export function sanitizeObject(obj: unknown, depth = 0): unknown {
-  if (depth > 20) return obj; // Prevent infinite recursion
+  if (depth > 20) return {}; // H-3 fix: return empty object, not original — original may contain pollution keys
   if (obj === null || obj === undefined) return obj;
   if (typeof obj !== "object") return obj;
 
