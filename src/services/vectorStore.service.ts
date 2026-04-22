@@ -77,7 +77,7 @@ export async function searchSimilar(
     FROM "Memory"
     WHERE "userId" = ${userId} ${kbCondition}
     ORDER BY score DESC
-    LIMIT ${limit}
+    LIMIT ${safeLimit}
   `);
 
   // Refresh lastAccessedAt for accessed memories (fire-and-forget)
@@ -110,7 +110,7 @@ export async function keywordSearch(
     WHERE "userId" = ${userId} ${kbCondition}
       AND "tsv" @@ plainto_tsquery('english', ${query})
     ORDER BY score DESC
-    LIMIT ${limit}
+    LIMIT ${safeLimit}
   `);
 
   return results.rows as unknown as MemoryChunk[];
@@ -127,8 +127,8 @@ export async function hybridSearch(
   const k = 60; // RRF constant
 
   const [vectorResults, kwResults] = await Promise.all([
-    searchSimilar(userId, query, kbId, limit * 2),
-    keywordSearch(userId, query, kbId, limit * 2),
+    searchSimilar(userId, query, kbId, safeLimit * 2),
+    keywordSearch(userId, query, kbId, safeLimit * 2),
   ]);
 
   // Build RRF scores
@@ -157,7 +157,7 @@ export async function hybridSearch(
   // Sort by RRF score and return top N
   const merged = Array.from(scoreMap.values())
     .sort((a, b) => b.rrfScore - a.rrfScore)
-    .slice(0, limit)
+    .slice(0, safeLimit)
     .map(({ chunk, rrfScore }) => ({ ...chunk, score: rrfScore }));
 
   return merged;
@@ -311,12 +311,12 @@ export async function enhancedHybridSearch(
   const k = 60;
 
   const searches: Promise<MemoryChunk[]>[] = [
-    searchSimilar(userId, query, kbId, limit * 2),
-    keywordSearch(userId, query, kbId, limit * 2),
+    searchSimilar(userId, query, kbId, safeLimit * 2),
+    keywordSearch(userId, query, kbId, safeLimit * 2),
   ];
 
   if (useHyde) {
-    searches.push(hydeSearch(userId, query, kbId, limit * 2));
+    searches.push(hydeSearch(userId, query, kbId, safeLimit * 2));
   }
 
   const allResults = await Promise.all(searches);
@@ -336,6 +336,6 @@ export async function enhancedHybridSearch(
 
   return Array.from(scoreMap.values())
     .sort((a, b) => b.rrfScore - a.rrfScore)
-    .slice(0, limit)
+    .slice(0, safeLimit)
     .map(({ chunk, rrfScore }) => ({ ...chunk, score: rrfScore }));
 }

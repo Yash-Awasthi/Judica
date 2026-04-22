@@ -27,9 +27,9 @@ interface CacheMessage {
   content: string | unknown[];
 }
 
-// P38-10: NaN-safe threshold with range validation
-const _parsedThreshold = Number((env as any).SEMANTIC_CACHE_THRESHOLD);
-const SEMANTIC_THRESHOLD = Number.isFinite(_parsedThreshold) && _parsedThreshold >= 0 && _parsedThreshold <= 1 ? _parsedThreshold : 0.15;
+// P9-17: Externalize semantic similarity threshold to env
+const _parsedThreshold = Number(process.env.SEMANTIC_CACHE_THRESHOLD);
+const SEMANTIC_THRESHOLD = Number.isFinite(_parsedThreshold) ? _parsedThreshold : 0.15;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
 // P9-12: Bounded lock map with TTL eviction — prevents unbounded growth under burst traffic

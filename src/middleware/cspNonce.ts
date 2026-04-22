@@ -13,8 +13,18 @@ export async function fastifyCspNonce(request: FastifyRequest, reply: FastifyRep
   (request as unknown as { cspNonce: string }).cspNonce = nonce;
 
   // P1-27: Derive allowed WS origin from FRONTEND_URL or request host
-  const frontendUrl = env.FRONTEND_URL || `${request.protocol}://${request.hostname}`;
-  const wsOrigin = frontendUrl.replace(/^http/, "ws");
+  let wsOrigin: string;
+  let frontendUrl: string;
+  if (env.FRONTEND_URL) {
+    frontendUrl = env.FRONTEND_URL;
+    wsOrigin = frontendUrl.replace(/^http/, "ws");
+  } else {
+    // Validate hostname to prevent Host header injection into CSP
+    const hostname = request.hostname;
+    const safeHostname = /^[a-zA-Z0-9._:-]+$/.test(hostname) ? hostname : "localhost";
+    frontendUrl = `${request.protocol}://${safeHostname}`;
+    wsOrigin = `ws://${safeHostname}`;
+  }
 
   // P8-56: CSP violation reporting endpoint
   const reportUri = `${frontendUrl}/api/csp-report`;

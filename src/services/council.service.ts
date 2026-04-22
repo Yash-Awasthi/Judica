@@ -87,9 +87,11 @@ export function getDefaultMembers(count = 3): CouncilProvider[] {
   }
   
   const originalLength = providers.length;
+  // P39-06: Cap count to prevent unbounded provider cloning
+  const safeCount = Math.min(count, 100);
   const MAX_CLONE_ITERATIONS = 20;
   let iterations = 0;
-  while (providers.length < count) {
+  while (providers.length < safeCount) {
     if (++iterations > MAX_CLONE_ITERATIONS) {
       logger.warn({ count, originalLength, iterations }, "Council cloning hit max iteration guard");
       break;
@@ -100,7 +102,7 @@ export function getDefaultMembers(count = 3): CouncilProvider[] {
     providers.push({ ...providerToClone, name: `${providerToClone.name}-${providers.length - originalLength + 1}` });
   }
   
-  return providers.slice(0, count);
+  return providers.slice(0, safeCount);
 }
 
 export function getDefaultMaster(): CouncilProvider {

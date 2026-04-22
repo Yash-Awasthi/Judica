@@ -169,7 +169,7 @@ export async function route(
 
   throw new AppError(
     503,
-    `All providers exhausted. Tried: ${Array.from(triedProviders).join(", ")}. Last error: ${lastError?.message || "unknown"}`,
+    `All providers exhausted. Tried: ${Array.from(triedProviders).join(", ")}.`,
     "PROVIDERS_EXHAUSTED"
   );
 }

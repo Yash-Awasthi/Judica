@@ -28,8 +28,11 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
       limit = "20",
     } = request.query as Record<string, string>;
 
-    const pageNum = Math.max(1, parseInt(page) || 1);
-    const limitNum = Math.min(100, Math.max(1, parseInt(limit) || 20));
+    // P31-06: NaN-safe parseInt with explicit radix
+    const _pageRaw = parseInt(page, 10);
+    const _limitRaw = parseInt(limit, 10);
+    const pageNum = Number.isFinite(_pageRaw) && _pageRaw > 0 ? _pageRaw : 1;
+    const limitNum = Number.isFinite(_limitRaw) && _limitRaw > 0 ? Math.min(_limitRaw, 100) : 20;
     const skip = (pageNum - 1) * limitNum;
 
     const conditions = [eq(marketplaceItems.published, true)];
@@ -39,7 +42,8 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     if (tags) {
-      const tagList = tags.split(",").map((t) => t.trim());
+      // P37-01: Cap tags to prevent unbounded array in SQL query
+      const tagList = tags.split(",").map((t) => t.trim()).slice(0, 20);
       conditions.push(
         sql`${marketplaceItems.tags} && ARRAY[${sql.join(tagList.map(t => sql`${t}`), sql`,`)}]::text[]`
       );
@@ -408,7 +412,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
         itemId,
         userId: request.userId!,
         rating: Math.round(rating),
-        comment: comment || null,
+        comment: safeComment,
       })
       .returning();
 

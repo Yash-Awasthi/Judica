@@ -122,14 +122,17 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     const startTime = Date.now();
 
     const { question, conversationId, summon, maxTokens, rounds = 1, context, mode, userConfig } = request.body as AskBody;
-    const upload_ids: string[] | undefined = (request.body as AskBody).upload_ids;
+    // P37-10: Cap rounds to safe range to prevent excessive deliberation cycles
+    const safeRounds = Math.min(Math.max(1, Number.isFinite(rounds) ? rounds : 1), 10);: string[] | undefined = (request.body as AskBody).upload_ids;
+    // P37-04: Cap upload_ids to prevent unbounded file loading
+    if (upload_ids && upload_ids.length > 50) upload_ids.length = 50;
     const kb_id: string | undefined = (request.body as AskBody).kb_id;
     const deliberation_mode: ReasoningMode = (request.body as AskBody).deliberation_mode ?? "standard";
 
     let effectiveSummon: string = summon || "default";
     let effectiveMembers = (request.body as AskBody).members;
     let routerDecision: ReturnType<typeof classifyQuery> | null = null;
-    let effectiveRounds = rounds;
+    let effectiveRounds = safeRounds;
 
     if (mode === "auto") {
       const { archetypes, result } = getAutoArchetypes(question);
@@ -391,13 +394,16 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     try {
       const { question, conversationId, summon, maxTokens, rounds = 1, context, mode } = request.body as AskBody;
       const upload_ids: string[] | undefined = (request.body as AskBody).upload_ids;
+      // P37-04: Cap upload_ids in stream handler too
+      if (upload_ids && upload_ids.length > 50) upload_ids.length = 50;
       const kb_id: string | undefined = (request.body as AskBody).kb_id;
       const deliberation_mode: ReasoningMode = (request.body as AskBody).deliberation_mode ?? "standard";
 
       let effectiveSummon: string = summon || "default";
       let effectiveMembers = (request.body as AskBody).members;
       let routerDecision: ReturnType<typeof classifyQuery> | null = null;
-      let effectiveRounds = rounds;
+      // P37-10: Cap rounds in stream handler too
+      let effectiveRounds = Math.min(Math.max(1, Number.isFinite(rounds) ? rounds : 1), 10);
 
       if (mode === "auto") {
         const { archetypes, result } = getAutoArchetypes(question);

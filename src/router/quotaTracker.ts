@@ -35,6 +35,7 @@ export interface QuotaStatus {
 }
 
 const quotas = new Map<string, QuotaEntry>();
+const MAX_QUOTA_ENTRIES = 10_000;
 
 function getTodayMidnight(): number {
   const now = new Date();
@@ -48,6 +49,14 @@ function getOrReset(provider: string): QuotaEntry {
   if (!entry || entry.last_reset < midnight) {
     const fresh: QuotaEntry = { requests_used: 0, tokens_used: 0, last_reset: midnight };
     quotas.set(provider, fresh);
+
+    if (quotas.size > MAX_QUOTA_ENTRIES) {
+      // Prune stale entries from previous days
+      for (const [k, v] of quotas) {
+        if (v.last_reset < midnight) quotas.delete(k);
+      }
+    }
+
     return fresh;
   }
 
