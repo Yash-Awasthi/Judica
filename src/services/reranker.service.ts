@@ -86,11 +86,13 @@ export async function rerank<T extends RerankableItem>(
       results: { index: number; relevance_score: number }[];
     };
 
-    return data.results.map((r) => ({
-      item: items[r.index],
-      relevanceScore: r.relevance_score,
-      originalIndex: r.index,
-    }));
+    return data.results
+      .filter((r) => r.index >= 0 && r.index < items.length)
+      .map((r) => ({
+        item: items[r.index],
+        relevanceScore: r.relevance_score,
+        originalIndex: r.index,
+      }));
   } catch (err) {
     logger.warn({ err }, "Cohere rerank failed, falling back to original order");
     return fallbackOrder(items, topN);

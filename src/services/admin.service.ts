@@ -8,6 +8,13 @@ import { eq, sql, desc, and, gte, lte, or, ilike } from "drizzle-orm";
 import logger from "../lib/logger.js";
 import { encrypt, decrypt } from "../lib/crypto.js";
 
+/** Escape SQL LIKE pattern characters to prevent wildcard injection */
+function escapeLikePattern(input: string): string {
+  return input.replace(/[%_\\]/g, '\\$&');
+}
+
+const VALID_ROLES = ["user", "admin", "owner", "moderator"] as const;
+
 export class AdminService {
   static async logAction(params: {
     adminId: number;
@@ -58,6 +65,7 @@ export class AdminService {
   }
 
   static async getUsageAnalytics(days = 7) {
+    days = Math.max(1, Math.min(days, 365));
     const startDate = new Date();
     startDate.setDate(startDate.getDate() - days);
 
@@ -140,13 +148,13 @@ export class AdminService {
     .leftJoin(users, eq(adminAuditLogs.adminId, users.id))
     .where(whereClause)
     .orderBy(desc(adminAuditLogs.createdAt))
-    .limit(params.limit || 50)
-    .offset(params.offset || 0);
+    .limit(Math.min(params.limit || 50, 200))
+    .offset(Math.max(params.offset || 0, 0));
 
-    return { 
-      logs, 
+    return {
+      logs,
       total: Number(countResult?.count || 0),
-      page: Math.floor((params.offset || 0) / (params.limit || 50)) + 1
+      page: Math.floor(Math.max(params.offset || 0, 0) / Math.min(params.limit || 50, 200)) + 1
     };
   }
 
@@ -160,8 +168,8 @@ export class AdminService {
     let whereClause = undefined;
     if (params.search) {
       whereClause = or(
-        ilike(users.username, `%${params.search}%`),
-        ilike(users.email, `%${params.search}%`)
+        ilike(users.username, `%${escapeLikePattern(params.search)}%`),
+        ilike(users.email, `%${escapeLikePattern(params.search)}%`)
       );
     }
 
@@ -188,13 +196,13 @@ export class AdminService {
       .from(users)
       .where(whereClause)
       .orderBy(sortFn)
-      .limit(params.limit || 50)
-      .offset(params.offset || 0);
+      .limit(Math.min(params.limit || 50, 200))
+      .offset(Math.max(params.offset || 0, 0));
 
-    return { 
-      users: allUsers, 
+    return {
+      users: allUsers,
       total: Number(countResult?.count || 0),
-      page: Math.floor((params.offset || 0) / (params.limit || 50)) + 1 
+      page: Math.floor(Math.max(params.offset || 0, 0) / Math.min(params.limit || 50, 200)) + 1
     };
   }
 
@@ -341,6 +349,10 @@ export class AdminService {
     // P1-17: Prevent admin self-demotion
     if (userId === adminId && role !== "admin" && role !== "owner") {
       throw new Error("Cannot demote yourself");
+    }
+
+    if (!VALID_ROLES.includes(role as typeof VALID_ROLES[number])) {
+      throw new Error(`Invalid role: ${role}. Must be one of: ${VALID_ROLES.join(", ")}`);
     }
 
     const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);

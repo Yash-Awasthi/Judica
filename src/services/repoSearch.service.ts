@@ -9,11 +9,15 @@ export interface CodeSearchResult {
   score: number;
 }
 
+// P19-03: Cap search limit to prevent excessive DB load
+const MAX_SEARCH_LIMIT = 50;
+
 export async function searchRepo(
   repoId: string,
   query: string,
   limit = 10
 ): Promise<CodeSearchResult[]> {
+  limit = Math.min(Math.max(1, limit), MAX_SEARCH_LIMIT);
   const queryEmbedding = await embed(query);
   const vectorStr = safeVectorLiteral(queryEmbedding);
 

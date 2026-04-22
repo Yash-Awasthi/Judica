@@ -7,6 +7,7 @@ import {
   jsonb,
   index,
 } from "drizzle-orm/pg-core";
+import { conversations } from "./conversations.js";
 import { users } from "./users.js";
 
 // ─── Trace ───────────────────────────────────────────────────────────────────
@@ -14,7 +15,8 @@ export const traces = pgTable(
   "Trace",
   {
     id: text("id").primaryKey(),
-    conversationId: text("conversationId"),
+    // P56-03: Add FK to prevent orphaned traces
+    conversationId: text("conversationId").references(() => conversations.id, { onDelete: "set null" }),
     workflowRunId: text("workflowRunId"),
     // P8-36: Add FK constraint — was missing, allowing orphaned trace rows
     userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),

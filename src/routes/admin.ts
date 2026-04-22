@@ -4,7 +4,7 @@ import { db } from "../lib/drizzle.js";
 import { users } from "../db/schema/users.js";
 import { customProviders } from "../db/schema/council.js";
 import { auditLogs } from "../db/schema/conversations.js";
-import { desc, sql, gte, lte } from "drizzle-orm";
+import { desc, sql, gte, lte, count, inArray, ne, and } from "drizzle-orm";
 import { fastifyRequireAdmin } from "../middleware/fastifyAuth.js";
 import { AdminService } from "../services/admin.service.js";
 import { AppError } from "../middleware/errorHandler.js";
@@ -48,8 +48,9 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
 
     return AdminService.getUsers({
       search,
-      limit: safeLimit,
-      offset: safeOffset,
+      // P30-01: Cap query limit to prevent unbounded user listing
+      limit: Math.min(Math.max(1, parseInt(String(limit), 10) || 20), 100),
+      offset: Math.max(0, parseInt(String(offset), 10) || 0),
       sortBy: safeSortBy,
       sortOrder: safeSortOrder
     });
@@ -83,13 +84,14 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(400, `Role must be: ${validRoles.join(", ")}`);
     }
 
-    // P1-17: Prevent demotion that would leave zero admins
+    // R2-06: Count admins/owners directly in DB — previous code fetched at most
+    // 1000 users which would give a wrong count on large installations.
     const currentUser = await AdminService.getUserDetail(parseId(id));
     if (currentUser && (currentUser.role === "admin" || currentUser.role === "owner") && role !== "admin" && role !== "owner") {
-      const { users: allUsers } = await AdminService.getUsers({ limit: 1000, offset: 0 });
-      const adminCount = allUsers.filter((u: { role: string; id: number }) =>
-        (u.role === "admin" || u.role === "owner") && u.id !== parseId(id)
-      ).length;
+      const [{ value: adminCount }] = await db
+        .select({ value: count() })
+        .from(users)
+        .where(and(inArray(users.role, ["admin", "owner"]), ne(users.id, parseId(id))));
       if (adminCount === 0) {
         throw new AppError(400, "Cannot demote: at least one admin/owner must remain");
       }
@@ -241,9 +243,9 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   // GET /analytics/daily-volume — time-series usage data
   fastify.get("/analytics/daily-volume", async (request, _reply) => {
     const { days = 30 } = request.query as { days?: string | number };
-    // P42-02: NaN-safe parseInt with upper bound on days
-    const safeDays = Math.min(Math.max(1, Number.isFinite(parseInt(String(days), 10)) ? parseInt(String(days), 10) : 30), 365);
-    const data = await AdminService.getUsageAnalytics(safeDays);
+    // P30-02: NaN guard on days parameter
+    const daysNum = parseInt(String(days), 10);
+    const data = await AdminService.getUsageAnalytics(Number.isFinite(daysNum) && daysNum > 0 ? Math.min(daysNum, 365) : 30);
     return { data };
   });
 
