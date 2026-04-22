@@ -1,3 +1,4 @@
+import { randomUUID } from "crypto";
 import { db } from "../lib/drizzle.js";
 import { contradictionRecords, type ContradictionVersion } from "../db/schema/council.js";
 import { eq, and } from "drizzle-orm";
@@ -74,7 +75,8 @@ export async function recordContradiction(
   conversationId: string,
   contradiction: DetectedContradiction,
 ): Promise<string> {
-  const id = `contra_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+  // P25-01: Use crypto.randomUUID for unpredictable IDs
+  const id = `contra_${randomUUID()}`;
 
   await db.insert(contradictionRecords).values({
     id,
@@ -125,7 +127,12 @@ export async function resolveContradiction(
     reason,
   };
 
+  // P25-08: Cap versions array to prevent unbounded growth
+  const MAX_CONTRADICTION_VERSIONS = 50;
   const updatedVersions = [...(existing.versions || []), newVersion];
+  if (updatedVersions.length > MAX_CONTRADICTION_VERSIONS) {
+    updatedVersions.splice(0, updatedVersions.length - MAX_CONTRADICTION_VERSIONS);
+  }
 
   await db
     .update(contradictionRecords)

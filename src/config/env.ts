@@ -1,14 +1,28 @@
 import "dotenv/config";
 import { z } from "zod";
 
+// M-5: Validate each CIDR/IP entry to prevent misconfigured TRUST_PROXY from
+// enabling IP spoofing (e.g. "0.0.0.0/0" would trust any X-Forwarded-For).
+const CIDR_RE = /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/;
+
 // P1-31: TRUST_PROXY validation — accept boolean, number, or comma-separated CIDRs
-const trustProxySchema = z.string().optional().transform((val) => {
+const trustProxySchema = z.string().optional().transform((val, ctx) => {
   if (!val) return undefined;
   if (val === "true") return true;
   if (val === "false") return false;
   const num = parseInt(val, 10);
   if (!isNaN(num) && num >= 0) return num;
-  // Accept comma-separated IPs/CIDRs
+  // Validate each comma-separated IP/CIDR entry
+  const parts = val.split(",").map(p => p.trim()).filter(Boolean);
+  for (const part of parts) {
+    if (!CIDR_RE.test(part)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `TRUST_PROXY contains invalid IP/CIDR: '${part}'. Use a valid IPv4 address or CIDR range.`,
+      });
+      return z.NEVER;
+    }
+  }
   return val;
 });
 
@@ -83,5 +97,10 @@ if (!parsed.success) {
 export const env = parsed.data;
 
 if (!parsed.data.OPENAI_API_KEY && !parsed.data.ANTHROPIC_API_KEY && !parsed.data.GOOGLE_API_KEY) {
-  process.stderr.write("WARNING: No AI provider API keys found (OPENAI_API_KEY / ANTHROPIC_API_KEY / GOOGLE_API_KEY). All council requests will fail at runtime.\n");
+  // L-9: In production, missing AI provider keys is a fatal misconfiguration — throw instead of warn
+  const msg = "No AI provider API keys found (OPENAI_API_KEY / ANTHROPIC_API_KEY / GOOGLE_API_KEY). All council requests will fail at runtime.";
+  if (parsed.data.NODE_ENV === "production") {
+    throw new Error(msg);
+  }
+  process.stderr.write(`WARNING: ${msg}\n`);
 }

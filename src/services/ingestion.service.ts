@@ -19,7 +19,16 @@ export async function ingestDocument(
   filename: string,
   extractedText: string
 ): Promise<number> {
-  const hierarchicalChunks = chunkHierarchical(extractedText);
+  // P36-10: Cap extracted text and chunks to prevent resource exhaustion
+  const MAX_TEXT_LENGTH = 5_000_000; // 5MB
+  const MAX_CHUNKS = 10_000;
+  if (extractedText.length > MAX_TEXT_LENGTH) {
+    extractedText = extractedText.slice(0, MAX_TEXT_LENGTH);
+  }
+  let hierarchicalChunks = chunkHierarchical(extractedText);
+  if (hierarchicalChunks.length > MAX_CHUNKS) {
+    hierarchicalChunks = hierarchicalChunks.slice(0, MAX_CHUNKS);
+  }
   logger.info({ docId, filename, chunkCount: hierarchicalChunks.length }, "Starting document ingestion (hierarchical)");
 
   let failedChunks = 0;
