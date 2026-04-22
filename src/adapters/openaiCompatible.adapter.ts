@@ -250,6 +250,13 @@ export abstract class OpenAICompatibleAdapter implements IProviderAdapter {
   }
 
   async listModels(): Promise<string[]> {
+    // R3-11: generate() calls validateSafeUrl but listModels/isAvailable did not.
+    // An attacker could use these methods to probe internal services via a crafted baseUrl.
+    try {
+      await validateSafeUrl(this.baseUrl);
+    } catch {
+      return [];
+    }
     try {
       const res = await fetch(`${this.baseUrl}/models`, {
         headers: { Authorization: `Bearer ${this.apiKey}`, ...this.getExtraHeaders() },
@@ -264,6 +271,12 @@ export abstract class OpenAICompatibleAdapter implements IProviderAdapter {
   }
 
   async isAvailable(): Promise<boolean> {
+    // R3-11: Same SSRF guard — validateSafeUrl before fetching.
+    try {
+      await validateSafeUrl(this.baseUrl);
+    } catch {
+      return false;
+    }
     try {
       const res = await fetch(`${this.baseUrl}/models`, {
         headers: { Authorization: `Bearer ${this.apiKey}`, ...this.getExtraHeaders() },

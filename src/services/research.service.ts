@@ -6,6 +6,14 @@ import logger from "../lib/logger.js";
 import type { AdapterMessage } from "../adapters/types.js";
 import { env } from "../config/env.js";
 
+/** Sanitize user input before interpolation into LLM prompts */
+function sanitizeForPrompt(text: string): string {
+  return text
+    .replace(/\b(system|assistant|user|human)\s*:/gi, (_m, role) => `${role as string} -`)
+    .replace(/ignore\s+(all\s+)?previous\s+instructions/gi, "[filtered]")
+    .replace(/you\s+are\s+now\b/gi, "[filtered]");
+}
+
 export interface ResearchStep {
   question: string;
   status: "pending" | "searching" | "synthesizing" | "done" | "failed";
@@ -81,7 +89,7 @@ async function callAI(systemPrompt: string, userPrompt: string, model?: string):
   ];
 
   const result = await routeAndCollect({
-    model: model || "",
+    model: model || "auto",
     messages,
     temperature: 0.3,
     max_tokens: 4096,
@@ -105,7 +113,7 @@ export async function runResearch(
 
     const planResponse = await callAI(
       "You are a research planner. Given a research query, break it down into 3-5 focused sub-questions that, when answered, will provide a comprehensive understanding of the topic. Return ONLY a JSON array of strings, no other text.",
-      `Research query: "${query}"`,
+      `Research query: "${sanitizeForPrompt(query.substring(0, 2000))}"`,
     );
 
     let subQuestions: string[];
@@ -157,12 +165,12 @@ export async function runResearch(
 
       if (steps[i].sources.length > 0) {
         const sourcesText = steps[i].sources
-          .map((s, idx) => `[Source ${idx + 1}] ${s.title}\nURL: ${s.url}\n${s.content}`)
+          .map((s, idx) => `[Source ${idx + 1}] ${sanitizeForPrompt(s.title)}\nURL: ${s.url}\n${sanitizeForPrompt(s.content)}`)
           .join("\n\n");
 
         const answer = await callAI(
           "You are a research analyst. Answer the question using ONLY the provided sources. Cite sources using [1], [2], etc. Be thorough but concise.",
-          `Question: ${steps[i].question}\n\nSources:\n${sourcesText}`,
+          `Question: ${sanitizeForPrompt(steps[i].question)}\n\nSources:\n${sourcesText}`,
         );
         steps[i].answer = answer;
       } else {
@@ -208,7 +216,7 @@ Include:
 
 Use citations like [1.1], [1.2] referring to the source indices provided.
 Format with proper Markdown: headers, bullet points, bold for emphasis.`,
-      `Research topic: "${query}"\n\nFindings:\n${findings}\n\nAll Sources:\n${allSources.map((s) => `${s.ref} ${s.title} — ${s.url}`).join("\n")}`,
+      `Research topic: "${sanitizeForPrompt(query.substring(0, 2000))}"\n\nFindings:\n${findings}\n\nAll Sources:\n${allSources.map((s) => `${s.ref} ${s.title} — ${s.url}`).join("\n")}`,
     );
 
     await db.update(researchJobs).set({

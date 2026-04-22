@@ -27,9 +27,10 @@ export class AnthropicProvider extends BaseProvider {
     await validateSafeUrl(url);
 
     const controller = new AbortController();
+    const onAbort = () => controller.abort();
     if (signal) {
       if (signal.aborted) controller.abort();
-      signal.addEventListener("abort", () => controller.abort());
+      else signal.addEventListener("abort", onAbort, { once: true });
     }
 
     try {
@@ -74,6 +75,8 @@ export class AnthropicProvider extends BaseProvider {
         let streamInputTokens = 0;
         let streamOutputTokens = 0;
         // P1-04: Track tool calls during streaming so they aren't dropped
+        // P40-02: Cap pending tools to prevent unbounded memory growth
+        const MAX_PENDING_TOOLS = 100;
         const pendingTools = new Map<number, { id: string; name: string; args: string }>();
         let currentBlockIndex = 0;
 
@@ -96,13 +99,14 @@ export class AnthropicProvider extends BaseProvider {
                 if (parsed.type === "content_block_start") {
                   currentBlockIndex = parsed.index ?? currentBlockIndex;
                   if (parsed.content_block?.type === "tool_use") {
-                    pendingTools.set(currentBlockIndex, {
-                      id: parsed.content_block.id,
-                      name: parsed.content_block.name,
-                      args: "",
-                    });
+                    if (pendingTools.size < MAX_PENDING_TOOLS) {
+                      pendingTools.set(currentBlockIndex, {
+                        id: parsed.content_block.id,
+                        name: parsed.content_block.name,
+                        args: "",
+                      });
+                    }
                   }
-                }
                 if (parsed.type === "content_block_delta") {
                   currentBlockIndex = parsed.index ?? currentBlockIndex;
                   if (parsed.delta?.text) {
@@ -111,7 +115,8 @@ export class AnthropicProvider extends BaseProvider {
                   }
                   if (parsed.delta?.type === "input_json_delta" && parsed.delta.partial_json) {
                     const tool = pendingTools.get(currentBlockIndex);
-                    if (tool) tool.args += parsed.delta.partial_json;
+                    // P40-03: Cap tool args to prevent unbounded string concatenation
+                    if (tool && tool.args.length < 1_000_000) tool.args += parsed.delta.partial_json;
                   }
                 }
                 if (parsed.type === "content_block_stop") {
@@ -226,9 +231,11 @@ export class AnthropicProvider extends BaseProvider {
         usage.completionTokens
       );
 
+      signal?.removeEventListener("abort", onAbort);
       return { text, usage, cost, raw: data };
 
     } catch (err) {
+      signal?.removeEventListener("abort", onAbort);
       if ((err as Error).name === "AbortError") {
         logger.warn({ provider: this.name }, "Anthropic call aborted");
         throw err;

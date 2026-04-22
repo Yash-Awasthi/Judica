@@ -135,7 +135,9 @@ export async function getEnhancedContext(conversationId: string, currentQuery: s
 // P9-94: Improved keyword extraction with basic suffix stripping (poor man's stemmer)
 // and n-gram support for multi-word phrases.
 function extractKeywords(text: string): string[] {
-  const words = text.toLowerCase()
+  // P30-05: Cap input length to prevent regex DoS on very large strings
+  const safeText = text.length > 10_000 ? text.slice(0, 10_000) : text;
+  const words = safeText.toLowerCase()
     .replace(/[^\w\s]/g, ' ')
     .split(/\s+/)
     .filter(word => word.length > 3)
@@ -201,7 +203,8 @@ async function extractRelevantMemories(conversationId: string, keywords: string[
 export async function updateEnhancedContextSummary(conversationId: string): Promise<void> {
   const allChats = await db.select().from(chats)
     .where(eq(chats.conversationId, conversationId))
-    .orderBy(asc(chats.createdAt));
+    .orderBy(asc(chats.createdAt))
+    .limit(200);
 
   if (allChats.length <= 8) return; // Wait for more substantial conversation
 
