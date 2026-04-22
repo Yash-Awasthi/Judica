@@ -20,7 +20,7 @@ export async function summarizeSession(
 
   const transcript = messages
     .reverse()
-    .map((m) => `user: ${m.question.substring(0, 500)}\nassistant: ${m.verdict.substring(0, 500)}`)
+    .map((m) => `user: ${(m.question || "").substring(0, 500)}\nassistant: ${(m.verdict || "").substring(0, 500)}`)
     .join("\n");
 
   const result = await routeAndCollect({
