@@ -72,7 +72,6 @@ export default function ProfilePage() {
   );
   const [defaultPreset, setDefaultPreset] = useState(mockUser.defaultPreset);
   const [defaultRounds, setDefaultRounds] = useState(String(mockUser.defaultRounds));
-  const [maxAgents, setMaxAgents] = useState(String(mockUser.maxAgents));
   const [githubConnected, setGithubConnected] = useState(mockUser.connectedAccounts.github);
   const [googleConnected, setGoogleConnected] = useState(mockUser.connectedAccounts.google);
   const [isEditing, setIsEditing] = useState(false);
@@ -274,21 +273,6 @@ export default function ProfilePage() {
                   {[1, 2, 3, 4, 5].map((n) => (
                     <SelectItem key={n} value={String(n)}>
                       {n} round{n !== 1 ? "s" : ""}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>Max Agents</Label>
-              <Select value={maxAgents} onValueChange={setMaxAgents}>
-                <SelectTrigger className="w-full max-w-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n} agent{n !== 1 ? "s" : ""}
                     </SelectItem>
                   ))}
                 </SelectContent>

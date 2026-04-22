@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import { useNavigate } from "react-router";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
+import { Label } from "~/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import { Separator } from "~/components/ui/separator";
+import { useStore } from "~/context/StoreContext";
 import {
   Select,
   SelectContent,
@@ -198,146 +200,263 @@ function Toast({ message, onDismiss }: { message: string; onDismiss: () => void 
   );
 }
 
-// ─── Custom Member Dialog ────────────────────────────────────────────────────
+// ─── Add Member Dialog ───────────────────────────────────────────────────────
 
-interface CustomMemberDialogProps {
+interface AddMemberDialogProps {
   open: boolean;
   onClose: () => void;
   onAdd: (member: Omit<CouncilMember, "id">) => void;
 }
 
-function CustomMemberDialog({ open, onClose, onAdd }: CustomMemberDialogProps) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [systemPrompt, setSystemPrompt] = useState("");
-  const [model, setModel] = useState("gpt-4o");
-  const [temperature, setTemperature] = useState(0.7);
-  const navigate = useNavigate();
+function AddMemberDialog({ open, onClose, onAdd }: AddMemberDialogProps) {
+  const store = useStore();
 
-  const handleArchetypeSelect = (archetype: typeof BUILT_IN_ARCHETYPES[0]) => {
-    setName(archetype.name);
-    setDescription(archetype.description);
-    setModel(archetype.model);
+  // Archetype selection
+  const [selectedArchetype, setSelectedArchetype] = useState("");
+  const [showNewArchetype, setShowNewArchetype] = useState(false);
+  const [newArchName, setNewArchName] = useState("");
+  const [newArchDescription, setNewArchDescription] = useState("");
+  const [newArchThinkingStyle, setNewArchThinkingStyle] = useState("");
+
+  // Model selection
+  const [selectedModel, setSelectedModel] = useState("gpt-4o");
+  const [showNewModel, setShowNewModel] = useState(false);
+  const [newModelName, setNewModelName] = useState("");
+  const [newModelApiUrl, setNewModelApiUrl] = useState("");
+  const [newModelApiKey, setNewModelApiKey] = useState("");
+
+  const allArchetypes = [
+    ...BUILT_IN_ARCHETYPES.map((a) => ({ id: a.name, name: a.name, description: a.description, model: a.model })),
+    ...store.customArchetypes.map((a) => ({ id: a.id, name: a.name, description: a.description, model: a.model ?? "gpt-4o" })),
+  ];
+
+  const resetForm = () => {
+    setSelectedArchetype("");
+    setShowNewArchetype(false);
+    setNewArchName("");
+    setNewArchDescription("");
+    setNewArchThinkingStyle("");
+    setSelectedModel("gpt-4o");
+    setShowNewModel(false);
+    setNewModelName("");
+    setNewModelApiUrl("");
+    setNewModelApiKey("");
   };
 
+  const handleCreateArchetype = () => {
+    if (!newArchName.trim()) return;
+    store.addCustomArchetype({
+      name: newArchName.trim(),
+      icon: "Hexagon",
+      color: "violet",
+      thinkingStyle: newArchThinkingStyle.trim() || "General purpose",
+      description: newArchDescription.trim(),
+    });
+    setSelectedArchetype(newArchName.trim());
+    setShowNewArchetype(false);
+    setNewArchName("");
+    setNewArchDescription("");
+    setNewArchThinkingStyle("");
+  };
+
+  const handleCreateModel = () => {
+    if (!newModelName.trim() || !newModelApiUrl.trim()) return;
+    store.addCustomModel({
+      label: newModelName.trim(),
+      apiUrl: newModelApiUrl.trim(),
+      apiKey: newModelApiKey.trim() || undefined,
+    });
+    setSelectedModel(`custom-model-pending`);
+    setShowNewModel(false);
+    setNewModelName("");
+    setNewModelApiUrl("");
+    setNewModelApiKey("");
+  };
+
+  // After store updates, pick the latest custom model
+  useEffect(() => {
+    if (selectedModel === "custom-model-pending" && store.customModels.length > 0) {
+      setSelectedModel(store.customModels[store.customModels.length - 1].id);
+    }
+  }, [store.customModels, selectedModel]);
+
   const handleSubmit = () => {
-    if (!name.trim()) return;
-    onAdd({ name: name.trim(), model });
-    setName("");
-    setDescription("");
-    setSystemPrompt("");
-    setModel("gpt-4o");
-    setTemperature(0.7);
+    const archName = selectedArchetype || "Custom Member";
+    onAdd({ name: archName, model: selectedModel });
+    resetForm();
     onClose();
   };
 
+  // When archetype changes, also set its default model
+  const handleArchetypeChange = (value: string) => {
+    if (value === "__new__") {
+      setShowNewArchetype(true);
+      return;
+    }
+    setSelectedArchetype(value);
+    setShowNewArchetype(false);
+    const arch = allArchetypes.find((a) => a.name === value);
+    if (arch?.model) setSelectedModel(arch.model);
+  };
+
   return (
-    <Dialog open={open} onOpenChange={(v) => !v && onClose()}>
-      <DialogContent className="max-w-md">
+    <Dialog open={open} onOpenChange={(v) => { if (!v) { resetForm(); onClose(); } }}>
+      <DialogContent className="max-w-md max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Create Custom Council Member</DialogTitle>
+          <DialogTitle>Add Council Member</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 py-2">
+          {/* Archetype selector */}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Start from Archetype</label>
-            <Select onValueChange={(v) => {
-              const arch = BUILT_IN_ARCHETYPES.find(a => a.name === v);
-              if (arch) handleArchetypeSelect(arch);
-            }}>
+            <Label className="text-sm font-medium">Archetype</Label>
+            <Select value={selectedArchetype} onValueChange={handleArchetypeChange}>
               <SelectTrigger>
-                <SelectValue placeholder="Pick an archetype (optional)" />
+                <SelectValue placeholder="Choose an archetype..." />
               </SelectTrigger>
               <SelectContent>
-                {BUILT_IN_ARCHETYPES.map((a) => (
-                  <SelectItem key={a.name} value={a.name}>
+                {allArchetypes.map((a) => (
+                  <SelectItem key={a.id} value={a.name}>
                     <div className="flex flex-col">
                       <span className="text-xs font-medium">{a.name}</span>
+                      {a.description && (
+                        <span className="text-[10px] text-muted-foreground">{a.description}</span>
+                      )}
                     </div>
                   </SelectItem>
                 ))}
+                <SelectItem value="__new__">
+                  <span className="flex items-center gap-1.5 text-primary">
+                    <Plus className="size-3" />
+                    Create New Archetype...
+                  </span>
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
+
+          {/* Inline new archetype form */}
+          {showNewArchetype && (
+            <div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 p-3 space-y-3">
+              <p className="text-xs font-medium text-primary">New Archetype</p>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Name *</Label>
+                <Input
+                  value={newArchName}
+                  onChange={(e) => setNewArchName(e.target.value)}
+                  placeholder="e.g. The Strategist"
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Description</Label>
+                <Input
+                  value={newArchDescription}
+                  onChange={(e) => setNewArchDescription(e.target.value)}
+                  placeholder="Short description of thinking style"
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Thinking Style</Label>
+                <Input
+                  value={newArchThinkingStyle}
+                  onChange={(e) => setNewArchThinkingStyle(e.target.value)}
+                  placeholder="e.g. Strategic, big-picture"
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowNewArchetype(false)}>
+                  Cancel
+                </Button>
+                <Button size="sm" className="h-7 text-xs" onClick={handleCreateArchetype} disabled={!newArchName.trim()}>
+                  Create
+                </Button>
+              </div>
+            </div>
+          )}
+
+          <Separator />
+
+          {/* Model selector */}
           <div className="space-y-1.5">
-            <label className="text-sm font-medium">Name *</label>
-            <Input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. The Strategist"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Description</label>
-            <Input
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Short description of this member's role"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">System Prompt</label>
-            <textarea
-              value={systemPrompt}
-              onChange={(e) => setSystemPrompt(e.target.value)}
-              placeholder="You are a strategic advisor who..."
-              rows={3}
-              className="w-full resize-none rounded-md border border-input bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-sm font-medium">Model</label>
+            <Label className="text-sm font-medium">Model</Label>
             <Select
-              value={model}
+              value={selectedModel}
               onValueChange={(v) => {
-                if (v === "__add_model__") {
-                  onClose();
-                  navigate("/language-models");
+                if (v === "__new_model__") {
+                  setShowNewModel(true);
                   return;
                 }
-                setModel(v);
+                setSelectedModel(v);
+                setShowNewModel(false);
               }}
             >
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {MODELS.map((m) => (
-                  <SelectItem key={m.value} value={m.value}>
+                {store.allModels.map((m) => (
+                  <SelectItem key={m.id} value={m.id}>
                     {m.label}
                   </SelectItem>
                 ))}
-                <SelectItem value="__add_model__">
+                <SelectItem value="__new_model__">
                   <span className="flex items-center gap-1.5 text-primary">
                     <Plus className="size-3" />
-                    Add Model...
+                    Add New Model...
                   </span>
                 </SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium">Temperature</label>
-              <span className="text-sm text-muted-foreground tabular-nums">{temperature.toFixed(1)}</span>
+
+          {/* Inline new model form */}
+          {showNewModel && (
+            <div className="rounded-lg border border-dashed border-primary/40 bg-primary/5 p-3 space-y-3">
+              <p className="text-xs font-medium text-primary">New Model</p>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Name *</Label>
+                <Input
+                  value={newModelName}
+                  onChange={(e) => setNewModelName(e.target.value)}
+                  placeholder="e.g. Mistral Large"
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">API URL *</Label>
+                <Input
+                  value={newModelApiUrl}
+                  onChange={(e) => setNewModelApiUrl(e.target.value)}
+                  placeholder="https://api.example.com/v1/chat"
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs">API Key</Label>
+                <Input
+                  type="password"
+                  value={newModelApiKey}
+                  onChange={(e) => setNewModelApiKey(e.target.value)}
+                  placeholder="sk-..."
+                  className="h-8 text-xs"
+                />
+              </div>
+              <div className="flex justify-end gap-2">
+                <Button variant="ghost" size="sm" className="h-7 text-xs" onClick={() => setShowNewModel(false)}>
+                  Cancel
+                </Button>
+                <Button size="sm" className="h-7 text-xs" onClick={handleCreateModel} disabled={!newModelName.trim() || !newModelApiUrl.trim()}>
+                  Add Model
+                </Button>
+              </div>
             </div>
-            <input
-              type="range"
-              min={0}
-              max={2}
-              step={0.1}
-              value={temperature}
-              onChange={(e) => setTemperature(parseFloat(e.target.value))}
-              className="w-full accent-primary"
-            />
-            <div className="flex justify-between text-[10px] text-muted-foreground">
-              <span>Precise (0)</span>
-              <span>Creative (2)</span>
-            </div>
-          </div>
+          )}
         </div>
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={handleSubmit} disabled={!name.trim()}>Add Member</Button>
+          <Button variant="outline" onClick={() => { resetForm(); onClose(); }}>Cancel</Button>
+          <Button onClick={handleSubmit} disabled={!selectedArchetype}>Add Member</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -347,6 +466,7 @@ function CustomMemberDialog({ open, onClose, onAdd }: CustomMemberDialogProps) {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export default function ChatPage() {
+  const store = useStore();
   const [conversations, setConversations] = useState(mockConversations);
   const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
   const [messageGroups, setMessageGroups] = useState<MessageGroup[]>([]);
@@ -627,10 +747,6 @@ export default function ChatPage() {
   };
 
   const addArchetype = (archetype: typeof BUILT_IN_ARCHETYPES[0]) => {
-    if (councilMembers.length >= 5) {
-      setToast("Maximum 5 council members reached");
-      return;
-    }
     if (councilMembers.some((m) => m.name === archetype.name)) {
       setToast(`${archetype.name} is already in your council`);
       return;
@@ -642,14 +758,13 @@ export default function ChatPage() {
   };
 
   const addCustomMember = (member: Omit<CouncilMember, "id">) => {
-    if (councilMembers.length >= 5) {
-      setToast("Maximum 5 council members reached");
-      return;
-    }
     setCouncilMembers((prev) => [
       ...prev,
       { id: Date.now().toString(), ...member },
     ]);
+    if (councilMembers.length >= 5) {
+      setToast("Above 5 members — make sure you have API keys configured for all models");
+    }
   };
 
   const removeMember = (id: string) => {
@@ -768,7 +883,7 @@ export default function ChatPage() {
                 variant="outline"
                 size="sm"
                 className="w-full gap-2 text-xs justify-between"
-                disabled={isStreaming || councilMembers.length >= 5}
+                disabled={isStreaming}
               >
                 <span className="flex items-center gap-2">
                   <Sparkles className="size-3" />
@@ -833,30 +948,18 @@ export default function ChatPage() {
                 </div>
                 <Select
                   value={member.model}
-                  onValueChange={(v) => {
-                    if (v === "__add_model__") {
-                      window.location.href = "/language-models";
-                      return;
-                    }
-                    updateMember(member.id, "model", v);
-                  }}
+                  onValueChange={(v) => updateMember(member.id, "model", v)}
                   disabled={isStreaming}
                 >
                   <SelectTrigger className="h-7 text-xs">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    {MODELS.map((m) => (
-                      <SelectItem key={m.value} value={m.value} className="text-xs">
+                    {store.allModels.map((m) => (
+                      <SelectItem key={m.id} value={m.id} className="text-xs">
                         {m.label}
                       </SelectItem>
                     ))}
-                    <SelectItem value="__add_model__" className="text-xs">
-                      <span className="flex items-center gap-1.5 text-primary">
-                        <Plus className="size-3" />
-                        Add Model...
-                      </span>
-                    </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -874,9 +977,9 @@ export default function ChatPage() {
             Add Member
           </Button>
 
-          {councilMembers.length >= 5 && (
-            <p className="text-[10px] text-muted-foreground text-center">
-              Maximum 5 council members
+          {councilMembers.length > 5 && (
+            <p className="text-[10px] text-amber-500 text-center">
+              More than 5 members — ensure API keys are configured
             </p>
           )}
         </div>
@@ -1254,7 +1357,7 @@ export default function ChatPage() {
       )}
 
       {/* ── Dialogs & Toasts ── */}
-      <CustomMemberDialog
+      <AddMemberDialog
         open={customDialogOpen}
         onClose={() => setCustomDialogOpen(false)}
         onAdd={addCustomMember}

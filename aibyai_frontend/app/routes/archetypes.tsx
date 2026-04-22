@@ -18,6 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
+import { useStore } from "~/context/StoreContext";
 import { Users, Plus, MoreHorizontal, Eye, Pencil, Trash2, ExternalLink } from "lucide-react";
 
 type Archetype = {
@@ -170,7 +171,7 @@ interface ArchetypeDialogProps {
 
 function ArchetypeDialog({ open, onOpenChange, onSave, initial, title }: ArchetypeDialogProps) {
   const [form, setForm] = useState<FormState>(initial ?? defaultFormState);
-  const navigate = useNavigate();
+  const store = useStore();
 
   // Reset form when dialog opens with new data
   const handleOpenChange = (o: boolean) => {
@@ -257,20 +258,12 @@ function ArchetypeDialog({ open, onOpenChange, onSave, initial, title }: Archety
               <select
                 id="arch-model"
                 value={form.model}
-                onChange={(e) => {
-                  if (e.target.value === "__add_model__") {
-                    onOpenChange(false);
-                    navigate("/language-models");
-                    return;
-                  }
-                  setForm((f) => ({ ...f, model: e.target.value }));
-                }}
+                onChange={(e) => setForm((f) => ({ ...f, model: e.target.value }))}
                 className="w-full h-9 text-sm bg-background border border-border rounded-md px-3 text-foreground"
               >
-                {modelOptions.map((m) => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
+                {store.allModels.map((m) => (
+                  <option key={m.id} value={m.id}>{m.label}</option>
                 ))}
-                <option value="__add_model__">+ Add Model...</option>
               </select>
             </div>
 
@@ -341,10 +334,31 @@ function ViewDetailsDialog({ open, onOpenChange, archetype }: ViewDetailsDialogP
 }
 
 export default function ArchetypesPage() {
-  const [archetypes, setArchetypes] = useState<Archetype[]>(builtinArchetypes);
+  const store = useStore();
+  const [localArchetypes, setLocalArchetypes] = useState<Archetype[]>(builtinArchetypes);
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Archetype | null>(null);
   const [viewTarget, setViewTarget] = useState<Archetype | null>(null);
+
+  // Merge builtins/local with store custom archetypes
+  const storeArchetypes: Archetype[] = store.customArchetypes.map((a) => ({
+    id: a.id,
+    name: a.name,
+    icon: a.icon || "🤖",
+    color: "bg-primary/20 border-primary/30",
+    thinkingStyle: a.thinkingStyle,
+    description: a.description,
+    systemPrompt: a.systemPrompt,
+    model: a.model,
+    temperature: a.temperature,
+    isCustom: true,
+  }));
+
+  // Deduplicate: store archetypes that aren't already in local list
+  const storeIds = new Set(storeArchetypes.map((a) => a.id));
+  const localIds = new Set(localArchetypes.filter((a) => a.isCustom).map((a) => a.id));
+  const extraFromStore = storeArchetypes.filter((a) => !localIds.has(a.id));
+  const archetypes = [...localArchetypes, ...extraFromStore];
 
   const handleCreate = (data: FormState) => {
     const newArch: Archetype = {
@@ -359,12 +373,23 @@ export default function ArchetypesPage() {
       temperature: data.temperature,
       isCustom: true,
     };
-    setArchetypes((prev) => [...prev, newArch]);
+    setLocalArchetypes((prev) => [...prev, newArch]);
+    // Also persist to store so chat page can see it
+    store.addCustomArchetype({
+      name: data.name,
+      icon: data.icon || "🤖",
+      color: "bg-primary/20 border-primary/30",
+      thinkingStyle: data.thinkingStyle,
+      description: data.description,
+      systemPrompt: data.systemPrompt,
+      model: data.model,
+      temperature: data.temperature,
+    });
   };
 
   const handleEdit = (data: FormState) => {
     if (!editTarget) return;
-    setArchetypes((prev) =>
+    setLocalArchetypes((prev) =>
       prev.map((a) =>
         a.id === editTarget.id
           ? {
@@ -380,11 +405,24 @@ export default function ArchetypesPage() {
           : a
       )
     );
+    // Sync to store if it's a custom archetype
+    if (editTarget.isCustom) {
+      store.updateArchetype(editTarget.id, {
+        name: data.name,
+        icon: data.icon || editTarget.icon,
+        thinkingStyle: data.thinkingStyle,
+        description: data.description,
+        systemPrompt: data.systemPrompt,
+        model: data.model,
+        temperature: data.temperature,
+      });
+    }
     setEditTarget(null);
   };
 
   const handleDelete = (id: string) => {
-    setArchetypes((prev) => prev.filter((a) => a.id !== id));
+    setLocalArchetypes((prev) => prev.filter((a) => a.id !== id));
+    store.removeArchetype(id);
   };
 
   return (

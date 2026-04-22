@@ -29,6 +29,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "~/components/ui/dialog";
+import { useStore } from "~/context/StoreContext";
 import {
   Brain,
   Settings,
@@ -69,6 +70,7 @@ function getProviderIcon(iconKey: string) {
 }
 
 export default function LanguageModelsPage() {
+  const store = useStore();
   const [connectedProviders, setConnectedProviders] = useState<ConnectedProvider[]>(
     INITIAL_CONNECTED_PROVIDERS
   );
@@ -302,6 +304,38 @@ export default function LanguageModelsPage() {
             </div>
           )}
         </div>
+
+        {/* Custom Models (created from chat or other pages) */}
+        {store.customModels.length > 0 && (
+          <div className="space-y-4">
+            <div>
+              <h2 className="text-sm font-medium">Custom Models</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Models added via the chat dialog or other pages
+              </p>
+            </div>
+            <div className="grid gap-3">
+              {store.customModels.map((m) => (
+                <Card key={m.id}>
+                  <CardContent className="py-0">
+                    <div className="flex items-center gap-3 py-3">
+                      <div className="flex items-center justify-center size-9 rounded-lg bg-muted">
+                        <Wrench className="size-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">{m.label}</span>
+                          <Badge variant="secondary" className="text-[10px]">Custom</Badge>
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate">{m.apiUrl}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Add a Provider */}
         <div className="space-y-4">

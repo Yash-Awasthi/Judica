@@ -50,6 +50,7 @@ import {
 } from "~/components/ui/sidebar";
 import { mockUser } from "~/lib/mock-data";
 import { ThemeProvider, useTheme } from "~/context/ThemeContext";
+import { StoreProvider } from "~/context/StoreContext";
 
 import type { Route } from "./+types/root";
 import "./app.css";
@@ -260,18 +261,20 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <TooltipProvider>
-        <SidebarProvider>
-          <AppSidebar />
-          <main className="flex-1 overflow-auto">
-            <div className="flex items-center gap-2 border-b border-border px-4 py-2 md:hidden">
-              <SidebarTrigger />
-              <span className="text-sm font-semibold">AIBYAI</span>
-            </div>
-            <Outlet />
-          </main>
-        </SidebarProvider>
-      </TooltipProvider>
+      <StoreProvider>
+        <TooltipProvider>
+          <SidebarProvider>
+            <AppSidebar />
+            <main className="flex-1 overflow-auto">
+              <div className="flex items-center gap-2 border-b border-border px-4 py-2 md:hidden">
+                <SidebarTrigger />
+                <span className="text-sm font-semibold">AIBYAI</span>
+              </div>
+              <Outlet />
+            </main>
+          </SidebarProvider>
+        </TooltipProvider>
+      </StoreProvider>
     </ThemeProvider>
   );
 }
