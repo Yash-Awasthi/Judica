@@ -143,7 +143,8 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
       .where(
         and(
           eq(chats.conversationId, id),
-          lte(chats.id, Number(toChatId))
+          // P30-09: NaN guard on toChatId numeric conversion
+          lte(chats.id, Number.isFinite(Number(toChatId)) ? Number(toChatId) : 0)
         )
       )
       .orderBy(asc(chats.createdAt));

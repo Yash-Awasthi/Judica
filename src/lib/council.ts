@@ -43,7 +43,8 @@ const MAX_CACHE_ENTRIES = parseInt(process.env.COUNCIL_CACHE_MAX || "50", 10);
 const deliberationCache = new Map<string, { result: { verdict: string; opinions: { name: string; opinion: string }[]; metrics: { totalTokens: number; totalCost: number; hallucinationCount: number } }; expiresAt: number }>();
 
 function getCacheKey(messages: Message[], memberNames: string[]): string {
-  const content = messages.map(m => m.content).join("|") + "||" + memberNames.sort().join(",");
+  // P30-10: Use slice to avoid mutating caller's array with sort()
+  const content = messages.map(m => m.content).join("|") + "||" + [...memberNames].sort().join(",");
   return createHash("sha256").update(content).digest("hex").slice(0, 32);
 }
 

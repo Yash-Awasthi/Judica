@@ -135,7 +135,9 @@ export async function getEnhancedContext(conversationId: string, currentQuery: s
 // P9-94: Improved keyword extraction with basic suffix stripping (poor man's stemmer)
 // and n-gram support for multi-word phrases.
 function extractKeywords(text: string): string[] {
-  const words = text.toLowerCase()
+  // P30-05: Cap input length to prevent regex DoS on very large strings
+  const safeText = text.length > 10_000 ? text.slice(0, 10_000) : text;
+  const words = safeText.toLowerCase()
     .replace(/[^\w\s]/g, ' ')
     .split(/\s+/)
     .filter(word => word.length > 3)
