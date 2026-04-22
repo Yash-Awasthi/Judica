@@ -15,9 +15,8 @@ function dollarsToMicrocents(dollars: number): number {
   return Math.round(dollars * MICROCENTS_PER_DOLLAR);
 }
 
-function _microcentsToDollars(microcents: number): number {
-  return microcents / MICROCENTS_PER_DOLLAR;
-}
+// P50-08: Removed unused _microcentsToDollars function (was dead code).
+// Restore as microcentsToDollars (no underscore) if an inverse conversion is needed.
 export interface RealTimeCostEntry {
   sessionId: string;
   userId: number;
@@ -67,6 +66,7 @@ class RealTimeCostTracker {
   
   private lastAccessTime: Map<number, Date> = new Map(); // userId -> last access
   private maxUsers = 10000; // Safety bound: max users to keep in memory
+  private maxSessions = 50000; // P50-08: Safety bound: max sessions to keep in memory
   private userTTLMs = 24 * 60 * 60 * 1000; // 24 hour TTL for user data
   private maxCallbacksPerUser = 10; // Safety bound: alert callbacks per user
 
@@ -80,6 +80,7 @@ class RealTimeCostTracker {
     }
 
     this.enforceUserBounds();
+    this.enforceSessionBounds();
     const now = new Date();
     const todayStr = now.toISOString().slice(0, 10);
     const monthStr = now.toISOString().slice(0, 7);
@@ -138,6 +139,32 @@ class RealTimeCostTracker {
     }
 
     logger.warn({ removed, reason: "max_users_bound" }, "Cleaned up oldest user cost data");
+  }
+
+  // P50-08: Evict oldest sessions when the session map exceeds its safety bound
+  private enforceSessionBounds(): void {
+    if (this.sessionCosts.size < this.maxSessions) return;
+
+    // Find sessions with entries and sort by last activity timestamp
+    const sessionsByAge: Array<{ sessionId: string; lastActivity: number }> = [];
+    for (const [sessionId, entries] of this.sessionCosts.entries()) {
+      const lastEntry = entries[entries.length - 1];
+      sessionsByAge.push({
+        sessionId,
+        lastActivity: lastEntry ? lastEntry.timestamp.getTime() : 0
+      });
+    }
+    sessionsByAge.sort((a, b) => a.lastActivity - b.lastActivity);
+
+    const sessionsToRemove = Math.ceil(this.maxSessions * 0.1);
+    let removed = 0;
+    for (let i = 0; i < sessionsByAge.length && removed < sessionsToRemove; i++) {
+      this.sessionCosts.delete(sessionsByAge[i].sessionId);
+      removed++;
+    }
+
+    logger.warn({ removed, remaining: this.sessionCosts.size, reason: "max_sessions_bound" },
+      "Cleaned up oldest session cost data");
   }
 
   private removeUserData(userId: number): void {

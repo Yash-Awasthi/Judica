@@ -31,6 +31,26 @@ export interface DistillationSample {
 const distillationStore: DistillationSample[] = [];
 const MAX_SAMPLES = 100_000;
 const MIN_CONFIDENCE_THRESHOLD = 0.75;
+const MAX_QUERY_LENGTH = 50_000; // 50 KB cap per field
+const MAX_ANSWER_LENGTH = 200_000; // 200 KB cap per field
+const MAX_METADATA_KEYS = 50;
+
+function truncate(value: string, limit: number): string {
+  return value.length > limit ? value.slice(0, limit) : value;
+}
+
+function clampMetadata(
+  meta: Record<string, unknown> | undefined,
+): Record<string, unknown> | undefined {
+  if (!meta) return meta;
+  const keys = Object.keys(meta);
+  if (keys.length <= MAX_METADATA_KEYS) return meta;
+  const clamped: Record<string, unknown> = {};
+  for (let i = 0; i < MAX_METADATA_KEYS; i++) {
+    clamped[keys[i]] = meta[keys[i]];
+  }
+  return clamped;
+}
 
 /**
  * Record a distillation sample from a high-confidence council verdict.
@@ -57,14 +77,20 @@ export function recordDistillationSample(sample: {
     consensusScore: sample.consensusScore,
     participatingModels: sample.participatingModels,
     createdAt: new Date().toISOString(),
-    metadata: sample.metadata,
+    metadata: clampMetadata(sample.metadata),
   };
 
   distillationStore.push(entry);
 
-  // Bound memory
+  // Bound memory — drop the oldest half when we exceed the cap.
+  // This amortises the O(n) copy: instead of shifting on every insert
+  // once at capacity, we pay once per (MAX_SAMPLES / 2) inserts.
   if (distillationStore.length > MAX_SAMPLES) {
-    distillationStore.splice(0, distillationStore.length - MAX_SAMPLES);
+    const keep = Math.floor(MAX_SAMPLES / 2);
+    const start = distillationStore.length - keep;
+    const recent = distillationStore.slice(start);
+    distillationStore.length = 0;
+    distillationStore.push(...recent);
   }
 
   logger.debug({ sampleId: entry.id, confidence: entry.confidence }, "Distillation sample recorded");

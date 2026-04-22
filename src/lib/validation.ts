@@ -93,6 +93,10 @@ export class ValidationModule {
    * Supports +, -, *, /, parentheses, and decimal numbers.
    */
   private safeMathEval(expr: string): number | null {
+    // P50-09: Cap expression length to prevent abuse via deeply nested or very long expressions
+    const MAX_EXPR_LENGTH = 200;
+    if (expr.length > MAX_EXPR_LENGTH) return null;
+
     const tokens: string[] = [];
     const sanitized = expr.replace(/\s+/g, "");
     // Tokenize: numbers (including decimals) and operators
@@ -104,7 +108,14 @@ export class ValidationModule {
     // Rebuild and verify it matches original (no extra chars)
     if (tokens.join("") !== sanitized) return null;
 
+    // P50-09: Cap token count to bound loop iterations
+    const MAX_TOKENS = 100;
+    if (tokens.length > MAX_TOKENS) return null;
+
     let pos = 0;
+    // P50-09: Recursion depth guard to prevent stack overflow from deeply nested parentheses
+    let depth = 0;
+    const MAX_DEPTH = 20;
     const peek = () => tokens[pos];
     const consume = () => tokens[pos++];
 
@@ -132,9 +143,11 @@ export class ValidationModule {
 
     const parseFactor = (): number => {
       if (peek() === "(") {
+        if (++depth > MAX_DEPTH) throw new Error("Max nesting depth exceeded");
         consume(); // (
         const result = parseExpr();
         consume(); // )
+        depth--;
         return result;
       }
       // Handle unary minus
@@ -151,6 +164,7 @@ export class ValidationModule {
     try {
       const result = parseExpr();
       if (pos !== tokens.length) return null; // leftover tokens
+      if (!isFinite(result)) return null; // P50-09: guard against Infinity from division by zero
       return result;
     } catch {
       return null;
@@ -164,11 +178,28 @@ export class ValidationModule {
     const errors: string[] = [];
     const combined = output.answer + " " + output.reasoning;
 
+    // P50-09: Cap input length to prevent ReDoS on long strings with many numerical patterns
+    const MAX_MATH_INPUT_LENGTH = 10_000;
+    if (combined.length > MAX_MATH_INPUT_LENGTH) {
+      logger.debug("Skipping math integrity check: input exceeds length cap");
+      return {
+        valid: true,
+        errors: [],
+        confidence_adjustment: 0,
+        type: "mathematical"
+      };
+    }
+
     // Look for simple arithmetic: 5 + 5 = 10
-    const mathRegex = /([\d\s+\-*/().]+)\s*=\s*([\d\s+\-*/().]+)/g;
+    // P50-09: Use atomic-style grouping via non-backtracking pattern — match digits/ops
+    // but limit each side to 100 chars to prevent catastrophic backtracking
+    const mathRegex = /([\d\s+\-*/().]{1,100})\s*=\s*([\d\s+\-*/().]{1,100})/g;
     let match;
+    const MAX_MATH_MATCHES = 50;
+    let matchCount = 0;
 
     while ((match = mathRegex.exec(combined)) !== null) {
+      if (++matchCount > MAX_MATH_MATCHES) break;
       const expression = match[1].trim();
       const result = match[2].trim();
 

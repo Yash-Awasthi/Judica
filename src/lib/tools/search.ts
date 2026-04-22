@@ -3,7 +3,7 @@ import { env } from "../../config/env.js";
 import logger from "../logger.js";
 
 export const executeSearchSchema = z.object({
-  query: z.string().describe("The search query to execute"),
+  query: z.string().max(1000).describe("The search query to execute"),
 });
 
 export const executeSearchDef = {
@@ -56,23 +56,32 @@ export async function executeSearch(args: unknown): Promise<string> {
 
   const url = `https://serpapi.com/search.json?${params.toString()}`;
 
-  try {
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 10000);
+  const MAX_RESPONSE_SIZE = 5 * 1024 * 1024; // 5MB
 
+  try {
     const response = await fetch(url, {
       signal: controller.signal,
       headers: { Authorization: `Bearer ${apiKey}` },
     });
-
-    clearTimeout(timeout);
 
     if (!response.ok) {
       logger.warn({ status: response.status }, "SERP API error");
       return "[]";
     }
 
-    const data = (await response.json()) as {
+    const contentLength = Number(response.headers.get("content-length") || "0");
+    if (contentLength > MAX_RESPONSE_SIZE) {
+      logger.warn({ contentLength }, "SERP API response too large");
+      return "[]";
+    }
+
+    const text = await response.text();
+    if (text.length > MAX_RESPONSE_SIZE) {
+      logger.warn("SERP API response body exceeded size limit");
+      return "[]";
+    }
+
+    const data = JSON.parse(text) as {
       organic_results?: Array<{
         title?: string;
         link?: string;
@@ -102,7 +111,8 @@ export async function executeSearch(args: unknown): Promise<string> {
 
     return JSON.stringify(results);
   } catch (error) {
-    logger.error({ error }, "Search failed");
+    const message = error instanceof Error ? error.message.replace(/api_key=[^&\s]*/gi, "api_key=***") : "Unknown error";
+    logger.error({ error: message }, "Search failed");
     return "[]";
   }
 }

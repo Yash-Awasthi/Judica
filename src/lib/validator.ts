@@ -42,6 +42,8 @@ export interface ValidationRule {
   check: (content: string, context: unknown) => ValidationIssue | null;
 }
 
+const MAX_VALIDATION_HISTORY = 500;
+
 export class ColdValidator {
   private config: ValidatorConfig;
   private validationHistory: Map<string, ValidationResult[]> = new Map();
@@ -520,6 +522,11 @@ Provide a corrected version that addresses these issues while preserving the cor
   }
 
   private storeValidationHistory(sessionId: string, result: ValidationResult): void {
+    if (this.validationHistory.size >= MAX_VALIDATION_HISTORY) {
+      const oldest = this.validationHistory.keys().next().value;
+      if (oldest !== undefined) this.validationHistory.delete(oldest);
+    }
+
     const history = this.validationHistory.get(sessionId) || [];
     history.push(result);
 

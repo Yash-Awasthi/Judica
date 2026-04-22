@@ -13,6 +13,12 @@
 
 import logger from "./logger.js";
 
+/** Maximum size of a single artifact (50 MB). */
+const MAX_ARTIFACT_SIZE = 50 * 1024 * 1024; // 50MB
+
+/** Maximum total number of artifacts stored in memory. */
+const MAX_ARTIFACTS = 10_000;
+
 export interface ArtifactStore {
   readonly name: string;
 
