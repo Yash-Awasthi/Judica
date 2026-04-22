@@ -42,7 +42,8 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     if (tags) {
-      const tagList = tags.split(",").map((t) => t.trim());
+      // P37-01: Cap tags to prevent unbounded array in SQL query
+      const tagList = tags.split(",").map((t) => t.trim()).slice(0, 20);
       conditions.push(
         sql`${marketplaceItems.tags} && ARRAY[${sql.join(tagList.map(t => sql`${t}`), sql`,`)}]::text[]`
       );
@@ -411,7 +412,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
         itemId,
         userId: request.userId!,
         rating: Math.round(rating),
-        comment: comment || null,
+        comment: safeComment,
       })
       .returning();
 
