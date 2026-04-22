@@ -195,7 +195,8 @@ async function extractRelevantMemories(conversationId: string, keywords: string[
 export async function updateEnhancedContextSummary(conversationId: string): Promise<void> {
   const allChats = await db.select().from(chats)
     .where(eq(chats.conversationId, conversationId))
-    .orderBy(asc(chats.createdAt));
+    .orderBy(asc(chats.createdAt))
+    .limit(200);
 
   if (allChats.length <= 8) return; // Wait for more substantial conversation
 
