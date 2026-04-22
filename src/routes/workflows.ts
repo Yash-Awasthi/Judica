@@ -294,7 +294,13 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
       try {
         for await (const event of executor.run(inputs || {})) {
           const entry = activeRuns.get(run.id);
-          if (entry) entry.events.push(event);
+          // P31-04: Cap events array to prevent unbounded memory growth
+          if (entry) {
+            if (entry.events.length >= 10_000) {
+              entry.events.splice(0, entry.events.length - 5000);
+            }
+            entry.events.push(event);
+          }
 
           if (event.type === "workflow_complete") {
             await db
@@ -441,13 +447,17 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
 
     const { choice, nodeId } = request.body as { choice?: string; nodeId?: string };
     if (!choice) throw new AppError(400, "Choice is required", "GATE_CHOICE_REQUIRED");
+    // P31-05: Validate nodeId is present and reasonable
+    if (!nodeId || typeof nodeId !== "string" || nodeId.length > 256) {
+      throw new AppError(400, "Valid nodeId is required", "GATE_NODE_ID_REQUIRED");
+    }
 
     const active = activeRuns.get(run.id);
     if (!active) {
       throw new AppError(400, "No active executor for this run", "GATE_NO_ACTIVE_RUN");
     }
 
-    active.executor.resumeGate(nodeId!, choice);
+    active.executor.resumeGate(nodeId, choice);
     return { success: true };
   });
 };

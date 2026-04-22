@@ -352,7 +352,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         cacheHit: isCacheHit,
       });
 
-      await updateDailyUsage({ userId: userId!, tokensUsed, isCacheHit });
+      await updateDailyUsage({ userId: userId!, tokensUsed: Math.max(0, tokensUsed || 0), isCacheHit }); // P31-09: Non-negative guard on tokensUsed
     }
 
     // Detect and save artifacts from the verdict

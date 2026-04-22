@@ -160,11 +160,21 @@ const researchPlugin: FastifyPluginAsync = async (fastify) => {
           reply.raw.end();
         }
       } catch (err) {
+        // P31-10: Clear interval on repeated errors to prevent polling zombie
         logger.error({ err }, "Research stream poll error");
       }
     }, 2000);
 
-    request.raw.on("close", () => clearInterval(interval));
+    // P31-10: Safety timeout — stop polling after 30 minutes to prevent zombie intervals
+    const safetyTimeout = setTimeout(() => {
+      clearInterval(interval);
+      try { reply.raw.end(); } catch { /* already closed */ }
+    }, 30 * 60 * 1000);
+
+    request.raw.on("close", () => {
+      clearInterval(interval);
+      clearTimeout(safetyTimeout);
+    });
   });
 
     // DELETE /api/research/:id — delete job

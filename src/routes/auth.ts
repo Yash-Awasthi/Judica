@@ -202,7 +202,9 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
        const payload = jwt.decode(token) as { userId?: number; exp?: number } | null;
        const expiresAt = payload?.exp ? new Date(payload.exp * 1000) : new Date(Date.now() + 15 * 60 * 1000);
 
-       const ttlSecs = Math.max(1, Math.floor((expiresAt.getTime() - Date.now()) / 1000));
+       // P31-01: NaN guard on TTL calculation to prevent Redis misuse
+       const ttlRaw = Math.floor((expiresAt.getTime() - Date.now()) / 1000);
+       const ttlSecs = Number.isFinite(ttlRaw) && ttlRaw > 0 ? ttlRaw : 900; // fallback 15min
        await redis.set(`revoked:${token}`, "1", { EX: ttlSecs });
 
        await db.insert(revokedTokens).values({ token, expiresAt });
@@ -248,9 +250,14 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
         // Token was already consumed — replay attack. Look up user from family mapping.
         const familyUserId = await redis.get(`refresh_family:${tokenHash}`);
         if (familyUserId) {
+          // P31-02: NaN guard on familyUserId parse
           const userId = parseInt(familyUserId, 10);
-          logger.warn({ userId }, "Refresh token replay detected — revoking all sessions for user");
-          await db.delete(refreshTokens).where(eq(refreshTokens.userId, userId));
+          if (!Number.isFinite(userId) || userId <= 0) {
+            logger.warn({ familyUserId }, "Refresh token replay — invalid userId in family mapping");
+          } else {
+            logger.warn({ userId }, "Refresh token replay detected — revoking all sessions for user");
+            await db.delete(refreshTokens).where(eq(refreshTokens.userId, userId));
+          }
         } else {
           logger.warn("Refresh token replay detected — user unknown");
         }
@@ -332,7 +339,13 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     const [row] = await db.select().from(councilConfigs).where(eq(councilConfigs.userId, request.userId!)).limit(1);
 
     if (!row) return null;
-    const decrypted = JSON.parse(decrypt(row.config as string));
+    // P31-07: Safe JSON.parse with try-catch to prevent crash on corrupted config
+    let decrypted: unknown;
+    try {
+      decrypted = JSON.parse(decrypt(row.config as string));
+    } catch {
+      throw new AppError(500, "Failed to decrypt configuration", "CONFIG_DECRYPT_ERROR");
+    }
     return decrypted;
   });
 
@@ -343,8 +356,13 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(404, "No configuration found to rotate");
     }
 
-    // Decrypt with the current/previous key, re-encrypt with current key
-    const decrypted = JSON.parse(decrypt(row.config as string));
+    // P31-07: Safe JSON.parse with try-catch
+    let decrypted: unknown;
+    try {
+      decrypted = JSON.parse(decrypt(row.config as string));
+    } catch {
+      throw new AppError(500, "Failed to decrypt configuration for rotation", "CONFIG_DECRYPT_ERROR");
+    }
     const reEncrypted = encrypt(JSON.stringify(decrypted));
 
     await db.update(councilConfigs).set({ config: reEncrypted }).where(eq(councilConfigs.userId, request.userId!));

@@ -36,6 +36,18 @@ const projectsPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.post("/", async (request, reply) => {
     const userId = request.userId!;
     const body = request.body as { name: string; description?: string; defaultCouncilComposition?: Record<string, unknown>; color?: string; icon?: string; defaultSystemPrompt?: string };
+    // P31-08: Validate council composition keys to prevent prototype pollution
+    if (body.defaultCouncilComposition) {
+      const forbidden = ["__proto__", "constructor", "prototype"];
+      for (const key of Object.keys(body.defaultCouncilComposition)) {
+        if (forbidden.includes(key)) {
+          throw new Error(`Invalid key in council composition: ${key}`);
+        }
+      }
+      if (Object.keys(body.defaultCouncilComposition).length > 50) {
+        throw new Error("Council composition has too many entries (max 50)");
+      }
+    }
     const project = await createProject({
       userId,
       name: body.name,
