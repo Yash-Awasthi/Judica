@@ -123,6 +123,7 @@ export function classifyQueryComplexity(query: string): QueryComplexity {
  * Get adaptive k for RAG retrieval, with optional override.
  */
 export function getAdaptiveK(query: string, overrideK?: number): { k: number; useHyde: boolean; complexity: QueryComplexity } {
+  // P42-06: Cap overrideK to prevent excessive retrieval
   if (overrideK !== undefined && overrideK > 0) {
     // P36-06: Cap overrideK to prevent unbounded retrieval
     const cappedK = Math.min(Math.floor(overrideK), 100);

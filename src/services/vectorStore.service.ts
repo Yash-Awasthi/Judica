@@ -77,7 +77,7 @@ export async function searchSimilar(
     FROM "Memory"
     WHERE "userId" = ${userId} ${kbCondition}
     ORDER BY score DESC
-    LIMIT ${limit}
+    LIMIT ${safeLimit}
   `);
 
   // Refresh lastAccessedAt for accessed memories (fire-and-forget)
@@ -110,7 +110,7 @@ export async function keywordSearch(
     WHERE "userId" = ${userId} ${kbCondition}
       AND "tsv" @@ plainto_tsquery('english', ${query})
     ORDER BY score DESC
-    LIMIT ${limit}
+    LIMIT ${safeLimit}
   `);
 
   return results.rows as unknown as MemoryChunk[];
