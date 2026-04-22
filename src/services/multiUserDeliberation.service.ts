@@ -140,6 +140,9 @@ export function sendMessage(
   if (session.status === "completed") {
     throw new Error("Session is completed");
   }
+  if (content.length > 10000) {
+    throw new Error("Message content exceeds 10,000 character limit");
+  }
   const message: SessionMessage = {
     userId,
     type,
@@ -173,6 +176,29 @@ export function closeSession(sessionId: string, userId: string): SharedSession {
   logger.info({ sessionId }, "Closed shared session");
   return session;
 }
+
+/**
+ * Clean up old completed sessions.
+ */
+export function cleanupSessions(maxAgeMs: number = 4 * 60 * 60 * 1000): number {
+  const cutoff = Date.now() - maxAgeMs;
+  let removed = 0;
+  for (const [id, session] of sessions.entries()) {
+    if (session.status === "completed" && session.createdAt.getTime() < cutoff) {
+      sessions.delete(id);
+      removed++;
+    }
+  }
+  return removed;
+}
+
+// Auto-cleanup completed sessions every 15 minutes
+setInterval(() => {
+  const removed = cleanupSessions();
+  if (removed > 0) {
+    logger.info({ removed }, "Auto-cleaned completed shared sessions");
+  }
+}, 15 * 60 * 1000).unref();
 
 // ─── Reset (for tests) ─────────────────────────────────────────────────────
 

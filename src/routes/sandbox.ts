@@ -17,6 +17,18 @@ const inflightMap = new Map<string, number>();
 
 // P1-21: Redis-backed rate limiter with in-memory fallback
 const memoryBuckets = new Map<string, { count: number; resetAt: number }>();
+const MAX_BUCKETS = 10_000;
+
+// Periodic cleanup of expired rate-limit buckets (every 60s)
+const bucketCleanupInterval = setInterval(() => {
+  const now = Date.now();
+  for (const [key, bucket] of memoryBuckets) {
+    if (now >= bucket.resetAt) {
+      memoryBuckets.delete(key);
+    }
+  }
+}, 60_000);
+bucketCleanupInterval.unref();
 
 async function sandboxRateLimiter(request: FastifyRequest, reply: FastifyReply) {
   const userId = (request as unknown as { userId?: number }).userId || request.ip;
@@ -41,6 +53,12 @@ async function sandboxRateLimiter(request: FastifyRequest, reply: FastifyReply) 
   const now = Date.now();
   let bucket = memoryBuckets.get(key);
   if (!bucket || now >= bucket.resetAt) {
+    // Safety net: evict expired entries if map exceeds cap
+    if (memoryBuckets.size >= MAX_BUCKETS) {
+      for (const [k, b] of memoryBuckets) {
+        if (now >= b.resetAt) memoryBuckets.delete(k);
+      }
+    }
     bucket = { count: 0, resetAt: now + 60_000 };
     memoryBuckets.set(key, bucket);
   }

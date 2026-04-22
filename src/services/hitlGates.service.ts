@@ -307,3 +307,14 @@ export function cleanupExpiredGates(maxAgeMs: number = 86400_000): number {
   }
   return removed;
 }
+
+// Auto-cleanup expired/resolved gates every 15 minutes
+const GATE_CLEANUP_INTERVAL_MS = 15 * 60 * 1000;
+const GATE_CLEANUP_MAX_AGE_MS = 2 * 60 * 60 * 1000; // 2 hours
+
+setInterval(() => {
+  const removed = cleanupExpiredGates(GATE_CLEANUP_MAX_AGE_MS);
+  if (removed > 0) {
+    logger.info({ removed }, "Auto-cleaned expired HITL gates");
+  }
+}, GATE_CLEANUP_INTERVAL_MS).unref();

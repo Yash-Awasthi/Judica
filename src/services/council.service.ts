@@ -208,9 +208,15 @@ export function resolveApiKey(member: ApiKeyResolutionInput): string {
   }
   if (model.includes("/"))            return env.OPENROUTER_API_KEY || env.OPENAI_API_KEY || "";
 
-  if (member.type === "api")       return env.GOOGLE_API_KEY || env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY || "";
+  if (member.type === "api") {
+    const key = env.GOOGLE_API_KEY || env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY || "";
+    if (!key) logger.warn({ member: { model: member.model, baseUrl: member.baseUrl } }, "resolveApiKey: no API key found for api-type member");
+    return key;
+  }
 
-  return env.OPENAI_API_KEY || "";
+  const fallbackKey = env.OPENAI_API_KEY || "";
+  if (!fallbackKey) logger.warn({ member: { model: member.model, baseUrl: member.baseUrl } }, "resolveApiKey: no fallback API key found");
+  return fallbackKey;
 }
 
 export function resolveMembersApiKeys(members: ApiKeyResolutionInput[]): CouncilProvider[] {

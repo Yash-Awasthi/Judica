@@ -45,7 +45,7 @@ function extractToken(req: IncomingMessage): string | null {
 }
 
 export function initSocket(server: HttpServer): WebSocketServer {
-  wss = new WebSocketServer({ noServer: true });
+  wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 }); // 16KB max message
 
   // Handle upgrade with JWT verification
   server.on("upgrade", async (req, socket, head) => {
@@ -126,12 +126,8 @@ export function initSocket(server: HttpServer): WebSocketServer {
 
     ws.on("message", async (raw) => {
       try {
-        // Reject oversized messages to prevent heap exhaustion
-        const MAX_WS_MESSAGE_SIZE = 64 * 1024; // 64KB
-        if (raw.length > MAX_WS_MESSAGE_SIZE) {
-          ws.send(JSON.stringify({ event: "error", data: { message: "Message too large" } }));
-          return;
-        }
+        // Reject oversized messages (defense in depth — maxPayload handles this at protocol level)
+        if (raw.length > 16 * 1024) return;
         const msg = JSON.parse(raw.toString());
         if (msg.type === "join:conversation" && msg.conversationId) {
           // Verify the user owns this conversation (or it's public)

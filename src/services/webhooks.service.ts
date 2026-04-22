@@ -1,5 +1,6 @@
-import crypto from "node:crypto";
+import crypto from "crypto";
 import logger from "../lib/logger.js";
+import { isPrivateIP } from "../lib/ssrf.js";
 
 
 /**
@@ -52,20 +53,25 @@ const deliveryLog: WebhookDelivery[] = [];
  * Register a webhook.
  */
 export function registerWebhook(config: Omit<WebhookConfig, "id" | "createdAt">): WebhookConfig {
-  // P6-10: Validate webhook URL against SSRF before registration
-  const url = new URL(config.url);
-  const hostname = url.hostname.toLowerCase();
+  // R2-02: Replace manual hostname list with isPrivateIP (covers all RFC-1918/loopback/link-local)
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(config.url);
+  } catch {
+    throw new Error("Invalid webhook URL");
+  }
+  if (parsedUrl.protocol !== "http:" && parsedUrl.protocol !== "https:") {
+    throw new Error("Webhook URL must use http or https protocol");
+  }
+  const hostname = parsedUrl.hostname.toLowerCase().replace(/^\[|\]$/g, "");
   if (
     hostname === "localhost" ||
-    hostname === "127.0.0.1" ||
-    hostname === "::1" ||
-    hostname === "[::1]" ||
-    hostname === "0.0.0.0" ||
     hostname.endsWith(".local") ||
     hostname.endsWith(".internal") ||
-    hostname === "metadata.google.internal"
+    hostname === "metadata.google.internal" ||
+    isPrivateIP(hostname)
   ) {
-    throw new Error(`Webhook URL targets a restricted hostname: ${hostname}`);
+    throw new Error("Webhook URL targets a restricted hostname");
   }
 
   const webhook: WebhookConfig = {
@@ -150,11 +156,11 @@ export async function retryFailedDelivery(
 
 /**
  * Compute HMAC-SHA256 signature for payload verification.
+ * Format matches GitHub/Stripe webhook conventions: "sha256=<hex>"
  */
 export function computeSignature(payload: string, secret: string): string {
-  const hmac = crypto.createHmac("sha256", secret);
-  hmac.update(payload, "utf8");
-  return `sha256=${hmac.digest("hex")}`;
+  // R2-01: Use proper HMAC-SHA256 — the previous djb2-style hash was trivially forgeable
+  return "sha256=" + crypto.createHmac("sha256", secret).update(payload, "utf8").digest("hex");
 }
 
 // ─── Event Firing ───────────────────────────────────────────────────────────

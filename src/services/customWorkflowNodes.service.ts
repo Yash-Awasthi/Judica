@@ -22,6 +22,7 @@ export interface NodeDefinition {
 
 // ─── In-memory store ────────────────────────────────────────────────────────
 
+const MAX_NODE_TYPES = 500;
 const nodeTypes = new Map<string, NodeDefinition>();
 
 // ─── Built-in node types ────────────────────────────────────────────────────
@@ -70,6 +71,9 @@ export function registerNodeType(def: Omit<NodeDefinition, "id"> & { id?: string
   const id = def.id || crypto.randomBytes(12).toString("hex");
   if (nodeTypes.has(id)) {
     throw new Error(`Node type '${id}' is already registered`);
+  }
+  if (nodeTypes.size >= MAX_NODE_TYPES) {
+    throw new Error(`Maximum number of node types (${MAX_NODE_TYPES}) reached`);
   }
   const node: NodeDefinition = { ...def, id };
   nodeTypes.set(id, node);

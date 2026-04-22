@@ -168,6 +168,24 @@ export function getTool(toolId: string): FederatedTool | undefined {
 export function publishTool(
   tool: Omit<FederatedTool, "id" | "downloads" | "rating" | "publishedAt">,
 ): FederatedTool {
+  // Validate tool metadata
+  if (!tool.name || tool.name.length > 100) {
+    throw new Error("Tool name is required and must be under 100 characters");
+  }
+  if (!tool.description || tool.description.length > 2000) {
+    throw new Error("Tool description is required and must be under 2000 characters");
+  }
+  if (tool.tags && tool.tags.length > 20) {
+    throw new Error("Maximum 20 tags allowed");
+  }
+  if (tool.author && tool.author.length > 100) {
+    throw new Error("Author name must be under 100 characters");
+  }
+  // Cap registry size to prevent unbounded growth
+  if (registry.size > 10000) {
+    throw new Error("Tool registry is full");
+  }
+
   const id = `tool_${crypto.randomBytes(8).toString("hex")}`;
   const published: FederatedTool = {
     ...tool,

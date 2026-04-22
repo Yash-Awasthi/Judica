@@ -21,12 +21,12 @@ export const codeHandler: NodeHandler = async (ctx) => {
   }
 
   // P10-96: Inject upstream node inputs into execution context
-  // Use base64 encoding to safely pass arbitrary JSON without escaping issues
-  const inputContext = JSON.stringify(ctx.inputs);
-  const b64Input = Buffer.from(inputContext).toString("base64");
+  // R2-03: Use JSON.stringify() for the Python literal — this produces a valid JSON string
+  // with all special characters properly escaped, preventing quote-based injection.
+  const inputJson = JSON.stringify(ctx.inputs);
   const contextPreamble = language === "python"
-    ? `import json, base64\n__inputs__ = json.loads(base64.b64decode("${b64Input}").decode("utf-8"))\n`
-    : `const __inputs__ = JSON.parse(atob("${b64Input}"));\n`;
+    ? `import json\n__inputs__ = json.loads(${JSON.stringify(inputJson)})\n`
+    : `const __inputs__ = ${inputJson};\n`;
 
   const fullCode = contextPreamble + code;
 
