@@ -76,8 +76,12 @@ export class GoogleProvider extends BaseProvider {
         const decoder = new TextDecoder();
         let text = "";
         let buffer = "";
+        // P40-08: Cap buffer to prevent unbounded memory from malicious streams
+        const MAX_BUFFER_SIZE = 10_000_000;
         let streamUsage: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number } | null = null;
         // P1-04: Track tool calls (functionCall parts) during streaming
+        // P40-04: Cap pending tool calls to prevent unbounded array growth
+        const MAX_PENDING_TOOLS = 100;
         const pendingToolCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
 
         while (true) {
@@ -85,6 +89,9 @@ export class GoogleProvider extends BaseProvider {
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
+          if (buffer.length > MAX_BUFFER_SIZE) {
+            throw new Error("SSE buffer exceeded maximum size");
+          }
           let newlineIndex;
           while ((newlineIndex = buffer.indexOf('\n')) >= 0) {
             const line = buffer.slice(0, newlineIndex).trim();
@@ -104,7 +111,7 @@ export class GoogleProvider extends BaseProvider {
                       onChunk(part.text);
                     }
                     // P1-04: Capture function calls from streaming response
-                    if (part.functionCall) {
+                    if (part.functionCall && pendingToolCalls.length < MAX_PENDING_TOOLS) {
                       pendingToolCalls.push({
                         name: part.functionCall.name,
                         args: part.functionCall.args || {},
