@@ -11,6 +11,9 @@ import type { AdapterMessage } from "../adapters/types.js";
 // CJK Unified Ideographs and common CJK ranges
 const CJK_REGEX = /[\u2E80-\u9FFF\uF900-\uFAFF\uFE30-\uFE4F\u{20000}-\u{2FA1F}]/u;
 
+// P52-08: Cap iteration length to avoid blocking the event loop on very long strings.
+const MAX_ESTIMATE_LENGTH = 500_000; // 500K chars max for estimation
+
 /**
  * Estimate tokens for a single string, adjusting for non-ASCII / CJK text.
  *
@@ -32,11 +35,15 @@ export function estimateStringTokens(text: string): number {
     text = text.slice(0, MAX_ESTIMATE_LENGTH);
   }
 
+  // For very long strings, sample to avoid blocking the event loop
+  const sampleLength = Math.min(text.length, MAX_ESTIMATE_LENGTH);
+  const sample = text.length > MAX_ESTIMATE_LENGTH ? text.slice(0, MAX_ESTIMATE_LENGTH) : text;
+
   let asciiChars = 0;
   let cjkChars = 0;
   let otherNonAsciiChars = 0;
 
-  for (const ch of text) {
+  for (const ch of sample) {
     const code = ch.codePointAt(0)!;
     if (code <= 0x7f) {
       asciiChars++;
@@ -52,7 +59,9 @@ export function estimateStringTokens(text: string): number {
   const cjkTokens = cjkChars / 1.5; // each CJK char ~ 1-2 tokens
   const otherTokens = otherNonAsciiChars / 2;
 
-  return Math.ceil(asciiTokens + cjkTokens + otherTokens);
+  // Scale estimate if we sampled
+  const scaleFactor = text.length / sampleLength;
+  return Math.ceil((asciiTokens + cjkTokens + otherTokens) * scaleFactor);
 }
 
 /**
@@ -73,9 +82,11 @@ export function estimateTokens(messages: AdapterMessage[]): number {
     }
 
     // Tool calls add overhead
+    // P43-07: Cap tool calls and argument size to prevent DoS
     if (m.tool_calls) {
-      for (const tc of m.tool_calls) {
-        totalTokens += estimateStringTokens(tc.name + JSON.stringify(tc.arguments));
+      for (const tc of m.tool_calls.slice(0, 100)) {
+        const argStr = JSON.stringify(tc.arguments);
+        totalTokens += estimateStringTokens(tc.name + (argStr.length > 100_000 ? argStr.slice(0, 100_000) : argStr));
       }
     }
   }

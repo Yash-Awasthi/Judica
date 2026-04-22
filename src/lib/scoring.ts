@@ -6,8 +6,10 @@ import logger from "./logger.js";
 let mlFallbackWarned = false;
 
 async function computeSemanticSimilarityML(a: string, b: string): Promise<number> {
+  const cappedA = a.length > MAX_SIMILARITY_INPUT_LENGTH ? a.slice(0, MAX_SIMILARITY_INPUT_LENGTH) : a;
+  const cappedB = b.length > MAX_SIMILARITY_INPUT_LENGTH ? b.slice(0, MAX_SIMILARITY_INPUT_LENGTH) : b;
   try {
-    return await mlWorker.computeSimilarity(a, b);
+    return await mlWorker.computeSimilarity(cappedA, cappedB);
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code === 'ENOENT' || process.env.NODE_ENV === 'test') {
       if ((err as NodeJS.ErrnoException).code === 'ENOENT' && process.env.NODE_ENV !== 'test' && !mlFallbackWarned) {
@@ -15,8 +17,8 @@ async function computeSemanticSimilarityML(a: string, b: string): Promise<number
         mlFallbackWarned = true;
       }
       const normalize = (s: string) => new Set(s.toLowerCase().replace(/[^a-z0-9]/g, " ").split(/\s+/).filter(w => w.length > 2));
-      const setA = normalize(a);
-      const setB = normalize(b);
+      const setA = normalize(cappedA);
+      const setB = normalize(cappedB);
       if (setA.size === 0 && setB.size === 0) return 1;
       if (setA.size === 0 || setB.size === 0) return 0;
       let overlap = 0;
@@ -55,8 +57,9 @@ function computePeerRankingScore(agentName: string, anonymizedLabels: Map<string
   let reviewCount = 0;
 
   for (const review of reviews) {
+    if (!Array.isArray(review.ranking)) continue;
     const rankIndex = review.ranking.indexOf(label);
-    if (rankIndex === -1) continue; 
+    if (rankIndex === -1) continue;
 
     const normalized = 1 - (rankIndex / Math.max(review.ranking.length - 1, 1));
     totalNormalizedScore += normalized;

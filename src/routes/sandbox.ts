@@ -32,6 +32,10 @@ const bucketCleanupInterval = setInterval(() => {
 }, 60_000);
 bucketCleanupInterval.unref();
 
+// P31-03: Cap in-memory maps to prevent unbounded growth
+const MAX_MEMORY_BUCKETS = 5000;
+const MAX_INFLIGHT_ENTRIES = 5000;
+
 async function sandboxRateLimiter(request: FastifyRequest, reply: FastifyReply) {
   const userId = (request as unknown as { userId?: number }).userId || request.ip;
   const key = `sandbox:rl:${userId}`;
@@ -53,6 +57,12 @@ async function sandboxRateLimiter(request: FastifyRequest, reply: FastifyReply) 
 
   // In-memory fallback
   const now = Date.now();
+  // P31-03: Evict expired buckets when map grows too large
+  if (memoryBuckets.size >= MAX_MEMORY_BUCKETS) {
+    for (const [k, v] of memoryBuckets) {
+      if (now >= v.resetAt) memoryBuckets.delete(k);
+    }
+  }
   let bucket = memoryBuckets.get(key);
   if (!bucket || now >= bucket.resetAt) {
     // Safety net: evict expired entries if map exceeds cap
@@ -73,6 +83,12 @@ async function sandboxRateLimiter(request: FastifyRequest, reply: FastifyReply) 
 
 // P1-22: Concurrency guard
 function acquireConcurrency(userId: string): boolean {
+  // P31-03: Cap inflight entries
+  if (inflightMap.size >= MAX_INFLIGHT_ENTRIES && !inflightMap.has(userId)) {
+    for (const [k, v] of inflightMap) {
+      if (v <= 0) { inflightMap.delete(k); break; }
+    }
+  }
   const current = inflightMap.get(userId) || 0;
   if (current >= MAX_CONCURRENT_PER_USER) return false;
   inflightMap.set(userId, current + 1);

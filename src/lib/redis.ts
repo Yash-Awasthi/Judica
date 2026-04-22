@@ -127,15 +127,21 @@ const redisWrapper = {
   },
 
   // P9-39: Use SCAN cursor to avoid blocking Redis event loop
+  // P42-05: Cap iteration count to prevent unbounded key accumulation
   async keys(pattern: string): Promise<string[]> {
     try {
       const c = getRedis();
       const results: string[] = [];
       let cursor = "0";
+      let iterations = 0;
+      const MAX_ITERATIONS = 1000;
+      const MAX_KEYS = 100_000;
       do {
         const [nextCursor, keys] = await c.scan(cursor, "MATCH", pattern, "COUNT", 100);
         cursor = nextCursor;
         results.push(...keys);
+        iterations++;
+        if (iterations >= MAX_ITERATIONS || results.length >= MAX_KEYS) break;
       } while (cursor !== "0");
       return results;
     } catch {
