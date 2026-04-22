@@ -18,3 +18,4 @@ export * from "./traces.js";
 export * from "./repos.js";
 export * from "./projects.js";
 export * from "./admin.js";
+export * from "./types.js";

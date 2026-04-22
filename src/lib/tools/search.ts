@@ -46,10 +46,12 @@ export async function executeSearch(args: unknown): Promise<string> {
     return "[]";
   }
 
+  // R4-02: Send API key in Authorization header rather than as a URL query parameter.
+  // Query parameters are logged in access logs, HTTP referrer headers, and server-side
+  // request logs — all of which would expose the key in plaintext.
   const params = new URLSearchParams({
     q: query,
     engine: "google",
-    api_key: apiKey,
   });
 
   const url = `https://serpapi.com/search.json?${params.toString()}`;
@@ -60,6 +62,7 @@ export async function executeSearch(args: unknown): Promise<string> {
 
     const response = await fetch(url, {
       signal: controller.signal,
+      headers: { Authorization: `Bearer ${apiKey}` },
     });
 
     clearTimeout(timeout);

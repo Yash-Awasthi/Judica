@@ -43,6 +43,25 @@ const personasPlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(400, "System prompt is required", "PERSONA_PROMPT_REQUIRED");
     }
 
+    if (name.length > 200) {
+      throw new AppError(400, "Name must be 200 characters or fewer", "PERSONA_NAME_TOO_LONG");
+    }
+    if (systemPrompt.length > 10000) {
+      throw new AppError(400, "System prompt must be 10000 characters or fewer", "PERSONA_PROMPT_TOO_LONG");
+    }
+    if (critiqueStyle && critiqueStyle.length > 500) {
+      throw new AppError(400, "Critique style must be 500 characters or fewer", "PERSONA_CRITIQUE_STYLE_TOO_LONG");
+    }
+    if (domain && domain.length > 200) {
+      throw new AppError(400, "Domain must be 200 characters or fewer", "PERSONA_DOMAIN_TOO_LONG");
+    }
+    if (temperature !== undefined && (typeof temperature !== "number" || temperature < 0 || temperature > 2)) {
+      throw new AppError(400, "Temperature must be a number between 0 and 2", "PERSONA_TEMPERATURE_INVALID");
+    }
+    if (aggressiveness !== undefined && (typeof aggressiveness !== "number" || aggressiveness < 0 || aggressiveness > 10)) {
+      throw new AppError(400, "Aggressiveness must be a number between 0 and 10", "PERSONA_AGGRESSIVENESS_INVALID");
+    }
+
     const [persona] = await db
       .insert(customPersonas)
       .values({
@@ -75,6 +94,25 @@ const personasPlugin: FastifyPluginAsync = async (fastify) => {
 
     const { name, systemPrompt, temperature, critiqueStyle, domain, aggressiveness } =
       request.body as { name?: string; systemPrompt?: string; temperature?: number; critiqueStyle?: string; domain?: string; aggressiveness?: number };
+
+    if (name !== undefined && name.length > 200) {
+      throw new AppError(400, "Name must be 200 characters or fewer", "PERSONA_NAME_TOO_LONG");
+    }
+    if (systemPrompt !== undefined && systemPrompt.length > 10000) {
+      throw new AppError(400, "System prompt must be 10000 characters or fewer", "PERSONA_PROMPT_TOO_LONG");
+    }
+    if (critiqueStyle !== undefined && critiqueStyle.length > 500) {
+      throw new AppError(400, "Critique style must be 500 characters or fewer", "PERSONA_CRITIQUE_STYLE_TOO_LONG");
+    }
+    if (domain !== undefined && domain.length > 200) {
+      throw new AppError(400, "Domain must be 200 characters or fewer", "PERSONA_DOMAIN_TOO_LONG");
+    }
+    if (temperature !== undefined && (typeof temperature !== "number" || temperature < 0 || temperature > 2)) {
+      throw new AppError(400, "Temperature must be a number between 0 and 2", "PERSONA_TEMPERATURE_INVALID");
+    }
+    if (aggressiveness !== undefined && (typeof aggressiveness !== "number" || aggressiveness < 0 || aggressiveness > 10)) {
+      throw new AppError(400, "Aggressiveness must be a number between 0 and 10", "PERSONA_AGGRESSIVENESS_INVALID");
+    }
 
     const data: Record<string, unknown> = {};
     if (name !== undefined) data.name = name.trim();

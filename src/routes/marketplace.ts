@@ -247,6 +247,12 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
       throw new AppError(404, "Item not found", "ITEM_NOT_FOUND");
     }
 
+    // R2-11: Only allow installation of published items — unpublished items are
+    // drafts/private and should not be installable by other users
+    if (!item.published) {
+      throw new AppError(403, "This item is not available for installation", "ITEM_NOT_PUBLISHED");
+    }
+
     const content = item.content as Record<string, unknown>;
 
     // Import item into user's account based on type
