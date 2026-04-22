@@ -23,7 +23,9 @@ export function getDb(): NodePgDatabase<typeof schema> {
       // P9-47: Enable query logging for slow query debugging
       logger: {
         logQuery(query: string, params: unknown[]) {
-          logger.trace({ query: query.slice(0, 200), paramCount: params.length }, "Drizzle query");
+          // P57-02: Add truncation marker so developers know the query was cut
+          const truncated = query.length > 200 ? query.slice(0, 200) + "…[truncated]" : query;
+          logger.trace({ query: truncated, paramCount: params.length }, "Drizzle query");
         },
       },
     });

@@ -311,12 +311,22 @@ export async function buildApp() {
     },
   });
 
+  // P19-01: Cache index.html in memory — avoid blocking readFileSync on every request
+  let cachedIndexHtml: string | null = null;
+  let cachedIndexMtime = 0;
+  const indexPath = path.join(publicPath, "index.html");
+
   fastify.get("/", {
     config: { rateLimit: { max: 60, timeWindow: "1 minute" } },
   }, async (request, reply) => {
-    const indexPath = path.join(publicPath, "index.html");
     try {
-      let html = fs.readFileSync(indexPath, "utf8");
+      // Reload if file changed (dev) or first load (prod)
+      const stat = fs.statSync(indexPath);
+      if (!cachedIndexHtml || stat.mtimeMs !== cachedIndexMtime) {
+        cachedIndexHtml = fs.readFileSync(indexPath, "utf8");
+        cachedIndexMtime = stat.mtimeMs;
+      }
+      let html = cachedIndexHtml;
       const nonce = (request as unknown as { cspNonce?: string }).cspNonce || "";
       html = html.split("<script").join(`<script nonce="${nonce}"`);
       html = html.split(`nonce="${nonce}" nonce="`).join(`nonce="`);
@@ -355,9 +365,11 @@ export async function buildApp() {
     });
   }
 
+  // P19-02: Don't reflect raw request.url in response — prevents info disclosure / log injection
   fastify.setNotFoundHandler((request, reply) => {
     if (request.url.startsWith("/api/")) {
-      reply.code(404).send({ error: `Not Found: ${request.url}` });
+      const safeRoute = request.routeOptions?.url || request.url.split("?")[0].slice(0, 200);
+      reply.code(404).send({ error: `Not Found: ${safeRoute}` });
     } else {
       reply.code(404).sendFile("404.html");
     }

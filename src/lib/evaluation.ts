@@ -195,12 +195,15 @@ function calculateQuality(outputs: AgentOutput[]): number {
 }
 
 // P10-48: Configurable efficiency baselines via environment variables
-const OPTIMAL_DURATION_PER_AGENT_MS = parseInt(process.env.EVAL_OPTIMAL_DURATION_PER_AGENT_MS || "10000", 10);
-const OPTIMAL_TOKENS_PER_AGENT = parseInt(process.env.EVAL_OPTIMAL_TOKENS_PER_AGENT || "1000", 10);
+const _parsedDuration = parseInt(process.env.EVAL_OPTIMAL_DURATION_PER_AGENT_MS || "10000", 10);
+const _parsedTokens = parseInt(process.env.EVAL_OPTIMAL_TOKENS_PER_AGENT || "1000", 10);
+// P29-07: NaN guards on env var parses
+const OPTIMAL_DURATION_PER_AGENT_MS = Number.isFinite(_parsedDuration) && _parsedDuration > 0 ? _parsedDuration : 10000;
+const OPTIMAL_TOKENS_PER_AGENT = Number.isFinite(_parsedTokens) && _parsedTokens > 0 ? _parsedTokens : 1000;
 
 function calculateEfficiency(totalTokens: number, agentCount: number, duration: number): number {
-  // P33-09: Guard against division by zero when agentCount is 0
-  if (agentCount <= 0 || !Number.isFinite(totalTokens) || !Number.isFinite(duration) || duration <= 0) return 0;
+  // P29-08: Guard against division by zero when agentCount is 0
+  if (agentCount <= 0) return 0;
   const tokensPerAgent = totalTokens / agentCount;
 
   const optimalDuration = agentCount * OPTIMAL_DURATION_PER_AGENT_MS;
@@ -326,7 +329,8 @@ export async function getUserEvaluationMetrics(userId: number, days: number = 30
         gte(evaluations.timestamp, startDate)
       )
     )
-    .orderBy(asc(evaluations.timestamp));
+    .orderBy(asc(evaluations.timestamp))
+    .limit(1000);
 
   if (results.length === 0) {
     return {
