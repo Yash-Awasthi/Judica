@@ -50,6 +50,9 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     if (search) {
+      if (search.length > 200) {
+        throw new AppError(400, "Search query too long (max 200 characters)", "SEARCH_TOO_LONG");
+      }
       // Escape LIKE special characters to prevent wildcard injection
       const escapedSearch = search
         .replace(/\\/g, "\\\\")

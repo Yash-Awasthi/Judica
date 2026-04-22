@@ -7,6 +7,7 @@ import type {
 import { createStreamResult } from "./types.js";
 import { decrypt } from "../lib/crypto.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
+import { resolve as dnsResolve } from "dns/promises";
 import { getBreaker } from "../lib/breaker.js";
 import type { Provider } from "../lib/providers.js";
 
@@ -48,6 +49,18 @@ export class CustomAdapter implements IProviderAdapter {
     const baseUrl = this.config.base_url.replace(/\/$/, "");
     // P7-39: Validate base URL against SSRF in all paths (streaming & non-streaming)
     await validateSafeUrl(baseUrl);
+
+    // DNS rebinding protection: pin resolved IP
+    const parsedUrl = new URL(`${baseUrl}/chat/completions`);
+    let resolvedHost = parsedUrl.hostname;
+    try {
+      const addresses = await dnsResolve(parsedUrl.hostname);
+      if (addresses.length > 0) {
+        await validateSafeUrl(`${parsedUrl.protocol}//${addresses[0]}`);
+        resolvedHost = addresses[0];
+      }
+    } catch { /* let fetch handle DNS if resolution fails */ }
+
     const apiKey = this.getApiKey();
 
     // Build headers based on auth type
@@ -56,9 +69,15 @@ export class CustomAdapter implements IProviderAdapter {
       case "bearer":
         headers["Authorization"] = `Bearer ${apiKey}`;
         break;
-      case "api_key_header":
-        headers[this.config.auth_header_name || "X-API-Key"] = apiKey;
+      case "api_key_header": {
+        const headerName = this.config.auth_header_name || "X-API-Key";
+        const BLOCKED_HEADERS = new Set(["authorization", "host", "content-type", "content-length", "transfer-encoding", "connection", "cookie", "set-cookie"]);
+        if (BLOCKED_HEADERS.has(headerName.toLowerCase())) {
+          throw new Error(`Custom auth header "${headerName}" conflicts with a reserved HTTP header`);
+        }
+        headers[headerName] = apiKey;
         break;
+      }
       case "api_key_query":
         // API key will be appended as a query parameter to the URL
         break;
@@ -74,7 +93,14 @@ export class CustomAdapter implements IProviderAdapter {
       // "none" doesn't need headers
     }
 
-    let url = `${baseUrl}/chat/completions`;
+    let url = resolvedHost !== parsedUrl.hostname
+      ? `${parsedUrl.protocol}//${resolvedHost}${parsedUrl.port ? ":" + parsedUrl.port : ""}${parsedUrl.pathname}${parsedUrl.search}`
+      : `${baseUrl}/chat/completions`;
+
+    // Set Host header when using resolved IP so the server sees the original hostname
+    if (resolvedHost !== parsedUrl.hostname) {
+      headers["Host"] = parsedUrl.hostname;
+    }
 
     // Append API key as query parameter for api_key_query auth type
     // R2-05: URL-encode the key to prevent injection if it contains special characters
@@ -258,9 +284,15 @@ export class CustomAdapter implements IProviderAdapter {
         case "bearer":
           headers["Authorization"] = `Bearer ${apiKey}`;
           break;
-        case "api_key_header":
-          headers[this.config.auth_header_name || "X-API-Key"] = apiKey;
+        case "api_key_header": {
+          const headerName = this.config.auth_header_name || "X-API-Key";
+          const BLOCKED_HEADERS = new Set(["authorization", "host", "content-type", "content-length", "transfer-encoding", "connection", "cookie", "set-cookie"]);
+          if (BLOCKED_HEADERS.has(headerName.toLowerCase())) {
+            throw new Error(`Custom auth header "${headerName}" conflicts with a reserved HTTP header`);
+          }
+          headers[headerName] = apiKey;
           break;
+        }
         case "api_key_query":
           // P7-35: Use header instead of query param
           headers["X-API-Key"] = apiKey;

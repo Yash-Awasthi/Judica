@@ -115,7 +115,7 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // POST /users/:id/suspend — suspend user and revoke sessions
-  fastify.post("/users/:id/suspend", async (request, _reply) => {
+  fastify.post("/users/:id/suspend", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request, _reply) => {
     const { id } = request.params as { id: string };
     const userId = parseId(id);
 
@@ -139,7 +139,7 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // DELETE /users/:id — hard delete user
-  fastify.delete("/users/:id", async (request, _reply) => {
+  fastify.delete("/users/:id", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request, _reply) => {
     const { id } = request.params as { id: string };
     await AdminService.deleteUser(parseId(id), request.userId!);
     return { success: true };
@@ -298,7 +298,7 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // POST /security/key-rotation — trigger manual rotation
-  fastify.post("/security/key-rotation", async (request, _reply) => {
+  fastify.post("/security/key-rotation", { config: { rateLimit: { max: 5, timeWindow: "1 minute" } } }, async (request, _reply) => {
     const { old_key, new_key } = request.body as { old_key?: string; new_key?: string };
 
     if (!old_key || !new_key) {
