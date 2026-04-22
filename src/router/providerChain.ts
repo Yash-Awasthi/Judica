@@ -33,8 +33,15 @@ function loadChainFromEnv(envKey: string, fallback: ChainEntry[]): ChainEntry[] 
     }
     // P20-07: Validate types and numeric ranges — reject nonsensical values like negative RPM
     for (const entry of parsed) {
-      if (!entry.provider || !entry.model || typeof entry.rpm !== "number") {
-        logger.warn({ envKey, entry }, "Invalid chain entry, using default chain");
+      if (!entry.provider || !entry.model) {
+        logger.warn({ envKey, entry }, "Invalid chain entry (missing provider/model), using default chain");
+        return fallback;
+      }
+      // Validate numeric fields are finite positive numbers
+      if (!Number.isFinite(entry.rpm) || entry.rpm < 0 ||
+          !Number.isFinite(entry.daily_tokens) || entry.daily_tokens < 0 ||
+          !Number.isFinite(entry.daily_requests) || entry.daily_requests < 0) {
+        logger.warn({ envKey, entry }, "Invalid chain entry (bad numeric values), using default chain");
         return fallback;
       }
       if (entry.rpm <= 0 || (entry.daily_tokens !== undefined && entry.daily_tokens <= 0) ||
