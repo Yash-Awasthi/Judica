@@ -1,7 +1,6 @@
 import { spawn, execSync } from "child_process";
 import fs from "fs";
 import path from "path";
-import crypto from "crypto";
 import os from "os";
 import logger from "../lib/logger.js";
 import { generateSeccompPolicy, isSeccompAvailable } from "./seccomp.js";
@@ -236,8 +235,9 @@ export async function executePython(code: string, timeout: number = 10000): Prom
     };
   }
 
-  const sandboxId = crypto.randomBytes(8).toString("hex");
-  const tmpDir = path.join(os.tmpdir(), `sandbox_${sandboxId}`);
+  // Fix CodeQL alert #62: Use mkdtemp for secure temp directory creation (atomic, no race)
+  const tmpDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "sandbox_"));
+  const sandboxId = path.basename(tmpDir);
   const tmpFile = path.join(tmpDir, "script.py");
   let bpfFd: number | undefined;
 
@@ -245,8 +245,7 @@ export async function executePython(code: string, timeout: number = 10000): Prom
   logger.debug({ sandboxId, isolationLevel, timeout }, "Python sandbox execution starting");
 
   try {
-    // Create isolated temp directory
-    await fs.promises.mkdir(tmpDir, { mode: 0o700 });
+    // Write script to the secure temp directory created by mkdtemp
     await fs.promises.writeFile(tmpFile, SANDBOX_PREAMBLE + "\n" + code, { encoding: "utf-8", mode: 0o600 });
 
     return await new Promise<SandboxResult>((resolve) => {

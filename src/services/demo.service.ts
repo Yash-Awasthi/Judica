@@ -37,7 +37,8 @@ export function getDemoConfig(): DemoConfig {
  */
 export function formatDemoSection(config: DemoConfig): string {
   // P30-08: Escape markdown special characters in URLs to prevent injection
-  const escMd = (s: string) => s.replace(/[[\]()]/g, "\\$&");
+  // Fix CodeQL alert #66: Escape all markdown special chars, not just brackets/parens
+  const escMd = (s: string) => s.replace(/[[\]()\\`*_{}#|!~>+-]/g, "\\$&");
   let output = `## Demo\n\n`;
   output += `**Live:** [${escMd(config.url)}](${escMd(config.url)})\n\n`;
   if (config.videoUrl) {

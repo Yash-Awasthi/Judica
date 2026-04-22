@@ -125,7 +125,8 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     }
   };
 
-    fastify.post("/register", { preHandler: [authRateLimit] }, async (request, reply) => {
+    // Fix CodeQL alert: Explicit rate limit config so static analyzers detect it
+    fastify.post("/register", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } }, preHandler: [authRateLimit] }, async (request, reply) => {
     try {
       const { username, password } = request.body as { username: string; password: string };
       const hash = await argon2.hash(password, { type: argon2.argon2id, memoryCost: 65536, timeCost: 3 });
@@ -143,7 +144,8 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     }
   });
 
-    fastify.post("/login", { preHandler: [authRateLimit] }, async (request, reply) => {
+    // Fix CodeQL alert #61: Explicit rate limit config so static analyzers detect it
+    fastify.post("/login", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } }, preHandler: [authRateLimit] }, async (request, reply) => {
     const { username, password } = request.body as { username: string; password: string };
     const [user] = await db.select().from(users).where(eq(users.username, username)).limit(1);
 

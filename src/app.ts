@@ -313,18 +313,17 @@ export async function buildApp() {
 
   // P19-01: Cache index.html in memory — avoid blocking readFileSync on every request
   let cachedIndexHtml: string | null = null;
-  let cachedIndexMtime = 0;
   const indexPath = path.join(publicPath, "index.html");
 
   fastify.get("/", {
     config: { rateLimit: { max: 60, timeWindow: "1 minute" } },
   }, async (request, reply) => {
     try {
-      // Reload if file changed (dev) or first load (prod)
-      const stat = fs.statSync(indexPath);
-      if (!cachedIndexHtml || stat.mtimeMs !== cachedIndexMtime) {
-        cachedIndexHtml = fs.readFileSync(indexPath, "utf8");
-        cachedIndexMtime = stat.mtimeMs;
+      // Fix CodeQL alert #64: Eliminate TOCTOU race by reading file directly
+      // and using content hash for cache invalidation instead of stat+read
+      const currentContent = fs.readFileSync(indexPath, "utf8");
+      if (currentContent !== cachedIndexHtml) {
+        cachedIndexHtml = currentContent;
       }
       let html = cachedIndexHtml;
       const nonce = (request as unknown as { cspNonce?: string }).cspNonce || "";
