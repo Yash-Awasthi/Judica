@@ -65,6 +65,8 @@ export interface GateResult {
 
 // ─── In-memory store (upgradeable to DB when infra available) ───────────────
 
+// P25-07: Cap gates Map to prevent unbounded memory growth
+const MAX_GATES = 5000;
 const gates = new Map<string, Gate>();
 const pendingCallbacks = new Map<string, {
   resolve: (result: GateResult) => void;
@@ -129,6 +131,16 @@ export function createGate(
     resolvedAt: null,
     expiresAt: new Date(Date.now() + timeoutMs),
   };
+
+  // P25-07: Evict oldest resolved gate if map is full
+  if (gates.size >= MAX_GATES) {
+    for (const [gid, g] of gates) {
+      if (g.status !== "pending") {
+        gates.delete(gid);
+        break;
+      }
+    }
+  }
 
   gates.set(id, gate);
 
