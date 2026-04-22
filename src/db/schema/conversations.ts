@@ -40,7 +40,8 @@ export const chats = pgTable(
   "Chat",
   {
     id: serial("id").primaryKey(),
-    userId: integer("userId").references(() => users.id, { onDelete: "cascade" }),
+    // P55-02: userId must be NOT NULL — prevents orphaned chats without an owner
+    userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
     question: text("question").notNull(),
     verdict: text("verdict").notNull(),
     opinions: jsonb("opinions").notNull(),
@@ -89,7 +90,8 @@ export const auditLogs = pgTable(
   "AuditLog",
   {
     id: serial("id").primaryKey(),
-    userId: integer("userId").references(() => users.id, { onDelete: "cascade" }),
+    // P55-03: userId must be NOT NULL — audit logs require user attribution for accountability
+    userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
     conversationId: text("conversationId").references(() => conversations.id, {
       onDelete: "cascade",
     }),
@@ -133,6 +135,8 @@ export const semanticCache = pgTable(
   (table) => [
     index("SemanticCache_embedding_hnsw_idx")
       .using("hnsw", table.embedding.op("vector_cosine_ops")),
+    // P55-08: Index for cache expiry cleanup queries (DELETE WHERE expiresAt < NOW())
+    index("SemanticCache_expiresAt_idx").on(table.expiresAt),
   ],
 );
 

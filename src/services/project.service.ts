@@ -29,6 +29,13 @@ export interface CreateProjectInput {
 }
 
 export async function createProject(input: CreateProjectInput): Promise<Project> {
+  // P30-03: Validate string field lengths to prevent storage exhaustion
+  if (input.name && input.name.length > 200) throw new Error("Project name too long (max 200 chars)");
+  if (input.description && input.description.length > 5000) throw new Error("Description too long (max 5000 chars)");
+  if (input.color && input.color.length > 30) throw new Error("Color value too long (max 30 chars)");
+  if (input.icon && input.icon.length > 50) throw new Error("Icon value too long (max 50 chars)");
+  if (input.defaultSystemPrompt && input.defaultSystemPrompt.length > 20_000) throw new Error("System prompt too long (max 20000 chars)");
+
   try {
     const now = new Date();
     const [project] = await db
@@ -48,7 +55,7 @@ export async function createProject(input: CreateProjectInput): Promise<Project>
       .returning();
     return project as unknown as Project;
   } catch (err) {
-    logger.error({ err, input }, "Failed to create project");
+    logger.error({ err, userId: input.userId, name: input.name }, "Failed to create project");
     throw err;
   }
 }
@@ -114,7 +121,7 @@ export async function updateProject(id: string, userId: number, input: Partial<C
     
     return project as unknown as Project || null;
   } catch (err) {
-    logger.error({ err, id, userId, input }, "Failed to update project");
+    logger.error({ err, id, userId }, "Failed to update project");
     throw err;
   }
 }

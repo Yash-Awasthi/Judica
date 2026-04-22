@@ -12,14 +12,22 @@ import {
 } from "../lib/cost.js";
 import { AppError } from "../middleware/errorHandler.js";
 
+function parseDays(days: unknown): number {
+  const parsed = parseInt(days as string);
+  if (isNaN(parsed) || parsed < 1) return 30;
+  if (parsed > 365) return 365;
+  return parsed;
+}
+
 const costsPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.get("/breakdown", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const { days = 30 } = request.query as { days?: string };
-    const breakdown = await getUserCostBreakdown(request.userId!, parseInt(days as string));
+    const daysNum = parseDays(days);
+    const breakdown = await getUserCostBreakdown(request.userId!, daysNum);
 
     return reply.send({
       breakdown,
-      period: `${days} days`,
+      period: `${daysNum} days`,
       currency: "USD"
     });
   });
@@ -41,7 +49,7 @@ const costsPlugin: FastifyPluginAsync = async (fastify) => {
 
   fastify.get("/efficiency", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const { days = 30 } = request.query as { days?: string };
-    const metrics = await getCostEfficiencyMetrics(request.userId!, parseInt(days as string));
+    const metrics = await getCostEfficiencyMetrics(request.userId!, parseDays(days));
 
     return reply.send(metrics);
   });
@@ -60,7 +68,8 @@ const costsPlugin: FastifyPluginAsync = async (fastify) => {
    */
   fastify.get("/per-provider", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const { days = "30" } = request.query as { days?: string };
-    const breakdown = await getUserCostBreakdown(request.userId!, parseInt(days as string));
+    const daysNum = parseDays(days);
+    const breakdown = await getUserCostBreakdown(request.userId!, daysNum);
 
     const providerLedger = Object.entries(breakdown.byProvider || {}).map(
       ([provider, data]) => {
@@ -78,7 +87,7 @@ const costsPlugin: FastifyPluginAsync = async (fastify) => {
 
     return reply.send({
       providers: providerLedger,
-      period: `${days} days`,
+      period: `${daysNum} days`,
       currency: "USD",
       grandTotal: providerLedger.reduce((sum, p) => sum + p.totalCost, 0),
     });
@@ -96,18 +105,19 @@ const costsPlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     const { days = 30 } = request.query as { days?: string };
-    const summary = await getOrganizationCostSummary(parseInt(days as string));
+    const daysNum = parseDays(days);
+    const summary = await getOrganizationCostSummary(daysNum);
 
     return reply.send({
       summary,
-      period: `${days} days`,
+      period: `${daysNum} days`,
       currency: "USD"
     });
   });
 
   fastify.get("/dashboard", { preHandler: fastifyRequireAuth }, async (request, reply) => {
     const { days = 30 } = request.query as { days?: string };
-    const daysNum = parseInt(days as string);
+    const daysNum = parseDays(days);
 
     const [breakdown, efficiency, limits] = await Promise.all([
       getUserCostBreakdown(request.userId!, daysNum),

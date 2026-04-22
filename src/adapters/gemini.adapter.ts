@@ -23,6 +23,10 @@ export class GeminiAdapter implements IProviderAdapter {
     await validateSafeUrl(this.baseUrl);
 
     const model = req.model || "gemini-2.0-flash";
+    // P5-08: Validate model name to prevent URL path injection
+    if (!/^[a-zA-Z0-9._-]+$/.test(model)) {
+      throw new Error(`Invalid model name: "${model}"`);
+    }
     const body: Record<string, unknown> = {
       contents: await this.formatContents(req),
       generationConfig: {} as Record<string, unknown>,
