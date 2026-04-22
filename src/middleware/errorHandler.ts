@@ -56,7 +56,15 @@ export function fastifyErrorHandler(error: FastifyError | Error, request: Fastif
 
   // P8-50: Handle ZodError by name check to support plain objects from serialization boundaries
   if (error instanceof ZodError || (error as any).name === "ZodError") {
-    const body: Record<string, unknown> = { error: "Validation failed", details: (error as any).issues };
+    // P52-05: Sanitize issues to prevent arbitrary data exposure from spoofed ZodError objects
+    const rawIssues = (error as any).issues;
+    const details = Array.isArray(rawIssues)
+      ? rawIssues.map((i: any) => ({
+          field: Array.isArray(i?.path) ? i.path.join(".") : "unknown",
+          message: typeof i?.message === "string" ? i.message : "Validation error",
+        }))
+      : [{ field: "unknown", message: "Validation failed" }];
+    const body: Record<string, unknown> = { error: "Validation failed", details };
     if (requestId !== undefined) body.requestId = requestId;
     reply.code(400).send(body);
     return;

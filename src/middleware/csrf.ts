@@ -14,6 +14,10 @@ import type { FastifyRequest, FastifyReply } from "fastify";
  */
 const STATE_MUTATING_METHODS = new Set(["POST", "PUT", "PATCH", "DELETE"]);
 
+const ALLOWED_ORIGINS_LIST: string[] = process.env.ALLOWED_ORIGINS
+  ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim()).filter(Boolean)
+  : ["http://localhost:3000", "http://localhost:5173"];
+
 export async function fastifyCsrfProtection(request: FastifyRequest, reply: FastifyReply) {
   // Only enforce on state-mutating methods
   if (!STATE_MUTATING_METHODS.has(request.method)) return;
@@ -34,11 +38,8 @@ export async function fastifyCsrfProtection(request: FastifyRequest, reply: Fast
   // P4-01: Defense-in-depth — validate Origin header when present
   const origin = request.headers.origin;
   if (origin) {
-    const allowedOrigins = process.env.ALLOWED_ORIGINS
-      ? process.env.ALLOWED_ORIGINS.split(",").map((o) => o.trim())
-      : ["http://localhost:3000", "http://localhost:5173"];
-    const isLocal = origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:");
-    if (!allowedOrigins.includes(origin) && !isLocal) {
+    const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1|\[::1\])(:\d+)?$/.test(origin);
+    if (!ALLOWED_ORIGINS_LIST.includes(origin) && !isLocal) {
       reply.code(403).send({ error: "CSRF validation failed. Origin not allowed." });
       return;
     }
