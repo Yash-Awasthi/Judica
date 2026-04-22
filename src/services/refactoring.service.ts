@@ -107,7 +107,13 @@ Return ONLY the JSON array.`,
 
     const match = result.text.match(/\[[\s\S]*\]/);
     if (match) {
-      return JSON.parse(match[0]) as RefactoringOpportunity[];
+      // P32-09: Safe JSON.parse with try-catch + cap results
+      try {
+        const opps = JSON.parse(match[0]) as RefactoringOpportunity[];
+        return Array.isArray(opps) ? opps.slice(0, 50) : [];
+      } catch {
+        return [];
+      }
     }
     return [];
   } catch (err) {

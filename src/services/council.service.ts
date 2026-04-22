@@ -96,6 +96,8 @@ export function getDefaultMembers(count = 3): CouncilProvider[] {
       logger.warn({ count, originalLength, iterations }, "Council cloning hit max iteration guard");
       break;
     }
+    // P36-04: Guard against modulo by zero when originalLength is 0
+    if (originalLength <= 0) break;
     const providerToClone = providers[(providers.length - originalLength) % originalLength];
     providers.push({ ...providerToClone, name: `${providerToClone.name}-${providers.length - originalLength + 1}` });
   }

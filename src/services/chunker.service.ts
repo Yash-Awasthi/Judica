@@ -9,8 +9,10 @@ export interface HierarchicalChunk {
  */
 export function chunkText(text: string, chunkSize: number = 512, overlap: number = 64): string[] {
   if (!text || text.trim().length === 0) return [];
-  // P39-01: Cap chunk accumulation to prevent unbounded memory growth
-  const MAX_CHUNKS = 10_000;
+  // P25-04: Validate chunk parameters to prevent infinite loops or division by zero
+  if (!Number.isFinite(chunkSize) || chunkSize < 1) chunkSize = 512;
+  if (!Number.isFinite(overlap) || overlap < 0) overlap = 0;
+  if (overlap >= chunkSize) overlap = Math.floor(chunkSize / 4);
 
   // Split by paragraphs first
   const paragraphs = text.split(/\n\s*\n/).filter((p) => p.trim().length > 0);

@@ -107,7 +107,13 @@ export async function updateProject(id: string, userId: number, input: Partial<C
     const [project] = await db
       .update(projects)
       .set({
-        ...input,
+        // P44-07: Explicitly whitelist updateable fields instead of spreading untrusted input
+        name: input.name,
+        description: input.description,
+        color: input.color,
+        icon: input.icon,
+        defaultCouncilComposition: input.defaultCouncilComposition,
+        defaultSystemPrompt: input.defaultSystemPrompt,
         updatedAt: new Date(),
       })
       .where(and(eq(projects.id, id), eq(projects.userId, userId)))
