@@ -21,6 +21,18 @@ export async function executeJS(code: string, timeout: number = 5000): Promise<S
   // L-11: Clamp timeout to safe range regardless of caller-supplied value
   const clampedTimeout = Math.min(Math.max(timeout, SANDBOX_TIMEOUT_MIN_MS), SANDBOX_TIMEOUT_MAX_MS);
   const start = Date.now();
+
+  const MAX_CODE_SIZE = 500_000; // 500KB
+  if (code.length > MAX_CODE_SIZE) {
+    return {
+      output: "",
+      stdout: [],
+      stderr: ["Code too large: maximum size is 500KB"],
+      error: `Code size ${code.length} exceeds maximum of ${MAX_CODE_SIZE} bytes`,
+      elapsedMs: Date.now() - start,
+    };
+  }
+
   const output: string[] = [];
   // P7-46: Separate stdout/stderr tracking
   const stdout: string[] = [];
