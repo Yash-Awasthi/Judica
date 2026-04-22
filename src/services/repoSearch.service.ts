@@ -14,6 +14,9 @@ export async function searchRepo(
   query: string,
   limit = 10
 ): Promise<CodeSearchResult[]> {
+  // P35-09: Validate and cap limit parameter
+  if (!Number.isFinite(limit) || limit < 1) limit = 10;
+  limit = Math.min(limit, 100);
   const queryEmbedding = await embed(query);
   const vectorStr = safeVectorLiteral(queryEmbedding);
 

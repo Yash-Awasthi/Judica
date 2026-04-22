@@ -54,6 +54,7 @@ export function registerWebhook(config: Omit<WebhookConfig, "id" | "createdAt">)
   // P6-10: Validate webhook URL against SSRF before registration
   const url = new URL(config.url);
   const hostname = url.hostname.toLowerCase();
+  // P35-02: Expanded SSRF hostname blocklist including private IP ranges
   if (
     hostname === "localhost" ||
     hostname === "127.0.0.1" ||
@@ -62,7 +63,11 @@ export function registerWebhook(config: Omit<WebhookConfig, "id" | "createdAt">)
     hostname === "0.0.0.0" ||
     hostname.endsWith(".local") ||
     hostname.endsWith(".internal") ||
-    hostname === "metadata.google.internal"
+    hostname === "metadata.google.internal" ||
+    hostname.startsWith("10.") ||
+    hostname.startsWith("192.168.") ||
+    hostname.startsWith("169.254.") ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(hostname)
   ) {
     throw new Error(`Webhook URL targets a restricted hostname: ${hostname}`);
   }
@@ -151,15 +156,10 @@ export async function retryFailedDelivery(
  * Compute HMAC-SHA256 signature for payload verification.
  */
 export function computeSignature(payload: string, secret: string): string {
-  // Simple hash for now — in production use crypto.createHmac
-  let hash = 0;
-  const combined = secret + payload;
-  for (let i = 0; i < combined.length; i++) {
-    const char = combined.charCodeAt(i);
-    hash = ((hash << 5) - hash) + char;
-    hash = hash & hash; // Convert to 32-bit integer
-  }
-  return `sha256=${Math.abs(hash).toString(16).padStart(8, "0")}`;
+  // P35-01: Replace weak hash with proper HMAC-SHA256
+  const hmac = require("crypto").createHmac("sha256", secret);
+  hmac.update(payload);
+  return `sha256=${hmac.digest("hex")}`;
 }
 
 // ─── Event Firing ───────────────────────────────────────────────────────────

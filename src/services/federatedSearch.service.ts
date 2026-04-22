@@ -238,10 +238,13 @@ export async function federatedSearch(opts: FederatedSearchOptions): Promise<Fed
   const allSearchResults = await Promise.all(searches);
 
   // Merge with Reciprocal Rank Fusion
+  // P35-10: Cap scoreMap to prevent unbounded memory growth
+  const MAX_SCORE_MAP = 10_000;
   const scoreMap = new Map<string, { result: FederatedResult; rrfScore: number }>();
 
   for (const { results } of allSearchResults) {
     results.forEach((result, rank) => {
+      if (scoreMap.size >= MAX_SCORE_MAP && !scoreMap.has(result.id)) return;
       const existing = scoreMap.get(result.id);
       const rrfContrib = 1 / (rank + 1 + k);
       if (existing) {

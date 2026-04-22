@@ -31,10 +31,27 @@ export interface MCPCallResult {
 const connections = new Map<string, MCPServerConnection>();
 const toolCache = new Map<string, MCPClientTool[]>();
 
+// P35-03: Cap MCP connection and tool cache maps
+const MAX_MCP_CONNECTIONS = 100;
+const MAX_TOOL_CACHE_ENTRIES = 100;
+
 /**
  * Register an external MCP server connection.
  */
 export function addConnection(conn: MCPServerConnection): void {
+  // P35-04: SSRF validation on MCP server URL
+  const url = new URL(conn.url);
+  const hostname = url.hostname.toLowerCase();
+  if (
+    hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" ||
+    hostname === "0.0.0.0" || hostname.endsWith(".local") || hostname.endsWith(".internal") ||
+    hostname.startsWith("10.") || hostname.startsWith("192.168.") || hostname.startsWith("169.254.")
+  ) {
+    throw new Error(`MCP server URL targets a restricted hostname: ${hostname}`);
+  }
+  if (connections.size >= MAX_MCP_CONNECTIONS && !connections.has(conn.name)) {
+    throw new Error(`Maximum MCP connections (${MAX_MCP_CONNECTIONS}) reached`);
+  }
   connections.set(conn.name, conn);
   toolCache.delete(conn.name); // Invalidate cache
   logger.info({ serverName: conn.name, transport: conn.transport }, "MCP server connection added");
@@ -105,7 +122,8 @@ export async function discoverTools(
     const data = await response.json() as { result?: { tools: { name: string; description: string; inputSchema: Record<string, unknown> }[] } };
 
     if (data.result?.tools) {
-      const tools: MCPClientTool[] = data.result.tools.map((t) => ({
+      // P35-05: Cap discovered tools to prevent unbounded cache growth
+      const tools: MCPClientTool[] = data.result.tools.slice(0, 500).map((t) => ({
         ...t,
         serverName,
       }));
