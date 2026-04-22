@@ -455,7 +455,7 @@ const adminPlugin: FastifyPluginAsync = async (fastify) => {
    * GET /api/admin/reliability — list all model reliability scores.
    */
   fastify.get("/reliability", async (_request, _reply) => {
-    const { getReliabilityScores: _getReliabilityScores } = await import("../services/reliability.service.js");
+    await import("../services/reliability.service.js");
     const { modelReliability } = await import("../db/schema/traces.js");
 
     const allRows = await db.select().from(modelReliability);

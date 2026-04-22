@@ -115,11 +115,15 @@ vi.mock("../../src/middleware/fastifyAuth.js", () => ({
 
 // ── Mock validate middleware ─────────────────────────────────────────────────
 vi.mock("../../src/middleware/validate.js", () => ({
+  fastifyValidate: vi.fn().mockReturnValue(vi.fn().mockImplementation(async () => {})),
   authSchema: {
     safeParse: vi.fn().mockReturnValue({ success: true, data: { username: "testuser", password: "password123" } }),
   },
   configSchema: {
     safeParse: vi.fn().mockReturnValue({ success: true, data: { config: { members: [], masterIndex: 0 } } }),
+  },
+  userSettingsSchema: {
+    safeParse: vi.fn().mockReturnValue({ success: true, data: { theme: "dark" } }),
   },
 }));
 
