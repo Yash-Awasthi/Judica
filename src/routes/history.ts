@@ -40,8 +40,9 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
       const limitNum = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 50);
       const filters = {
         projectId,
-        after: after ? new Date(after) : undefined,
-        before: before ? new Date(before) : undefined,
+        // P39-04: Validate date parsing in search handler too
+        after: after && !isNaN(new Date(after).getTime()) ? new Date(after) : undefined,
+        before: before && !isNaN(new Date(before).getTime()) ? new Date(before) : undefined,
       };
 
       return await searchChats(request.userId!, q, limitNum, filters);
@@ -57,8 +58,9 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
 
     const filters = {
       projectId,
-      after: after ? new Date(after) : undefined,
-      before: before ? new Date(before) : undefined,
+      // P39-04: Validate date parsing to prevent NaN/Invalid Date propagation
+      after: after && !isNaN(new Date(after).getTime()) ? new Date(after) : undefined,
+      before: before && !isNaN(new Date(before).getTime()) ? new Date(before) : undefined,
     };
 
     const { data, total } = await getConversationList(request.userId!, limit, skip, filters);
@@ -143,10 +145,12 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
       .where(
         and(
           eq(chats.conversationId, id),
-          lte(chats.id, Number(toChatId))
+          // P30-09: NaN guard on toChatId numeric conversion
+          lte(chats.id, Number.isFinite(Number(toChatId)) ? Number(toChatId) : 0)
         )
       )
-      .orderBy(asc(chats.createdAt));
+      .orderBy(asc(chats.createdAt))
+      .limit(1000);
 
     if (!chatsToFork.length) throw new AppError(400, "No messages to fork");
 
@@ -194,7 +198,8 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
       .select()
       .from(chats)
       .where(eq(chats.conversationId, id))
-      .orderBy(asc(chats.createdAt));
+      .orderBy(asc(chats.createdAt))
+      .limit(200);
 
     return {
       ...conversation,

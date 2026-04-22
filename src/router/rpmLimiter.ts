@@ -8,9 +8,19 @@ interface SlidingWindow {
 }
 
 const windows = new Map<string, SlidingWindow>();
+const MAX_WINDOWS = 10_000;
 
 function getWindow(provider: string): SlidingWindow {
   let win = windows.get(provider);
+  if (!win && windows.size >= MAX_WINDOWS) {
+    // Prune windows with no recent activity (all timestamps older than 60s)
+    const cutoff = Date.now() - 60_000;
+    for (const [k, w] of windows) {
+      if (w.timestamps.length === 0 || w.timestamps[w.timestamps.length - 1] < cutoff) {
+        windows.delete(k);
+      }
+    }
+  }
   if (!win) {
     win = { timestamps: [], start: 0 };
     windows.set(provider, win);
@@ -67,3 +77,28 @@ export function getCurrentRPM(provider: string, userId?: string): number {
   prune(win, Date.now() - 60_000);
   return activeCount(win);
 }
+
+// ─── Periodic cleanup of stale windows ─────────────────────────────────────
+
+const WINDOW_CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+
+const _cleanupInterval = setInterval(() => {
+  const cutoff = Date.now() - 60_000;
+  for (const [key, win] of windows) {
+    prune(win, cutoff);
+    if (activeCount(win) === 0) {
+      windows.delete(key);
+    }
+  }
+  // Hard cap: if still over limit, evict oldest entries
+  if (windows.size > MAX_WINDOWS) {
+    const excess = windows.size - MAX_WINDOWS;
+    const keys = windows.keys();
+    for (let i = 0; i < excess; i++) {
+      const k = keys.next().value;
+      if (k) windows.delete(k);
+    }
+  }
+}, WINDOW_CLEANUP_INTERVAL_MS);
+
+if (_cleanupInterval.unref) _cleanupInterval.unref();

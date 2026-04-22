@@ -70,7 +70,8 @@ export async function ingestGitHubRepo(
         item.type === "blob" &&
         item.path &&
         SUPPORTED_EXTENSIONS.includes(getExtension(item.path))
-    );
+    // P35-08: Cap files to prevent unbounded memory from large repos
+    ).slice(0, 5000);
 
     logger.info(
       { repoId, owner, repo, totalFiles: files.length },
@@ -96,6 +97,14 @@ export async function ingestGitHubRepo(
               .slice(0, MAX_CONTENT_LENGTH);
 
             if (!content.trim()) return;
+
+            // R3-14: Reject files with traversal sequences in the path returned by GitHub API.
+            // Although GitHub's API is trusted, a compromised or malicious repo manifest
+            // could return paths like "../../etc/passwd".
+            if (!file.path || file.path.includes("..") || file.path.startsWith("/")) {
+              logger.warn({ path: file.path }, "Skipping file with unsafe path");
+              return;
+            }
 
             const ext = getExtension(file.path!);
             const language = extensionToLanguage(ext);

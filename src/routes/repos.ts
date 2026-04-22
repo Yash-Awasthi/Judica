@@ -37,6 +37,13 @@ const reposPlugin: FastifyPluginAsync = async (fastify) => {
       return { error: "owner and repo are required" };
     }
 
+    // Validate GitHub owner/repo format: alphanumeric, hyphens, underscores, dots only
+    const GITHUB_NAME_RE = /^[a-zA-Z0-9._-]{1,100}$/;
+    if (!GITHUB_NAME_RE.test(owner) || !GITHUB_NAME_RE.test(repo)) {
+      reply.code(400);
+      return { error: "Invalid owner or repo name. Must contain only alphanumeric characters, hyphens, underscores, and dots." };
+    }
+
     // Queue the ingestion via BullMQ
     await repoQueue.add("ingest", { userId, owner: owner.trim(), repo: repo.trim() });
 
@@ -108,7 +115,9 @@ const reposPlugin: FastifyPluginAsync = async (fastify) => {
       return { error: "Repository not found" };
     }
 
-    await db.delete(codeRepositories).where(eq(codeRepositories.id, id));
+    await db.delete(codeRepositories).where(and(eq(codeRepositories.id, id), eq(codeRepositories.userId, userId)));
+    // R4-01: Include userId in DELETE WHERE clause — the prior ownership check is a
+    // read-then-delete TOCTOU; using a scoped WHERE is the authoritative guard.
     return { message: "Repository deleted" };
   });
 };

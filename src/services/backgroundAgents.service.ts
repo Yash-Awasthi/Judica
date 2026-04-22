@@ -67,9 +67,41 @@ export interface StepContext {
 
 // ─── Store ──────────────────────────────────────────────────────────────────
 
+// P24-03: Cap in-memory maps to prevent unbounded growth
+const MAX_BACKGROUND_AGENTS = 500;
+
 const agents = new Map<string, BackgroundAgent>();
 const handlers = new Map<string, Array<(ctx: StepContext) => Promise<unknown>>>();
 const progressCallbacks = new Map<string, (agent: BackgroundAgent) => void>();
+
+const MAX_AGENTS = 10_000;
+const AGENT_CLEANUP_INTERVAL_MS = 15 * 60 * 1000; // 15 minutes
+
+// Automatic cleanup of completed/failed agents older than 1 hour
+const _agentCleanupInterval = setInterval(() => {
+  const cutoff = Date.now() - 3600_000; // 1 hour
+  for (const [id, agent] of agents) {
+    if ((agent.status === "completed" || agent.status === "failed") &&
+        agent.createdAt.getTime() < cutoff) {
+      agents.delete(id);
+      handlers.delete(id);
+      progressCallbacks.delete(id);
+    }
+  }
+  // Hard cap
+  if (agents.size > MAX_AGENTS) {
+    const sorted = [...agents.entries()].sort((a, b) => a[1].createdAt.getTime() - b[1].createdAt.getTime());
+    const excess = agents.size - MAX_AGENTS;
+    for (let i = 0; i < excess; i++) {
+      const [id] = sorted[i];
+      agents.delete(id);
+      handlers.delete(id);
+      progressCallbacks.delete(id);
+    }
+  }
+}, AGENT_CLEANUP_INTERVAL_MS);
+
+if (_agentCleanupInterval.unref) _agentCleanupInterval.unref();
 
 // ─── Core Functions ─────────────────────────────────────────────────────────
 
@@ -99,6 +131,24 @@ export async function createAgent(input: CreateAgentInput): Promise<BackgroundAg
     lastHeartbeat: null,
     metadata: input.metadata ?? {},
   };
+
+  // P24-03: Enforce agent map cap
+  if (agents.size >= MAX_BACKGROUND_AGENTS) {
+    // Evict oldest completed/failed/cancelled agent
+    let evicted = false;
+    for (const [eid, ea] of agents) {
+      if (ea.status === "completed" || ea.status === "failed" || ea.status === "cancelled") {
+        agents.delete(eid);
+        handlers.delete(eid);
+        progressCallbacks.delete(eid);
+        evicted = true;
+        break;
+      }
+    }
+    if (!evicted) {
+      throw new Error(`Maximum background agent limit (${MAX_BACKGROUND_AGENTS}) reached`);
+    }
+  }
 
   agents.set(id, agent);
   handlers.set(id, input.steps.map((s) => s.handler));
@@ -279,3 +329,13 @@ export function cleanupAgents(maxAgeMs: number = 86400_000 * 7): number {
   }
   return removed;
 }
+
+// Auto-cleanup completed/failed/cancelled agents every 30 minutes
+const AGENT_CLEANUP_MAX_AGE_MS = 4 * 60 * 60 * 1000; // 4 hours
+
+setInterval(() => {
+  const removed = cleanupAgents(AGENT_CLEANUP_MAX_AGE_MS);
+  if (removed > 0) {
+    logger.info({ removed }, "Auto-cleaned old background agents");
+  }
+}, AGENT_CLEANUP_INTERVAL_MS).unref();

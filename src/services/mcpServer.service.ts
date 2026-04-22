@@ -85,6 +85,17 @@ export function clearTools(): void {
   toolRegistry.clear();
 }
 
+const MCP_TOOL_TIMEOUT_MS = 30_000; // 30 seconds
+
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(`MCP tool "${label}" timed out after ${ms}ms`)), ms),
+    ),
+  ]);
+}
+
 // ─── JSON-RPC Handler ───────────────────────────────────────────────────────
 
 /**
@@ -119,7 +130,21 @@ export async function handleMCPRequest(request: MCPRequest): Promise<MCPResponse
 
       case "tools/call": {
         const toolName = request.params?.name as string;
+        // P36-01: Validate toolName is a non-empty string within bounds
+        if (!toolName || typeof toolName !== "string" || toolName.length > 200) {
+          return {
+            ...baseResponse,
+            error: { code: -32602, message: "Invalid tool name" },
+          };
+        }
         const args = (request.params?.arguments as Record<string, unknown>) || {};
+        // P36-01: Cap args keys to prevent unbounded object processing
+        if (Object.keys(args).length > 100) {
+          return {
+            ...baseResponse,
+            error: { code: -32602, message: "Too many arguments (max 100)" },
+          };
+        }
 
         const tool = getTool(toolName);
         if (!tool) {
@@ -129,7 +154,7 @@ export async function handleMCPRequest(request: MCPRequest): Promise<MCPResponse
           };
         }
 
-        const result = await tool.handler(args);
+        const result = await withTimeout(tool.handler(args), MCP_TOOL_TIMEOUT_MS, toolName);
         return { ...baseResponse, result };
       }
 

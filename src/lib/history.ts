@@ -71,14 +71,18 @@ export async function getRecentHistory(conversationId: string, userId?: number):
   return budgetedMessages;
 }
 
-export async function getHistoryWithContext(conversationId: string): Promise<Message[]> {
+export async function getHistoryWithContext(conversationId: string, userId?: number): Promise<Message[]> {
   const [summary] = await db.select().from(contextSummaries)
     .where(eq(contextSummaries.conversationId, conversationId))
     .orderBy(desc(contextSummaries.createdAt))
     .limit(1);
 
+  const historyWhereClause = userId
+    ? and(eq(chats.conversationId, conversationId), eq(chats.userId, userId))
+    : eq(chats.conversationId, conversationId);
+
   const recentChats = await db.select().from(chats)
-    .where(eq(chats.conversationId, conversationId))
+    .where(historyWhereClause)
     .orderBy(desc(chats.createdAt))
     .limit(5);
   recentChats.reverse();
@@ -135,7 +139,9 @@ export async function getEnhancedContext(conversationId: string, currentQuery: s
 // P9-94: Improved keyword extraction with basic suffix stripping (poor man's stemmer)
 // and n-gram support for multi-word phrases.
 function extractKeywords(text: string): string[] {
-  const words = text.toLowerCase()
+  // P30-05: Cap input length to prevent regex DoS on very large strings
+  const safeText = text.length > 10_000 ? text.slice(0, 10_000) : text;
+  const words = safeText.toLowerCase()
     .replace(/[^\w\s]/g, ' ')
     .split(/\s+/)
     .filter(word => word.length > 3)
@@ -161,10 +167,15 @@ function hasKeywordOverlap(text: string, keywords: string[]): boolean {
   return keywords.some(keyword => lowerText.includes(keyword));
 }
 
+const stopWords = new Set(['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'what', 'which', 'who', 'when', 'where', 'why', 'how', 'not', 'no', 'yes', 'if', 'then', 'else', 'because', 'since', 'until', 'while', 'during', 'before', 'after', 'above', 'below', 'under', 'over', 'between', 'among', 'through', 'against', 'without', 'within', 'upon', 'about', 'along', 'around', 'behind', 'beyond', 'inside', 'outside', 'toward', 'towards', 'into', 'onto', 'onto', 'off']);
+
 function isStopWord(word: string): boolean {
-  const stopWords = new Set(['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'what', 'which', 'who', 'when', 'where', 'why', 'how', 'not', 'no', 'yes', 'if', 'then', 'else', 'because', 'since', 'until', 'while', 'during', 'before', 'after', 'above', 'below', 'under', 'over', 'between', 'among', 'through', 'against', 'without', 'within', 'upon', 'about', 'along', 'around', 'behind', 'beyond', 'inside', 'outside', 'toward', 'towards', 'into', 'onto', 'onto', 'off']);
-  return stopWords.has(word);
+  // P34-08: Moved stopWords to module level to avoid re-creation per call; fixed duplicate 'onto'
+  return HISTORY_STOP_WORDS.has(word);
 }
+
+// P34-08: Module-level Set avoids re-allocation on every call
+const HISTORY_STOP_WORDS = new Set(['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'what', 'which', 'who', 'when', 'where', 'why', 'how', 'not', 'no', 'yes', 'if', 'then', 'else', 'because', 'since', 'until', 'while', 'during', 'before', 'after', 'above', 'below', 'under', 'over', 'between', 'among', 'through', 'against', 'without', 'within', 'upon', 'about', 'along', 'around', 'behind', 'beyond', 'inside', 'outside', 'toward', 'towards', 'into', 'onto', 'off']);
 
 async function extractRelevantMemories(conversationId: string, keywords: string[]): Promise<string[]> {
   const pastChats = await db.select().from(chats)
@@ -175,10 +186,13 @@ async function extractRelevantMemories(conversationId: string, keywords: string[
   const relevantMemories: string[] = [];
 
   for (const chat of pastChats) {
+    // P34-09: Early exit once we have enough relevant memories
+    if (relevantMemories.length >= 5) break;
     const combinedText = `${chat.question} ${chat.verdict}`;
     if (hasKeywordOverlap(combinedText, keywords)) {
       const opinions = chat.opinions as { name: string; opinion: string }[];
-      if (opinions && opinions.length > 0) {
+      // P34-09: Validate opinions is actually an array before use
+      if (Array.isArray(opinions) && opinions.length > 0) {
         const relevantOpinion = opinions.find((op: { opinion: string }) =>
           hasKeywordOverlap(op.opinion, keywords)
         );
@@ -195,7 +209,8 @@ async function extractRelevantMemories(conversationId: string, keywords: string[
 export async function updateEnhancedContextSummary(conversationId: string): Promise<void> {
   const allChats = await db.select().from(chats)
     .where(eq(chats.conversationId, conversationId))
-    .orderBy(asc(chats.createdAt));
+    .orderBy(asc(chats.createdAt))
+    .limit(200);
 
   if (allChats.length <= 8) return; // Wait for more substantial conversation
 

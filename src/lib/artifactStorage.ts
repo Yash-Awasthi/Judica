@@ -13,6 +13,12 @@
 
 import logger from "./logger.js";
 
+/** Maximum size of a single artifact (50 MB). */
+const MAX_ARTIFACT_SIZE = 50 * 1024 * 1024; // 50MB
+
+/** Maximum total number of artifacts stored in memory. */
+const MAX_ARTIFACTS = 10_000;
+
 export interface ArtifactStore {
   readonly name: string;
 
@@ -33,13 +39,29 @@ export interface ArtifactStore {
  * In-memory artifact store — the current default.
  * Suitable for single-process deployments and development.
  */
+// P19-08: Cap in-memory artifact store to prevent unbounded memory growth
+const MAX_STREAMS = 500;
+const MAX_ARTIFACTS_PER_STREAM = 100;
+
 class InMemoryArtifactStore implements ArtifactStore {
   readonly name = "memory";
   private store = new Map<string, Map<string, Buffer>>();
 
   async put(streamId: string, artifactId: string, data: Buffer | string): Promise<void> {
-    if (!this.store.has(streamId)) this.store.set(streamId, new Map());
-    this.store.get(streamId)!.set(artifactId, Buffer.from(data));
+    if (!this.store.has(streamId)) {
+      // Evict oldest stream if at capacity
+      if (this.store.size >= MAX_STREAMS) {
+        const oldestKey = this.store.keys().next().value;
+        if (oldestKey) this.store.delete(oldestKey);
+      }
+      this.store.set(streamId, new Map());
+    }
+    const streamMap = this.store.get(streamId)!;
+    if (streamMap.size >= MAX_ARTIFACTS_PER_STREAM) {
+      const oldestArtifact = streamMap.keys().next().value;
+      if (oldestArtifact) streamMap.delete(oldestArtifact);
+    }
+    streamMap.set(artifactId, Buffer.from(data));
   }
 
   async get(streamId: string, artifactId: string): Promise<Buffer | null> {

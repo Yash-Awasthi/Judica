@@ -9,14 +9,20 @@ export interface HierarchicalChunk {
  */
 export function chunkText(text: string, chunkSize: number = 512, overlap: number = 64): string[] {
   if (!text || text.trim().length === 0) return [];
+  // P25-04: Validate chunk parameters to prevent infinite loops or division by zero
+  if (!Number.isFinite(chunkSize) || chunkSize < 1) chunkSize = 512;
+  if (!Number.isFinite(overlap) || overlap < 0) overlap = 0;
+  if (overlap >= chunkSize) overlap = Math.floor(chunkSize / 4);
 
   // Split by paragraphs first
   const paragraphs = text.split(/\n\s*\n/).filter((p) => p.trim().length > 0);
+  const MAX_CHUNKS = 10_000;
   const chunks: string[] = [];
 
   let buffer = "";
 
   for (const para of paragraphs) {
+    if (chunks.length >= MAX_CHUNKS) break;
     if (buffer.length + para.length + 1 <= chunkSize) {
       buffer += (buffer ? "\n\n" : "") + para;
     } else {
@@ -26,7 +32,8 @@ export function chunkText(text: string, chunkSize: number = 512, overlap: number
         buffer = para;
       } else {
         // Split long paragraph by sentences
-        const sentences = para.match(/[^.!?]+[.!?]+\s*/g) || [para];
+        // P39-08: Cap sentences per paragraph to prevent pathological regex results
+        const sentences = (para.match(/[^.!?]+[.!?]+\s*/g) || [para]).slice(0, 500);
         buffer = "";
 
         for (const sentence of sentences) {

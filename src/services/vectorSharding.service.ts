@@ -35,10 +35,26 @@ export function getShardName(entityId: string, strategy: ShardConfig["strategy"]
   return `vectors_${strategy}_${entityId}`;
 }
 
+/** Validate that a shard name contains only safe characters for SQL identifiers. */
+function validateIdentifier(name: string): string {
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/.test(name)) {
+    throw new Error(`Invalid SQL identifier: ${name}`);
+  }
+  return name;
+}
+
 /**
  * Generate the SQL for creating a sharded vector table with HNSW index.
  */
 export function generateShardDDL(shardName: string, dimensions: number = 1536): string {
+  // Validate shard name to prevent SQL injection in DDL
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/.test(shardName)) {
+    throw new Error(`Invalid shard name: must be a valid SQL identifier (letters, numbers, underscores)`);
+  }
+  if (!Number.isInteger(dimensions) || dimensions < 1 || dimensions > 4096) {
+    throw new Error(`Invalid dimensions: must be an integer between 1 and 4096`);
+  }
+
   return `
 -- Create sharded vector table
 CREATE TABLE IF NOT EXISTS "${shardName}" (
@@ -96,6 +112,15 @@ export function generateMigrationSQL(
   toShard: string,
   condition: string,
 ): string {
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/.test(fromShard) || !/^[a-zA-Z_][a-zA-Z0-9_]{0,62}$/.test(toShard)) {
+    throw new Error(`Invalid shard name: must be a valid SQL identifier`);
+  }
+  // Reject dangerous SQL patterns in condition to prevent injection
+  const dangerousPatterns = /;|--|\bdrop\b|\btruncate\b|\balter\b|\bcreate\b/i;
+  if (dangerousPatterns.test(condition)) {
+    throw new Error(`Condition contains disallowed SQL patterns`);
+  }
+
   return `
 -- Migrate vectors matching condition
 INSERT INTO "${toShard}" (id, content, embedding, metadata, created_at)

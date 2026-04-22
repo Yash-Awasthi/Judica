@@ -16,7 +16,23 @@ const MAX_CONCURRENT_PER_USER = 3; // P1-22: cap concurrent sandbox executions
 const inflightMap = new Map<string, number>();
 
 // P1-21: Redis-backed rate limiter with in-memory fallback
+// P44-06: Cap memoryBuckets to prevent unbounded growth
+const MAX_MEMORY_BUCKETS = 10_000;
 const memoryBuckets = new Map<string, { count: number; resetAt: number }>();
+const MAX_BUCKETS = 10_000;
+
+// Periodic cleanup of expired rate-limit buckets (every 60s)
+const bucketCleanupInterval = setInterval(() => {
+  const now = Date.now();
+  for (const [key, bucket] of memoryBuckets) {
+    if (now >= bucket.resetAt) {
+      memoryBuckets.delete(key);
+    }
+  }
+}, 60_000);
+bucketCleanupInterval.unref();
+
+const MAX_INFLIGHT_ENTRIES = 5000;
 
 async function sandboxRateLimiter(request: FastifyRequest, reply: FastifyReply) {
   const userId = (request as unknown as { userId?: number }).userId || request.ip;
@@ -39,8 +55,20 @@ async function sandboxRateLimiter(request: FastifyRequest, reply: FastifyReply) 
 
   // In-memory fallback
   const now = Date.now();
+  // P31-03: Evict expired buckets when map grows too large
+  if (memoryBuckets.size >= MAX_MEMORY_BUCKETS) {
+    for (const [k, v] of memoryBuckets) {
+      if (now >= v.resetAt) memoryBuckets.delete(k);
+    }
+  }
   let bucket = memoryBuckets.get(key);
   if (!bucket || now >= bucket.resetAt) {
+    // Safety net: evict expired entries if map exceeds cap
+    if (memoryBuckets.size >= MAX_BUCKETS) {
+      for (const [k, b] of memoryBuckets) {
+        if (now >= b.resetAt) memoryBuckets.delete(k);
+      }
+    }
     bucket = { count: 0, resetAt: now + 60_000 };
     memoryBuckets.set(key, bucket);
   }
@@ -53,6 +81,12 @@ async function sandboxRateLimiter(request: FastifyRequest, reply: FastifyReply) 
 
 // P1-22: Concurrency guard
 function acquireConcurrency(userId: string): boolean {
+  // P31-03: Cap inflight entries
+  if (inflightMap.size >= MAX_INFLIGHT_ENTRIES && !inflightMap.has(userId)) {
+    for (const [k, v] of inflightMap) {
+      if (v <= 0) { inflightMap.delete(k); break; }
+    }
+  }
   const current = inflightMap.get(userId) || 0;
   if (current >= MAX_CONCURRENT_PER_USER) return false;
   inflightMap.set(userId, current + 1);

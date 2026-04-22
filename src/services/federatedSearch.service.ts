@@ -6,6 +6,11 @@ import { hybridSearch } from "./vectorStore.service.js";
 import { pool } from "../lib/db.js";
 import logger from "../lib/logger.js";
 
+const MAX_FEDERATED_LIMIT = 50;
+function clampLimit(limit: number): number {
+  return Math.max(1, Math.min(limit, MAX_FEDERATED_LIMIT));
+}
+
 /**
  * Federated search result: a unified item from any index.
  */
@@ -27,6 +32,7 @@ async function searchConversations(
   limit: number,
 ): Promise<FederatedResult[]> {
   try {
+    limit = clampLimit(limit);
     const vectorStr = safeVectorLiteral(queryEmbedding);
     const result = await db.execute(sql`
       SELECT "id", "question", "verdict",
@@ -60,6 +66,7 @@ async function searchAllRepos(
   limit: number,
 ): Promise<FederatedResult[]> {
   try {
+    limit = clampLimit(limit);
     const vectorStr = safeVectorLiteral(queryEmbedding);
     const { rows } = await pool.query<{
       id: string;
@@ -106,6 +113,8 @@ async function searchFacts(
     // Only include if conversationId is provided
     if (!conversationId) return [];
 
+    limit = clampLimit(limit);
+
     const result = await db.execute(sql`
       SELECT "id", "content", "sourceAgent", "type", "confidence"
       FROM "SharedFact"
@@ -149,10 +158,13 @@ export async function federatedSearch(opts: FederatedSearchOptions): Promise<Fed
     query,
     kbId,
     conversationId,
-    limit = 10,
+    // P23-07: Cap limit to prevent excessive DB reads and memory usage
+    limit: rawLimit = 10,
     indexes = ["kb", "repo", "conversation", "fact"],
     perSourceTimeoutMs = 10_000,
   } = opts;
+  const MAX_FEDERATED_LIMIT = 100;
+  const limit = Math.min(Math.max(1, rawLimit), MAX_FEDERATED_LIMIT);
 
   const k = 60; // RRF constant
 
@@ -163,14 +175,18 @@ export async function federatedSearch(opts: FederatedSearchOptions): Promise<Fed
     promise: Promise<T>,
     fallback: T,
   ): Promise<T> {
+    let timer: ReturnType<typeof setTimeout>;
     return Promise.race([
-      promise,
-      new Promise<T>((resolve) =>
-        setTimeout(() => {
+      promise.then((result) => {
+        clearTimeout(timer);
+        return result;
+      }),
+      new Promise<T>((resolve) => {
+        timer = setTimeout(() => {
           logger.warn({ source, timeoutMs: perSourceTimeoutMs }, "Federated search source timed out");
           resolve(fallback);
-        }, perSourceTimeoutMs),
-      ),
+        }, perSourceTimeoutMs);
+      }),
     ]);
   }
 
@@ -238,10 +254,13 @@ export async function federatedSearch(opts: FederatedSearchOptions): Promise<Fed
   const allSearchResults = await Promise.all(searches);
 
   // Merge with Reciprocal Rank Fusion
+  // P35-10: Cap scoreMap to prevent unbounded memory growth
+  const MAX_SCORE_MAP = 10_000;
   const scoreMap = new Map<string, { result: FederatedResult; rrfScore: number }>();
 
   for (const { results } of allSearchResults) {
     results.forEach((result, rank) => {
+      if (scoreMap.size >= MAX_SCORE_MAP && !scoreMap.has(result.id)) return;
       const existing = scoreMap.get(result.id);
       const rrfContrib = 1 / (rank + 1 + k);
       if (existing) {

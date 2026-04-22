@@ -57,6 +57,10 @@ export interface ToolSearchOptions {
 
 // ─── Registry (in-memory, upgradeable to external registry) ─────────────────
 
+// P27-05: Cap registry and installed maps to prevent unbounded memory growth
+const MAX_REGISTRY_SIZE = 1000;
+const MAX_INSTALLED_SIZE = 5000;
+
 const registry = new Map<string, FederatedTool>();
 const installed = new Map<string, InstalledTool>(); // key: `userId:toolId`
 
@@ -168,6 +172,24 @@ export function getTool(toolId: string): FederatedTool | undefined {
 export function publishTool(
   tool: Omit<FederatedTool, "id" | "downloads" | "rating" | "publishedAt">,
 ): FederatedTool {
+  // Validate tool metadata
+  if (!tool.name || tool.name.length > 100) {
+    throw new Error("Tool name is required and must be under 100 characters");
+  }
+  if (!tool.description || tool.description.length > 2000) {
+    throw new Error("Tool description is required and must be under 2000 characters");
+  }
+  if (tool.tags && tool.tags.length > 20) {
+    throw new Error("Maximum 20 tags allowed");
+  }
+  if (tool.author && tool.author.length > 100) {
+    throw new Error("Author name must be under 100 characters");
+  }
+  // Cap registry size to prevent unbounded growth
+  if (registry.size > 10000) {
+    throw new Error("Tool registry is full");
+  }
+
   const id = `tool_${crypto.randomBytes(8).toString("hex")}`;
   const published: FederatedTool = {
     ...tool,
@@ -177,6 +199,9 @@ export function publishTool(
     publishedAt: new Date(),
   };
 
+  if (registry.size >= MAX_REGISTRY_SIZE) {
+    throw new Error("Tool registry is at capacity. Remove unused tools before publishing new ones.");
+  }
   registry.set(id, published);
   logger.info({ toolId: id, name: tool.name }, "Tool published to registry");
   return published;
@@ -196,6 +221,9 @@ export function installTool(
   const key = `${userId}:${toolId}`;
   if (installed.has(key)) return { success: false, error: "Tool already installed" };
 
+  if (installed.size >= MAX_INSTALLED_SIZE) {
+    return { success: false, error: "Installation limit reached. Uninstall unused tools first." };
+  }
   installed.set(key, {
     toolId,
     name: tool.name,

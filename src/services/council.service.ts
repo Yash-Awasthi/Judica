@@ -87,18 +87,22 @@ export function getDefaultMembers(count = 3): CouncilProvider[] {
   }
   
   const originalLength = providers.length;
+  // P39-06: Cap count to prevent unbounded provider cloning
+  const safeCount = Math.min(count, 100);
   const MAX_CLONE_ITERATIONS = 20;
   let iterations = 0;
-  while (providers.length < count) {
+  while (providers.length < safeCount) {
     if (++iterations > MAX_CLONE_ITERATIONS) {
       logger.warn({ count, originalLength, iterations }, "Council cloning hit max iteration guard");
       break;
     }
+    // P36-04: Guard against modulo by zero when originalLength is 0
+    if (originalLength <= 0) break;
     const providerToClone = providers[(providers.length - originalLength) % originalLength];
     providers.push({ ...providerToClone, name: `${providerToClone.name}-${providers.length - originalLength + 1}` });
   }
   
-  return providers.slice(0, count);
+  return providers.slice(0, safeCount);
 }
 
 export function getDefaultMaster(): CouncilProvider {
@@ -208,9 +212,15 @@ export function resolveApiKey(member: ApiKeyResolutionInput): string {
   }
   if (model.includes("/"))            return env.OPENROUTER_API_KEY || env.OPENAI_API_KEY || "";
 
-  if (member.type === "api")       return env.GOOGLE_API_KEY || env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY || "";
+  if (member.type === "api") {
+    const key = env.GOOGLE_API_KEY || env.ANTHROPIC_API_KEY || env.OPENAI_API_KEY || "";
+    if (!key) logger.warn({ member: { model: member.model, baseUrl: member.baseUrl } }, "resolveApiKey: no API key found for api-type member");
+    return key;
+  }
 
-  return env.OPENAI_API_KEY || "";
+  const fallbackKey = env.OPENAI_API_KEY || "";
+  if (!fallbackKey) logger.warn({ member: { model: member.model, baseUrl: member.baseUrl } }, "resolveApiKey: no fallback API key found");
+  return fallbackKey;
 }
 
 export function resolveMembersApiKeys(members: ApiKeyResolutionInput[]): CouncilProvider[] {

@@ -80,6 +80,11 @@ export class PostgresBackend implements CacheBackend {
 
   async searchSemantic(embedding: number[], threshold = 0.15): Promise<SemanticSearchResult | null> {
     try {
+      // P21-03: Validate embedding array contains only finite numbers to prevent SQL injection
+      if (!embedding.every(n => Number.isFinite(n))) {
+        logger.warn("searchSemantic: embedding contains non-finite values — rejecting");
+        return null;
+      }
       const embeddingStr = `[${embedding.join(',')}]`;
       // P9-22: Check that HNSW index exists — warn if falling back to seqscan
       // P9-23: Push similarity threshold into WHERE clause to reduce sort cost
@@ -99,9 +104,18 @@ export class PostgresBackend implements CacheBackend {
           keyHash: rows[0].keyHash,
           verdict: rows[0].verdict,
           // P9-27: Handle mixed opinions field schema — may be string or JSON
-          opinions: typeof rows[0].opinions === 'string'
-            ? JSON.parse(rows[0].opinions)
-            : rows[0].opinions,
+          // P51-07: Safe-parse opinions so malformed JSON doesn't discard a valid row
+          opinions: (() => {
+            let opinions: CacheOpinion[];
+            try {
+              opinions = typeof rows[0].opinions === 'string'
+                ? JSON.parse(rows[0].opinions)
+                : rows[0].opinions;
+            } catch {
+              opinions = [];
+            }
+            return opinions;
+          })(),
           distance: rows[0].distance
         };
       }

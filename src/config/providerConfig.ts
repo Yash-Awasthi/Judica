@@ -129,14 +129,25 @@ export async function loadProviderConfig(): Promise<ProviderRegistryConfig> {
 
   try {
     const fs = await import('fs/promises');
-    const configData = await fs.readFile(configPath, 'utf-8');
-    const config = JSON.parse(configData) as ProviderRegistryConfig;
-    
-    if (!config.providers || !Array.isArray(config.providers)) {
-      throw new Error('Invalid provider config: providers array is required');
+    // Fix CodeQL alert #65: Use file handle to eliminate TOCTOU race between stat and read
+    const fh = await fs.open(configPath, 'r');
+    try {
+      const stat = await fh.stat();
+      if (stat.size > 1_000_000) {
+        logger.warn({ configPath, size: stat.size }, "Provider config file too large (>1MB), using defaults");
+        return DEFAULT_PROVIDER_CONFIG;
+      }
+      const configData = await fh.readFile({ encoding: 'utf-8' });
+      const config = JSON.parse(configData) as ProviderRegistryConfig;
+
+      if (!config.providers || !Array.isArray(config.providers)) {
+        throw new Error('Invalid provider config: providers array is required');
+      }
+
+      return config;
+    } finally {
+      await fh.close();
     }
-    
-    return config;
   } catch (error) {
     logger.warn({ error, configPath }, "Failed to load provider config, using defaults");
     return DEFAULT_PROVIDER_CONFIG;

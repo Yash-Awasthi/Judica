@@ -63,9 +63,14 @@ export const httpHandler: NodeHandler = async (ctx) => {
   }
 
   // Use resolved IP if available to prevent DNS rebinding
-  const fetchUrl = resolvedIp
-    ? url.replace(hostname, resolvedIp)
-    : url;
+  // R3-03: Construct URL properly instead of string-replacing hostname, which could
+  // corrupt query parameters or path segments that happen to contain the hostname string.
+  let fetchUrl = url;
+  if (resolvedIp) {
+    const resolvedUrlObj = new URL(url);
+    resolvedUrlObj.hostname = resolvedIp;
+    fetchUrl = resolvedUrlObj.toString();
+  }
 
   const response = await fetch(fetchUrl, fetchOptions);
 

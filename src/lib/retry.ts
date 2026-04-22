@@ -7,6 +7,8 @@ const MAX_CONCURRENT_RETRIES = 50;
 let activeRetries = 0;
 
 // P9-34: Retry metrics for observability
+// P22-08: Cap retriesByProvider Map to prevent unbounded growth from many distinct labels
+const MAX_PROVIDER_METRIC_ENTRIES = 200;
 const retryMetrics = {
   totalRetries: 0,
   retriesByProvider: new Map<string, number>(),
@@ -41,13 +43,20 @@ export async function withRetry<T>(
   } = {}
 ): Promise<T> {
   const {
-    maxRetries = 2,
-    initialDelay = 1000,
-    maxDelay = 10000,
-    factor = 2,
     onRetry,
     signal,
   } = options;
+
+  // P50-07: Guard numeric options against NaN, negative, and non-finite values.
+  // Fall back to safe defaults so delay calculations never produce NaN.
+  const maxRetries = Number.isFinite(options.maxRetries) && (options.maxRetries as number) >= 0
+    ? (options.maxRetries as number) : 2;
+  const initialDelay = Number.isFinite(options.initialDelay) && (options.initialDelay as number) > 0
+    ? (options.initialDelay as number) : 1000;
+  const maxDelay = Number.isFinite(options.maxDelay) && (options.maxDelay as number) > 0
+    ? (options.maxDelay as number) : 10000;
+  const factor = Number.isFinite(options.factor) && (options.factor as number) >= 1
+    ? (options.factor as number) : 2;
 
   let attempt = 0;
   let delay = initialDelay;
@@ -80,6 +89,11 @@ export async function withRetry<T>(
       if (options.label) {
         const prev = retryMetrics.retriesByProvider.get(options.label) || 0;
         retryMetrics.retriesByProvider.set(options.label, prev + 1);
+        // P22-08: Evict oldest entry if map exceeds cap
+        if (retryMetrics.retriesByProvider.size > MAX_PROVIDER_METRIC_ENTRIES) {
+          const oldest = retryMetrics.retriesByProvider.keys().next().value;
+          if (oldest !== undefined) retryMetrics.retriesByProvider.delete(oldest);
+        }
       }
 
       if (onRetry) {
@@ -88,8 +102,27 @@ export async function withRetry<T>(
 
       // P9-35: Check AbortSignal during backoff sleep — don't wait if already aborted
       try {
+        // P9-34: Track retry metrics
+        // P50-07: Cap counter to prevent overflow past Number.MAX_SAFE_INTEGER
+        if (retryMetrics.totalRetries < Number.MAX_SAFE_INTEGER) {
+          retryMetrics.totalRetries++;
+        }
+        if (options.label) {
+          const prev = retryMetrics.retriesByProvider.get(options.label) || 0;
+          retryMetrics.retriesByProvider.set(options.label, prev + 1);
+        }
+
+        if (onRetry) {
+          onRetry(error, attempt);
+        }
+
+        // P9-35: Check AbortSignal during backoff sleep — don't wait if already aborted
         await new Promise<void>((resolve, reject) => {
-          const timer = setTimeout(resolve, delay);
+          let onAbort: (() => void) | undefined;
+          const timer = setTimeout(() => {
+            if (onAbort && signal) signal.removeEventListener("abort", onAbort);
+            resolve();
+          }, delay);
 
           if (signal) {
             if (signal.aborted) {
@@ -97,7 +130,7 @@ export async function withRetry<T>(
               reject(new DOMException("Retry aborted", "AbortError"));
               return;
             }
-            const onAbort = () => {
+            onAbort = () => {
               clearTimeout(timer);
               reject(new DOMException("Retry aborted", "AbortError"));
             };

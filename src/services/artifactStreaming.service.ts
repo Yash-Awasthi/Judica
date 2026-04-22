@@ -49,8 +49,21 @@ export interface StreamInfo {
 const emitter = new EventEmitter();
 emitter.setMaxListeners(100);
 
+// P24-04: Cap stream maps to prevent unbounded memory growth
+const MAX_STREAMS = 1000;
+
 const streams = new Map<string, StreamInfo>();
 const artifactStore = new Map<string, Artifact[]>();
+
+const MAX_ARTIFACTS_PER_STREAM = 5_000;
+const STREAM_CLEANUP_INTERVAL_MS = 10 * 60 * 1000; // 10 minutes
+
+// Automatic periodic cleanup of completed streams older than 1 hour
+const _cleanupInterval = setInterval(() => {
+  cleanupStreams(3600_000); // 1 hour for completed streams
+}, STREAM_CLEANUP_INTERVAL_MS);
+
+if (_cleanupInterval.unref) _cleanupInterval.unref();
 
 // ─── Redis Stream Helpers ───────────────────────────────────────────────────
 
@@ -79,8 +92,20 @@ async function setRedisExpiry(streamId: string): Promise<void> {
  * Create a new artifact stream.
  */
 export function createStream(userId: number, title: string, agentId?: string): string {
+  if (streams.size > 10000) {
+    cleanupStreams(CLEANUP_MAX_AGE_MS);
+  }
+
   const id = `stream_${crypto.randomBytes(8).toString("hex")}`;
 
+  // Enforce stream cap — clean up old streams first
+  if (streams.size >= MAX_STREAMS) {
+    cleanupStreams(3600_000);
+    if (streams.size >= MAX_STREAMS) {
+      logger.warn({ streamCount: streams.size }, "Stream limit reached, cannot create new stream");
+      return "";
+    }
+  }
   streams.set(id, {
     id,
     userId,
@@ -113,6 +138,10 @@ export async function emitArtifact(
   if (!stream || stream.isComplete) return null;
 
   const artifacts = artifactStore.get(streamId)!;
+  if (artifacts.length >= MAX_ARTIFACTS_PER_STREAM) {
+    logger.warn({ streamId, artifactCount: artifacts.length }, "Artifact limit per stream reached");
+    return null;
+  }
   const artifact: Artifact = {
     id: `artifact_${crypto.randomBytes(6).toString("hex")}`,
     streamId,
@@ -255,6 +284,10 @@ export function formatAsSSE(artifact: Artifact): string {
 /**
  * Clean up old completed streams.
  */
+// Auto-cleanup completed streams every hour to prevent memory leak
+const CLEANUP_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
+const CLEANUP_MAX_AGE_MS = 4 * 60 * 60 * 1000; // 4 hours
+
 export function cleanupStreams(maxAgeMs: number = 86400_000): number {
   const cutoff = Date.now() - maxAgeMs;
   let removed = 0;
@@ -267,3 +300,10 @@ export function cleanupStreams(maxAgeMs: number = 86400_000): number {
   }
   return removed;
 }
+
+setInterval(() => {
+  const removed = cleanupStreams(CLEANUP_MAX_AGE_MS);
+  if (removed > 0) {
+    logger.info({ removed }, "Auto-cleaned artifact streams");
+  }
+}, CLEANUP_INTERVAL_MS).unref();

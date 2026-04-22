@@ -48,7 +48,7 @@ async function isTokenRevoked(token: string): Promise<boolean> {
   const revokedInRedis = await redis.get(`revoked:${tokenHash}`);
   if (revokedInRedis) return true;
 
-  const [revokedInDB] = await db.select().from(revokedTokens).where(eq(revokedTokens.token, tokenHash)).limit(1);
+  const [revokedInDB] = await db.select().from(revokedTokens).where(eq(revokedTokens.tokenHash, tokenHash)).limit(1);
   return !!revokedInDB;
 }
 
@@ -151,7 +151,15 @@ export function fastifyRequireRole(minRole: "viewer" | "member" | "admin" | "own
     await fastifyRequireAuth(request, reply);
     if (reply.sent) return;
 
-    const userRank = ROLE_RANK[request.role ?? "member"] ?? 0;
+    const role = request.role ?? "";
+    // L-7: Reject unrecognized roles instead of silently downgrading to rank 0
+    if (!(role in ROLE_RANK)) {
+      logger.warn({ role, url: request.url }, "JWT contains unrecognized role — access denied");
+      reply.code(403).send({ error: "Unrecognized role" });
+      return;
+    }
+
+    const userRank = ROLE_RANK[role];
     const requiredRank = ROLE_RANK[minRole];
 
     if (userRank < requiredRank) {

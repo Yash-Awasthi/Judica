@@ -1,7 +1,6 @@
 import { spawn, execSync } from "child_process";
 import fs from "fs";
 import path from "path";
-import crypto from "crypto";
 import os from "os";
 import logger from "../lib/logger.js";
 import { generateSeccompPolicy, isSeccompAvailable } from "./seccomp.js";
@@ -42,9 +41,20 @@ try {
 }
 if (isolationLevel === "ulimit") {
   logger.warn("Neither bwrap nor unshare available — Python sandbox will use ulimit-only isolation");
+  // H-5 fix: fail loudly in production so operators know isolation is degraded.
+  // Set ALLOW_UNSAFE_SANDBOX=1 to override (e.g. in local dev without bwrap installed).
+  if (process.env.NODE_ENV === "production" && process.env.ALLOW_UNSAFE_SANDBOX !== "1") {
+    throw new Error(
+      "CRITICAL: Python sandbox requires bubblewrap (bwrap) or unshare for production use. " +
+      "Install bubblewrap, or set ALLOW_UNSAFE_SANDBOX=1 to acknowledge the degraded security posture."
+    );
+  }
 } else {
   logger.info(`Python sandbox using ${isolationLevel} isolation`);
 }
+
+const MAX_OUTPUT_LINES = 1000;
+const MAX_OUTPUT_BYTES = 1_000_000; // 1MB total output cap
 
 // Python preamble that blocks dangerous modules and network access
 // P0-30: Use closure-captured import ref and make __import__ non-writable
@@ -90,7 +100,7 @@ const SANDBOX_PREAMBLE = [
   `              'spawnlp', 'spawnlpe', 'spawnv', 'spawnve', 'spawnvp', 'spawnvpe',`,
   `              'fork', 'forkpty', 'kill', 'killpg', 'plock', 'putenv', 'unsetenv']:`,
   `    if hasattr(_os, _attr):`,
-  `        setattr(_os, _attr, lambda *a, **k: (_ for _ in ()).throw(PermissionError(f"os.{_attr} is disabled in sandbox")))`,
+  `        setattr(_os, _attr, (lambda name: lambda *a, **k: (_ for _ in ()).throw(PermissionError(f"os.{name} is disabled in sandbox")))(_attr))`,
   ``,
   // P0-38: Block socket.fromfd/socketpair as well
   // Block network access at socket level
@@ -134,10 +144,11 @@ const SANDBOX_PREAMBLE = [
   `        return f`,
   `    _sys._getframe = _safe_getframe`,
   `# Prevent sys.modules manipulation to re-import blocked modules`,
-  `_blocked_from_modules = [k for k in _sys.modules if any(k == b or k.startswith(b + '.') for b in _BLOCKED_MODULES if '_BLOCKED_MODULES' in dir())]`,
+  `_blocked_from_modules = [k for k in _sys.modules if any(k == b or k.startswith(b + '.') for b in {'ctypes', 'ctypes.util', 'ctypes.wintypes', '_ctypes', '_ctypes_test', 'cffi', '_cffi_backend', 'subprocess', '_subprocess', 'multiprocessing', 'multiprocessing.process', 'signal', '_signal', 'resource', '_posixsubprocess', 'importlib.machinery', 'importlib.abc', 'code', 'codeop', 'compileall', 'py_compile', 'gc', 'inspect', 'dis', 'pickletools', 'webbrowser', 'antigravity', 'turtle', 'ensurepip', 'pip', 'venv'})]`,
   `for _k in _blocked_from_modules:`,
   `    del _sys.modules[_k]`,
-  `del _blocked_from_modules, _k`,
+  `del _blocked_from_modules`,
+  `if '_k' in dir(): del _k`,
   ``,
 ].join("\n");
 
@@ -145,6 +156,7 @@ const SANDBOX_PREAMBLE = [
 interface SandboxCommand {
   cmd: string;
   args: string[];
+  seccompFd?: string; // path to seccomp BPF file to open as fd
 }
 
 function buildCommand(tmpFile: string, tmpDir: string): SandboxCommand {
@@ -176,7 +188,9 @@ function buildCommand(tmpFile: string, tmpDir: string): SandboxCommand {
 
     if (isSeccompAvailable()) {
       const policyPath = generateSeccompPolicy(tmpDir);
-      args.push("--seccomp", "9", `9<${policyPath}`);
+      args.push("--seccomp", "3"); // fd 3 (first extra fd after stdin/stdout/stderr)
+      args.push("--chdir", "/sandbox", "--", "python3", "/sandbox/script.py");
+      return { cmd: "bwrap", args, seccompFd: policyPath };
     }
 
     args.push("--chdir", "/sandbox", "--", "python3", "/sandbox/script.py");
@@ -203,21 +217,45 @@ function buildCommand(tmpFile: string, tmpDir: string): SandboxCommand {
 }
 
 export async function executePython(code: string, timeout: number = 10000): Promise<SandboxResult> {
+  // P28-03: Validate timeout to prevent hangs or negative values
+  if (!Number.isFinite(timeout) || timeout < 100) timeout = 10000;
+  timeout = Math.min(timeout, 60_000); // Hard cap at 60s
   const start = Date.now();
-  const sandboxId = crypto.randomBytes(8).toString("hex");
-  const tmpDir = path.join(os.tmpdir(), `sandbox_${sandboxId}`);
+
+  const MAX_CODE_SIZE = 500_000; // 500KB
+  if (code.length > MAX_CODE_SIZE) {
+    return {
+      output: [],
+      error: `Code size ${code.length} exceeds maximum of ${MAX_CODE_SIZE} bytes`,
+      elapsedMs: Date.now() - start,
+    };
+  }
+
+  // Fix CodeQL alert #62: Use mkdtemp for secure temp directory creation (atomic, no race)
+  const tmpDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), "sandbox_"));
+  const sandboxId = path.basename(tmpDir);
   const tmpFile = path.join(tmpDir, "script.py");
+  let bpfFd: number | undefined;
+
+  // L-12: Log the isolation tier for each execution so operators can audit sandbox strength
+  logger.debug({ sandboxId, isolationLevel, timeout }, "Python sandbox execution starting");
 
   try {
-    // Create isolated temp directory
-    fs.mkdirSync(tmpDir, { mode: 0o700 });
-    fs.writeFileSync(tmpFile, SANDBOX_PREAMBLE + "\n" + code, { encoding: "utf-8", mode: 0o600 });
+    // Write script to the secure temp directory created by mkdtemp
+    await fs.promises.writeFile(tmpFile, SANDBOX_PREAMBLE + "\n" + code, { encoding: "utf-8", mode: 0o600 });
 
     return await new Promise<SandboxResult>((resolve) => {
       const stdout: string[] = [];
       const stderr: string[] = [];
+      let totalBytes = 0;
 
-      const { cmd, args } = buildCommand(tmpFile, tmpDir);
+      const { cmd, args, seccompFd } = buildCommand(tmpFile, tmpDir);
+
+      const stdioDef: Array<"pipe" | "inherit" | number> = ["pipe", "pipe", "pipe"];
+      if (seccompFd) {
+        bpfFd = fs.openSync(seccompFd, "r");
+        stdioDef.push(bpfFd); // becomes fd 3 in the child
+      }
 
       // P0-39: Use execFile-style spawn (no shell) to prevent interpolation
       // P0-40: Use SIGKILL to ensure sandbox processes are terminated
@@ -234,18 +272,36 @@ export async function executePython(code: string, timeout: number = 10000): Prom
           PYTHONNOUSERSITE: "1",
           PYTHONSAFEPATH: "1",
         },
-        stdio: ["pipe", "pipe", "pipe"],
+        stdio: stdioDef,
         shell: false,
         cwd: tmpDir,
       });
 
-      proc.stdout.on("data", (data) => {
-        stdout.push(...data.toString().split("\n").filter((l: string) => l.length > 0));
-      });
+      // P28-04: Cap stdout/stderr to prevent OOM from malicious print loops
+      const MAX_OUTPUT_LINES = 5000;
+      if (proc.stdout) {
+        proc.stdout.on("data", (data) => {
+          if (stdout.length >= MAX_OUTPUT_LINES || totalBytes >= MAX_OUTPUT_BYTES) return;
+          const lines = data.toString().split("\n").filter((l: string) => l.length > 0);
+          for (const line of lines) {
+            if (stdout.length >= MAX_OUTPUT_LINES || totalBytes >= MAX_OUTPUT_BYTES) break;
+            stdout.push(line);
+            totalBytes += line.length;
+          }
+        });
+      }
 
-      proc.stderr.on("data", (data) => {
-        stderr.push(...data.toString().split("\n").filter((l: string) => l.length > 0));
-      });
+      if (proc.stderr) {
+        proc.stderr.on("data", (data) => {
+          if (stderr.length >= MAX_OUTPUT_LINES || totalBytes >= MAX_OUTPUT_BYTES) return;
+          const lines = data.toString().split("\n").filter((l: string) => l.length > 0);
+          for (const line of lines) {
+            if (stderr.length >= MAX_OUTPUT_LINES || totalBytes >= MAX_OUTPUT_BYTES) break;
+            stderr.push(line);
+            totalBytes += line.length;
+          }
+        });
+      }
 
       proc.on("close", (exitCode) => {
         resolve({
@@ -264,7 +320,11 @@ export async function executePython(code: string, timeout: number = 10000): Prom
       });
     });
   } finally {
+    // Clean up BPF file descriptor if opened
+    if (bpfFd !== undefined) {
+      try { fs.closeSync(bpfFd); } catch { /* cleanup */ }
+    }
     // Clean up sandbox directory
-    try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch { /* cleanup best-effort */ }
+    try { await fs.promises.rm(tmpDir, { recursive: true, force: true }); } catch { /* cleanup best-effort */ }
   }
 }

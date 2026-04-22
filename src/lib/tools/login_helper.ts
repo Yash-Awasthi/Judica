@@ -1,7 +1,8 @@
 import { chromium } from "playwright";
 import logger from "../logger.js";
 import path from "path";
-import fs from "fs";
+import fs from "fs/promises";
+import { chmodSync } from "fs";
 
 export async function runLoginHelper(targetName: "chatgpt" | "claude" | "deepseek" | "gemini") {
   const targets: Record<string, string> = {
@@ -17,9 +18,7 @@ export async function runLoginHelper(targetName: "chatgpt" | "claude" | "deepsee
   }
 
   const sessionDir = path.join(process.cwd(), "sessions");
-  if (!fs.existsSync(sessionDir)) {
-    fs.mkdirSync(sessionDir, { recursive: true });
-  }
+  await fs.mkdir(sessionDir, { recursive: true });
 
   const sessionFile = path.join(sessionDir, `${targetName}.json`);
 
@@ -29,7 +28,13 @@ export async function runLoginHelper(targetName: "chatgpt" | "claude" | "deepsee
     headless: false // MUST be false for user interaction
   });
 
-  const context = fs.existsSync(sessionFile) 
+  let hasExistingSession = false;
+  try {
+    await fs.access(sessionFile);
+    hasExistingSession = true;
+  } catch { /* no existing session */ }
+
+  const context = hasExistingSession
     ? await browser.newContext({ storageState: sessionFile })
     : await browser.newContext();
 
@@ -43,7 +48,9 @@ export async function runLoginHelper(targetName: "chatgpt" | "claude" | "deepsee
 
   logger.info({ sessionFile }, "Saving storage state...");
   await context.storageState({ path: sessionFile });
-  
+  // P19-10: Restrict session file permissions — contains sensitive auth tokens
+  try { chmodSync(sessionFile, 0o600); } catch { /* may fail on some OS */ }
+
   logger.info("Session saved successfully. You can now close the browser.");
   
   await browser.close();

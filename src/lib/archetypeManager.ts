@@ -264,6 +264,26 @@ export async function exportUserArchetypes(userId: number): Promise<string> {
   return JSON.stringify(sanitized, null, 2);
 }
 
+// Validate that an archetypeId (if provided) is a string matching allowed characters and length
+const ARCHETYPE_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+const MAX_ARCHETYPE_ID_LENGTH = 100;
+
+function validateArchetypeId(id: unknown): { valid: boolean; error?: string } {
+  if (id === undefined || id === null) {
+    return { valid: true }; // optional — a UUID will be generated
+  }
+  if (typeof id !== "string") {
+    return { valid: false, error: `archetypeId must be a string, got ${typeof id}` };
+  }
+  if (id.length === 0 || id.length > MAX_ARCHETYPE_ID_LENGTH) {
+    return { valid: false, error: `archetypeId must be between 1 and ${MAX_ARCHETYPE_ID_LENGTH} characters` };
+  }
+  if (!ARCHETYPE_ID_PATTERN.test(id)) {
+    return { valid: false, error: "archetypeId must contain only alphanumeric characters, hyphens, and underscores" };
+  }
+  return { valid: true };
+}
+
 export async function importArchetypes(userId: number, jsonData: string): Promise<{ imported: number; errors: string[] }> {
   const errors: string[] = [];
   let imported = 0;
@@ -274,24 +294,38 @@ export async function importArchetypes(userId: number, jsonData: string): Promis
     return { imported, errors };
   }
 
+  // Parse JSON separately so we can report an accurate error message
+  let data: unknown;
   try {
-    const data = JSON.parse(jsonData);
+    data = JSON.parse(jsonData);
+  } catch (err) {
+    errors.push(`Failed to parse JSON: ${(err as Error).message}`);
+    return { imported, errors };
+  }
 
-    if (!Array.isArray(data)) {
-      errors.push("Invalid format: expected array of archetypes");
-      return { imported, errors };
-    }
+  if (!Array.isArray(data)) {
+    errors.push("Invalid format: expected array of archetypes");
+    return { imported, errors };
+  }
 
-    // P10-06: Enforce maximum import count
-    if (data.length > MAX_IMPORT_COUNT) {
-      errors.push(`Too many archetypes: ${data.length} exceeds maximum of ${MAX_IMPORT_COUNT}`);
-      return { imported, errors };
-    }
+  // P10-06: Enforce maximum import count
+  if (data.length > MAX_IMPORT_COUNT) {
+    errors.push(`Too many archetypes: ${data.length} exceeds maximum of ${MAX_IMPORT_COUNT}`);
+    return { imported, errors };
+  }
 
-    // P10-12: Wrap bulk import in a transaction — all-or-nothing semantics
+  // P10-12: Wrap bulk import in a transaction — all-or-nothing semantics
+  try {
     await db.transaction(async (tx) => {
       for (const item of data) {
         try {
+          // Validate archetypeId type and format before using it
+          const idCheck = validateArchetypeId(item.archetypeId);
+          if (!idCheck.valid) {
+            errors.push(`Archetype "${item.name || 'unknown'}": ${idCheck.error}`);
+            continue;
+          }
+
           const validation = validateArchetype(item);
           if (!validation.valid) {
             errors.push(`Archetype "${item.name || 'unknown'}": ${validation.errors.join(", ")}`);
@@ -328,7 +362,7 @@ export async function importArchetypes(userId: number, jsonData: string): Promis
       }
     });
   } catch (err) {
-    errors.push(`Failed to parse JSON: ${(err as Error).message}`);
+    errors.push(`Failed to save archetypes to database: ${(err as Error).message}`);
   }
 
   return { imported, errors };

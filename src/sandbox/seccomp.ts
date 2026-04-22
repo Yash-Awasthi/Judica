@@ -204,9 +204,11 @@ export function isSeccompAvailable(): boolean {
     // Fallback: check if Seccomp: field shows mode 2 (filter mode) is possible
     const match = status.match(/Seccomp:\s*(\d+)/);
     if (!match) return false;
-    // Seccomp: 0 = disabled, 1 = strict, 2 = filter — we need filter support
-    // If the field exists with value 0, the kernel has seccomp support compiled in
-    return parseInt(match[1], 10) >= 0;
+    // Seccomp: 0 = no filter active but kernel supports seccomp (we can apply one)
+    // Seccomp: 1 = strict mode, 2 = filter mode — both confirm support
+    const value = parseInt(match[1], 10);
+    if (Number.isNaN(value)) return false;
+    return value >= 0;
   } catch {
     return false;
   }

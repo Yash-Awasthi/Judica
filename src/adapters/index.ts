@@ -11,6 +11,7 @@ export type {
   AdapterCollectedResponse,
 } from "./types.js";
 export { createStreamResult } from "./types.js";
+export { normalizeToolArguments, normalizeSystemPrompt } from "./types.js";
 
 export { OpenAIAdapter } from "./openai.adapter.js";
 export { AnthropicAdapter } from "./anthropic.adapter.js";
@@ -28,3 +29,8 @@ export {
   hasAdapter,
   resolveProviderFromModel,
 } from "./registry.js";
+
+export { getEmbeddingProvider, setEmbeddingProvider } from "./embeddingModel.adapter.js";
+export type { EmbeddingProvider } from "./embeddingModel.adapter.js";
+export { getVectorAdapter, setVectorAdapter } from "./vectorDb.adapter.js";
+export type { VectorDbAdapter, VectorSearchResult } from "./vectorDb.adapter.js";

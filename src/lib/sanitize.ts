@@ -27,7 +27,7 @@ const PROTOTYPE_POLLUTION_KEYS = new Set([
  * Prevents pollution from propagating through workflow state.
  */
 export function sanitizeObject(obj: unknown, depth = 0): unknown {
-  if (depth > 20) return obj; // Prevent infinite recursion
+  if (depth > 20) return {}; // H-3 fix: return empty object, not original — original may contain pollution keys
   if (obj === null || obj === undefined) return obj;
   if (typeof obj !== "object") return obj;
 
@@ -52,8 +52,10 @@ export function sanitizeForPrompt(text: string): string {
   return text
     // Neutralize role-switching attempts
     .replace(/^(system|assistant|user)\s*:/gim, "[$1]:")
-    // Escape markdown code blocks that could confuse prompt parsing
-    .replace(/```/g, "\\`\\`\\`")
+    // L-4: Escape markdown code block fences without breaking legitimate content.
+    // Replace ``` with a visually equivalent but non-functional sequence so
+    // the LLM won't interpret it as a code fence boundary.
+    .replace(/`{3,}/g, (m) => "`".repeat(m.length - 1) + "\u200B`")
     // Strip ANSI escape sequences
     // eslint-disable-next-line no-control-regex
     .replace(/\x1b\[[0-9;]*m/g, "");
@@ -75,10 +77,16 @@ export function sanitizeForTemplate(text: string): string {
  */
 export function sanitizeHeaders(headers: Record<string, string>): Record<string, string> {
   const clean: Record<string, string> = {};
+  // P45-09: Cap header count and value size to prevent resource exhaustion
+  const MAX_HEADERS = 100;
+  const MAX_HEADER_VALUE_SIZE = 8192;
+  let count = 0;
   for (const [key, value] of Object.entries(headers)) {
+    if (count >= MAX_HEADERS) break;
     // P10-102/P10-137: Reject headers with newlines (HTTP header injection)
     if (/[\r\n\0]/.test(key) || /[\r\n\0]/.test(value)) continue;
-    clean[key] = value;
+    clean[key] = typeof value === "string" && value.length > MAX_HEADER_VALUE_SIZE ? value.slice(0, MAX_HEADER_VALUE_SIZE) : value;
+    count++;
   }
   return clean;
 }
@@ -92,9 +100,13 @@ export function sanitizeCodeOutput(output: string): string {
   // Cap length to prevent DoS
   const capped = output.length > 1_000_000 ? output.slice(0, 1_000_000) : output;
   return capped
-    // Neutralize template-like patterns in output
+    // Neutralize Handlebars/Mustache template delimiters
     .replace(/\{\{/g, "{ {")
-    .replace(/\}\}/g, "} }");
+    .replace(/\}\}/g, "} }")
+    // L-4: Neutralize additional template syntaxes to prevent injection into template nodes
+    .replace(/\$\{/g, "$ {")      // JS template literals
+    .replace(/<%/g, "< %")        // EJS / ERB
+    .replace(/#\{/g, "# {");      // Ruby interpolation
 }
 
 /**

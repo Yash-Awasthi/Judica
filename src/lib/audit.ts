@@ -62,6 +62,10 @@ export async function logAudit(entry: AuditEntry): Promise<void> {
       }, "Moderate PII risk — response anonymized before audit storage");
     }
 
+    if (!entry.userId) {
+      logger.warn("Audit entry missing userId — skipping insert");
+      return;
+    }
     await db.insert(auditLogs).values({
       userId: entry.userId,
       conversationId: entry.conversationId,
@@ -73,22 +77,34 @@ export async function logAudit(entry: AuditEntry): Promise<void> {
       tokensIn: entry.tokensIn,
       tokensOut: entry.tokensOut,
       latencyMs: entry.latencyMs,
-      metadata: {
-        sessionId: entry.sessionId,
-        requestType: entry.requestType,
-        success: entry.success,
-        errorCode: entry.errorCode,
-        errorMessage: entry.errorMessage,
-        piiDetected: {
-          prompt: { found: promptPII.found, riskScore: promptPII.riskScore, types: promptPII.types },
-          response: { found: responsePII.found, riskScore: responsePII.riskScore, types: responsePII.types }
-        },
-        originalLengths: {
-          prompt: entry.prompt.length,
-          response: entry.response.length
-        },
-        ...entry.metadata
-      }
+      metadata: (() => {
+        // P21-10: Cap serialized metadata size to prevent unbounded DB bloat
+        const MAX_METADATA_BYTES = 10_000;
+        const meta = {
+          sessionId: entry.sessionId,
+          requestType: entry.requestType,
+          success: entry.success,
+          errorCode: entry.errorCode,
+          errorMessage: entry.errorMessage,
+          piiDetected: {
+            prompt: { found: promptPII.found, riskScore: promptPII.riskScore, types: promptPII.types },
+            response: { found: responsePII.found, riskScore: responsePII.riskScore, types: responsePII.types }
+          },
+          originalLengths: {
+            prompt: entry.prompt.length,
+            response: entry.response.length
+          },
+          ...entry.metadata
+        };
+        const serialized = JSON.stringify(meta);
+        if (serialized.length > MAX_METADATA_BYTES) {
+          logger.warn({ userId: entry.userId, size: serialized.length }, "Audit metadata exceeds size cap — stripping caller metadata");
+          const { ...rest } = meta;
+          delete (rest as Record<string, unknown>)["toolArgs"];
+          return rest;
+        }
+        return meta;
+      })()
     });
 
     if (promptPII.riskScore >= 70 || responsePII.riskScore >= 70) {
@@ -215,7 +231,11 @@ export async function getUserAuditLogs(
     successOnly?: boolean;
   } = {}
 ) {
-  const { limit = 50, offset = 0, requestType, dateFrom, dateTo, successOnly } = options;
+  // P21-05: Cap limit/offset to prevent excessive DB reads
+  const MAX_AUDIT_LIMIT = 200;
+  const { limit: rawLimit = 50, offset: rawOffset = 0, requestType, dateFrom, dateTo, successOnly } = options;
+  const limit = Math.min(Math.max(1, rawLimit), MAX_AUDIT_LIMIT);
+  const offset = Math.max(0, rawOffset);
 
   const conditions = [eq(auditLogs.userId, userId)];
 
@@ -272,7 +292,8 @@ export async function getUserAuditStats(userId: number, days = 30) {
         eq(auditLogs.userId, userId),
         gte(auditLogs.createdAt, startDate)
       )
-    ) as { id: number; userId: number | null; createdAt: Date; conversationId: string | null; prompt: string; modelName: string; response: string; tokensIn: number; tokensOut: number; latencyMs: number; metadata?: { success?: boolean; requestType?: string; piiDetected?: { prompt?: { found: boolean }; response?: { found: boolean } } } }[];
+    )
+    .limit(10000) as { id: number; userId: number | null; createdAt: Date; conversationId: string | null; prompt: string; modelName: string; response: string; tokensIn: number; tokensOut: number; latencyMs: number; metadata?: { success?: boolean; requestType?: string; piiDetected?: { prompt?: { found: boolean }; response?: { found: boolean } } } }[];
 
   const stats = {
     totalRequests: logs.length,
