@@ -16,7 +16,7 @@ const PII_PATTERNS: { type: string; pattern: RegExp; severity: 'low' | 'medium' 
     // P10-69: SSN area number validation (exclude invalid ranges)
     validate: (m) => {
       const digits = m.replace(/[-\s]/g, '');
-      const area = parseInt(digits.slice(0, 3));
+      const area = parseInt(digits.slice(0, 3), 10); // P24-06: Explicit radix
       return area > 0 && area !== 666 && area < 900;
     }
   },
