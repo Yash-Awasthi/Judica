@@ -220,10 +220,14 @@ const uploadsPlugin: FastifyPluginAsync = async (fastify) => {
     if (!record) throw new AppError(404, "Upload not found", "UPLOAD_NOT_FOUND");
 
     // Validate that the resolved path stays within the uploads directory to prevent path traversal
-    const uploadsDir = path.resolve(process.cwd(), "uploads");
-    const resolvedPath = path.resolve(record.storagePath);
-    // P39-10: Use path.relative() for more robust traversal check and resolve symlinks
-    const relativePath = path.relative(uploadsDir, resolvedPath);
+    const uploadsDir = fs.realpathSync(path.resolve(process.cwd(), "uploads"));
+    let realPath: string;
+    try {
+      realPath = fs.realpathSync(record.storagePath);
+    } catch {
+      throw new AppError(404, "File not found on disk", "FILE_MISSING");
+    }
+    const relativePath = path.relative(uploadsDir, realPath);
     if (relativePath.startsWith("..") || path.isAbsolute(relativePath)) {
       throw new AppError(403, "Access denied", "PATH_TRAVERSAL");
     }

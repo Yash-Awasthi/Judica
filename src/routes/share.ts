@@ -1,4 +1,5 @@
 import type { FastifyPluginAsync } from "fastify";
+import fastifyRateLimit from "@fastify/rate-limit";
 import { randomUUID } from "crypto";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { db } from "../lib/drizzle.js";
@@ -40,6 +41,8 @@ function parseExpiry(expiresIn?: string): Date | null {
 }
 
 const sharePlugin: FastifyPluginAsync = async (fastify) => {
+  await fastify.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute" });
+
     // POST /conversations/:id — share a conversation
   fastify.post("/conversations/:id", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
