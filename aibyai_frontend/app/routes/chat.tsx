@@ -1163,104 +1163,87 @@ export default function ChatPage() {
       {/* ── Center: Main Chat ── */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Chat header */}
-        <div className="border-b border-border px-4 py-2 flex items-center gap-2 shrink-0">
-          {/* Left controls */}
-          <div className="flex items-center gap-1">
-            {/* Main sidebar toggle */}
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8"
-              onClick={toggleSidebar}
-              title={mainSidebarOpen ? "Hide main panel" : "Show main panel"}
-            >
-              <PanelLeft className="size-4" />
-            </Button>
-            <Button
-              variant={historyOpen ? "secondary" : "ghost"}
-              size="icon"
-              className="size-8"
-              onClick={toggleHistory}
-              title={historyOpen ? "Hide history" : "Show history"}
-            >
-              {historyOpen ? <ChevronLeft className="size-4" /> : <Menu className="size-4" />}
-            </Button>
-          </div>
+        <div className="border-b border-border px-3 py-2 flex items-center gap-1.5 shrink-0">
+          {/* Left controls — always visible */}
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 shrink-0"
+            onClick={toggleSidebar}
+            title={mainSidebarOpen ? "Hide sidebar" : "Show sidebar"}
+          >
+            <PanelLeft className={`size-4 transition-transform ${!mainSidebarOpen ? "text-primary" : ""}`} />
+          </Button>
+          <Button
+            variant={historyOpen ? "secondary" : "ghost"}
+            size="icon"
+            className="size-8 shrink-0"
+            onClick={toggleHistory}
+            title={historyOpen ? "Hide history" : "Show history"}
+          >
+            {historyOpen ? <ChevronLeft className="size-4" /> : <Menu className="size-4" />}
+          </Button>
 
-          {/* Title area */}
-          <div className="flex-1 flex items-center gap-2 min-w-0">
-            <Sparkles className="size-4 text-primary shrink-0" />
+          {/* Title area — fills remaining space */}
+          <div className="flex-1 flex items-center gap-2 min-w-0 px-1">
+            <Sparkles className="size-4 text-primary shrink-0 hidden sm:block" />
             <span className="text-sm font-medium truncate">Council Deliberation</span>
-            {councilMembers.length > 0 && (
-              <div className="hidden sm:flex items-center gap-1 flex-wrap">
-                {councilMembers.slice(0, 3).map((m) => {
-                  const c = getColor(m.name);
-                  return (
-                    <Badge key={m.id} className={`text-[10px] ${c.badge}`}>
-                      {m.name}
-                    </Badge>
-                  );
-                })}
-                {councilMembers.length > 3 && (
-                  <span className="text-[10px] text-muted-foreground">+{councilMembers.length - 3}</span>
-                )}
-              </div>
-            )}
           </div>
 
           {/* Right controls */}
-          <div className="flex items-center gap-1 shrink-0">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-1.5 h-8 text-xs hidden sm:flex"
-              onClick={handleExportChat}
-              title="Export chat"
-            >
-              <Download className="size-3.5" />
-              Export
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8 sm:hidden"
-              onClick={handleExportChat}
-              title="Export chat"
-            >
-              <Download className="size-4" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="gap-1.5 h-8 text-xs hidden sm:flex"
-              onClick={handleShare}
-              title="Share"
-            >
-              <Share2 className="size-3.5" />
-              Share
-            </Button>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="size-8 sm:hidden"
-              onClick={handleShare}
-              title="Share"
-            >
-              <Share2 className="size-4" />
-            </Button>
-            {!configOpen && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-1.5 h-8 text-xs"
-                onClick={toggleCouncil}
-              >
-                <Users className="size-3.5" />
-                Council
-                <Badge variant="outline" className="text-[10px] ml-0.5">{councilMembers.length}</Badge>
-              </Button>
-            )}
-          </div>
+          {/* Export — icon+text on >=1024, icon-only on >=640, hidden below 640 */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 h-8 text-xs hidden lg:flex shrink-0"
+            onClick={handleExportChat}
+            title="Export chat"
+          >
+            <Download className="size-3.5" />
+            Export
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 hidden sm:flex lg:hidden shrink-0"
+            onClick={handleExportChat}
+            title="Export chat"
+          >
+            <Download className="size-4" />
+          </Button>
+
+          {/* Share — icon+text on >=1024, icon-only on >=640, hidden below 640 */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="gap-1.5 h-8 text-xs hidden lg:flex shrink-0"
+            onClick={handleShare}
+            title="Share"
+          >
+            <Share2 className="size-3.5" />
+            Share
+          </Button>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="size-8 hidden sm:flex lg:hidden shrink-0"
+            onClick={handleShare}
+            title="Share"
+          >
+            <Share2 className="size-4" />
+          </Button>
+
+          {/* Council — always visible */}
+          <Button
+            variant={configOpen ? "secondary" : "outline"}
+            size="sm"
+            className="gap-1.5 h-8 text-xs shrink-0"
+            onClick={toggleCouncil}
+          >
+            <Users className="size-3.5" />
+            <span className="hidden sm:inline">Council</span>
+            <Badge variant="outline" className="text-[10px] ml-0.5">{councilMembers.length}</Badge>
+          </Button>
         </div>
 
         {/* Message area */}
