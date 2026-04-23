@@ -510,7 +510,7 @@ function CodeViewer({ code }: { code: string }) {
   );
 }
 
-// ─── Import Mock Dialog ────────────────────────────────────────────────────────
+// ─── Import Dialog (real file reading) ─────────────────────────────────────────
 
 function ImportDialog({
   open,
@@ -524,23 +524,113 @@ function ImportDialog({
   const [dragging, setDragging] = useState(false);
   const [importing, setImporting] = useState(false);
   const [fileName, setFileName] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useState<HTMLInputElement | null>(null);
 
-  const handleMockImport = async (name: string) => {
-    setFileName(name);
+  const processFile = (file: File) => {
+    setFileName(file.name);
     setImporting(true);
-    await new Promise((r) => setTimeout(r, 1200));
-    const imported: Skill = {
-      id: `sk_import_${Date.now()}`,
-      name: name.replace(/\.(json|yaml|yml)$/, ""),
-      description: "Imported skill from file",
-      language: "Python",
-      tags: ["imported"],
-      code: `# Imported from ${name}\ndef run():\n    print("Imported skill")`,
+    setError(null);
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const content = ev.target?.result as string;
+        if (file.name.endsWith(".json")) {
+          const data = JSON.parse(content);
+          const newSkill: Skill = {
+            id: `sk_import_${Date.now()}`,
+            name: data.name || file.name.replace(/\.\w+$/, ""),
+            description: data.description || "Imported skill",
+            language: data.language || "Python",
+            tags: Array.isArray(data.tags) ? data.tags : ["imported"],
+            code: data.code || content,
+          };
+          onImport(newSkill);
+          onOpenChange(false);
+        } else if (
+          file.name.endsWith(".yaml") ||
+          file.name.endsWith(".yml")
+        ) {
+          // Simple YAML key-value parsing
+          const lines = content.split("\n");
+          const parsed: Record<string, string> = {};
+          let codeLines: string[] = [];
+          let inCode = false;
+
+          for (const line of lines) {
+            if (inCode) {
+              if (line.startsWith("  ")) {
+                codeLines.push(line.slice(2));
+              } else if (line.trim() === "") {
+                codeLines.push("");
+              } else {
+                inCode = false;
+              }
+            }
+            const match = line.match(/^(\w+):\s*(.+)/);
+            if (match) {
+              const key = match[1];
+              let val = match[2].replace(/^["']|["']$/g, "");
+              parsed[key] = val;
+            }
+            if (line.match(/^code:\s*\|/)) {
+              inCode = true;
+            }
+          }
+
+          const newSkill: Skill = {
+            id: `sk_import_${Date.now()}`,
+            name: parsed.name || file.name.replace(/\.\w+$/, ""),
+            description: parsed.description || "Imported skill",
+            language: (parsed.language as Skill["language"]) || "Python",
+            tags: parsed.tags
+              ? parsed.tags
+                  .replace(/[\[\]]/g, "")
+                  .split(",")
+                  .map((t) => t.trim().replace(/^["']|["']$/g, ""))
+                  .filter(Boolean)
+              : ["imported"],
+            code: codeLines.length > 0 ? codeLines.join("\n") : content,
+          };
+          onImport(newSkill);
+          onOpenChange(false);
+        } else {
+          // Plain text / code file - treat as code
+          const newSkill: Skill = {
+            id: `sk_import_${Date.now()}`,
+            name: file.name.replace(/\.\w+$/, ""),
+            description: "Imported from file",
+            language: file.name.endsWith(".ts") || file.name.endsWith(".tsx")
+              ? "TypeScript"
+              : file.name.endsWith(".js") || file.name.endsWith(".jsx")
+                ? "JavaScript"
+                : "Python",
+            tags: ["imported"],
+            code: content,
+          };
+          onImport(newSkill);
+          onOpenChange(false);
+        }
+      } catch (err) {
+        setError(
+          `Failed to parse file: ${err instanceof Error ? err.message : "Unknown error"}`
+        );
+      }
+      setImporting(false);
+      setFileName(null);
     };
-    onImport(imported);
-    setImporting(false);
-    setFileName(null);
-    onOpenChange(false);
+    reader.onerror = () => {
+      setError("Failed to read file");
+      setImporting(false);
+      setFileName(null);
+    };
+    reader.readAsText(file);
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) processFile(file);
   };
 
   return (
@@ -555,8 +645,23 @@ function ImportDialog({
 
         <div className="space-y-4 py-2">
           <p className="text-sm text-muted-foreground">
-            Import a skill from a JSON or YAML file.
+            Import a skill from a JSON, YAML, or code file.
           </p>
+
+          {error && (
+            <div className="text-sm text-destructive bg-destructive/10 border border-destructive/20 rounded-md px-3 py-2">
+              {error}
+            </div>
+          )}
+
+          {/* Hidden file input */}
+          <input
+            type="file"
+            accept=".json,.yaml,.yml,.py,.ts,.tsx,.js,.jsx,.txt"
+            className="hidden"
+            id="skill-file-input"
+            onChange={handleFileInput}
+          />
 
           {/* Drop zone */}
           <div
@@ -574,9 +679,11 @@ function ImportDialog({
               e.preventDefault();
               setDragging(false);
               const file = e.dataTransfer.files[0];
-              if (file) handleMockImport(file.name);
+              if (file) processFile(file);
             }}
-            onClick={() => handleMockImport("my-skill.json")}
+            onClick={() => {
+              document.getElementById("skill-file-input")?.click();
+            }}
           >
             {importing ? (
               <div className="flex flex-col items-center gap-2">
@@ -592,37 +699,10 @@ function ImportDialog({
                   Drop a file here or click to browse
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  Supports .json and .yaml files
+                  Supports .json, .yaml, .py, .ts, .js files
                 </p>
               </div>
             )}
-          </div>
-
-          {/* Quick import examples */}
-          <div className="space-y-1.5">
-            <p className="text-xs text-muted-foreground font-medium">Quick import examples:</p>
-            <div className="flex gap-2">
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5 text-xs"
-                onClick={() => handleMockImport("skill-export.json")}
-                disabled={importing}
-              >
-                <FileJson className="size-3" />
-                skill-export.json
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                className="gap-1.5 text-xs"
-                onClick={() => handleMockImport("skill-config.yaml")}
-                disabled={importing}
-              >
-                <FileText className="size-3" />
-                skill-config.yaml
-              </Button>
-            </div>
           </div>
         </div>
 

@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useState, useCallback, useEffect, type ReactNode } from "react";
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -51,6 +51,34 @@ const StoreContext = createContext<StoreContextType | null>(null);
 export function StoreProvider({ children }: { children: ReactNode }) {
   const [customModels, setCustomModels] = useState<CustomModel[]>([]);
   const [customArchetypes, setCustomArchetypes] = useState<CustomArchetype[]>([]);
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const saved = localStorage.getItem("aibyai_custom_archetypes");
+      if (saved) setCustomArchetypes(JSON.parse(saved));
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    try {
+      const saved = localStorage.getItem("aibyai_custom_models");
+      if (saved) setCustomModels(JSON.parse(saved));
+    } catch {}
+  }, []);
+
+  // Persist to localStorage on change
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem("aibyai_custom_archetypes", JSON.stringify(customArchetypes));
+  }, [customArchetypes]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    localStorage.setItem("aibyai_custom_models", JSON.stringify(customModels));
+  }, [customModels]);
 
   const addCustomModel = useCallback((model: Omit<CustomModel, "id">) => {
     const id = `custom-model-${Date.now()}`;

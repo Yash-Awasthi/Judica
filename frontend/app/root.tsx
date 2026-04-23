@@ -123,12 +123,20 @@ const navGroups = [
 
 export function Layout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className="dark">
+    <html lang="en" suppressHydrationMismatch>
       <head>
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <Meta />
         <Links />
+        <script dangerouslySetInnerHTML={{ __html: `
+          (function() {
+            try {
+              var theme = localStorage.getItem('aibyai_theme') || 'dark';
+              document.documentElement.classList.toggle('dark', theme === 'dark');
+            } catch(e) {}
+          })();
+        `}} />
       </head>
       <body>
         {children}

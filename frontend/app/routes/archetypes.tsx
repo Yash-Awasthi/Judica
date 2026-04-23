@@ -335,17 +335,16 @@ function ViewDetailsDialog({ open, onOpenChange, archetype }: ViewDetailsDialogP
 
 export default function ArchetypesPage() {
   const store = useStore();
-  const [localArchetypes, setLocalArchetypes] = useState<Archetype[]>(builtinArchetypes);
   const [createOpen, setCreateOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<Archetype | null>(null);
   const [viewTarget, setViewTarget] = useState<Archetype | null>(null);
 
-  // Merge builtins/local with store custom archetypes
-  const storeArchetypes: Archetype[] = store.customArchetypes.map((a) => ({
+  // Merge builtins with store custom archetypes
+  const customArchetypes: Archetype[] = store.customArchetypes.map((a) => ({
     id: a.id,
     name: a.name,
     icon: a.icon || "🤖",
-    color: "bg-primary/20 border-primary/30",
+    color: a.color || "bg-primary/20 border-primary/30",
     thinkingStyle: a.thinkingStyle,
     description: a.description,
     systemPrompt: a.systemPrompt,
@@ -354,27 +353,9 @@ export default function ArchetypesPage() {
     isCustom: true,
   }));
 
-  // Deduplicate: store archetypes that aren't already in local list
-  const storeIds = new Set(storeArchetypes.map((a) => a.id));
-  const localIds = new Set(localArchetypes.filter((a) => a.isCustom).map((a) => a.id));
-  const extraFromStore = storeArchetypes.filter((a) => !localIds.has(a.id));
-  const archetypes = [...localArchetypes, ...extraFromStore];
+  const archetypes = [...builtinArchetypes, ...customArchetypes];
 
   const handleCreate = (data: FormState) => {
-    const newArch: Archetype = {
-      id: `custom-${Date.now()}`,
-      name: data.name,
-      icon: data.icon || "🤖",
-      color: "bg-primary/20 border-primary/30",
-      thinkingStyle: data.thinkingStyle,
-      description: data.description,
-      systemPrompt: data.systemPrompt,
-      model: data.model,
-      temperature: data.temperature,
-      isCustom: true,
-    };
-    setLocalArchetypes((prev) => [...prev, newArch]);
-    // Also persist to store so chat page can see it
     store.addCustomArchetype({
       name: data.name,
       icon: data.icon || "🤖",
@@ -389,23 +370,6 @@ export default function ArchetypesPage() {
 
   const handleEdit = (data: FormState) => {
     if (!editTarget) return;
-    setLocalArchetypes((prev) =>
-      prev.map((a) =>
-        a.id === editTarget.id
-          ? {
-              ...a,
-              name: data.name,
-              icon: data.icon || a.icon,
-              thinkingStyle: data.thinkingStyle,
-              description: data.description,
-              systemPrompt: data.systemPrompt,
-              model: data.model,
-              temperature: data.temperature,
-            }
-          : a
-      )
-    );
-    // Sync to store if it's a custom archetype
     if (editTarget.isCustom) {
       store.updateArchetype(editTarget.id, {
         name: data.name,
@@ -421,7 +385,6 @@ export default function ArchetypesPage() {
   };
 
   const handleDelete = (id: string) => {
-    setLocalArchetypes((prev) => prev.filter((a) => a.id !== id));
     store.removeArchetype(id);
   };
 

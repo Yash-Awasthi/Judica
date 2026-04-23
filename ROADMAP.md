@@ -4,9 +4,11 @@
 
 **Multi-Agent Deliberative Intelligence Platform**
 
+[![Phase 0](https://img.shields.io/badge/Phase_0-In_Progress-22C55E?style=flat-square)](#phase-0-frontend-polish--core-ux)
 [![Phase 1](https://img.shields.io/badge/Phase_1-Planned-3B82F6?style=flat-square)](#phase-1-enterprise-deployment--sso)
 [![Phase 2](https://img.shields.io/badge/Phase_2-Planned-3B82F6?style=flat-square)](#phase-2-agent-observability--evaluation)
 [![Phase 3](https://img.shields.io/badge/Phase_3-Planned-3B82F6?style=flat-square)](#phase-3-multi-tenant-saas)
+[![Phase 4](https://img.shields.io/badge/Phase_4-Planned-3B82F6?style=flat-square)](#phase-4-connected-ai-accounts--advanced-interaction)
 
 </div>
 
@@ -76,6 +78,20 @@ The following features are fully implemented and shipped in the current codebase
 
 ---
 
+## Phase 0: Frontend Polish & Core UX
+
+> Immediate fixes and improvements to make the existing UI interactive and complete.
+
+| # | Feature | Status |
+|---|---|---|
+| 1 | **Marketplace Interactivity** — Star toggle, install/uninstall toggle, and publish dialog all fully functional with state management | Completed |
+| 2 | **Marketplace Download as JSON** — Export any marketplace item as a JSON file for offline use or sharing | Completed |
+| 3 | **Marketplace Filter Layout** — Starred, My Items, and Installed filter toggles on the LEFT side of the category tabs row with a visual divider | Completed |
+| 4 | **Always-Visible Action Buttons** — Star, Download, and Install/Uninstall buttons visible on every card without requiring hover | Completed |
+| 5 | **Publish to Marketplace Dialog** — Full publish form with name, description, type, content, and tags fields | Completed |
+
+---
+
 ## Phase 1: Enterprise Deployment & SSO
 
 > Production-ready features for team and enterprise adoption.
@@ -115,6 +131,19 @@ The following features are fully implemented and shipped in the current codebase
 | 3 | **Onboarding Wizard** — Guided setup: provider keys, first council, sample deliberation | Medium |
 | 4 | **Admin Super-Dashboard** — Cross-tenant usage metrics, health checks, feature flags | Medium |
 | 5 | **Audit Log Export** — Compliance-ready export of all actions per tenant | Medium |
+
+---
+
+## Phase 4: Connected AI Accounts & Advanced Interaction
+
+> Connected multi-provider AI sessions, live controls, and rich interaction patterns.
+
+| # | Feature | Priority |
+|---|---|---|
+| 1 | **Google SSO + Connected AI Accounts** — Sign up via Google, connect OpenAI/Claude/Gemini accounts. Connected APIs visible in council panel. Each connected service sees user prompts, replies independently, responses used in consensus. Services cannot see each other's responses, only consensus + user messages. Conversations stored in user's actual accounts on those platforms. | High |
+| 2 | **Live AI Toggle** — Toggle any AI on/off during a chat session. Off → AI finishes current response then stops. On → AI catches up by reading user messages + consensus summaries from missed rounds. Warning: toggling on for long chats costs significant context. Warning: toggling off then on again costs credits regardless of usage. | High |
+| 3 | **Comment & Quote System** — Select text in any message to attach inline comments. Multiple quotes can be accumulated before sending. Comments appear as an overlay above the prompt box with an apostrophe icon listing all quoted lines + annotations. Final prompt can reference comments ("look into all my comments" / "do sequentially"). Inspired by Antigravity-style quoting. | Medium |
+| 4 | **Themes & Customization** — Custom theme editor, high contrast mode, and theme marketplace for sharing color schemes | Medium |
 
 ---
 

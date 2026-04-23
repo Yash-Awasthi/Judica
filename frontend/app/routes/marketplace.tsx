@@ -14,7 +14,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "~/components/ui/dialog";
-import { Store, Star, Download, Search, Plus, Check, Loader2 } from "lucide-react";
+import { Store, Star, Download, Search, Plus, Check, Loader2, FileDown, Trash2 } from "lucide-react";
 
 type ItemType = "archetype" | "workflow" | "prompt" | "skill";
 
@@ -152,7 +152,6 @@ export default function MarketplacePage() {
   const [starred, setStarred] = useState<Set<string>>(INITIAL_STARRED);
   const [installed, setInstalled] = useState<Set<string>>(INITIAL_INSTALLED);
   const [installing, setInstalling] = useState<Set<string>>(new Set());
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
   // Filter toggles
   const [filterStarred, setFilterStarred] = useState(false);
@@ -189,7 +188,19 @@ export default function MarketplacePage() {
   };
 
   const handleInstall = (id: string) => {
-    if (installed.has(id) || installing.has(id)) return;
+    if (installing.has(id)) return;
+    if (installed.has(id)) {
+      // Uninstall
+      setInstalled((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+      setItems((items) =>
+        items.map((item) => (item.id === id ? { ...item, installs: Math.max(0, item.installs - 1) } : item))
+      );
+      return;
+    }
     setInstalling((prev) => new Set(prev).add(id));
     setTimeout(() => {
       setInstalling((prev) => {
@@ -202,6 +213,28 @@ export default function MarketplacePage() {
         items.map((item) => (item.id === id ? { ...item, installs: item.installs + 1 } : item))
       );
     }, 1000);
+  };
+
+  const handleDownloadJson = (item: MarketplaceItem) => {
+    const exportData = {
+      id: item.id,
+      name: item.name,
+      type: item.type,
+      author: item.author,
+      description: item.description,
+      stars: item.stars,
+      installs: item.installs,
+      exportedAt: new Date().toISOString(),
+    };
+    const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${item.name.toLowerCase().replace(/\s+/g, "-")}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const handlePublish = async () => {
@@ -328,14 +361,11 @@ export default function MarketplacePage() {
                 const isStarred = starred.has(item.id);
                 const isInstalled = installed.has(item.id);
                 const isInstalling = installing.has(item.id);
-                const isHovered = hoveredId === item.id;
 
                 return (
                   <Card
                     key={item.id}
                     className="cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all relative"
-                    onMouseEnter={() => setHoveredId(item.id)}
-                    onMouseLeave={() => setHoveredId(null)}
                   >
                     <CardHeader className="pb-2">
                       <div className="flex items-start justify-between gap-2">
@@ -361,12 +391,8 @@ export default function MarketplacePage() {
                         </div>
                       </div>
 
-                      {/* Action buttons — visible on hover or if relevant state exists */}
-                      <div
-                        className={`flex items-center gap-2 transition-all duration-150 ${
-                          isHovered || isInstalled ? "opacity-100" : "opacity-0 pointer-events-none"
-                        }`}
-                      >
+                      {/* Action buttons — always visible */}
+                      <div className="flex items-center gap-2">
                         {/* Star toggle */}
                         <Button
                           size="sm"
@@ -383,12 +409,26 @@ export default function MarketplacePage() {
                           <Star className={`size-3.5 ${isStarred ? "fill-current" : ""}`} />
                         </Button>
 
-                        {/* Install button */}
+                        {/* Download JSON button */}
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 w-7 p-0 shrink-0 text-muted-foreground hover:text-foreground"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDownloadJson(item);
+                          }}
+                          title="Download as JSON"
+                        >
+                          <FileDown className="size-3.5" />
+                        </Button>
+
+                        {/* Install / Uninstall button */}
                         <Button
                           size="sm"
                           variant={isInstalled ? "secondary" : "default"}
                           className="flex-1 h-7 text-xs gap-1.5"
-                          disabled={isInstalled || isInstalling}
+                          disabled={isInstalling}
                           onClick={(e) => {
                             e.stopPropagation();
                             handleInstall(item.id);
@@ -401,8 +441,8 @@ export default function MarketplacePage() {
                             </>
                           ) : isInstalled ? (
                             <>
-                              <Check className="size-3" />
-                              Installed
+                              <Trash2 className="size-3" />
+                              Uninstall
                             </>
                           ) : (
                             <>

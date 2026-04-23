@@ -58,6 +58,8 @@ import {
   Save,
   FolderOpen,
   Trash2,
+  Mic,
+  Globe,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -734,6 +736,7 @@ export default function ChatPage() {
   const [inlineArchTarget, setInlineArchTarget] = useState<string | null>(null); // member id
   const [inlineModelOpen, setInlineModelOpen] = useState(false);
   const [inlineModelTarget, setInlineModelTarget] = useState<string | null>(null); // member id
+  const [deepResearch, setDeepResearch] = useState(false);
   const stopRef = useRef(false);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -746,12 +749,14 @@ export default function ChatPage() {
   const [layoutStage, setLayoutStage] = useState(3);
   const [layoutInitialized, setLayoutInitialized] = useState(false);
 
-  // Detect mobile
+  // Detect mobile and very narrow screens
   useEffect(() => {
     const check = () => {
-      const mobile = window.innerWidth < 768;
+      const w = window.innerWidth;
+      const mobile = w < 768;
+      const veryNarrow = w < 480;
       setIsMobile(mobile);
-      if (mobile) {
+      if (mobile || veryNarrow) {
         setHistoryOpen(false);
         setConfigOpen(false);
       }
@@ -1115,9 +1120,27 @@ export default function ChatPage() {
     );
   };
 
-  const handleExportChat = () => {
+  const handleExportChat = (format: "markdown" | "json" = "markdown") => {
     if (messageGroups.length === 0) {
       setToast("No messages to export");
+      return;
+    }
+    if (format === "json") {
+      const data = messageGroups.map((group) => ({
+        userMessage: group.userMessage,
+        opinions: group.opinions,
+        verdict: group.verdict,
+        tokens: group.tokens ?? null,
+        cost: group.cost ?? null,
+        latencyMs: group.latencyMs ?? null,
+      }));
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "council-deliberation.json";
+      a.click();
+      URL.revokeObjectURL(url);
       return;
     }
     let content = "# Council Deliberation Export\n\n";
@@ -1146,9 +1169,9 @@ export default function ChatPage() {
       setToast("Nothing to share yet");
       return;
     }
-    let shareText = `Council Deliberation: ${lastGroup.question}\n\n`;
-    for (const op of lastGroup.opinions) {
-      shareText += `${op.member}: ${op.text.slice(0, 200)}...\n\n`;
+    let shareText = `Council Deliberation: ${lastGroup.userMessage}\n\n`;
+    for (const [memberName, opinion] of Object.entries(lastGroup.opinions)) {
+      shareText += `${memberName}: ${opinion.slice(0, 200)}...\n\n`;
     }
     if (lastGroup.verdict) {
       shareText += `Verdict: ${lastGroup.verdict.slice(0, 300)}...`;
@@ -1186,6 +1209,31 @@ export default function ChatPage() {
         }
       };
       input.click();
+    } else if (type === "audio") {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".mp3,.wav,.m4a,.ogg,audio/*";
+      input.onchange = () => {
+        if (input.files?.[0]) {
+          setToast(`Audio attached: ${input.files[0].name}`);
+        }
+      };
+      input.click();
+    } else if (type === "video") {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".mp4,.webm,.mov,video/*";
+      input.onchange = () => {
+        if (input.files?.[0]) {
+          setToast(`Video attached: ${input.files[0].name}`);
+        }
+      };
+      input.click();
+    } else if (type === "link") {
+      const url = prompt("Enter a URL:");
+      if (url?.trim()) {
+        setToast(`Link attached: ${url.trim()}`);
+      }
     } else {
       setToast(`${type} attachments not yet supported`);
     }
@@ -1259,6 +1307,62 @@ export default function ChatPage() {
   const CouncilPanelContent = (
     <ScrollArea className="flex-1">
       <div className="p-3 space-y-3">
+        {/* Quick Add Archetype */}
+        <div className="space-y-1.5">
+          <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium px-0.5">
+            Quick Add
+          </p>
+          <div className="flex gap-1.5">
+            <Select
+              value=""
+              onValueChange={(v) => {
+                if (v === "__custom__") {
+                  setCustomDialogOpen(true);
+                  return;
+                }
+                const arch = [...BUILT_IN_ARCHETYPES, ...store.customArchetypes.map((a) => ({ name: a.name, description: a.description, model: a.model ?? "gpt-4o" }))].find((a) => a.name === v);
+                if (arch) {
+                  addArchetype(arch);
+                }
+              }}
+            >
+              <SelectTrigger className="h-8 text-xs flex-1">
+                <SelectValue placeholder="Add archetype..." />
+              </SelectTrigger>
+              <SelectContent>
+                {BUILT_IN_ARCHETYPES.map((a) => (
+                  <SelectItem key={a.name} value={a.name} className="text-xs">
+                    <div className="flex flex-col">
+                      <span>{a.name}</span>
+                      <span className="text-[10px] text-muted-foreground">{a.description}</span>
+                    </div>
+                  </SelectItem>
+                ))}
+                {store.customArchetypes.length > 0 && (
+                  <>
+                    {store.customArchetypes.map((a) => (
+                      <SelectItem key={a.id} value={a.name} className="text-xs">
+                        <div className="flex flex-col">
+                          <span>{a.name}</span>
+                          {a.description && <span className="text-[10px] text-muted-foreground">{a.description}</span>}
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </>
+                )}
+                <SelectItem value="__custom__" className="text-xs">
+                  <span className="flex items-center gap-1.5 text-primary">
+                    <Plus className="size-3" />
+                    Create Custom...
+                  </span>
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+
+        <Separator />
+
         {/* Presets */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
@@ -1448,11 +1552,10 @@ export default function ChatPage() {
       {/* ── Left: History Panel (desktop, stages 1+) ── */}
       {layoutStage >= 1 && (
         <div
-          className={`border-r border-border flex flex-col shrink-0 transition-all duration-200 overflow-hidden ${
-            historyOpen ? "w-64" : "w-0"
-          }`}
+          style={{ width: historyOpen ? 288 : 0, minWidth: historyOpen ? 288 : 0, transition: 'width 0.2s, min-width 0.2s' }}
+          className="overflow-hidden border-r border-border flex flex-col bg-background shrink-0"
         >
-          <div className="w-64 flex flex-col h-full">
+          <div className="w-72 flex flex-col h-full">
             {HistoryPanelContent}
           </div>
         </div>
@@ -1473,13 +1576,14 @@ export default function ChatPage() {
             <PanelLeft className={`size-4 transition-transform ${!mainSidebarOpen ? "text-primary" : ""}`} />
           </Button>
           <Button
-            variant={historyOpen ? "secondary" : "ghost"}
-            size="icon"
-            className="size-8 shrink-0"
+            variant={historyOpen ? "secondary" : "outline"}
+            size="sm"
+            className="h-8 gap-1.5 text-xs shrink-0"
             onClick={toggleHistory}
             title={historyOpen ? "Hide history" : "Show history"}
           >
-            {historyOpen ? <ChevronLeft className="size-4" /> : <Menu className="size-4" />}
+            {historyOpen ? <ChevronLeft className="size-3.5" /> : <Menu className="size-3.5" />}
+            <span className="hidden sm:inline">History</span>
           </Button>
 
           {/* Title area — fills remaining space */}
@@ -1489,17 +1593,30 @@ export default function ChatPage() {
           </div>
 
           {/* Right controls */}
-          {/* Export — icon always visible, text label on >=1024 */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-8 lg:w-auto lg:px-3 lg:gap-1.5 shrink-0"
-            onClick={handleExportChat}
-            title="Export chat"
-          >
-            <Download className="size-3.5" />
-            <span className="hidden lg:inline text-xs">Export</span>
-          </Button>
+          {/* Export — dropdown with format options */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-8 lg:w-auto lg:px-3 lg:gap-1.5 shrink-0"
+                title="Export chat"
+              >
+                <Download className="size-3.5" />
+                <span className="hidden lg:inline text-xs">Export</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => handleExportChat("markdown")}>
+                <FileText className="size-3.5 mr-2" />
+                Export as Markdown
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleExportChat("json")}>
+                <Download className="size-3.5 mr-2" />
+                Export as JSON
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {/* Share — icon always visible, text label on >=1024 */}
           <Button
@@ -1697,19 +1814,23 @@ export default function ChatPage() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" side="top" className="w-48">
-                  <DropdownMenuItem onClick={() => handleAttachment("File upload")}>
+                  <DropdownMenuItem onClick={() => handleAttachment("file")}>
                     <FileText className="size-3.5 mr-2" />
                     Upload File
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleAttachment("Image upload")}>
+                  <DropdownMenuItem onClick={() => handleAttachment("image")}>
                     <Image className="size-3.5 mr-2" />
                     Add Image
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleAttachment("Audio/Video upload")}>
+                  <DropdownMenuItem onClick={() => handleAttachment("audio")}>
                     <Video className="size-3.5 mr-2" />
-                    Add Audio/Video
+                    Add Audio
                   </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleAttachment("Website link")}>
+                  <DropdownMenuItem onClick={() => handleAttachment("video")}>
+                    <Video className="size-3.5 mr-2" />
+                    Add Video
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleAttachment("link")}>
                     <Link className="size-3.5 mr-2" />
                     Add Website Link
                   </DropdownMenuItem>
@@ -1727,6 +1848,16 @@ export default function ChatPage() {
                 disabled={isStreaming}
               />
               <div className="flex items-center gap-1 shrink-0">
+                <Button
+                  variant={deepResearch ? "secondary" : "ghost"}
+                  size="icon"
+                  className={`size-8 shrink-0 ${deepResearch ? "text-primary" : "text-muted-foreground hover:text-foreground"}`}
+                  onClick={() => setDeepResearch((v) => !v)}
+                  title={deepResearch ? "Deep Research ON" : "Deep Research OFF"}
+                  disabled={isStreaming}
+                >
+                  <Globe className="size-4" />
+                </Button>
                 {isStreaming ? (
                   <Button size="sm" variant="destructive" onClick={handleStop} className="gap-1.5">
                     <Square className="size-3" />
@@ -1777,11 +1908,10 @@ export default function ChatPage() {
       {/* ── Right: Council Config (desktop, stages 1+) ── */}
       {layoutStage >= 1 && (
         <div
-          className={`border-l border-border flex flex-col shrink-0 transition-all duration-200 overflow-hidden ${
-            configOpen ? "w-72" : "w-0"
-          }`}
+          style={{ width: configOpen ? 320 : 0, minWidth: configOpen ? 320 : 0, transition: 'width 0.2s, min-width 0.2s' }}
+          className="overflow-hidden border-l border-border flex flex-col bg-background shrink-0"
         >
-          <div className="w-72 flex flex-col h-full">
+          <div className="w-80 flex flex-col h-full">
             <div className="p-3 border-b border-border flex items-center gap-2 shrink-0">
               <Users className="size-4 text-muted-foreground" />
               <span className="text-sm font-medium">Council</span>

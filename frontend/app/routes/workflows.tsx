@@ -460,12 +460,16 @@ function NewWorkflowDialog({ open, onOpenChange, onSubmit }: NewWorkflowDialogPr
   const [description, setDescription] = useState("");
 
   const handleOpenChange = (o: boolean) => {
-    if (o) {
+    onOpenChange(o);
+  };
+
+  // Reset fields whenever dialog opens
+  useEffect(() => {
+    if (open) {
       setName("");
       setDescription("");
     }
-    onOpenChange(o);
-  };
+  }, [open]);
 
   const handleSubmit = () => {
     if (!name.trim()) return;
@@ -591,7 +595,7 @@ export default function WorkflowsPage() {
               </p>
             </div>
           </div>
-          <Button size="sm" className="gap-2" onClick={() => setNewWorkflowOpen(true)}>
+          <Button size="sm" className="gap-2 relative z-10" onClick={() => setNewWorkflowOpen(true)}>
             <Plus className="size-3.5" />
             New Workflow
           </Button>

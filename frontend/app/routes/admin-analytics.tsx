@@ -1,13 +1,69 @@
-import { lazy, Suspense, useState, useEffect } from "react";
+import { lazy, Suspense, useState, useEffect, Component, type ReactNode, type ErrorInfo } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
-import { BarChart3, Users, MessageSquare, Coins, DollarSign } from "lucide-react";
+import { BarChart3, Users, MessageSquare, Coins, DollarSign, AlertTriangle } from "lucide-react";
 
 // ─── Lazy-load all Recharts components (avoids SSR issues) ────────────────────
 
 const LazyCharts = lazy(() => import("~/components/analytics-charts"));
 
+// ─── Error Boundary for lazy-loaded charts ─────────────────────────────────────
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+  fallback?: ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ChartsErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("Analytics charts failed to load:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        this.props.fallback ?? (
+          <Card>
+            <CardContent className="py-8">
+              <div className="flex flex-col items-center gap-3 text-center">
+                <AlertTriangle className="size-8 text-amber-400" />
+                <div>
+                  <p className="text-sm font-medium">Charts failed to load</p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {this.state.error?.message || "An unexpected error occurred while loading the analytics charts."}
+                  </p>
+                </div>
+                <button
+                  onClick={() => this.setState({ hasError: false, error: null })}
+                  className="text-xs text-primary hover:underline mt-1"
+                >
+                  Try again
+                </button>
+              </div>
+            </CardContent>
+          </Card>
+        )
+      );
+    }
+    return this.props.children;
+  }
+}
+
 // Client-only wrapper to prevent SSR of Recharts
-function ClientOnly({ children, fallback }: { children: React.ReactNode; fallback: React.ReactNode }) {
+function ClientOnly({ children, fallback }: { children: ReactNode; fallback: ReactNode }) {
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   return mounted ? <>{children}</> : <>{fallback}</>;
@@ -96,7 +152,9 @@ export default function AdminAnalyticsPage() {
           }
         >
           <Suspense fallback={<div className="h-[200px] bg-muted/30 rounded animate-pulse" />}>
-            <LazyCharts />
+            <ChartsErrorBoundary>
+              <LazyCharts />
+            </ChartsErrorBoundary>
           </Suspense>
         </ClientOnly>
       </div>

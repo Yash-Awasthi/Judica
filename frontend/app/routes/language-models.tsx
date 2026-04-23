@@ -91,6 +91,14 @@ export default function LanguageModelsPage() {
   const [testResult, setTestResult] = useState<"success" | "error" | null>(null);
   const [isSaving, setIsSaving] = useState(false);
 
+  // Inline API key editing state
+  const [inlineKeyEditing, setInlineKeyEditing] = useState<string | null>(null);
+  const [inlineKeyValue, setInlineKeyValue] = useState("");
+  const [inlineKeyVisible, setInlineKeyVisible] = useState(false);
+
+  // Custom model name input
+  const [customModelName, setCustomModelName] = useState("");
+
   const availableToConnect = AVAILABLE_PROVIDERS.filter(
     (p) => !connectedProviders.some((cp) => cp.providerId === p.id)
   );
@@ -171,6 +179,26 @@ export default function LanguageModelsPage() {
     setConnectedProviders((prev) => prev.filter((cp) => cp.id !== connectionId));
   }
 
+  function handleInlineKeySave(connectionId: string) {
+    setConnectedProviders((prev) =>
+      prev.map((cp) =>
+        cp.id === connectionId ? { ...cp, apiKey: inlineKeyValue } : cp
+      )
+    );
+    setInlineKeyEditing(null);
+    setInlineKeyValue("");
+    setInlineKeyVisible(false);
+  }
+
+  function handleAddCustomModel() {
+    if (!customModelName.trim() || !editingProvider) return;
+    const modelId = customModelName.trim();
+    if (!formEnabledModels.includes(modelId)) {
+      setFormEnabledModels((prev) => [...prev, modelId]);
+    }
+    setCustomModelName("");
+  }
+
   function toggleModel(modelId: string) {
     setFormEnabledModels((prev) =>
       prev.includes(modelId) ? prev.filter((id) => id !== modelId) : [...prev, modelId]
@@ -189,9 +217,14 @@ export default function LanguageModelsPage() {
   // Build grouped models for default model select
   const groupedModels = connectedProviders.map((cp) => {
     const provider = AVAILABLE_PROVIDERS.find((p) => p.id === cp.providerId);
+    const providerModels = provider?.models.filter((m) => cp.enabledModels.includes(m.id)) ?? [];
+    // Include custom models that aren't in the provider's predefined list
+    const customModels = cp.enabledModels
+      .filter((id) => !provider?.models.some((m) => m.id === id))
+      .map((id) => ({ id, name: id, description: "Custom model" }));
     return {
       providerName: cp.displayName,
-      models: provider?.models.filter((m) => cp.enabledModels.includes(m.id)) ?? [],
+      models: [...providerModels, ...customModels],
     };
   });
 
@@ -297,6 +330,82 @@ export default function LanguageModelsPage() {
                           </Button>
                         </div>
                       </div>
+                      {/* Inline API Key Input */}
+                      {cp.providerId !== "ollama" && (
+                        <div className="border-t border-border px-1 py-2">
+                          {inlineKeyEditing === cp.id ? (
+                            <div className="flex items-center gap-2">
+                              <div className="relative flex-1">
+                                <Input
+                                  type={inlineKeyVisible ? "text" : "password"}
+                                  value={inlineKeyValue}
+                                  onChange={(e) => setInlineKeyValue(e.target.value)}
+                                  placeholder="Enter API key..."
+                                  className="h-7 text-xs pr-7"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") handleInlineKeySave(cp.id);
+                                    if (e.key === "Escape") {
+                                      setInlineKeyEditing(null);
+                                      setInlineKeyVisible(false);
+                                    }
+                                  }}
+                                />
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon-xs"
+                                  className="absolute right-0.5 top-1/2 -translate-y-1/2"
+                                  onClick={() => setInlineKeyVisible(!inlineKeyVisible)}
+                                >
+                                  {inlineKeyVisible ? (
+                                    <EyeOff className="size-3" />
+                                  ) : (
+                                    <Eye className="size-3" />
+                                  )}
+                                </Button>
+                              </div>
+                              <Button
+                                size="sm"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => handleInlineKeySave(cp.id)}
+                              >
+                                Save
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-7 px-2 text-xs"
+                                onClick={() => {
+                                  setInlineKeyEditing(null);
+                                  setInlineKeyVisible(false);
+                                }}
+                              >
+                                Cancel
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs text-muted-foreground">API Key:</span>
+                              <span className="text-xs font-mono text-muted-foreground truncate flex-1">
+                                {cp.apiKey ? cp.apiKey.slice(0, 8) + "..." : "Not set"}
+                              </span>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                className="h-6 px-2 text-[11px]"
+                                onClick={() => {
+                                  setInlineKeyEditing(cp.id);
+                                  setInlineKeyValue(cp.apiKey.includes("...") ? "" : cp.apiKey);
+                                  setInlineKeyVisible(false);
+                                }}
+                              >
+                                Edit
+                              </Button>
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                 );
@@ -496,6 +605,108 @@ export default function LanguageModelsPage() {
                         </button>
                       );
                     })}
+                    {/* Show custom-added models that aren't in the provider's default list */}
+                    {formEnabledModels
+                      .filter((id) => !editingProvider.models.some((m) => m.id === id))
+                      .map((modelId) => (
+                        <button
+                          key={modelId}
+                          type="button"
+                          onClick={() => toggleModel(modelId)}
+                          className="flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted bg-muted/50"
+                        >
+                          <div className="flex items-center justify-center size-4 rounded border bg-primary border-primary text-primary-foreground transition-colors">
+                            <Check className="size-3" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <span className="text-xs font-medium font-mono">{modelId}</span>
+                            <span className="text-xs text-muted-foreground ml-2">Custom</span>
+                          </div>
+                        </button>
+                      ))}
+                  </div>
+                  {/* Custom model name input */}
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={customModelName}
+                      onChange={(e) => setCustomModelName(e.target.value)}
+                      placeholder="Type a custom model name..."
+                      className="h-7 text-xs flex-1"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddCustomModel();
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs gap-1"
+                      onClick={handleAddCustomModel}
+                      disabled={!customModelName.trim()}
+                    >
+                      <Plus className="size-3" />
+                      Add
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    Add custom model names not listed above (e.g. fine-tuned models)
+                  </p>
+                </div>
+              )}
+
+              {/* Models section for providers with no predefined models (e.g. Custom) */}
+              {editingProvider && editingProvider.models.length === 0 && (
+                <div className="space-y-2">
+                  <Label>Models</Label>
+                  <div className="rounded-md border border-border bg-muted/30 p-2 space-y-0.5 max-h-48 overflow-y-auto">
+                    {formEnabledModels.map((modelId) => (
+                      <button
+                        key={modelId}
+                        type="button"
+                        onClick={() => toggleModel(modelId)}
+                        className="flex items-center gap-2 w-full rounded-md px-2 py-1.5 text-left transition-colors hover:bg-muted bg-muted/50"
+                      >
+                        <div className="flex items-center justify-center size-4 rounded border bg-primary border-primary text-primary-foreground transition-colors">
+                          <Check className="size-3" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <span className="text-xs font-medium font-mono">{modelId}</span>
+                        </div>
+                      </button>
+                    ))}
+                    {formEnabledModels.length === 0 && (
+                      <p className="text-xs text-muted-foreground text-center py-2">
+                        No models added yet. Use the input below to add custom model names.
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      value={customModelName}
+                      onChange={(e) => setCustomModelName(e.target.value)}
+                      placeholder="Type a custom model name..."
+                      className="h-7 text-xs flex-1"
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          e.preventDefault();
+                          handleAddCustomModel();
+                        }
+                      }}
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-7 text-xs gap-1"
+                      onClick={handleAddCustomModel}
+                      disabled={!customModelName.trim()}
+                    >
+                      <Plus className="size-3" />
+                      Add
+                    </Button>
                   </div>
                 </div>
               )}
