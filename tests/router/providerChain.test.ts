@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("../../src/lib/logger.js", () => ({
   default: {
@@ -30,10 +30,12 @@ import { selectProvider, getChainEntry, FREE_TIER_CHAIN, PAID_CHAIN, type ChainE
 import { canUse } from "../../src/router/quotaTracker.js";
 import { checkRPM } from "../../src/router/rpmLimiter.js";
 import { hasAdapter } from "../../src/adapters/registry.js";
+import logger from "../../src/lib/logger.js";
 
 const mockedCanUse = vi.mocked(canUse);
 const mockedCheckRPM = vi.mocked(checkRPM);
 const mockedHasAdapter = vi.mocked(hasAdapter);
+const mockedLogger = vi.mocked(logger);
 
 describe("providerChain", () => {
   beforeEach(() => {
@@ -172,5 +174,100 @@ describe("providerChain", () => {
       ];
       expect(getChainEntry("gemini", custom)).toBeUndefined();
     });
+  });
+});
+
+// ── loadChainFromEnv validation (via dynamic import) ─────────────────────────
+// loadChainFromEnv is a private function called at module initialisation time.
+// The only way to reach its branches is to set env vars, reset the module
+// registry, then re-import the module so it re-executes the top-level call.
+
+describe("loadChainFromEnv validation paths", () => {
+  const ENV_KEY = "PROVIDER_CHAIN_FREE";
+  let savedEnv: string | undefined;
+
+  beforeEach(() => {
+    savedEnv = process.env[ENV_KEY];
+  });
+
+  afterEach(() => {
+    if (savedEnv === undefined) {
+      delete process.env[ENV_KEY];
+    } else {
+      process.env[ENV_KEY] = savedEnv;
+    }
+    vi.resetModules();
+  });
+
+  async function loadChain(): Promise<ChainEntry[]> {
+    const mod = await import("../../src/router/providerChain.js?t=" + Date.now());
+    return (mod as { FREE_TIER_CHAIN: ChainEntry[] }).FREE_TIER_CHAIN;
+  }
+
+  it("uses default chain when env var is not set", async () => {
+    delete process.env[ENV_KEY];
+    vi.resetModules();
+    const chain = await loadChain();
+    expect(chain.length).toBeGreaterThan(0);
+    expect(chain[0].provider).toBe("gemini");
+  });
+
+  it("uses custom chain when valid JSON is provided", async () => {
+    process.env[ENV_KEY] = JSON.stringify([
+      { provider: "custom", model: "c-model", rpm: 5, daily_tokens: 1000, daily_requests: 10 },
+    ]);
+    vi.resetModules();
+    const chain = await loadChain();
+    expect(chain[0].provider).toBe("custom");
+  });
+
+  it("falls back to default for invalid JSON", async () => {
+    process.env[ENV_KEY] = "not-valid-json{{";
+    vi.resetModules();
+    const chain = await loadChain();
+    expect(chain[0].provider).toBe("gemini");
+  });
+
+  it("falls back to default for an empty array", async () => {
+    process.env[ENV_KEY] = "[]";
+    vi.resetModules();
+    const chain = await loadChain();
+    expect(chain[0].provider).toBe("gemini");
+  });
+
+  it("falls back to default when entry is missing provider field", async () => {
+    process.env[ENV_KEY] = JSON.stringify([
+      { model: "c-model", rpm: 5, daily_tokens: 1000, daily_requests: 10 },
+    ]);
+    vi.resetModules();
+    const chain = await loadChain();
+    expect(chain[0].provider).toBe("gemini");
+  });
+
+  it("falls back to default when entry has negative RPM", async () => {
+    process.env[ENV_KEY] = JSON.stringify([
+      { provider: "bad", model: "b-model", rpm: -1, daily_tokens: 1000, daily_requests: 10 },
+    ]);
+    vi.resetModules();
+    const chain = await loadChain();
+    expect(chain[0].provider).toBe("gemini");
+  });
+
+  it("falls back to default when entry has zero daily_requests", async () => {
+    process.env[ENV_KEY] = JSON.stringify([
+      { provider: "bad", model: "b-model", rpm: 5, daily_tokens: 1000, daily_requests: 0 },
+    ]);
+    vi.resetModules();
+    const chain = await loadChain();
+    expect(chain[0].provider).toBe("gemini");
+  });
+
+  it("falls back to default when entry has non-finite tokens", async () => {
+    process.env[ENV_KEY] = JSON.stringify([
+      { provider: "bad", model: "b-model", rpm: 5, daily_tokens: null, daily_requests: 10 },
+    ]);
+    vi.resetModules();
+    const chain = await loadChain();
+    expect(chain[0].provider).toBe("gemini");
   });
 });

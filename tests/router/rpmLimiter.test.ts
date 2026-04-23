@@ -97,4 +97,74 @@ describe("rpmLimiter", () => {
       Date.now = realNow;
     });
   });
+
+  // ── userId scoping ──────────────────────────────────────────────────────────
+
+  describe("userId scoping", () => {
+    it("tracks per-user RPM independently from global provider RPM", () => {
+      recordRequest(provider, "user-A");
+      recordRequest(provider, "user-A");
+      recordRequest(provider, "user-B");
+
+      expect(getCurrentRPM(provider, "user-A")).toBe(2);
+      expect(getCurrentRPM(provider, "user-B")).toBe(1);
+      // Global provider (no userId) is unaffected
+      expect(getCurrentRPM(provider)).toBe(0);
+    });
+
+    it("checkRPM with userId uses user-scoped window", () => {
+      for (let i = 0; i < 5; i++) recordRequest(provider, "user-X");
+      expect(checkRPM(provider, 5, "user-X")).toBe(false);
+      expect(checkRPM(provider, 5, "user-Y")).toBe(true); // Y has 0 requests
+    });
+
+    it("records and checks without userId use the provider-level key", () => {
+      recordRequest(provider);
+      expect(getCurrentRPM(provider)).toBe(1);
+      expect(getCurrentRPM(provider, undefined)).toBe(1);
+    });
+  });
+
+  // ── sliding window compaction ───────────────────────────────────────────────
+
+  describe("sliding window compaction", () => {
+    it("compacts internal array when start pointer exceeds 512 and > half of array", () => {
+      const realNow = Date.now;
+      const baseTime = 1_000_000;
+
+      // Insert 600 expired timestamps so start will advance past 512
+      Date.now = () => baseTime;
+      for (let i = 0; i < 600; i++) recordRequest(provider);
+
+      // Advance time so all 600 are expired
+      Date.now = () => baseTime + 61_000;
+
+      // Add one fresh request to trigger prune (start will advance to 600)
+      recordRequest(provider);
+
+      // getCurrentRPM prunes and should compact when start(=600) > 512 and > length/2
+      const rpm = getCurrentRPM(provider);
+      // Only the 1 fresh request should remain in the active window
+      expect(rpm).toBe(1);
+
+      Date.now = realNow;
+    });
+
+    it("does not compact when start is ≤ 512", () => {
+      const realNow = Date.now;
+      const baseTime = 2_000_000;
+
+      Date.now = () => baseTime;
+      // Only 10 expired entries — start will advance to 10, below 512 threshold
+      for (let i = 0; i < 10; i++) recordRequest(provider);
+
+      Date.now = () => baseTime + 61_000;
+      recordRequest(provider); // fresh
+
+      const rpm = getCurrentRPM(provider);
+      expect(rpm).toBe(1);
+
+      Date.now = realNow;
+    });
+  });
 });
