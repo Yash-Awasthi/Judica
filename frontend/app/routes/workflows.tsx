@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
@@ -28,6 +28,9 @@ import {
   Wrench,
   Code2,
   GripVertical,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { ReactFlow, Background, Controls, MiniMap, type Node, type Edge, useNodesState, useEdgesState, addEdge, type Connection } from '@xyflow/react';
 import '@xyflow/react/dist/style.css';
@@ -245,11 +248,31 @@ function PropertiesPanel({ selectedNode, onUpdateLabel }: { selectedNode: Node |
   );
 }
 
-function WorkflowEditor({ workflow, onBack }: { workflow: Workflow; onBack: () => void }) {
-  const [nodes, setNodes, onNodesChange] = useNodesState(workflow.id === '1' ? demoNodes : []);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(workflow.id === '1' ? demoEdges : []);
+function WorkflowEditor({ workflow, onBack, onUpdateWorkflow }: { workflow: Workflow; onBack: () => void; onUpdateWorkflow: (updated: Workflow) => void }) {
+  const savedGraph = (() => {
+    try {
+      const raw = localStorage.getItem(`workflow-${workflow.id}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed.nodes) && Array.isArray(parsed.edges)) {
+          return { nodes: parsed.nodes as Node[], edges: parsed.edges as Edge[] };
+        }
+      }
+    } catch {}
+    return null;
+  })();
+
+  const initialNodes = savedGraph ? savedGraph.nodes : (workflow.id === '1' ? demoNodes : []);
+  const initialEdges = savedGraph ? savedGraph.edges : (workflow.id === '1' ? demoEdges : []);
+
+  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
+  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
   const [selectedNode, setSelectedNode] = useState<Node | null>(null);
   const [nodeIdCounter, setNodeIdCounter] = useState(100);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
+  const [isRunning, setIsRunning] = useState(false);
+  const [runOutput, setRunOutput] = useState<string | null>(null);
+  const [outputExpanded, setOutputExpanded] = useState(true);
 
   const onConnect = useCallback(
     (connection: Connection) => setEdges((eds) => addEdge({ ...connection, style: { stroke: '#555' } }, eds)),
@@ -294,6 +317,54 @@ function WorkflowEditor({ workflow, onBack }: { workflow: Workflow; onBack: () =
     setSelectedNode((prev) => prev && prev.id === id ? { ...prev, data: { ...prev.data, label } } : prev);
   }, [setNodes]);
 
+  const handleSave = useCallback(() => {
+    try {
+      localStorage.setItem(`workflow-${workflow.id}`, JSON.stringify({ nodes, edges }));
+      onUpdateWorkflow({ ...workflow, nodeCount: nodes.length });
+      setSaveMessage("Workflow saved successfully!");
+      setTimeout(() => setSaveMessage(null), 2500);
+    } catch (err) {
+      setSaveMessage("Failed to save workflow.");
+      setTimeout(() => setSaveMessage(null), 2500);
+    }
+  }, [workflow, nodes, edges, onUpdateWorkflow]);
+
+  const handleRun = useCallback(async () => {
+    setIsRunning(true);
+    setRunOutput(null);
+    setOutputExpanded(true);
+    try {
+      const nodeLabels = nodes.map((n) => (n.data?.label as string) || "Unnamed Node");
+      const prompt = `Analyze this workflow called "${workflow.name}" (${workflow.description}). It has the following steps: ${nodeLabels.join(" -> ")}. Describe what this workflow does, evaluate its design, and suggest improvements.`;
+
+      const res = await fetch("/api/deliberate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt,
+          type: "opinion",
+          members: [{ name: "Architect" }],
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error(`API error: ${res.status}`);
+      }
+
+      const data = await res.json();
+      setRunOutput(data.text || "No output returned.");
+
+      const now = new Date();
+      const timeStr = `${now.getHours()}:${now.getMinutes().toString().padStart(2, "0")}`;
+      onUpdateWorkflow({ ...workflow, lastRun: `Today at ${timeStr}`, status: "success", nodeCount: nodes.length });
+    } catch (err: any) {
+      setRunOutput(`Error: ${err?.message ?? String(err)}`);
+      onUpdateWorkflow({ ...workflow, lastRun: "Just now", status: "failed", nodeCount: nodes.length });
+    } finally {
+      setIsRunning(false);
+    }
+  }, [nodes, workflow, onUpdateWorkflow]);
+
   return (
     <div className="flex flex-col" style={{ height: '100vh' }}>
       {/* Toolbar */}
@@ -313,11 +384,14 @@ function WorkflowEditor({ workflow, onBack }: { workflow: Workflow; onBack: () =
         </Badge>
         <div className="ml-auto flex items-center gap-2">
           <span className="text-xs text-muted-foreground">{nodes.length} nodes · {edges.length} edges</span>
-          <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs">
-            <Play className="size-3" />
-            Run
+          {saveMessage && (
+            <span className="text-xs text-green-400 animate-in fade-in">{saveMessage}</span>
+          )}
+          <Button variant="outline" size="sm" className="gap-1.5 h-7 text-xs" onClick={handleRun} disabled={isRunning}>
+            {isRunning ? <Loader2 className="size-3 animate-spin" /> : <Play className="size-3" />}
+            {isRunning ? "Running..." : "Run"}
           </Button>
-          <Button size="sm" className="gap-1.5 h-7 text-xs">
+          <Button size="sm" className="gap-1.5 h-7 text-xs" onClick={handleSave}>
             <Save className="size-3" />
             Save
           </Button>
@@ -351,6 +425,26 @@ function WorkflowEditor({ workflow, onBack }: { workflow: Workflow; onBack: () =
 
         <PropertiesPanel selectedNode={selectedNode} onUpdateLabel={handleUpdateLabel} />
       </div>
+
+      {/* AI Run Output Panel */}
+      {runOutput && (
+        <div className="border-t border-border bg-background shrink-0">
+          <button
+            onClick={() => setOutputExpanded((v) => !v)}
+            className="w-full flex items-center justify-between px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-muted transition-colors"
+          >
+            <span>AI Run Output</span>
+            {outputExpanded ? <ChevronDown className="size-3.5" /> : <ChevronUp className="size-3.5" />}
+          </button>
+          {outputExpanded && (
+            <div className="px-4 pb-3 max-h-48 overflow-y-auto">
+              <div className="text-xs text-foreground whitespace-pre-wrap leading-relaxed bg-muted/50 rounded-md p-3 border border-border">
+                {runOutput}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -434,6 +528,38 @@ export default function WorkflowsPage() {
   const [editingWorkflow, setEditingWorkflow] = useState<Workflow | null>(null);
   const [newWorkflowOpen, setNewWorkflowOpen] = useState(false);
 
+  // Load workflows from localStorage on mount, merge with initialWorkflows
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem("workflows");
+      if (raw) {
+        const saved: Workflow[] = JSON.parse(raw);
+        if (Array.isArray(saved)) {
+          const initialIds = new Set(initialWorkflows.map((w) => w.id));
+          const extras = saved.filter((w) => !initialIds.has(w.id));
+          // Also update initial workflows with any saved state changes
+          const merged = initialWorkflows.map((iw) => {
+            const savedVersion = saved.find((sw) => sw.id === iw.id);
+            return savedVersion ?? iw;
+          });
+          setWorkflows([...merged, ...extras]);
+        }
+      }
+    } catch {}
+  }, []);
+
+  // Save workflows to localStorage whenever they change
+  useEffect(() => {
+    try {
+      localStorage.setItem("workflows", JSON.stringify(workflows));
+    } catch {}
+  }, [workflows]);
+
+  const handleUpdateWorkflow = useCallback((updated: Workflow) => {
+    setWorkflows((prev) => prev.map((w) => w.id === updated.id ? updated : w));
+    setEditingWorkflow(updated);
+  }, []);
+
   const handleCreateWorkflow = (name: string, description: string) => {
     const newWorkflow: Workflow = {
       id: `custom-${Date.now()}`,
@@ -449,7 +575,7 @@ export default function WorkflowsPage() {
   };
 
   if (editingWorkflow) {
-    return <WorkflowEditor workflow={editingWorkflow} onBack={() => setEditingWorkflow(null)} />;
+    return <WorkflowEditor workflow={editingWorkflow} onBack={() => setEditingWorkflow(null)} onUpdateWorkflow={handleUpdateWorkflow} />;
   }
 
   return (

@@ -1140,12 +1140,55 @@ export default function ChatPage() {
     URL.revokeObjectURL(url);
   };
 
-  const handleShare = () => {
-    setToast("Sharing coming soon");
+  const handleShare = async () => {
+    const lastGroup = messageGroups[messageGroups.length - 1];
+    if (!lastGroup) {
+      setToast("Nothing to share yet");
+      return;
+    }
+    let shareText = `Council Deliberation: ${lastGroup.question}\n\n`;
+    for (const op of lastGroup.opinions) {
+      shareText += `${op.member}: ${op.text.slice(0, 200)}...\n\n`;
+    }
+    if (lastGroup.verdict) {
+      shareText += `Verdict: ${lastGroup.verdict.slice(0, 300)}...`;
+    }
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "AIBYAI Council Deliberation", text: shareText });
+      } catch {
+        // user cancelled or not supported
+      }
+    } else {
+      await navigator.clipboard.writeText(shareText);
+      setToast("Copied to clipboard");
+    }
   };
 
   const handleAttachment = (type: string) => {
-    setToast(`${type} coming soon`);
+    if (type === "file") {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = ".txt,.md,.pdf,.csv,.json";
+      input.onchange = () => {
+        if (input.files?.[0]) {
+          setToast(`Attached: ${input.files[0].name}`);
+        }
+      };
+      input.click();
+    } else if (type === "image") {
+      const input = document.createElement("input");
+      input.type = "file";
+      input.accept = "image/*";
+      input.onchange = () => {
+        if (input.files?.[0]) {
+          setToast(`Image attached: ${input.files[0].name}`);
+        }
+      };
+      input.click();
+    } else {
+      setToast(`${type} attachments not yet supported`);
+    }
   };
 
   // ── History Panel content (shared between desktop sidebar and mobile overlay)

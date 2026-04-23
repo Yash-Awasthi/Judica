@@ -8,10 +8,18 @@ import {
   SelectTrigger,
   SelectValue,
 } from "~/components/ui/select";
-import { Brain, Database, HardDrive, Clock, Trash2, Minimize2 } from "lucide-react";
-import { useState } from "react";
+import { Brain, Database, HardDrive, Clock, Trash2, Minimize2, X, Loader2 } from "lucide-react";
+import { useState, useMemo } from "react";
 
-const mockMemoryEntries = [
+interface MemoryEntry {
+  id: string;
+  topic: string;
+  chunks: number;
+  date: string;
+  source: string;
+}
+
+const initialMemoryEntries: MemoryEntry[] = [
   { id: "1", topic: "User authentication preferences", chunks: 23, date: "2 hours ago", source: "chat" },
   { id: "2", topic: "React performance optimization patterns", chunks: 45, date: "Yesterday", source: "chat" },
   { id: "3", topic: "Database indexing strategies for PostgreSQL", chunks: 18, date: "2 days ago", source: "document" },
@@ -21,6 +29,55 @@ const mockMemoryEntries = [
 
 export default function MemoryPage() {
   const [backend, setBackend] = useState("local");
+  const [entries, setEntries] = useState<MemoryEntry[]>(initialMemoryEntries);
+  const [isCompacting, setIsCompacting] = useState(false);
+  const [lastCompacted, setLastCompacted] = useState("2 days ago");
+
+  const totalChunks = useMemo(() => entries.reduce((sum, e) => sum + e.chunks, 0), [entries]);
+  const storageMB = useMemo(() => (totalChunks * 0.00384).toFixed(1), [totalChunks]);
+
+  const handleCompact = () => {
+    if (entries.length < 2) return;
+    setIsCompacting(true);
+    setTimeout(() => {
+      setEntries((prev) => {
+        if (prev.length < 2) return prev;
+        // Merge pairs of adjacent entries to reduce count by ~30%
+        const merged: MemoryEntry[] = [];
+        let i = 0;
+        while (i < prev.length) {
+          if (i + 1 < prev.length && merged.length < Math.ceil(prev.length * 0.7)) {
+            // Keep this entry but absorb some chunks from the next
+            if (i % 3 === 0 && i + 1 < prev.length) {
+              merged.push({
+                ...prev[i],
+                topic: prev[i].topic + " & " + prev[i + 1].topic.toLowerCase(),
+                chunks: Math.ceil((prev[i].chunks + prev[i + 1].chunks) * 0.75),
+              });
+              i += 2;
+              continue;
+            }
+          }
+          merged.push(prev[i]);
+          i++;
+        }
+        return merged;
+      });
+      setLastCompacted("Just now");
+      setIsCompacting(false);
+    }, 1000);
+  };
+
+  const handleClearAll = () => {
+    if (window.confirm("Are you sure you want to clear all memory entries? This cannot be undone.")) {
+      setEntries([]);
+      setLastCompacted("Never");
+    }
+  };
+
+  const handleDeleteEntry = (id: string) => {
+    setEntries((prev) => prev.filter((e) => e.id !== id));
+  };
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -43,7 +100,7 @@ export default function MemoryPage() {
                 <Database className="size-5 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-semibold">1,247</p>
+                <p className="text-2xl font-semibold">{totalChunks.toLocaleString()}</p>
                 <p className="text-xs text-muted-foreground">Chunks</p>
               </div>
             </CardContent>
@@ -54,7 +111,7 @@ export default function MemoryPage() {
                 <HardDrive className="size-5 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-semibold">~4.8 MB</p>
+                <p className="text-2xl font-semibold">~{storageMB} MB</p>
                 <p className="text-xs text-muted-foreground">Storage</p>
               </div>
             </CardContent>
@@ -65,7 +122,7 @@ export default function MemoryPage() {
                 <Clock className="size-5 text-primary" />
               </div>
               <div>
-                <p className="text-2xl font-semibold">2 days ago</p>
+                <p className="text-2xl font-semibold">{lastCompacted}</p>
                 <p className="text-xs text-muted-foreground">Last Compacted</p>
               </div>
             </CardContent>
@@ -99,11 +156,27 @@ export default function MemoryPage() {
               </Select>
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" size="sm" className="gap-1.5">
-                <Minimize2 className="size-3" />
-                Compact Memory
+              <Button
+                variant="outline"
+                size="sm"
+                className="gap-1.5"
+                onClick={handleCompact}
+                disabled={isCompacting || entries.length < 2}
+              >
+                {isCompacting ? (
+                  <Loader2 className="size-3 animate-spin" />
+                ) : (
+                  <Minimize2 className="size-3" />
+                )}
+                {isCompacting ? "Compacting..." : "Compact Memory"}
               </Button>
-              <Button variant="destructive" size="sm" className="gap-1.5">
+              <Button
+                variant="destructive"
+                size="sm"
+                className="gap-1.5"
+                onClick={handleClearAll}
+                disabled={entries.length === 0}
+              >
                 <Trash2 className="size-3" />
                 Clear All
               </Button>
@@ -118,27 +191,42 @@ export default function MemoryPage() {
             <CardDescription>Latest topics stored in long-term memory</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-0 divide-y divide-border">
-              {mockMemoryEntries.map((entry) => (
-                <div key={entry.id} className="flex items-center justify-between py-3">
-                  <div className="flex items-center gap-3">
-                    <Brain className="size-4 text-muted-foreground" />
-                    <div>
-                      <p className="text-sm font-medium">{entry.topic}</p>
-                      <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs text-muted-foreground">
-                          {entry.chunks} chunks
-                        </span>
-                        <Badge variant="outline" className="text-[10px]">
-                          {entry.source}
-                        </Badge>
+            {entries.length === 0 ? (
+              <p className="text-sm text-muted-foreground py-4 text-center">
+                No memory entries. Start a conversation to build memory.
+              </p>
+            ) : (
+              <div className="space-y-0 divide-y divide-border">
+                {entries.map((entry) => (
+                  <div key={entry.id} className="flex items-center justify-between py-3">
+                    <div className="flex items-center gap-3">
+                      <Brain className="size-4 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium">{entry.topic}</p>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <span className="text-xs text-muted-foreground">
+                            {entry.chunks} chunks
+                          </span>
+                          <Badge variant="outline" className="text-[10px]">
+                            {entry.source}
+                          </Badge>
+                        </div>
                       </div>
                     </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">{entry.date}</span>
+                      <button
+                        onClick={() => handleDeleteEntry(entry.id)}
+                        className="text-muted-foreground hover:text-destructive transition-colors p-1 rounded-sm hover:bg-destructive/10"
+                        title="Delete entry"
+                      >
+                        <X className="size-3.5" />
+                      </button>
+                    </div>
                   </div>
-                  <span className="text-xs text-muted-foreground">{entry.date}</span>
-                </div>
-              ))}
-            </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>

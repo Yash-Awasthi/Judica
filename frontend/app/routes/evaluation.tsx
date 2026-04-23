@@ -1,6 +1,11 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Button } from "~/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+} from "~/components/ui/card";
 import { ClipboardCheck, Loader2, Play } from "lucide-react";
 
 interface EvalEntry {
@@ -13,7 +18,7 @@ interface EvalEntry {
   date: string;
 }
 
-const mockEvals: EvalEntry[] = [
+const initialEvals: EvalEntry[] = [
   {
     id: "ev_1",
     conversation: "API architecture discussion",
@@ -88,6 +93,19 @@ const mockEvals: EvalEntry[] = [
   },
 ];
 
+const sampleTopics = [
+  "Microservices vs monolith architecture",
+  "TypeScript strict mode adoption",
+  "Zero-trust security model",
+  "Event-driven architecture patterns",
+  "Serverless cost optimization",
+  "AI code review automation",
+  "Kubernetes cluster scaling strategy",
+  "Data lake governance policies",
+  "Frontend framework migration plan",
+  "Real-time collaboration features",
+];
+
 function scoreColor(value: number, isPercent = false): string {
   const v = isPercent ? value : value * 100;
   if (v >= 80) return "text-green-400";
@@ -95,18 +113,78 @@ function scoreColor(value: number, isPercent = false): string {
   return "text-red-400";
 }
 
-const avgQuality = Math.round(mockEvals.reduce((s, e) => s + e.quality, 0) / mockEvals.length);
-const avgCoherence = (mockEvals.reduce((s, e) => s + e.coherence, 0) / mockEvals.length).toFixed(2);
-const avgConsensus = (mockEvals.reduce((s, e) => s + e.consensus, 0) / mockEvals.length).toFixed(2);
-const avgDiversity = (mockEvals.reduce((s, e) => s + e.diversity, 0) / mockEvals.length).toFixed(2);
-
 export default function EvaluationPage() {
+  const [evals, setEvals] = useState<EvalEntry[]>(initialEvals);
   const [isRunning, setIsRunning] = useState(false);
+  const [customTopic, setCustomTopic] = useState("");
+  const [error, setError] = useState<string | null>(null);
+
+  const { avgQuality, avgCoherence, avgConsensus, avgDiversity } =
+    useMemo(() => {
+      const len = evals.length;
+      if (len === 0)
+        return {
+          avgQuality: 0,
+          avgCoherence: "0.00",
+          avgConsensus: "0.00",
+          avgDiversity: "0.00",
+        };
+      return {
+        avgQuality: Math.round(
+          evals.reduce((s, e) => s + e.quality, 0) / len
+        ),
+        avgCoherence: (
+          evals.reduce((s, e) => s + e.coherence, 0) / len
+        ).toFixed(2),
+        avgConsensus: (
+          evals.reduce((s, e) => s + e.consensus, 0) / len
+        ).toFixed(2),
+        avgDiversity: (
+          evals.reduce((s, e) => s + e.diversity, 0) / len
+        ).toFixed(2),
+      };
+    }, [evals]);
 
   const handleRun = async () => {
     setIsRunning(true);
-    await new Promise((res) => setTimeout(res, 2000));
-    setIsRunning(false);
+    setError(null);
+
+    const topic =
+      customTopic.trim() ||
+      sampleTopics[Math.floor(Math.random() * sampleTopics.length)];
+
+    try {
+      const res = await fetch("/api/evaluate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ topic }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error ?? "Evaluation failed");
+        setIsRunning(false);
+        return;
+      }
+
+      const newEntry: EvalEntry = {
+        id: `ev_${Date.now()}`,
+        conversation: topic,
+        quality: data.quality,
+        coherence: data.coherence,
+        consensus: data.consensus,
+        diversity: data.diversity,
+        date: new Date().toISOString().split("T")[0],
+      };
+
+      setEvals((prev) => [newEntry, ...prev]);
+      setCustomTopic("");
+    } catch (err: any) {
+      setError(err?.message ?? "Network error");
+    } finally {
+      setIsRunning(false);
+    }
   };
 
   return (
@@ -119,11 +197,32 @@ export default function EvaluationPage() {
             <div>
               <h1 className="text-xl font-semibold">Evaluation</h1>
               <p className="text-sm text-muted-foreground">
-                Measure and track quality metrics across AI council conversations
+                Measure and track quality metrics across AI council
+                conversations
               </p>
             </div>
           </div>
-          <Button size="sm" className="gap-2" onClick={handleRun} disabled={isRunning}>
+        </div>
+
+        {/* Topic input + run button */}
+        <div className="flex items-center gap-3">
+          <input
+            type="text"
+            value={customTopic}
+            onChange={(e) => setCustomTopic(e.target.value)}
+            placeholder="Enter a topic to evaluate (or leave blank for a random one)..."
+            className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+            disabled={isRunning}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !isRunning) handleRun();
+            }}
+          />
+          <Button
+            size="sm"
+            className="gap-2"
+            onClick={handleRun}
+            disabled={isRunning}
+          >
             {isRunning ? (
               <>
                 <Loader2 className="size-3.5 animate-spin" />
@@ -138,6 +237,12 @@ export default function EvaluationPage() {
           </Button>
         </div>
 
+        {error && (
+          <div className="rounded-md border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-400">
+            {error}
+          </div>
+        )}
+
         {/* Stats Row */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
@@ -147,7 +252,9 @@ export default function EvaluationPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className={`text-2xl font-bold ${scoreColor(avgQuality, true)}`}>
+              <p
+                className={`text-2xl font-bold ${scoreColor(avgQuality, true)}`}
+              >
                 {avgQuality}%
               </p>
             </CardContent>
@@ -159,7 +266,9 @@ export default function EvaluationPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className={`text-2xl font-bold ${scoreColor(Number(avgCoherence))}`}>
+              <p
+                className={`text-2xl font-bold ${scoreColor(Number(avgCoherence))}`}
+              >
                 {avgCoherence}
               </p>
             </CardContent>
@@ -171,7 +280,9 @@ export default function EvaluationPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className={`text-2xl font-bold ${scoreColor(Number(avgConsensus))}`}>
+              <p
+                className={`text-2xl font-bold ${scoreColor(Number(avgConsensus))}`}
+              >
                 {avgConsensus}
               </p>
             </CardContent>
@@ -183,7 +294,9 @@ export default function EvaluationPage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <p className={`text-2xl font-bold ${scoreColor(Number(avgDiversity))}`}>
+              <p
+                className={`text-2xl font-bold ${scoreColor(Number(avgDiversity))}`}
+              >
                 {avgDiversity}
               </p>
             </CardContent>
@@ -219,27 +332,39 @@ export default function EvaluationPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {mockEvals.map((ev, i) => (
+                  {evals.map((ev, i) => (
                     <tr
                       key={ev.id}
                       className={`border-b border-border last:border-0 hover:bg-muted/30 transition-colors ${
                         i % 2 === 0 ? "" : "bg-muted/10"
                       }`}
                     >
-                      <td className="px-4 py-3 font-medium">{ev.conversation}</td>
-                      <td className={`px-4 py-3 text-center font-mono font-semibold ${scoreColor(ev.quality, true)}`}>
+                      <td className="px-4 py-3 font-medium">
+                        {ev.conversation}
+                      </td>
+                      <td
+                        className={`px-4 py-3 text-center font-mono font-semibold ${scoreColor(ev.quality, true)}`}
+                      >
                         {ev.quality}%
                       </td>
-                      <td className={`px-4 py-3 text-center font-mono font-semibold ${scoreColor(ev.coherence)}`}>
+                      <td
+                        className={`px-4 py-3 text-center font-mono font-semibold ${scoreColor(ev.coherence)}`}
+                      >
                         {ev.coherence.toFixed(2)}
                       </td>
-                      <td className={`px-4 py-3 text-center font-mono font-semibold ${scoreColor(ev.consensus)}`}>
+                      <td
+                        className={`px-4 py-3 text-center font-mono font-semibold ${scoreColor(ev.consensus)}`}
+                      >
                         {ev.consensus.toFixed(2)}
                       </td>
-                      <td className={`px-4 py-3 text-center font-mono font-semibold ${scoreColor(ev.diversity)}`}>
+                      <td
+                        className={`px-4 py-3 text-center font-mono font-semibold ${scoreColor(ev.diversity)}`}
+                      >
                         {ev.diversity.toFixed(2)}
                       </td>
-                      <td className="px-4 py-3 text-right text-muted-foreground">{ev.date}</td>
+                      <td className="px-4 py-3 text-right text-muted-foreground">
+                        {ev.date}
+                      </td>
                     </tr>
                   ))}
                 </tbody>

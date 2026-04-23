@@ -20,6 +20,8 @@ import {
   AlertCircle,
   Search,
   ExternalLink,
+  X,
+  RefreshCw,
 } from "lucide-react";
 
 interface Repo {
@@ -121,6 +123,7 @@ function StatusBadge({ status }: { status: Repo["status"] }) {
 }
 
 export default function ReposPage() {
+  const [repos, setRepos] = useState<Repo[]>(mockRepos);
   const [addOpen, setAddOpen] = useState(false);
   const [repoUrl, setRepoUrl] = useState("");
   const [branch, setBranch] = useState("main");
@@ -129,18 +132,129 @@ export default function ReposPage() {
   const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null);
 
   const handleAddRepo = () => {
-    // Mock — just close
+    if (!repoUrl.trim()) return;
+    // Extract repo name from URL
+    const urlParts = repoUrl.trim().replace(/\.git$/, "").split("/");
+    const repoName = urlParts[urlParts.length - 1] || "new-repo";
+    const newId = `repo_${Date.now()}`;
+
+    const newRepo: Repo = {
+      id: newId,
+      name: repoName,
+      url: repoUrl.trim(),
+      branch: branch || "main",
+      fileCount: 0,
+      status: "indexing",
+      lastIndexed: "Indexing...",
+    };
+
+    setRepos((prev) => [...prev, newRepo]);
     setAddOpen(false);
     setRepoUrl("");
     setBranch("main");
+
+    // Simulate indexing completing after 2 seconds
+    setTimeout(() => {
+      const fileCount = Math.floor(Math.random() * 200) + 20;
+      setRepos((prev) =>
+        prev.map((r) =>
+          r.id === newId
+            ? { ...r, status: "indexed" as const, fileCount, lastIndexed: "Just now" }
+            : r
+        )
+      );
+    }, 2000);
+  };
+
+  const handleDeleteRepo = (id: string) => {
+    setRepos((prev) => prev.filter((r) => r.id !== id));
+  };
+
+  const handleReindex = (id: string) => {
+    setRepos((prev) =>
+      prev.map((r) =>
+        r.id === id ? { ...r, status: "indexing" as const, lastIndexed: "Indexing..." } : r
+      )
+    );
+    setTimeout(() => {
+      const fileCount = Math.floor(Math.random() * 200) + 20;
+      setRepos((prev) =>
+        prev.map((r) =>
+          r.id === id
+            ? { ...r, status: "indexed" as const, fileCount, lastIndexed: "Just now" }
+            : r
+        )
+      );
+    }, 2000);
   };
 
   const handleSearch = async () => {
     if (!searchQuery.trim()) return;
     setIsSearching(true);
-    await new Promise((res) => setTimeout(res, 800));
-    setSearchResults(mockSearchResults);
-    setIsSearching(false);
+    try {
+      const response = await fetch("/api/deliberate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: `Given a code search query '${searchQuery}', generate 3 realistic code search results as JSON array with fields: file (filepath), snippet (one-line code), score (0-1). Return ONLY the JSON array.`,
+          members: [{ name: "Empiricist" }],
+          type: "opinion",
+        }),
+      });
+
+      if (!response.ok) throw new Error("API request failed");
+
+      const data = await response.json();
+      // Try to extract JSON array from the response
+      let results: SearchResult[] | null = null;
+      // The response may have the results in various formats depending on the API
+      const responseText = typeof data === "string" ? data : JSON.stringify(data);
+      const jsonMatch = responseText.match(/\[[\s\S]*?\]/);
+      if (jsonMatch) {
+        try {
+          const parsed = JSON.parse(jsonMatch[0]);
+          if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].file) {
+            results = parsed.map((r: SearchResult) => ({
+              file: r.file || "unknown",
+              snippet: r.snippet || "",
+              score: typeof r.score === "number" ? r.score : 0.5,
+            }));
+          }
+        } catch {
+          // JSON parsing of extracted array failed
+        }
+      }
+
+      // If we got opinions back, try to parse from the opinion text
+      if (!results && data?.opinions) {
+        for (const opinion of data.opinions) {
+          const text = opinion?.opinion || opinion?.text || "";
+          const arrMatch = text.match(/\[[\s\S]*?\]/);
+          if (arrMatch) {
+            try {
+              const parsed = JSON.parse(arrMatch[0]);
+              if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].file) {
+                results = parsed.map((r: SearchResult) => ({
+                  file: r.file || "unknown",
+                  snippet: r.snippet || "",
+                  score: typeof r.score === "number" ? r.score : 0.5,
+                }));
+                break;
+              }
+            } catch {
+              // continue trying
+            }
+          }
+        }
+      }
+
+      setSearchResults(results ?? mockSearchResults);
+    } catch {
+      // Fall back to mock results on any error
+      setSearchResults(mockSearchResults);
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   return (
@@ -165,7 +279,7 @@ export default function ReposPage() {
 
         {/* Repo Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {mockRepos.map((repo) => (
+          {repos.map((repo) => (
             <Card
               key={repo.id}
               className="cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all"
@@ -187,6 +301,30 @@ export default function ReposPage() {
                       {repo.url}
                       <ExternalLink className="size-2.5" />
                     </a>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {repo.status === "error" && (
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleReindex(repo.id);
+                        }}
+                        className="text-muted-foreground hover:text-primary transition-colors p-1 rounded-sm hover:bg-primary/10"
+                        title="Re-index"
+                      >
+                        <RefreshCw className="size-3.5" />
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteRepo(repo.id);
+                      }}
+                      className="text-muted-foreground hover:text-destructive transition-colors p-1 rounded-sm hover:bg-destructive/10"
+                      title="Delete repository"
+                    >
+                      <X className="size-3.5" />
+                    </button>
                   </div>
                 </div>
               </CardHeader>
