@@ -51,6 +51,9 @@ import {
   Video,
   Link,
   Settings2,
+  RotateCcw,
+  Clock,
+  Zap,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -69,6 +72,7 @@ interface MessageGroup {
   isStreaming: boolean;
   tokens?: string;
   cost?: string;
+  latencyMs?: number;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -830,11 +834,11 @@ export default function ChatPage() {
     []
   );
 
-  const handleSend = async () => {
-    const text = inputValue.trim();
+  const handleSend = async (retryText?: string) => {
+    const text = retryText ?? inputValue.trim();
     if (!text || isStreaming || councilMembers.length === 0) return;
 
-    setInputValue("");
+    if (!retryText) setInputValue("");
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
     }
@@ -852,6 +856,7 @@ export default function ChatPage() {
     }
 
     const groupId = Date.now().toString();
+    const startTime = performance.now();
 
     // Add new message group — existing groups are untouched
     const newGroup: MessageGroup = {
@@ -877,6 +882,8 @@ export default function ChatPage() {
       await new Promise((r) => setTimeout(r, 200));
     }
 
+    const elapsed = Math.round(performance.now() - startTime);
+
     if (!stopRef.current) {
       const verdict = pickRandom(VERDICTS);
       const finalOpinions: Record<string, string> = {};
@@ -894,13 +901,14 @@ export default function ChatPage() {
                 isStreaming: false,
                 tokens: `${(Math.floor(Math.random() * 900) + 800).toLocaleString()} tokens`,
                 cost: `$${(Math.random() * 0.04 + 0.01).toFixed(2)}`,
+                latencyMs: elapsed,
               }
             : g
         )
       );
     } else {
       setMessageGroups((prev) =>
-        prev.map((g) => (g.id === groupId ? { ...g, isStreaming: false } : g))
+        prev.map((g) => (g.id === groupId ? { ...g, isStreaming: false, latencyMs: elapsed } : g))
       );
     }
 
@@ -1384,14 +1392,56 @@ export default function ChatPage() {
                             <p className="text-sm leading-relaxed text-muted-foreground">
                               {group.verdict}
                             </p>
-                            {group.tokens && group.cost && (
-                              <div className="flex items-center gap-1.5 mt-3 text-xs text-muted-foreground">
-                                <Coins className="size-3" />
-                                <span>{group.tokens} · {group.cost}</span>
-                              </div>
-                            )}
+                            <div className="flex items-center gap-3 mt-3 text-xs text-muted-foreground">
+                              {group.tokens && group.cost && (
+                                <span className="flex items-center gap-1">
+                                  <Coins className="size-3" />
+                                  {group.tokens} · {group.cost}
+                                </span>
+                              )}
+                              {group.latencyMs != null && (
+                                <span className="flex items-center gap-1">
+                                  <Clock className="size-3" />
+                                  {group.latencyMs < 1000
+                                    ? `${group.latencyMs}ms`
+                                    : `${(group.latencyMs / 1000).toFixed(1)}s`}
+                                </span>
+                              )}
+                              <button
+                                className="flex items-center gap-1 hover:text-foreground transition-colors ml-auto"
+                                onClick={() => handleSend(group.userMessage)}
+                                disabled={isStreaming}
+                                title="Retry this prompt"
+                              >
+                                <RotateCcw className="size-3" />
+                                Retry
+                              </button>
+                            </div>
                           </CardContent>
                         </Card>
+                      )}
+
+                      {/* Retry for stopped/incomplete groups */}
+                      {!group.verdict && !group.isStreaming && (
+                        <div className="ml-4 flex items-center gap-2">
+                          <button
+                            className="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+                            onClick={() => handleSend(group.userMessage)}
+                            disabled={isStreaming}
+                          >
+                            <RotateCcw className="size-3" />
+                            Retry
+                          </button>
+                          {group.latencyMs != null && (
+                            <span className="text-xs text-muted-foreground flex items-center gap-1">
+                              <Clock className="size-3" />
+                              {group.latencyMs < 1000
+                                ? `${group.latencyMs}ms`
+                                : `${(group.latencyMs / 1000).toFixed(1)}s`}
+                              (stopped)
+                            </span>
+                          )}
+                        </div>
                       )}
                     </div>
                   </div>
@@ -1468,9 +1518,31 @@ export default function ChatPage() {
                 )}
               </div>
             </div>
-            <p className="text-[10px] text-muted-foreground mt-1.5 px-1">
-              {councilMembers.length} council member{councilMembers.length !== 1 ? "s" : ""} · Ctrl+Enter to send
-            </p>
+            <div className="flex items-center justify-between mt-1.5 px-1">
+              <p className="text-[10px] text-muted-foreground">
+                {councilMembers.length} council member{councilMembers.length !== 1 ? "s" : ""} · Ctrl+Enter to send
+              </p>
+              {messageGroups.length > 0 && (
+                <p className="text-[10px] text-muted-foreground flex items-center gap-2">
+                  <span className="flex items-center gap-0.5">
+                    <Zap className="size-2.5" />
+                    {messageGroups.filter((g) => g.tokens).length} responses
+                  </span>
+                  <span>
+                    {messageGroups.reduce((sum, g) => {
+                      const n = parseInt((g.tokens ?? "0").replace(/[^0-9]/g, ""), 10);
+                      return sum + (isNaN(n) ? 0 : n);
+                    }, 0).toLocaleString()} tokens
+                  </span>
+                  <span>
+                    ${messageGroups.reduce((sum, g) => {
+                      const n = parseFloat((g.cost ?? "0").replace("$", ""));
+                      return sum + (isNaN(n) ? 0 : n);
+                    }, 0).toFixed(2)}
+                  </span>
+                </p>
+              )}
+            </div>
           </div>
         </div>
       </div>
