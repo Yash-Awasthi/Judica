@@ -62,6 +62,7 @@ vi.mock("../../src/lib/logger.js", () => ({
 // ── Import SUT after mocks ──────────────────────────────────────────────────
 
 import { compact } from "../../src/services/memoryCompaction.service.js";
+import logger from "../../src/lib/logger.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -69,18 +70,6 @@ import { compact } from "../../src/services/memoryCompaction.service.js";
 function unitVector(dims: number, axis: number): number[] {
   const v = new Array(dims).fill(0);
   v[axis] = 1;
-  return v;
-}
-
-/**
- * Build a vector close to `base` (cosine similarity > threshold).
- * Adds a small perturbation orthogonal to `base`.
- */
-function similarVector(base: number[], perturbation = 0.05): number[] {
-  const v = [...base];
-  // Nudge the first zero-ish dimension
-  const idx = v.findIndex((x, i) => i !== v.indexOf(Math.max(...v)) && true);
-  v[idx] += perturbation;
   return v;
 }
 
@@ -151,6 +140,52 @@ describe("compact()", () => {
     });
   });
 
+  // ---------- Expiry ----------
+
+  describe("one-off memory expiry", () => {
+    it("reports expired count from the DELETE RETURNING query", async () => {
+      mockExecute.mockResolvedValue({ rowCount: 7 });
+      mockLimit.mockResolvedValue([]); // no old memories to compact
+
+      const result = await compact(1);
+      expect(result.expiredCount).toBe(7);
+    });
+
+    it("logs when memories are expired", async () => {
+      mockExecute.mockResolvedValue({ rowCount: 3 });
+      mockLimit.mockResolvedValue([]);
+
+      await compact(5);
+
+      expect(logger.info).toHaveBeenCalledWith(
+        expect.objectContaining({ userId: 5, expiredCount: 3 }),
+        expect.stringContaining("Expired stale one-off memories"),
+      );
+    });
+
+    it("does not log when no memories expired", async () => {
+      mockExecute.mockResolvedValue({ rowCount: 0 });
+      mockLimit.mockResolvedValue([]);
+
+      await compact(1);
+
+      // info should not have been called for expiry (only possibly for completion)
+      const infoCalls = (logger.info as ReturnType<typeof vi.fn>).mock.calls;
+      const expiryCalls = infoCalls.filter((c: any[]) =>
+        typeof c[1] === "string" && c[1].includes("Expired")
+      );
+      expect(expiryCalls).toHaveLength(0);
+    });
+
+    it("treats null rowCount as 0 expired", async () => {
+      mockExecute.mockResolvedValue({ rowCount: null });
+      mockLimit.mockResolvedValue([]);
+
+      const result = await compact(1);
+      expect(result.expiredCount).toBe(0);
+    });
+  });
+
   // ---------- Embedding ----------
 
   describe("embedding phase", () => {
@@ -165,7 +200,6 @@ describe("compact()", () => {
       await compact(1);
 
       expect(mockEmbed).toHaveBeenCalledTimes(10);
-      // First call should receive first memory's content
       expect(mockEmbed).toHaveBeenCalledWith("content 0");
     });
 
@@ -180,14 +214,32 @@ describe("compact()", () => {
 
       expect(mockEmbed).not.toHaveBeenCalled();
     });
+
+    it("handles mixed memories: some with embeddings, some without", async () => {
+      const emb = unitVector(8, 0);
+      const mems = [
+        ...Array.from({ length: 5 }, (_, i) =>
+          makeMemory(`with${i}`, `has embedding ${i}`, { embedding: emb })
+        ),
+        ...Array.from({ length: 5 }, (_, i) =>
+          makeMemory(`without${i}`, `no embedding ${i}`)
+        ),
+      ];
+      mockLimit.mockResolvedValue(mems);
+      mockEmbed.mockResolvedValue(emb);
+
+      const result = await compact(1);
+
+      expect(mockEmbed).toHaveBeenCalledTimes(5);
+      expect(result.originalCount).toBe(10);
+      expect(result.compactedCount).toBe(1);
+    });
   });
 
   // ---------- Clustering ----------
 
   describe("clustering by cosine similarity", () => {
     it("groups memories with similarity > 0.85 into a cluster", async () => {
-      // Create 10 memories: first 5 point along axis 0, next 5 along axis 1
-      // Members of each group are identical -> cosine sim = 1.0
       const embA = unitVector(8, 0);
       const embB = unitVector(8, 1);
 
@@ -203,7 +255,6 @@ describe("compact()", () => {
 
       const result = await compact(1);
 
-      // Two clusters of 5 => 2 compacted memories, 10 originals
       expect(result.compactedCount).toBe(2);
       expect(result.originalCount).toBe(10);
       expect(mockRouteAndCollect).toHaveBeenCalledTimes(2);
@@ -211,7 +262,6 @@ describe("compact()", () => {
     });
 
     it("does not cluster memories with similarity <= 0.85", async () => {
-      // 10 memories each along a different orthogonal axis -> cosine sim = 0
       const mems = Array.from({ length: 10 }, (_, i) =>
         makeMemory(`m${i}`, `unique topic ${i}`, { embedding: unitVector(16, i) })
       );
@@ -219,7 +269,6 @@ describe("compact()", () => {
 
       const result = await compact(1);
 
-      // No clusters of size >= 2 -> nothing compacted
       expect(result.compactedCount).toBe(0);
       expect(result.originalCount).toBe(0);
       expect(result.tokensSaved).toBe(0);
@@ -228,7 +277,6 @@ describe("compact()", () => {
     });
 
     it("only includes clusters with 2 or more members", async () => {
-      // 9 similar memories in one cluster, 1 outlier
       const embA = unitVector(8, 0);
       const embOutlier = unitVector(8, 7);
 
@@ -246,11 +294,7 @@ describe("compact()", () => {
       expect(result.originalCount).toBe(9);
     });
 
-    it("handles similarity at exactly the boundary (0.85) by excluding", async () => {
-      // Craft two vectors whose cosine similarity is ~0.85
-      // cos(theta) = 0.85 => we need vectors just at and below the threshold
-      // Using 2D: [1, 0] and [0.85, sqrt(1-0.85^2)] = [0.85, 0.5268]
-      // cosine = 0.85 exactly; code checks > 0.85 (strict), so these should NOT cluster
+    it("handles similarity at exactly the 0.85 boundary by excluding (strict >)", async () => {
       const emb1 = [1, 0, 0, 0, 0, 0, 0, 0];
       const emb2 = [0.85, Math.sqrt(1 - 0.85 * 0.85), 0, 0, 0, 0, 0, 0];
 
@@ -267,7 +311,6 @@ describe("compact()", () => {
       const result = await compact(1);
 
       // Two separate clusters (each group clusters with itself sim=1.0)
-      // but they don't merge across groups because sim == 0.85 (not > 0.85)
       expect(result.compactedCount).toBe(2);
     });
   });
@@ -306,9 +349,6 @@ describe("compact()", () => {
 
       const callArgs = mockRouteAndCollect.mock.calls[0][0];
       const userContent = callArgs.messages[0].content as string;
-      // The combinedText.substring(0, 4000) is embedded in a longer prompt string
-      // The total content includes the prefix text + up to 4000 chars of combined text
-      // Just verify the combined portion doesn't exceed what's expected
       const prefixLen = "Synthesize these related memories into one concise paragraph that preserves all key information:\n\n".length;
       const afterPrefix = userContent.substring(prefixLen);
       expect(afterPrefix.length).toBeLessThanOrEqual(4000);
@@ -365,7 +405,6 @@ describe("compact()", () => {
 
       expect(mockDelete).toHaveBeenCalledTimes(1);
       expect(mockDeleteWhere).toHaveBeenCalledTimes(1);
-      // Verify inArray was called with the memory ids
       expect(inArray).toHaveBeenCalledWith(
         "id",
         expect.arrayContaining(["m0", "m1", "m2", "m9"])
@@ -398,12 +437,10 @@ describe("compact()", () => {
   describe("token savings calculation", () => {
     it("calculates tokensSaved as difference between original and compacted token estimates", async () => {
       const emb = unitVector(8, 0);
-      // Each memory has 40 chars -> 10 tokens each (40/4)
       const mems = Array.from({ length: 10 }, (_, i) =>
         makeMemory(`m${i}`, "a]".repeat(20), { embedding: emb })
       );
       mockLimit.mockResolvedValue(mems);
-      // Compacted text is short: 20 chars -> 5 tokens
       mockRouteAndCollect.mockResolvedValue({ text: "short summary of 20c" });
 
       const result = await compact(1);
@@ -422,12 +459,10 @@ describe("compact()", () => {
         makeMemory(`m${i}`, "ab", { embedding: emb })
       );
       mockLimit.mockResolvedValue(mems);
-      // Return a very long synthesis
       mockRouteAndCollect.mockResolvedValue({ text: "x".repeat(10000) });
 
       const result = await compact(1);
 
-      // Math.max(0, tokensSaved) ensures non-negative
       expect(result.tokensSaved).toBe(0);
     });
 
@@ -446,13 +481,11 @@ describe("compact()", () => {
 
       const result = await compact(1);
 
-      // Cluster A has 6, cluster B has 4 => 10 total originals, 2 compacted
       expect(result.originalCount).toBe(10);
       expect(result.compactedCount).toBe(2);
     });
 
     it("does not count singleton memories in originalCount", async () => {
-      // 8 similar + 2 outliers. Only the 8 form a cluster.
       const embA = unitVector(16, 0);
       const mems = [
         ...Array.from({ length: 8 }, (_, i) =>
@@ -482,12 +515,48 @@ describe("compact()", () => {
 
       const result = await compact(1);
 
-      // Should NOT early-return; 10 >= 10 proceeds to clustering
       expect(result.compactedCount).toBe(1);
       expect(mockRouteAndCollect).toHaveBeenCalledTimes(1);
     });
 
-    it("passes correct userId to db.select query chain", async () => {
+    it("returns correct CompactionResult shape", async () => {
+      mockLimit.mockResolvedValue([]);
+
+      const result = await compact(1);
+
+      expect(result).toHaveProperty("originalCount");
+      expect(result).toHaveProperty("compactedCount");
+      expect(result).toHaveProperty("tokensSaved");
+      expect(result).toHaveProperty("expiredCount");
+      expect(typeof result.originalCount).toBe("number");
+      expect(typeof result.compactedCount).toBe("number");
+      expect(typeof result.tokensSaved).toBe("number");
+      expect(typeof result.expiredCount).toBe("number");
+    });
+
+    it("logs completion info with all metrics", async () => {
+      const emb = unitVector(8, 0);
+      const mems = Array.from({ length: 10 }, (_, i) =>
+        makeMemory(`m${i}`, `content ${i}`, { embedding: emb })
+      );
+      mockLimit.mockResolvedValue(mems);
+      mockExecute.mockResolvedValue({ rowCount: 2 });
+
+      await compact(42);
+
+      expect(logger.info).toHaveBeenCalledWith(
+        expect.objectContaining({
+          userId: 42,
+          originalCount: expect.any(Number),
+          compactedCount: expect.any(Number),
+          tokensSaved: expect.any(Number),
+          expiredCount: 2,
+        }),
+        "Memory compaction complete",
+      );
+    });
+
+    it("passes userId to db.select chain", async () => {
       mockLimit.mockResolvedValue([]);
 
       await compact(999);
@@ -495,27 +564,6 @@ describe("compact()", () => {
       expect(mockSelect).toHaveBeenCalled();
       expect(mockFrom).toHaveBeenCalled();
       expect(mockWhere).toHaveBeenCalled();
-    });
-
-    it("handles mixed memories: some with embeddings, some without", async () => {
-      const emb = unitVector(8, 0);
-      const mems = [
-        ...Array.from({ length: 5 }, (_, i) =>
-          makeMemory(`with${i}`, `has embedding ${i}`, { embedding: emb })
-        ),
-        ...Array.from({ length: 5 }, (_, i) =>
-          makeMemory(`without${i}`, `no embedding ${i}`)
-        ),
-      ];
-      mockLimit.mockResolvedValue(mems);
-      // embed() returns same vector -> everything clusters together
-      mockEmbed.mockResolvedValue(emb);
-
-      const result = await compact(1);
-
-      expect(mockEmbed).toHaveBeenCalledTimes(5); // Only the 5 without embeddings
-      expect(result.originalCount).toBe(10);
-      expect(result.compactedCount).toBe(1);
     });
   });
 });

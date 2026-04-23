@@ -428,5 +428,48 @@ describe("sessionSummary service", () => {
 
       expect(result).toBe("[RETRIEVED MEMORY]\nonly chunk\n[/RETRIEVED MEMORY]");
     });
+
+    it("should cap ragChunks at 20 (P30-04)", () => {
+      const chunks = Array.from({ length: 25 }, (_, i) => `chunk_${i}`);
+      const result = buildLayeredContext(null, [], chunks);
+
+      expect(result).toContain("chunk_19");
+      expect(result).not.toContain("chunk_20");
+      expect(result).not.toContain("chunk_24");
+    });
+
+    it("should truncate individual chunks to 2000 chars", () => {
+      const longChunk = "x".repeat(3000);
+      const result = buildLayeredContext(null, [], [longChunk]);
+
+      // The chunk in output should be truncated to 2000 chars
+      const memorySection = result
+        .split("[RETRIEVED MEMORY]")[1]
+        .split("[/RETRIEVED MEMORY]")[0];
+      const xCount = (memorySection.match(/x/g) || []).length;
+      expect(xCount).toBe(2000);
+    });
+
+    it("should handle exactly 20 ragChunks without dropping any", () => {
+      const chunks = Array.from({ length: 20 }, (_, i) => `chunk_${i}`);
+      const result = buildLayeredContext(null, [], chunks);
+
+      expect(result).toContain("chunk_0");
+      expect(result).toContain("chunk_19");
+    });
+
+    it("should truncate each chunk independently", () => {
+      const chunk1 = "a".repeat(2500);
+      const chunk2 = "b".repeat(100);
+      const result = buildLayeredContext(null, [], [chunk1, chunk2]);
+
+      const memorySection = result
+        .split("[RETRIEVED MEMORY]")[1]
+        .split("[/RETRIEVED MEMORY]")[0];
+      const aCount = (memorySection.match(/a/g) || []).length;
+      const bCount = (memorySection.match(/b/g) || []).length;
+      expect(aCount).toBe(2000);
+      expect(bCount).toBe(100);
+    });
   });
 });
