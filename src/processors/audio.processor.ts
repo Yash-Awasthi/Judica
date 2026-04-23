@@ -15,7 +15,7 @@ const WHISPER_MAX_BYTES = 25 * 1024 * 1024; // Whisper hard limit: 25 MB
  * Returns the transcript as `text` so it can be injected as RAG context.
  */
 export async function processAudio(filePath: string, mimeType: string): Promise<ProcessedFile> {
-  assertFileSizeLimit(filePath);
+  await assertFileSizeLimit(filePath);
 
   // Reject files that live in the OS temp directory — guarding against symlink attacks
   // on paths created without O_EXCL (CodeQL js/insecure-temporary-file)
