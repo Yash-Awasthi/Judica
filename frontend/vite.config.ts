@@ -1,88 +1,35 @@
-import { defineConfig } from 'vite'
-import react from '@vitejs/plugin-react'
-import { VitePWA } from 'vite-plugin-pwa'
+import { reactRouter } from "@react-router/dev/vite";
+import { cloudflare } from "@cloudflare/vite-plugin";
+import tailwindcss from "@tailwindcss/vite";
+import { defineConfig } from "vite";
+import { resolve } from "path";
 
-export default defineConfig({
+export default defineConfig(({ command }) => ({
   plugins: [
-    react(),
-    VitePWA({
-      registerType: 'autoUpdate',
-      manifest: {
-        name: 'AIBYAI',
-        short_name: 'AIBYAI',
-        description: 'Multi-model AI orchestration engine',
-        theme_color: '#000000',
-        background_color: '#000000',
-        display: 'standalone',
-        start_url: '/',
-        icons: [
-          {
-            src: '/icon-192.png',
-            sizes: '192x192',
-            type: 'image/png',
-          },
-          {
-            src: '/icon-512.png',
-            sizes: '512x512',
-            type: 'image/png',
-          },
-        ],
-      },
-      workbox: {
-        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024, // 3 MiB
-        runtimeCaching: [
-          {
-            urlPattern: ({ url }: { url: URL }) => {
-              if (!url.pathname.startsWith('/api/')) return false;
-              // Never cache auth, cost, audit, or user-specific sensitive endpoints
-              const sensitive = ['/api/auth/', '/api/costs/', '/api/audit/', '/api/admin/', '/api/usage/', '/api/ask/'];
-              return !sensitive.some(prefix => url.pathname.startsWith(prefix));
-            },
-            handler: 'NetworkFirst',
-            options: {
-              cacheName: 'api-cache',
-              expiration: {
-                maxEntries: 100,
-                maxAgeSeconds: 60 * 60, // 1 hour
-              },
-              networkTimeoutSeconds: 5,
-            },
-          },
-          {
-            urlPattern: /\.(js|css|png|svg|woff2?)$/,
-            handler: 'CacheFirst',
-            options: {
-              cacheName: 'assets-cache',
-              expiration: {
-                maxEntries: 200,
-                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
-              },
-            },
-          },
-        ],
-      },
-    }),
+    cloudflare({ viteEnvironment: { name: "ssr" } }),
+    tailwindcss(),
+    reactRouter(),
   ],
-  server: {
-    proxy: {
-      '/api': 'http://localhost:3000',
-      '/health': 'http://localhost:3000',
+  resolve: {
+    alias: {
+      "~": resolve(__dirname, "./app"),
     },
   },
-  build: {
-    outDir: 'dist',
-    sourcemap: false,
-    chunkSizeWarningLimit: 1200,
-    rollupOptions: {
-      output: {
-        manualChunks(id: string) {
-          if (id.includes('react-markdown') || id.includes('remark-gfm')) return 'markdown';
-          if (id.includes('framer-motion')) return 'motion';
-          if (id.includes('lucide-react')) return 'icons';
-          if (id.includes('@xyflow/react')) return 'workflow';
-          if (id.includes('echarts')) return 'echarts';
+  // Configure SSR environment to use Cloudflare's worker entry as the rollup input
+  // This ensures Durable Object exports are included in the bundle
+  environments: {
+    ssr: {
+      build: {
+        rollupOptions: {
+          input: "virtual:cloudflare/worker-entry",
         },
       },
     },
   },
-})
+  // Polyfill __filename for @cloudflare/codemode (uses zod-to-ts → TypeScript compiler)
+  define: {
+    __filename: "'index.ts'",
+  },
+  // Disable dep discovery during builds to avoid WebSocket error in @cloudflare/vite-plugin
+  optimizeDeps: command === "build" ? { noDiscovery: true } : {},
+}));
