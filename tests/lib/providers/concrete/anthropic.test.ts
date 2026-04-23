@@ -265,3 +265,132 @@ describe("AnthropicProvider", () => {
     ).rejects.toThrow("AbortError");
   });
 });
+
+// ── Streaming (onChunk) tests ─────────────────────────────────────────────────
+
+function makeAnthropicSseBody(lines: string[]) {
+  const encoder = new TextEncoder();
+  const chunks = lines.map((l) => encoder.encode(l + "\n"));
+  let index = 0;
+  return {
+    body: {
+      getReader: () => ({
+        read: vi.fn().mockImplementation(async () => {
+          if (index < chunks.length) return { done: false, value: chunks[index++] };
+          return { done: true, value: undefined };
+        }),
+      }),
+    },
+  };
+}
+
+function sseData(obj: unknown) {
+  return `data: ${JSON.stringify(obj)}`;
+}
+
+describe("AnthropicProvider — streaming (onChunk)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (getToolDefinitions as any).mockReturnValue([]);
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  it("calls onChunk for each text delta and returns aggregated text", async () => {
+    const streamBody = makeAnthropicSseBody([
+      sseData({ type: "message_start", message: { usage: { input_tokens: 10 } } }),
+      sseData({ type: "content_block_start", index: 0, content_block: { type: "text", text: "" } }),
+      sseData({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "Hello" } }),
+      sseData({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: " world" } }),
+      sseData({ type: "message_delta", usage: { output_tokens: 2 } }),
+      sseData({ type: "message_stop" }),
+    ]);
+
+    (global.fetch as any).mockResolvedValue({ ok: true, ...streamBody });
+
+    const chunks: string[] = [];
+    const provider = makeProvider();
+    const result = await provider.call({
+      messages: [{ role: "user", content: "hi" }],
+      onChunk: (c: string) => chunks.push(c),
+    });
+
+    expect(chunks).toEqual(["Hello", " world"]);
+    expect(result.text).toBe("Hello world");
+    expect(result.usage.promptTokens).toBe(10);
+    expect(result.usage.completionTokens).toBe(2);
+  });
+
+  it("tracks input/output tokens from message_start and message_delta", async () => {
+    const streamBody = makeAnthropicSseBody([
+      sseData({ type: "message_start", message: { usage: { input_tokens: 50 } } }),
+      sseData({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "done" } }),
+      sseData({ type: "message_delta", usage: { output_tokens: 25 } }),
+    ]);
+
+    (global.fetch as any).mockResolvedValue({ ok: true, ...streamBody });
+
+    const provider = makeProvider();
+    const result = await provider.call({
+      messages: [{ role: "user", content: "test" }],
+      onChunk: () => {},
+    });
+
+    expect(result.usage.promptTokens).toBe(50);
+    expect(result.usage.completionTokens).toBe(25);
+    expect(result.usage.totalTokens).toBe(75);
+  });
+
+  it("handles malformed SSE lines without throwing", async () => {
+    const streamBody = makeAnthropicSseBody([
+      "not-a-data-line",
+      "data: not-valid-json{{{",
+      sseData({ type: "content_block_delta", index: 0, delta: { type: "text_delta", text: "ok" } }),
+    ]);
+
+    (global.fetch as any).mockResolvedValue({ ok: true, ...streamBody });
+
+    const provider = makeProvider();
+    const result = await provider.call({
+      messages: [{ role: "user", content: "test" }],
+      onChunk: () => {},
+    });
+
+    expect(result.text).toBe("ok");
+  });
+
+  it("processes tool_use block in stream and makes recursive call", async () => {
+    const toolStreamBody = makeAnthropicSseBody([
+      sseData({ type: "message_start", message: { usage: { input_tokens: 5 } } }),
+      sseData({ type: "content_block_start", index: 0, content_block: { type: "tool_use", id: "tool-1", name: "search" } }),
+      sseData({ type: "content_block_delta", index: 0, delta: { type: "input_json_delta", partial_json: '{"q":"test"}' } }),
+      sseData({ type: "content_block_stop", index: 0 }),
+      sseData({ type: "message_delta", usage: { output_tokens: 3 } }),
+    ]);
+
+    (global.fetch as any)
+      .mockResolvedValueOnce({ ok: true, ...toolStreamBody })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          content: [{ type: "text", text: "Search result" }],
+          usage: { input_tokens: 20, output_tokens: 10 },
+        }),
+      });
+
+    (callTool as any).mockResolvedValue({ result: "search results" });
+    (getToolDefinitions as any).mockReturnValue([
+      { name: "search", description: "Search", parameters: { type: "object", properties: {} } }
+    ]);
+
+    const provider = makeProvider();
+    const result = await provider.call({
+      messages: [{ role: "user", content: "search for test" }],
+      onChunk: () => {},
+    });
+
+    expect(callTool).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "search", arguments: { q: "test" } })
+    );
+    expect(result.text).toBe("Search result");
+  });
+});

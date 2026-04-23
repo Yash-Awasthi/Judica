@@ -219,3 +219,115 @@ describe("OllamaProvider", () => {
     });
   });
 });
+
+// ── Streaming (onChunk) tests ─────────────────────────────────────────────────
+
+function makeOllamaNdjsonBody(lines: string[]) {
+  const encoder = new TextEncoder();
+  const chunks = lines.map((l) => encoder.encode(l + "\n"));
+  let index = 0;
+  return {
+    body: {
+      getReader: () => ({
+        read: vi.fn().mockImplementation(async () => {
+          if (index < chunks.length) return { done: false, value: chunks[index++] };
+          return { done: true, value: undefined };
+        }),
+      }),
+    },
+  };
+}
+
+describe("OllamaProvider — streaming (onChunk)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  it("calls onChunk for each response chunk and returns aggregated text", async () => {
+    const streamBody = makeOllamaNdjsonBody([
+      JSON.stringify({ response: "Hello", done: false }),
+      JSON.stringify({ response: " world", done: false }),
+      JSON.stringify({ response: "", done: true, prompt_eval_count: 10, eval_count: 2 }),
+    ]);
+
+    (global.fetch as any).mockResolvedValue({ ok: true, ...streamBody });
+
+    const chunks: string[] = [];
+    const provider = makeProvider();
+    const result = await provider.call({
+      messages: [{ role: "user", content: "hi" }],
+      onChunk: (c: string) => chunks.push(c),
+    });
+
+    expect(chunks).toEqual(["Hello", " world"]);
+    expect(result.text).toBe("Hello world");
+    expect(result.usage.promptTokens).toBe(10);
+    expect(result.usage.completionTokens).toBe(2);
+  });
+
+  it("falls back to estimated tokens when stream reports 0 counts", async () => {
+    const streamBody = makeOllamaNdjsonBody([
+      JSON.stringify({ response: "test", done: false }),
+      JSON.stringify({ response: "", done: true, prompt_eval_count: 0, eval_count: 0 }),
+    ]);
+
+    (global.fetch as any).mockResolvedValue({ ok: true, ...streamBody });
+
+    const provider = makeProvider();
+    const result = await provider.call({
+      messages: [{ role: "user", content: "hi" }],
+      onChunk: () => {},
+    });
+
+    // Falls back to ceil(text.length / 4)
+    expect(result.usage.completionTokens).toBeGreaterThan(0);
+  });
+
+  it("handles malformed NDJSON lines without throwing", async () => {
+    const streamBody = makeOllamaNdjsonBody([
+      "",
+      "invalid-json{{{",
+      JSON.stringify({ response: "ok", done: false }),
+      JSON.stringify({ response: "", done: true }),
+    ]);
+
+    (global.fetch as any).mockResolvedValue({ ok: true, ...streamBody });
+
+    const provider = makeProvider();
+    const result = await provider.call({
+      messages: [{ role: "user", content: "test" }],
+      onChunk: () => {},
+    });
+
+    expect(result.text).toBe("ok");
+  });
+
+  it("throws when stream buffer exceeds maximum size", async () => {
+    const encoder = new TextEncoder();
+    let called = false;
+    const streamBody = {
+      body: {
+        getReader: () => ({
+          read: vi.fn().mockImplementation(async () => {
+            if (!called) {
+              called = true;
+              return { done: false, value: encoder.encode("x".repeat(11_000_000)) };
+            }
+            return { done: true, value: undefined };
+          }),
+        }),
+      },
+    };
+
+    (global.fetch as any).mockResolvedValue({ ok: true, ...streamBody });
+
+    const provider = makeProvider();
+    await expect(
+      provider.call({
+        messages: [{ role: "user", content: "test" }],
+        onChunk: () => {},
+      })
+    ).rejects.toThrow(/buffer exceeded/);
+  });
+});

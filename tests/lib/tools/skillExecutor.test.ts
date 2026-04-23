@@ -180,3 +180,148 @@ describe("skillExecutor – executeUserSkill", () => {
     expect(mockExecutePython).toHaveBeenCalledWith(expect.any(String), 10_000);
   });
 });
+
+// ── runSkillCode guards ───────────────────────────────────────────────────────
+
+describe("skillExecutor — size guards in runSkillCode", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("throws when skill code exceeds MAX_SKILL_CODE_SIZE (100 KB)", async () => {
+    const oversizedCode = "x".repeat(102_401);
+    mockDbSelect.mockResolvedValueOnce([
+      { id: 1, userId: 42, name: "big_skill", code: oversizedCode, active: true },
+    ]);
+
+    await expect(
+      executeUserSkill(42, "big_skill", {})
+    ).rejects.toThrow(/exceeds maximum size/);
+  });
+
+  it("throws when an input value exceeds MAX_INPUT_VALUE_SIZE (50 KB)", async () => {
+    mockDbSelect.mockResolvedValueOnce([
+      { id: 1, userId: 42, name: "input_skill", code: 'print("ok")', active: true },
+    ]);
+
+    const oversizedInput = { bigValue: "y".repeat(51_201) };
+
+    await expect(
+      executeUserSkill(42, "input_skill", oversizedInput)
+    ).rejects.toThrow(/exceeds maximum size/);
+  });
+
+  it("throws with the input key name in the message", async () => {
+    mockDbSelect.mockResolvedValueOnce([
+      { id: 1, userId: 42, name: "input_skill", code: 'print("ok")', active: true },
+    ]);
+
+    await expect(
+      executeUserSkill(42, "input_skill", { my_data: "z".repeat(51_201) })
+    ).rejects.toThrow("my_data");
+  });
+});
+
+// ── registerUserSkillsAsTools ─────────────────────────────────────────────────
+
+describe("skillExecutor — registerUserSkillsAsTools", () => {
+  let registerTool: ReturnType<typeof vi.fn>;
+
+  beforeEach(async () => {
+    vi.clearAllMocks();
+    const toolsModule = await import("../../../src/lib/tools/index.js");
+    registerTool = vi.mocked(toolsModule.registerTool);
+  });
+
+  async function callRegisteredHandler(
+    args: Record<string, unknown>,
+    context?: Record<string, unknown>
+  ): Promise<string> {
+    const { registerUserSkillsAsTools } = await import(
+      "../../../src/lib/tools/skillExecutor.js"
+    );
+    registerUserSkillsAsTools();
+
+    // The handler is the second argument of the last registerTool call
+    const handler = registerTool.mock.calls[registerTool.mock.calls.length - 1][1] as (
+      args: Record<string, unknown>,
+      context?: unknown
+    ) => Promise<string>;
+    return handler(args, context);
+  }
+
+  it("registers a tool named 'user_skill'", async () => {
+    const { registerUserSkillsAsTools } = await import(
+      "../../../src/lib/tools/skillExecutor.js"
+    );
+    registerUserSkillsAsTools();
+
+    expect(registerTool).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "user_skill" }),
+      expect.any(Function)
+    );
+  });
+
+  it("returns auth-required error JSON when userId is missing from context", async () => {
+    const result = await callRegisteredHandler(
+      { skill_name: "my_skill" },
+      {} // no userId
+    );
+    const parsed = JSON.parse(result);
+    expect(parsed.error).toMatch(/authentication required/i);
+  });
+
+  it("returns error JSON when inputs is invalid JSON string", async () => {
+    const result = await callRegisteredHandler(
+      { skill_name: "my_skill", inputs: "not-valid-json{" },
+      { userId: 42 }
+    );
+    const parsed = JSON.parse(result);
+    expect(parsed.error).toMatch(/Invalid inputs JSON/i);
+  });
+
+  it("returns stringified result on successful skill execution", async () => {
+    mockDbSelect.mockResolvedValueOnce([
+      { id: 1, userId: 42, name: "my_skill", code: 'print(json.dumps({"val": 1}))', active: true },
+    ]);
+    mockExecutePython.mockResolvedValueOnce({
+      output: ['{"val": 1}'],
+      error: null,
+      elapsedMs: 5,
+    });
+
+    const result = await callRegisteredHandler(
+      { skill_name: "my_skill", inputs: '{"x": 1}' },
+      { userId: 42 }
+    );
+    expect(result).toBe('{"val":1}');
+  });
+
+  it("returns error JSON when executeUserSkill throws", async () => {
+    mockDbSelect.mockResolvedValueOnce([]);
+
+    const result = await callRegisteredHandler(
+      { skill_name: "nonexistent" },
+      { userId: 42 }
+    );
+    const parsed = JSON.parse(result);
+    expect(parsed.error).toMatch(/not found/i);
+  });
+
+  it("accepts parsed-object inputs (not a JSON string)", async () => {
+    mockDbSelect.mockResolvedValueOnce([
+      { id: 1, userId: 42, name: "my_skill", code: 'print("done")', active: true },
+    ]);
+    mockExecutePython.mockResolvedValueOnce({
+      output: ["done"],
+      error: null,
+      elapsedMs: 5,
+    });
+
+    const result = await callRegisteredHandler(
+      { skill_name: "my_skill", inputs: { key: "value" } },
+      { userId: 42 }
+    );
+    expect(result).toBe("done");
+  });
+});
