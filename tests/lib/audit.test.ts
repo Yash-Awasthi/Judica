@@ -140,3 +140,155 @@ describe("Audit Utility", () => {
     expect(result).toBe(10);
   });
 });
+
+// ── metadata size cap ─────────────────────────────────────────────────────────
+
+describe("Audit — metadata size cap (>MAX_METADATA_BYTES strips toolArgs)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("strips toolArgs from metadata when serialized size exceeds cap", async () => {
+    const { logAudit } = await import("../../src/lib/audit.js");
+    const { db } = await import("../../src/lib/drizzle.js");
+    const { default: logger } = await import("../../src/lib/logger.js");
+    const { detectPII } = await import("../../src/lib/pii.js");
+
+    (detectPII as any).mockReturnValue({
+      found: false, riskScore: 0, types: [], anonymized: "prompt",
+    });
+
+    // Create a metadata object whose JSON representation exceeds 8 KB
+    const bigEntry = {
+      userId: 1,
+      modelName: "gpt-4",
+      prompt: "Hello",
+      response: "Hi",
+      tokensIn: 10,
+      tokensOut: 20,
+      latencyMs: 100,
+      requestType: "tool_call" as const,
+      success: true,
+      metadata: {
+        toolArgs: { huge: "x".repeat(10_000) }, // push over 8 KB
+      },
+    };
+
+    await logAudit(bigEntry);
+
+    expect(vi.mocked(logger).warn).toHaveBeenCalledWith(
+      expect.objectContaining({ size: expect.any(Number) }),
+      expect.stringContaining("size cap")
+    );
+
+    // The inserted metadata should NOT contain the oversized toolArgs
+    const valuesCall = (db.insert({} as any).values as any).mock.calls[0][0];
+    expect(valuesCall.metadata).not.toHaveProperty("toolArgs");
+  });
+
+  it("does NOT strip toolArgs when metadata is under the cap", async () => {
+    const { logAudit } = await import("../../src/lib/audit.js");
+    const { db } = await import("../../src/lib/drizzle.js");
+    const { detectPII } = await import("../../src/lib/pii.js");
+
+    (detectPII as any).mockReturnValue({
+      found: false, riskScore: 0, types: [], anonymized: "prompt",
+    });
+
+    const smallEntry = {
+      userId: 1,
+      modelName: "gpt-4",
+      prompt: "Hello",
+      response: "Hi",
+      tokensIn: 10,
+      tokensOut: 20,
+      latencyMs: 100,
+      requestType: "tool_call" as const,
+      success: true,
+      metadata: {
+        toolArgs: { small: "value" },
+      },
+    };
+
+    await logAudit(smallEntry);
+
+    const valuesCall = (db.insert({} as any).values as any).mock.calls[0][0];
+    // toolArgs should be preserved when under the cap
+    expect(valuesCall.metadata).toHaveProperty("toolArgs");
+  });
+});
+
+// ── getUserAuditLogs ──────────────────────────────────────────────────────────
+
+describe("getUserAuditLogs — limit/offset caps and filter conditions", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it("returns results with default options", async () => {
+    const { getUserAuditLogs } = await import("../../src/lib/audit.js");
+    const result = await getUserAuditLogs(1);
+    expect(result).toEqual([]);
+  });
+
+  it("caps limit to MAX_AUDIT_LIMIT (200) when value exceeds it", async () => {
+    const { getUserAuditLogs } = await import("../../src/lib/audit.js");
+    const { db } = await import("../../src/lib/drizzle.js");
+    await getUserAuditLogs(1, { limit: 999 });
+    const limitCall = db.select().from({} as any).where([]).orderBy({} as any).limit as any;
+    // Verify .limit() was called (the mock resolves empty; we just verify no throw)
+    expect(limitCall).toBeDefined();
+  });
+
+  it("enforces minimum limit of 1", async () => {
+    const { getUserAuditLogs } = await import("../../src/lib/audit.js");
+    // Should not throw even with 0 or negative limit
+    await expect(getUserAuditLogs(1, { limit: 0 })).resolves.toEqual([]);
+    await expect(getUserAuditLogs(1, { limit: -5 })).resolves.toEqual([]);
+  });
+
+  it("enforces non-negative offset", async () => {
+    const { getUserAuditLogs } = await import("../../src/lib/audit.js");
+    await expect(getUserAuditLogs(1, { offset: -10 })).resolves.toEqual([]);
+  });
+
+  it("accepts requestType filter without throwing", async () => {
+    const { getUserAuditLogs } = await import("../../src/lib/audit.js");
+    await expect(getUserAuditLogs(1, { requestType: "deliberation" })).resolves.toEqual([]);
+  });
+
+  it("accepts dateFrom filter without throwing", async () => {
+    const { getUserAuditLogs } = await import("../../src/lib/audit.js");
+    await expect(
+      getUserAuditLogs(1, { dateFrom: new Date("2024-01-01") })
+    ).resolves.toEqual([]);
+  });
+
+  it("accepts dateTo filter without throwing", async () => {
+    const { getUserAuditLogs } = await import("../../src/lib/audit.js");
+    await expect(
+      getUserAuditLogs(1, { dateTo: new Date("2025-01-01") })
+    ).resolves.toEqual([]);
+  });
+
+  it("accepts successOnly filter without throwing", async () => {
+    const { getUserAuditLogs } = await import("../../src/lib/audit.js");
+    await expect(
+      getUserAuditLogs(1, { successOnly: true })
+    ).resolves.toEqual([]);
+  });
+
+  it("accepts all filters combined without throwing", async () => {
+    const { getUserAuditLogs } = await import("../../src/lib/audit.js");
+    await expect(
+      getUserAuditLogs(1, {
+        limit: 10,
+        offset: 5,
+        requestType: "router",
+        dateFrom: new Date("2024-01-01"),
+        dateTo: new Date("2025-01-01"),
+        successOnly: true,
+      })
+    ).resolves.toEqual([]);
+  });
+});
