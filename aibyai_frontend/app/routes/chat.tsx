@@ -586,9 +586,30 @@ function InlineModelDialog({
 export default function ChatPage() {
   const store = useStore();
   const [conversations, setConversations] = useState(mockConversations);
-  const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
+  const [selectedConvId, setSelectedConvId] = useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("aibyai-conv") || null;
+    }
+    return null;
+  });
+
+  // Persist selected conversation
+  useEffect(() => {
+    if (selectedConvId) sessionStorage.setItem("aibyai-conv", selectedConvId);
+    else sessionStorage.removeItem("aibyai-conv");
+  }, [selectedConvId]);
   const [messageGroups, setMessageGroups] = useState<MessageGroup[]>([]);
-  const [inputValue, setInputValue] = useState("");
+  const [inputValue, setInputValue] = useState(() => {
+    if (typeof window !== "undefined") {
+      return sessionStorage.getItem("aibyai-draft") ?? "";
+    }
+    return "";
+  });
+
+  // Persist draft to sessionStorage
+  useEffect(() => {
+    sessionStorage.setItem("aibyai-draft", inputValue);
+  }, [inputValue]);
   const [councilMembers, setCouncilMembers] = useState<CouncilMember[]>(defaultMembers);
 
   // Panel visibility — initial state deferred to layout effect
