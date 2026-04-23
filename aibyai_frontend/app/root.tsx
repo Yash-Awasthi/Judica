@@ -295,15 +295,43 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
     stack = import.meta.env.DEV ? error.stack : undefined;
   }
 
+  const is404 = isRouteErrorResponse(error) && error.status === 404;
+
   return (
-    <main className="pt-16 p-4 container mx-auto">
-      <h1>{message}</h1>
-      <p>{details}</p>
-      {stack && (
-        <pre className="w-full p-4 overflow-x-auto">
-          <code>{stack}</code>
-        </pre>
-      )}
+    <main className="min-h-screen flex items-center justify-center bg-background p-6">
+      <div className="max-w-md w-full text-center space-y-6">
+        <div className="mx-auto size-20 rounded-2xl bg-destructive/10 flex items-center justify-center">
+          <span className="text-4xl font-bold text-destructive">{is404 ? "404" : "!"}</span>
+        </div>
+        <div className="space-y-2">
+          <h1 className="text-2xl font-semibold tracking-tight text-foreground">{message}</h1>
+          <p className="text-sm text-muted-foreground leading-relaxed">{details}</p>
+        </div>
+        <div className="flex items-center justify-center gap-3">
+          <a
+            href="/"
+            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            Go Home
+          </a>
+          <button
+            onClick={() => window.history.back()}
+            className="inline-flex items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium text-foreground hover:bg-muted transition-colors"
+          >
+            Go Back
+          </button>
+        </div>
+        {stack && (
+          <details className="text-left">
+            <summary className="text-xs text-muted-foreground cursor-pointer hover:text-foreground">
+              Stack Trace
+            </summary>
+            <pre className="mt-2 w-full p-3 rounded-md bg-muted text-xs overflow-x-auto">
+              <code className="text-muted-foreground">{stack}</code>
+            </pre>
+          </details>
+        )}
+      </div>
     </main>
   );
 }
