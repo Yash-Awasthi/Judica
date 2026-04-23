@@ -292,7 +292,7 @@ export default function ReposPage() {
                       <StatusBadge status={repo.status} />
                     </CardTitle>
                     <a
-                      href={repo.url}
+                      href={/^https?:\/\//i.test(repo.url) ? repo.url : "#"}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1 mt-0.5"

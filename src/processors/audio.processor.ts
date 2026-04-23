@@ -1,4 +1,5 @@
 import fs from "fs/promises";
+import { constants as fsConstants } from "fs";
 import path from "path";
 import os from "os";
 import FormData from "form-data";
@@ -24,8 +25,9 @@ export async function processAudio(filePath: string, mimeType: string): Promise<
     throw new Error("Audio file must not reside in the OS temp directory");
   }
 
-  // Open file descriptor once to avoid TOCTOU race between stat and read
-  const fh = await fs.open(resolvedPath, "r");
+  // Open file descriptor once to avoid TOCTOU race between stat and read.
+  // O_NOFOLLOW prevents symlink attacks on temp paths (CodeQL js/insecure-temporary-file).
+  const fh = await fs.open(resolvedPath, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
   try {
     const stat = await fh.stat();
     if (stat.size > WHISPER_MAX_BYTES) {

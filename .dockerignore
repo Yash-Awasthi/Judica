@@ -1,7 +1,9 @@
 node_modules
+**/node_modules
 .git
 tests
 *.md
 .github
 grafana
 .env
+frontend/node_modules

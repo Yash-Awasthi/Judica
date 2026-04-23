@@ -5,8 +5,8 @@
 	"type": "module",
 	"scripts": {
 		"build": "react-router build",
-		"cf-typegen": "bun wrangler types",
-		"postinstall": "bun run cf-typegen",
+		"cf-typegen": "npx wrangler types",
+		"postinstall": "npx wrangler types || true",
 		"deploy": "bun run build && bun wrangler deploy --dispatch-namespace chiridion",
 		"dev": "react-router dev",
 		"preview": "bun run build && vite preview",

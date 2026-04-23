@@ -10,9 +10,12 @@ WORKDIR /app
 COPY package*.json ./
 RUN npm ci
 
-# Install frontend dependencies before running the build
-COPY frontend/package*.json ./frontend/
-RUN cd frontend && npm ci
+# Install frontend dependencies before running the build.
+# Delete lockfile before install: it was generated on glibc and lacks musl-specific
+# optional binaries (e.g. @rollup/rollup-linux-x64-musl). A fresh resolve on Alpine
+# picks up the correct platform-specific packages (npm bug #4828).
+COPY frontend/package*.json frontend/.npmrc ./frontend/
+RUN cd frontend && rm -f package-lock.json && npm install --legacy-peer-deps
 
 # Copy all source
 COPY tsconfig.json ./

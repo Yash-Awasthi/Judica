@@ -4,18 +4,47 @@ import { env } from "../../config/env.js";
 import { registerUserSkillsAsTools } from "./skillExecutor.js";
 import { validateSafeUrl } from "../ssrf.js";
 
+/**
+ * Remove all occurrences of a given block-level tag (e.g. script, style) and
+ * its content using indexOf scanning.  Avoids regex-based HTML filtering which
+ * CodeQL flags as js/bad-tag-filter and js/incomplete-multi-character-sanitization.
+ */
+function removeTagBlocks(html: string, tagName: string): string {
+  const lower = html.toLowerCase();
+  const openTag = `<${tagName}`;
+  const closeTag = `</${tagName}`;
+  let result = "";
+  let cursor = 0;
+
+  while (cursor < html.length) {
+    const openIdx = lower.indexOf(openTag, cursor);
+    if (openIdx === -1) {
+      result += html.slice(cursor);
+      break;
+    }
+    // Ensure it's actually a tag start (followed by space, >, or end)
+    const charAfterOpen = lower[openIdx + openTag.length];
+    if (charAfterOpen !== undefined && charAfterOpen !== " " && charAfterOpen !== ">" && charAfterOpen !== "\t" && charAfterOpen !== "\n" && charAfterOpen !== "\r" && charAfterOpen !== "/") {
+      result += html.slice(cursor, openIdx + openTag.length);
+      cursor = openIdx + openTag.length;
+      continue;
+    }
+    result += html.slice(cursor, openIdx);
+    const closeIdx = lower.indexOf(closeTag, openIdx + openTag.length);
+    if (closeIdx === -1) {
+      break; // No closing tag — discard rest
+    }
+    const endOfClose = html.indexOf(">", closeIdx + closeTag.length);
+    cursor = endOfClose === -1 ? html.length : endOfClose + 1;
+  }
+
+  return result;
+}
+
 /** Strip HTML tags safely (handles multi-line, nested tags, entities) */
 function stripHtml(html: string): string {
-  // Use loop to handle nested/split tags — prevents incomplete-multi-character-sanitization
-  // Closing tag regex matches optional whitespace before '>' — prevents bad-tag-filter (CodeQL)
-  const SCRIPT_RE = /<script\b[\s\S]*?<\/script\s*>/gi;
-  const STYLE_RE = /<style\b[\s\S]*?<\/style\s*>/gi;
-  let result = html;
-  let prev = "";
-  while (prev !== result) {
-    prev = result;
-    result = result.replace(SCRIPT_RE, "").replace(STYLE_RE, "");
-  }
+  let result = removeTagBlocks(html, "script");
+  result = removeTagBlocks(result, "style");
   return result
     .replace(/<[^>]+>/g, " ")
     .replace(/&nbsp;/g, " ")

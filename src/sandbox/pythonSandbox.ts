@@ -241,14 +241,17 @@ export async function executePython(code: string, timeout: number = 10000): Prom
   logger.debug({ sandboxId, isolationLevel, timeout }, "Python sandbox execution starting");
 
   try {
-    // Write script to the secure temp directory created by mkdtemp
-    // Canonicalize and assert the destination is inside tmpDir — prevents path-traversal (CodeQL js/http-to-file-access)
+    // Write script to the secure temp directory created by mkdtemp.
+    // Canonicalize and assert the destination is inside tmpDir — prevents path-traversal.
+    // Flag 'wx' (O_CREAT|O_EXCL|O_WRONLY) atomically creates a new file, preventing symlink
+    // attacks and ensuring no existing file is overwritten (CodeQL js/http-to-file-access).
     const resolvedTmpFile = path.resolve(tmpFile);
     const resolvedTmpDir = path.resolve(tmpDir);
     if (!resolvedTmpFile.startsWith(resolvedTmpDir + path.sep)) {
       throw new Error("Sandbox script path escaped temp directory");
     }
-    await fs.promises.writeFile(resolvedTmpFile, SANDBOX_PREAMBLE + "\n" + code, { encoding: "utf-8", mode: 0o600 });
+    const scriptContent = SANDBOX_PREAMBLE + "\n" + code;
+    await fs.promises.writeFile(resolvedTmpFile, scriptContent, { encoding: "utf-8", mode: 0o600, flag: "wx" });
 
     return await new Promise<SandboxResult>((resolve) => {
       const stdout: string[] = [];
