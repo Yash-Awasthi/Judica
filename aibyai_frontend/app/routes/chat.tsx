@@ -1191,46 +1191,28 @@ export default function ChatPage() {
           </div>
 
           {/* Right controls */}
-          {/* Export — icon+text on >=1024, icon-only on >=640, hidden below 640 */}
+          {/* Export — icon always visible, text label on >=1024 */}
           <Button
             variant="ghost"
-            size="sm"
-            className="gap-1.5 h-8 text-xs hidden lg:flex shrink-0"
+            size="icon"
+            className="size-8 lg:w-auto lg:px-3 lg:gap-1.5 shrink-0"
             onClick={handleExportChat}
             title="Export chat"
           >
             <Download className="size-3.5" />
-            Export
+            <span className="hidden lg:inline text-xs">Export</span>
           </Button>
+
+          {/* Share — icon always visible, text label on >=1024 */}
           <Button
             variant="ghost"
             size="icon"
-            className="size-8 hidden sm:flex lg:hidden shrink-0"
-            onClick={handleExportChat}
-            title="Export chat"
-          >
-            <Download className="size-4" />
-          </Button>
-
-          {/* Share — icon+text on >=1024, icon-only on >=640, hidden below 640 */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="gap-1.5 h-8 text-xs hidden lg:flex shrink-0"
+            className="size-8 lg:w-auto lg:px-3 lg:gap-1.5 shrink-0"
             onClick={handleShare}
             title="Share"
           >
             <Share2 className="size-3.5" />
-            Share
-          </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="size-8 hidden sm:flex lg:hidden shrink-0"
-            onClick={handleShare}
-            title="Share"
-          >
-            <Share2 className="size-4" />
+            <span className="hidden lg:inline text-xs">Share</span>
           </Button>
 
           {/* Council — always visible */}
