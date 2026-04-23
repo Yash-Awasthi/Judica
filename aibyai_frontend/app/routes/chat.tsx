@@ -633,6 +633,48 @@ export default function ChatPage() {
     return () => window.removeEventListener("resize", check);
   }, []);
 
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      const isInput = target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.tagName === "SELECT" || target.isContentEditable;
+
+      // Escape — close overlays/panels
+      if (e.key === "Escape") {
+        if (mobileHistoryOpen) { setMobileHistoryOpen(false); return; }
+        if (mobileCouncilOpen) { setMobileCouncilOpen(false); return; }
+        if (customDialogOpen) { setCustomDialogOpen(false); return; }
+        if (inlineArchOpen) { setInlineArchOpen(false); return; }
+        if (inlineModelOpen) { setInlineModelOpen(false); return; }
+        if (configOpen) { setConfigOpen(false); return; }
+        if (historyOpen && layoutStage <= 1) { setHistoryOpen(false); return; }
+      }
+
+      if (isInput) return; // Don't hijack typing in inputs
+
+      // / — focus search
+      if (e.key === "/") {
+        e.preventDefault();
+        const searchInput = document.querySelector<HTMLInputElement>('[placeholder="Search..."]');
+        if (searchInput) {
+          if (!historyOpen) setHistoryOpen(true);
+          setTimeout(() => searchInput.focus(), 100);
+        }
+      }
+
+      // N — new deliberation
+      if (e.key === "n" || e.key === "N") {
+        e.preventDefault();
+        setSelectedConvId(null);
+        setMessageGroups([]);
+        setStreamingOpinions({});
+        textareaRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [mobileHistoryOpen, mobileCouncilOpen, customDialogOpen, inlineArchOpen, inlineModelOpen, configOpen, historyOpen, layoutStage]);
+
   // Responsive layout stages:
   // <640: too narrow — only one panel visible at a time (overlays)
   // 640-1024: 1st stage — two panels max (history+chat default)
