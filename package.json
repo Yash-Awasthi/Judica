@@ -28,7 +28,9 @@
     "test:load": "tsx tests/load/deliberation.load.ts",
     "bench": "tsx tests/load/deliberation.load.ts",
     "bench:light": "CONNECTIONS=10 DURATION=10 tsx tests/load/deliberation.load.ts",
-    "prepare": "husky"
+    "prepare": "husky",
+    "deploy": "wrangler deploy",
+    "preview": "wrangler dev"
   },
   "keywords": [
     "ai",
@@ -58,6 +60,7 @@
     "@fastify/cors": "^11.0.0",
     "@fastify/helmet": "^13.0.0",
     "@fastify/multipart": "^10.0.0",
+    "@fastify/oauth2": "^8.1.0",
     "@fastify/rate-limit": "^10.3.0",
     "@fastify/static": "^9.1.2",
     "@fastify/swagger": "^9.7.0",
@@ -76,7 +79,6 @@
     "mammoth": "1.12.0",
     "opossum": "9.0.0",
     "papaparse": "5.5.3",
-    "@fastify/oauth2": "^8.1.0",
     "passport": "^0.7.0",
     "passport-google-oauth20": "^2.0.0",
     "pdf-parse": "2.4.5",
@@ -110,7 +112,8 @@
     "prettier": "^3.5.3",
     "tsx": "4.21.0",
     "typescript": "6.0.3",
-    "vitest": "4.1.4"
+    "vitest": "4.1.4",
+    "wrangler": "^4.84.1"
   },
   "overrides": {
     "esbuild": ">=0.25.0"

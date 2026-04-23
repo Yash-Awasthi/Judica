@@ -54,6 +54,9 @@ import {
   RotateCcw,
   Clock,
   Zap,
+  Save,
+  FolderOpen,
+  Trash2,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -62,6 +65,12 @@ interface CouncilMember {
   id: string;
   name: string;
   model: string;
+}
+
+interface CouncilPreset {
+  id: string;
+  name: string;
+  members: Omit<CouncilMember, "id">[];
 }
 
 interface MessageGroup {
@@ -173,6 +182,36 @@ const defaultMembers: CouncilMember[] = [
   { id: "m1", name: "Architect", model: "claude-sonnet-4-6" },
   { id: "m2", name: "Pragmatist", model: "gpt-4o" },
   { id: "m3", name: "Ethicist", model: "gemini-2.5-pro" },
+];
+
+const BUILT_IN_PRESETS: CouncilPreset[] = [
+  {
+    id: "balanced",
+    name: "Balanced Council",
+    members: [
+      { name: "The Architect", model: "claude-sonnet-4-6" },
+      { name: "The Pragmatist", model: "gpt-4o" },
+      { name: "The Ethicist", model: "gemini-2.5-pro" },
+    ],
+  },
+  {
+    id: "technical",
+    name: "Technical Review",
+    members: [
+      { name: "The Architect", model: "claude-sonnet-4-6" },
+      { name: "The Empiricist", model: "gpt-4o" },
+      { name: "The Contrarian", model: "claude-sonnet-4-6" },
+    ],
+  },
+  {
+    id: "strategy",
+    name: "Strategy & Ethics",
+    members: [
+      { name: "The Pragmatist", model: "gpt-4o" },
+      { name: "The Ethicist", model: "gemini-2.5-pro" },
+      { name: "The Contrarian", model: "claude-sonnet-4-6" },
+    ],
+  },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -615,6 +654,45 @@ export default function ChatPage() {
     sessionStorage.setItem("aibyai-draft", inputValue);
   }, [inputValue]);
   const [councilMembers, setCouncilMembers] = useState<CouncilMember[]>(defaultMembers);
+  const [savedPresets, setSavedPresets] = useState<CouncilPreset[]>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const stored = localStorage.getItem("aibyai-presets");
+        return stored ? JSON.parse(stored) : [];
+      } catch { return []; }
+    }
+    return [];
+  });
+
+  // Persist presets
+  useEffect(() => {
+    localStorage.setItem("aibyai-presets", JSON.stringify(savedPresets));
+  }, [savedPresets]);
+
+  const allPresets = [...BUILT_IN_PRESETS, ...savedPresets];
+
+  const saveCurrentAsPreset = () => {
+    const name = prompt("Preset name:");
+    if (!name?.trim()) return;
+    const preset: CouncilPreset = {
+      id: `preset-${Date.now()}`,
+      name: name.trim(),
+      members: councilMembers.map(({ name, model }) => ({ name, model })),
+    };
+    setSavedPresets((prev) => [...prev, preset]);
+    setToast(`Saved preset "${name.trim()}"`);
+  };
+
+  const loadPreset = (preset: CouncilPreset) => {
+    setCouncilMembers(
+      preset.members.map((m, i) => ({ id: `p${Date.now()}-${i}`, ...m }))
+    );
+    setToast(`Loaded "${preset.name}"`);
+  };
+
+  const deletePreset = (id: string) => {
+    setSavedPresets((prev) => prev.filter((p) => p.id !== id));
+  };
 
   // Panel visibility — initial state deferred to layout effect
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -1072,6 +1150,46 @@ export default function ChatPage() {
   const CouncilPanelContent = (
     <ScrollArea className="flex-1">
       <div className="p-3 space-y-3">
+        {/* Presets */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium px-0.5">
+              Presets
+            </p>
+            <button
+              className="text-[10px] text-primary hover:underline"
+              onClick={saveCurrentAsPreset}
+              disabled={councilMembers.length === 0}
+            >
+              <span className="flex items-center gap-1"><Save className="size-2.5" /> Save Current</span>
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {allPresets.map((preset) => (
+              <div key={preset.id} className="group/preset flex items-center">
+                <button
+                  className="text-[10px] px-2 py-1 rounded-md border border-border bg-card hover:bg-muted transition-colors truncate max-w-[120px]"
+                  onClick={() => loadPreset(preset)}
+                  title={`Load: ${preset.members.map((m) => m.name).join(", ")}`}
+                >
+                  {preset.name}
+                </button>
+                {!BUILT_IN_PRESETS.some((b) => b.id === preset.id) && (
+                  <button
+                    className="size-4 flex items-center justify-center text-muted-foreground hover:text-destructive opacity-0 group-hover/preset:opacity-100 -ml-1"
+                    onClick={() => deletePreset(preset.id)}
+                    title="Delete preset"
+                  >
+                    <X className="size-2.5" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <Separator />
+
         <div className="space-y-1.5">
           <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-medium px-0.5">
             Current Council
