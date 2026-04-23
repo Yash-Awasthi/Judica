@@ -6,6 +6,7 @@ export default [
   route("register", "routes/register.tsx"),
   route("chat", "routes/chat.tsx"),
   route("chat/:id", "routes/chat-detail.tsx"),
+  route("api/deliberate", "routes/api.deliberate.tsx"),
   route("settings", "routes/settings.tsx"),
   route("profile", "routes/profile.tsx"),
   route("language-models", "routes/language-models.tsx"),

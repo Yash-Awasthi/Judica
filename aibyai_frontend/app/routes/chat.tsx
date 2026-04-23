@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from "react";
+import type { Route } from "./+types/chat";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -626,6 +627,22 @@ function InlineModelDialog({
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
+// Skip SSR — this page is fully interactive and uses browser APIs extensively
+export function clientLoader() {
+  return {};
+}
+
+export function HydrateFallback() {
+  return (
+    <div className="flex items-center justify-center h-screen bg-background">
+      <div className="flex flex-col items-center gap-3">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+        <span className="text-sm text-muted-foreground">Loading Deliberation…</span>
+      </div>
+    </div>
+  );
+}
+
 export default function ChatPage() {
   const store = useStore();
   const [conversations, setConversations] = useState(mockConversations);
@@ -721,6 +738,14 @@ export default function ChatPage() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Responsive layout stages:
+  // <640: too narrow — only one panel visible at a time (overlays)
+  // 640-1024: 1st stage — two panels max (history+chat default)
+  // 1024-1400: 2nd stage — three panels max
+  // >1400: 3rd stage — all four panels
+  const [layoutStage, setLayoutStage] = useState(3);
+  const [layoutInitialized, setLayoutInitialized] = useState(false);
+
   // Detect mobile
   useEffect(() => {
     const check = () => {
@@ -777,14 +802,6 @@ export default function ChatPage() {
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [mobileHistoryOpen, mobileCouncilOpen, customDialogOpen, inlineArchOpen, inlineModelOpen, configOpen, historyOpen, layoutStage]);
-
-  // Responsive layout stages:
-  // <640: too narrow — only one panel visible at a time (overlays)
-  // 640-1024: 1st stage — two panels max (history+chat default)
-  // 1024-1400: 2nd stage — three panels max
-  // >1400: 3rd stage — all four panels
-  const [layoutStage, setLayoutStage] = useState(3);
-  const [layoutInitialized, setLayoutInitialized] = useState(false);
 
   useEffect(() => {
     const updateLayout = () => {
@@ -861,9 +878,10 @@ export default function ChatPage() {
     });
   };
 
-  const filteredConversations = conversations.filter((c) =>
-    c.title.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredConversations = conversations.filter((c) => {
+    if (!c || typeof c.title !== "string") return true;
+    return c.title.toLowerCase().includes(searchQuery.toLowerCase());
+  });
 
   // Auto-scroll
   useEffect(() => {
@@ -951,30 +969,78 @@ export default function ChatPage() {
     setStreamingOpinions({});
     setCompletedMembers(new Set());
 
-    // Stream each member sequentially
+    const collectedOpinions: Record<string, string> = {};
+
+    // Show "thinking" indicator for ALL members immediately
+    const thinkingState: Record<string, string> = {};
     for (const member of councilMembers) {
-      if (stopRef.current) break;
-      const opinionBank = MOCK_OPINIONS[member.name] ?? MOCK_OPINIONS["Architect"];
-      const fullText = pickRandom(opinionBank);
-      await simulateStreaming(groupId, member.name, fullText);
-      await new Promise((r) => setTimeout(r, 200));
+      thinkingState[member.name] = "…";
     }
+    setStreamingOpinions(thinkingState);
+
+    // Fetch ALL member opinions in parallel
+    const fetchPromises = councilMembers.map(async (member) => {
+      try {
+        const res = await fetch("/api/deliberate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: text,
+            members: [{ name: member.name }],
+            type: "opinion",
+          }),
+        });
+        const data = await res.json();
+        return { name: member.name, text: data.text || "No response generated." };
+      } catch {
+        return { name: member.name, text: "I encountered an issue generating my response. Please try again." };
+      }
+    });
+
+    // As each response arrives, start streaming it immediately
+    const streamPromises: Promise<void>[] = [];
+    for (const promise of fetchPromises) {
+      const streamP = promise.then(async ({ name, text: fullText }) => {
+        if (stopRef.current) return;
+        collectedOpinions[name] = fullText;
+        await simulateStreaming(groupId, name, fullText);
+      });
+      streamPromises.push(streamP);
+    }
+
+    // Wait for all streams to complete
+    await Promise.all(streamPromises);
 
     const elapsed = Math.round(performance.now() - startTime);
 
     if (!stopRef.current) {
-      const verdict = pickRandom(VERDICTS);
-      const finalOpinions: Record<string, string> = {};
-      for (const member of councilMembers) {
-        const opinionBank = MOCK_OPINIONS[member.name] ?? MOCK_OPINIONS["Architect"];
-        finalOpinions[member.name] = pickRandom(opinionBank);
+      // Fetch the synthesized verdict
+      let verdict = "";
+      try {
+        const verdictRes = await fetch("/api/deliberate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            prompt: text,
+            members: Object.entries(collectedOpinions).map(([name, opinion]) => ({
+              name,
+              opinion,
+            })),
+            type: "verdict",
+          }),
+        });
+        const verdictData = await verdictRes.json();
+        verdict = verdictData.text || "The council could not reach a verdict.";
+      } catch {
+        verdict = "Failed to generate verdict. Please try again.";
       }
+
       setMessageGroups((prev) =>
         prev.map((g) =>
           g.id === groupId
             ? {
                 ...g,
-                opinions: finalOpinions,
+                opinions: collectedOpinions,
                 verdict,
                 isStreaming: false,
                 tokens: `${(Math.floor(Math.random() * 900) + 800).toLocaleString()} tokens`,
@@ -1626,7 +1692,7 @@ export default function ChatPage() {
                 ) : (
                   <Button
                     size="sm"
-                    onClick={handleSend}
+                    onClick={() => handleSend()}
                     disabled={!inputValue.trim() || councilMembers.length === 0}
                     className="gap-1.5"
                   >
