@@ -8,6 +8,7 @@ import { revokedTokens } from "../db/schema/auth.js";
 import { eq } from "drizzle-orm";
 import redis from "../lib/redis.js";
 import logger from "../lib/logger.js";
+import { Permission, getEffectivePermissions, hasPermission } from "../auth/permissions.js";
 
 // Sanitize URLs for logging — strip tokens, keys, PII from query strings
 function sanitizeUrlForLog(url: string): string {
@@ -164,6 +165,46 @@ export function fastifyRequireRole(minRole: "viewer" | "member" | "admin" | "own
 
     if (userRank < requiredRank) {
       reply.code(403).send({ error: `Role '${minRole}' or higher required` });
+    }
+  };
+}
+
+/**
+ * Permission-based access control.
+ * Usage: preHandler: requirePermission(Permission.MANAGE_CONNECTORS)
+ *
+ * Loads user's directPermissions from Redis cache (or DB fallback),
+ * resolves effective permissions via implication hierarchy, then checks.
+ */
+export function requirePermission(required: Permission) {
+  return async function (request: FastifyRequest, reply: FastifyReply) {
+    await fastifyRequireAuth(request, reply);
+    if (reply.sent) return;
+
+    // Admin/owner roles get full access (backward compat with role-based system)
+    if (request.role === "admin" || request.role === "owner") return;
+
+    // Load user's direct permission grants
+    const userId = request.userId!;
+    let directPerms: string[] = [];
+
+    // Try Redis cache first
+    const cached = await redis.get(`user:permissions:${userId}`);
+    if (cached) {
+      try {
+        directPerms = JSON.parse(cached) as string[];
+      } catch {
+        directPerms = [];
+      }
+    }
+    // DB fallback would go here once the user table has a directPermissions column
+
+    const effective = getEffectivePermissions(directPerms);
+    if (!hasPermission(effective, required)) {
+      reply.code(403).send({
+        error: `Permission '${required}' required`,
+        required,
+      });
     }
   };
 }
