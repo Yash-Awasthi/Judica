@@ -22,43 +22,73 @@ export interface ConnectorMapping {
  * Connectors are loaded lazily on first use — this avoids importing
  * heavy SDKs (Google, Slack, etc.) at startup.
  *
- * Start with the 6 highest-impact sources:
- *   Google Drive, Slack, Notion, GitHub, Confluence, Jira
- * The rest are stubbed for future implementation.
+ * 30+ connectors covering all major data source categories.
  */
 export const CONNECTOR_CLASS_MAP: Partial<Record<DocumentSource, ConnectorMapping>> = {
-  [DocumentSource.GOOGLE_DRIVE]: {
-    modulePath: "./sources/google_drive.connector",
-    className: "GoogleDriveConnector",
-  },
-  [DocumentSource.SLACK]: {
-    modulePath: "./sources/slack.connector",
-    className: "SlackConnector",
-  },
-  [DocumentSource.NOTION]: {
-    modulePath: "./sources/notion.connector",
-    className: "NotionConnector",
-  },
-  [DocumentSource.GITHUB]: {
-    modulePath: "./sources/github.connector",
-    className: "GitHubConnector",
-  },
-  [DocumentSource.CONFLUENCE]: {
-    modulePath: "./sources/confluence.connector",
-    className: "ConfluenceConnector",
-  },
-  [DocumentSource.JIRA]: {
-    modulePath: "./sources/jira.connector",
-    className: "JiraConnector",
-  },
-  [DocumentSource.WEB]: {
-    modulePath: "./sources/web.connector",
-    className: "WebConnector",
-  },
-  [DocumentSource.FILE]: {
-    modulePath: "./sources/file.connector",
-    className: "FileConnector",
-  },
+  // ─── Cloud Storage ──────────────────────────────────────────────────────────
+  [DocumentSource.GOOGLE_DRIVE]: { modulePath: "./sources/google_drive.connector", className: "GoogleDriveConnector" },
+  [DocumentSource.DROPBOX]:      { modulePath: "./sources/dropbox.connector",      className: "DropboxConnector" },
+  [DocumentSource.SHAREPOINT]:   { modulePath: "./sources/sharepoint.connector",   className: "SharePointConnector" },
+  [DocumentSource.S3]:           { modulePath: "./sources/s3.connector",           className: "S3Connector" },
+  [DocumentSource.R2]:           { modulePath: "./sources/r2.connector",           className: "R2Connector" },
+  [DocumentSource.GCS]:          { modulePath: "./sources/gcs.connector",          className: "GCSConnector" },
+
+  // ─── Collaboration / Messaging ──────────────────────────────────────────────
+  [DocumentSource.SLACK]:        { modulePath: "./sources/slack.connector",        className: "SlackConnector" },
+  [DocumentSource.DISCORD]:      { modulePath: "./sources/discord.connector",      className: "DiscordConnector" },
+  [DocumentSource.TEAMS]:        { modulePath: "./sources/teams.connector",        className: "TeamsConnector" },
+
+  // ─── Knowledge Bases / Wikis ────────────────────────────────────────────────
+  [DocumentSource.NOTION]:       { modulePath: "./sources/notion.connector",       className: "NotionConnector" },
+  [DocumentSource.CONFLUENCE]:   { modulePath: "./sources/confluence.connector",   className: "ConfluenceConnector" },
+  [DocumentSource.BOOKSTACK]:    { modulePath: "./sources/bookstack.connector",    className: "BookStackConnector" },
+  [DocumentSource.GITBOOK]:      { modulePath: "./sources/gitbook.connector",      className: "GitBookConnector" },
+  [DocumentSource.OUTLINE]:      { modulePath: "./sources/outline.connector",      className: "OutlineConnector" },
+  [DocumentSource.GURU]:         { modulePath: "./sources/guru.connector",         className: "GuruConnector" },
+  [DocumentSource.SLAB]:         { modulePath: "./sources/slab.connector",         className: "SlabConnector" },
+  [DocumentSource.CODA]:         { modulePath: "./sources/coda.connector",         className: "CodaConnector" },
+  [DocumentSource.DOCUMENT360]:  { modulePath: "./sources/document360.connector",  className: "Document360Connector" },
+
+  // ─── Project Management ─────────────────────────────────────────────────────
+  [DocumentSource.JIRA]:         { modulePath: "./sources/jira.connector",         className: "JiraConnector" },
+  [DocumentSource.LINEAR]:       { modulePath: "./sources/linear.connector",       className: "LinearConnector" },
+  [DocumentSource.ASANA]:        { modulePath: "./sources/asana.connector",        className: "AsanaConnector" },
+  [DocumentSource.CLICKUP]:      { modulePath: "./sources/clickup.connector",      className: "ClickUpConnector" },
+
+  // ─── Code Repositories ─────────────────────────────────────────────────────
+  [DocumentSource.GITHUB]:       { modulePath: "./sources/github.connector",       className: "GitHubConnector" },
+  [DocumentSource.GITLAB]:       { modulePath: "./sources/gitlab.connector",       className: "GitLabConnector" },
+  [DocumentSource.BITBUCKET]:    { modulePath: "./sources/bitbucket.connector",    className: "BitbucketConnector" },
+
+  // ─── CRM / Sales ───────────────────────────────────────────────────────────
+  [DocumentSource.SALESFORCE]:   { modulePath: "./sources/salesforce.connector",   className: "SalesforceConnector" },
+  [DocumentSource.HUBSPOT]:      { modulePath: "./sources/hubspot.connector",      className: "HubSpotConnector" },
+
+  // ─── Support / Ticketing ────────────────────────────────────────────────────
+  [DocumentSource.ZENDESK]:      { modulePath: "./sources/zendesk.connector",      className: "ZendeskConnector" },
+  [DocumentSource.FRESHDESK]:    { modulePath: "./sources/freshdesk.connector",    className: "FreshdeskConnector" },
+
+  // ─── Communication / Email ──────────────────────────────────────────────────
+  [DocumentSource.GMAIL]:        { modulePath: "./sources/gmail.connector",        className: "GmailConnector" },
+  [DocumentSource.IMAP]:         { modulePath: "./sources/imap.connector",         className: "ImapConnector" },
+
+  // ─── Community / Forums ─────────────────────────────────────────────────────
+  [DocumentSource.DISCOURSE]:    { modulePath: "./sources/discourse.connector",    className: "DiscourseConnector" },
+  [DocumentSource.XENFORO]:      { modulePath: "./sources/xenforo.connector",      className: "XenForoConnector" },
+  [DocumentSource.MEDIAWIKI]:    { modulePath: "./sources/mediawiki.connector",    className: "MediaWikiConnector" },
+  [DocumentSource.WIKIPEDIA]:    { modulePath: "./sources/wikipedia.connector",    className: "WikipediaConnector" },
+
+  // ─── Enterprise / Misc ─────────────────────────────────────────────────────
+  [DocumentSource.AIRTABLE]:     { modulePath: "./sources/airtable.connector",     className: "AirtableConnector" },
+  [DocumentSource.GOOGLE_SITES]: { modulePath: "./sources/google_sites.connector", className: "GoogleSitesConnector" },
+
+  // ─── Recording / Meetings ──────────────────────────────────────────────────
+  [DocumentSource.GONG]:         { modulePath: "./sources/gong.connector",         className: "GongConnector" },
+  [DocumentSource.FIREFLIES]:    { modulePath: "./sources/fireflies.connector",    className: "FirefliesConnector" },
+
+  // ─── Web / File ─────────────────────────────────────────────────────────────
+  [DocumentSource.WEB]:          { modulePath: "./sources/web.connector",          className: "WebConnector" },
+  [DocumentSource.FILE]:         { modulePath: "./sources/file.connector",         className: "FileConnector" },
 };
 
 // ─── Lazy-Loading Cache ───────────────────────────────────────────────────────
