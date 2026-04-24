@@ -776,3 +776,174 @@ describe("GET /dashboard", () => {
     await expect(handler(createRequest(), createReply())).rejects.toThrow("limits failed");
   });
 });
+
+// ================================================================
+// parseDays — edge cases
+// ================================================================
+describe("parseDays — called via GET /breakdown", () => {
+  it("defaults to 30 when days param is absent", async () => {
+    mockGetUserCostBreakdown.mockResolvedValue({
+      totalCost: 0, totalTokens: 0, byProvider: {}, byModel: {}, byTimeframe: {},
+    });
+    const { handler } = registeredRoutes["GET /breakdown"];
+    const reply = createReply();
+    await handler(createRequest({ query: {} }), reply);
+    expect(mockGetUserCostBreakdown).toHaveBeenCalledWith(expect.any(Number), 30);
+  });
+
+  it("clamps days > 365 to 365", async () => {
+    mockGetUserCostBreakdown.mockResolvedValue({
+      totalCost: 0, totalTokens: 0, byProvider: {}, byModel: {}, byTimeframe: {},
+    });
+    const { handler } = registeredRoutes["GET /breakdown"];
+    const reply = createReply();
+    await handler(createRequest({ query: { days: "999" } }), reply);
+    expect(mockGetUserCostBreakdown).toHaveBeenCalledWith(expect.any(Number), 365);
+    expect(reply.send).toHaveBeenCalledWith(expect.objectContaining({ period: "365 days" }));
+  });
+
+  it("defaults to 30 when days param is 0", async () => {
+    mockGetUserCostBreakdown.mockResolvedValue({
+      totalCost: 0, totalTokens: 0, byProvider: {}, byModel: {}, byTimeframe: {},
+    });
+    const { handler } = registeredRoutes["GET /breakdown"];
+    await handler(createRequest({ query: { days: "0" } }), createReply());
+    expect(mockGetUserCostBreakdown).toHaveBeenCalledWith(expect.any(Number), 30);
+  });
+
+  it("defaults to 30 when days param is negative", async () => {
+    mockGetUserCostBreakdown.mockResolvedValue({
+      totalCost: 0, totalTokens: 0, byProvider: {}, byModel: {}, byTimeframe: {},
+    });
+    const { handler } = registeredRoutes["GET /breakdown"];
+    await handler(createRequest({ query: { days: "-5" } }), createReply());
+    expect(mockGetUserCostBreakdown).toHaveBeenCalledWith(expect.any(Number), 30);
+  });
+
+  it("defaults to 30 when days param is non-numeric", async () => {
+    mockGetUserCostBreakdown.mockResolvedValue({
+      totalCost: 0, totalTokens: 0, byProvider: {}, byModel: {}, byTimeframe: {},
+    });
+    const { handler } = registeredRoutes["GET /breakdown"];
+    await handler(createRequest({ query: { days: "abc" } }), createReply());
+    expect(mockGetUserCostBreakdown).toHaveBeenCalledWith(expect.any(Number), 30);
+  });
+
+  it("accepts valid days within range", async () => {
+    mockGetUserCostBreakdown.mockResolvedValue({
+      totalCost: 0, totalTokens: 0, byProvider: {}, byModel: {}, byTimeframe: {},
+    });
+    const { handler } = registeredRoutes["GET /breakdown"];
+    await handler(createRequest({ query: { days: "14" } }), createReply());
+    expect(mockGetUserCostBreakdown).toHaveBeenCalledWith(expect.any(Number), 14);
+  });
+});
+
+// ================================================================
+// GET /per-provider
+// ================================================================
+describe("GET /per-provider", () => {
+  it("returns per-provider ledger sorted by totalCost descending", async () => {
+    mockGetUserCostBreakdown.mockResolvedValue({
+      totalCost: 15,
+      totalTokens: 5000,
+      byProvider: {
+        openai: { cost: 10, tokens: 3000, requests: 20 },
+        anthropic: { cost: 5, tokens: 2000, requests: 10 },
+      },
+      byModel: {},
+      byTimeframe: {},
+    });
+
+    const { handler } = registeredRoutes["GET /per-provider"];
+    const reply = createReply();
+    await handler(createRequest({ userId: 1, query: {} }), reply);
+
+    const result = reply.send.mock.calls[0][0];
+    expect(result.providers).toHaveLength(2);
+    // openai costs more → listed first
+    expect(result.providers[0].provider).toBe("openai");
+    expect(result.providers[0].totalCost).toBe(10);
+    expect(result.providers[0].totalTokens).toBe(3000);
+    expect(result.providers[0].requestCount).toBe(20);
+    expect(result.providers[0].avgCostPerRequest).toBeCloseTo(0.5);
+    expect(result.grandTotal).toBe(15);
+    expect(result.currency).toBe("USD");
+  });
+
+  it("computes avgCostPerRequest as 0 when requests is 0", async () => {
+    mockGetUserCostBreakdown.mockResolvedValue({
+      totalCost: 0,
+      totalTokens: 0,
+      byProvider: {
+        openai: { cost: 0, tokens: 0, requests: 0 },
+      },
+      byModel: {},
+      byTimeframe: {},
+    });
+
+    const { handler } = registeredRoutes["GET /per-provider"];
+    const reply = createReply();
+    await handler(createRequest(), reply);
+
+    const result = reply.send.mock.calls[0][0];
+    expect(result.providers[0].avgCostPerRequest).toBe(0);
+  });
+
+  it("returns empty providers array when byProvider is empty", async () => {
+    mockGetUserCostBreakdown.mockResolvedValue({
+      totalCost: 0, totalTokens: 0, byProvider: {}, byModel: {}, byTimeframe: {},
+    });
+
+    const { handler } = registeredRoutes["GET /per-provider"];
+    const reply = createReply();
+    await handler(createRequest(), reply);
+
+    const result = reply.send.mock.calls[0][0];
+    expect(result.providers).toEqual([]);
+    expect(result.grandTotal).toBe(0);
+  });
+
+  it("accepts custom days parameter", async () => {
+    mockGetUserCostBreakdown.mockResolvedValue({
+      totalCost: 0, totalTokens: 0, byProvider: {}, byModel: {}, byTimeframe: {},
+    });
+
+    const { handler } = registeredRoutes["GET /per-provider"];
+    await handler(createRequest({ query: { days: "7" } }), createReply());
+
+    expect(mockGetUserCostBreakdown).toHaveBeenCalledWith(expect.any(Number), 7);
+  });
+
+  it("includes models field from provider data", async () => {
+    mockGetUserCostBreakdown.mockResolvedValue({
+      totalCost: 5,
+      totalTokens: 1000,
+      byProvider: {
+        openai: {
+          cost: 5,
+          tokens: 1000,
+          requests: 5,
+          models: { "gpt-4o": { cost: 3, tokens: 600 }, "gpt-3.5-turbo": { cost: 2, tokens: 400 } },
+        },
+      },
+      byModel: {},
+      byTimeframe: {},
+    });
+
+    const { handler } = registeredRoutes["GET /per-provider"];
+    const reply = createReply();
+    await handler(createRequest(), reply);
+
+    const result = reply.send.mock.calls[0][0];
+    expect(result.providers[0].models).toHaveProperty("gpt-4o");
+    expect(result.providers[0].models).toHaveProperty("gpt-3.5-turbo");
+  });
+
+  it("propagates errors from getUserCostBreakdown", async () => {
+    mockGetUserCostBreakdown.mockRejectedValue(new Error("per-provider db error"));
+
+    const { handler } = registeredRoutes["GET /per-provider"];
+    await expect(handler(createRequest(), createReply())).rejects.toThrow("per-provider db error");
+  });
+});

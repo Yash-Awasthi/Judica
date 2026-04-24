@@ -140,6 +140,10 @@ jobs:
       - run: npm ci
       - run: cd frontend && npm ci
       - run: npx playwright install --with-deps chromium
+      - name: Push DB schema
+        run: npx drizzle-kit push --force
+        env:
+          DATABASE_URL: postgresql://council:council@localhost:5432/council
       - name: Run E2E tests
         run: npx playwright test --project=chromium
         env:

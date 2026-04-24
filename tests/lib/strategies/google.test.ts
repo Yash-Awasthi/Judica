@@ -11,7 +11,7 @@ vi.mock("../../../src/lib/ssrf.js", () => ({
   validateSafeUrl: vi.fn().mockResolvedValue(undefined),
 }));
 
-import { askGoogle, streamGoogle } from "../../../src/lib/strategies/google.js";
+import { askGoogle, streamGoogle } from "../../../src/lib/providers/strategies/google.js";
 import type { Provider, Message } from "../../../src/lib/providers.js";
 
 function makeProvider(overrides: Partial<Provider> = {}): Provider {

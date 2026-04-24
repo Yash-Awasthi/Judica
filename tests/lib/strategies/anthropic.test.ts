@@ -9,7 +9,7 @@ vi.mock("../../../src/lib/tools/index.js", () => ({
   callTool: vi.fn().mockResolvedValue("tool result"),
 }));
 
-import { askAnthropic, streamAnthropic } from "../../../src/lib/strategies/anthropic.js";
+import { askAnthropic, streamAnthropic } from "../../../src/lib/providers/strategies/anthropic.js";
 import type { Provider, Message } from "../../../src/lib/providers.js";
 
 function makeProvider(overrides: Partial<Provider> = {}): Provider {

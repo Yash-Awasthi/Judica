@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { addFact, getFacts, confirmFact, disputeFact, getFactContext, extractAndStoreFacts } from "../../src/agents/sharedMemory.js";
 import { db } from "../../src/lib/drizzle.js";
-import { sharedFacts } from "../../db/schema/council.js";
+import { sharedFacts } from "../../src/db/schema/council.js";
 import { routeAndCollect } from "../../src/router/index.js";
 
 vi.mock("../../src/lib/drizzle.js", () => ({

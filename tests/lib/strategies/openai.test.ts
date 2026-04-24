@@ -11,7 +11,7 @@ vi.mock("../../../src/lib/tools/index.js", () => ({
   callTool: vi.fn().mockResolvedValue({ result: "tool result" }),
 }));
 
-import { askOpenAI, streamOpenAI } from "../../../src/lib/strategies/openai.js";
+import { askOpenAI, streamOpenAI } from "../../../src/lib/providers/strategies/openai.js";
 import { validateSafeUrl } from "../../../src/lib/ssrf.js";
 import type { Provider, Message } from "../../../src/lib/providers.js";
 

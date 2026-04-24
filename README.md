@@ -17,7 +17,7 @@
 
 **Instead of trusting one model's best guess, AIBYAI runs a council — 4+ agents argue, critique each other's claims, and produce a scored consensus with a confidence number you can actually trust.**
 
-[Quick Start](#quick-start) · [Architecture](#architecture) · [Features](#features) · [Documentation](./DOCUMENTATION.md) · [Roadmap](./ROADMAP.md) · [Security](./SECURITY.md)
+[Quick Start](#quick-start) · [Architecture](#architecture) · [Features](#features) · [Documentation](./docs/DOCUMENTATION.md) · [Roadmap](./docs/ROADMAP.md) · [Security](./docs/SECURITY.md)
 
 </div>
 
@@ -274,7 +274,7 @@ docker compose up -d
 # Prometheus → http://localhost:9090
 ```
 
-> **Full setup guide, environment variables, and API reference:** [DOCUMENTATION.md](./DOCUMENTATION.md)
+> **Full setup guide, environment variables, and API reference:** [DOCUMENTATION.md](./docs/DOCUMENTATION.md)
 
 ---
 
@@ -300,7 +300,7 @@ The endpoint streams SSE events in order:
 | `metrics` | `{ tokens, cost, latency }` | Usage and cost |
 | `done` | `{ verdict, confidence, opinions }` | Final synthesis |
 
-> **Full API reference:** [DOCUMENTATION.md](./DOCUMENTATION.md#api-reference) | **Interactive docs:** `/api/docs`
+> **Full API reference:** [DOCUMENTATION.md](./docs/DOCUMENTATION.md#api-reference) | **Interactive docs:** `/api/docs`
 
 ---
 
@@ -339,14 +339,16 @@ aibyai/
 ├── tests/                  # 200+ test files, 2950+ tests (Vitest)
 ├── grafana/                # Auto-provisioned dashboards
 ├── scripts/                # Setup, load tests, provider diagnostics
+├── docs/                   # Project documentation
+│   ├── DOCUMENTATION.md    #   Complete technical reference and API docs
+│   ├── CONTRIBUTING.md     #   Development guide and contribution workflow
+│   ├── SECURITY.md         #   Vulnerability reporting and security policy
+│   ├── THREAT_MODEL.md     #   Attack surface analysis and trust boundaries
+│   └── ROADMAP.md          #   Planned features by phase
 ├── .github/workflows/      # CI: lint, typecheck, test, security audit, CodeQL
 ├── docker-compose.yml      # PostgreSQL + Redis + Prometheus + Grafana
 ├── Dockerfile              # Multi-stage build with HEALTHCHECK
-├── DOCUMENTATION.md        # Complete technical reference and API docs
-├── CONTRIBUTING.md         # Development guide and contribution workflow
-├── SECURITY.md             # Vulnerability reporting and security policy
-├── THREAT_MODEL.md         # Attack surface analysis and trust boundaries
-└── ROADMAP.md              # Planned features by phase
+└── README.md               # This file
 ```
 
 ---
@@ -368,7 +370,7 @@ aibyai/
 | **HTML Sanitization** | Loop-based script/style stripping preventing nested-tag bypass |
 | **Path Safety** | Canonicalization + boundary checks on all file operations (no TOCTOU) |
 
-See [SECURITY.md](./SECURITY.md) for the vulnerability reporting policy and [THREAT_MODEL.md](./THREAT_MODEL.md) for the full attack surface analysis.
+See [SECURITY.md](./docs/SECURITY.md) for the vulnerability reporting policy and [THREAT_MODEL.md](./docs/THREAT_MODEL.md) for the full attack surface analysis.
 
 ---
 
@@ -385,7 +387,7 @@ See [SECURITY.md](./SECURITY.md) for the vulnerability reporting policy and [THR
 4. Commit with conventional commits: `feat:`, `fix:`, `docs:`, `refactor:`
 5. Push and open a pull request
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full development guide, architecture overview, and instructions for adding new providers, archetypes, and workflow nodes.
+See [CONTRIBUTING.md](./docs/CONTRIBUTING.md) for the full development guide, architecture overview, and instructions for adding new providers, archetypes, and workflow nodes.
 
 ---
 
@@ -393,6 +395,6 @@ See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full development guide, archite
 
 **Built with deliberation, not hallucination.**
 
-[Report a Bug](https://github.com/Yash-Awasthi/aibyai/issues) · [Request a Feature](https://github.com/Yash-Awasthi/aibyai/issues) · [Roadmap](./ROADMAP.md) · [Documentation](./DOCUMENTATION.md)
+[Report a Bug](https://github.com/Yash-Awasthi/aibyai/issues) · [Request a Feature](https://github.com/Yash-Awasthi/aibyai/issues) · [Roadmap](./docs/ROADMAP.md) · [Documentation](./docs/DOCUMENTATION.md)
 
 </div>

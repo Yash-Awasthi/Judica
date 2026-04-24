@@ -109,12 +109,12 @@ describe("quotaTracker", () => {
     it("should clear usage for a provider", () => {
       recordUsage(provider, 500);
       expect(getRemainingQuota(provider, 10, 1000).requests_used).toBe(1);
-      resetQuota(provider, undefined, true);
+      resetQuota(provider);
       expect(getRemainingQuota(provider, 10, 1000).requests_used).toBe(0);
     });
 
     it("should be safe to call on unknown provider", () => {
-      expect(() => resetQuota("nonexistent", undefined, true)).not.toThrow();
+      expect(() => resetQuota("nonexistent")).not.toThrow();
     });
   });
 
@@ -135,5 +135,71 @@ describe("quotaTracker", () => {
       const fresh = getAllQuotas();
       expect(fresh[provider].requests_used).toBe(1);
     });
+  });
+});
+
+// ── Per-user quota tracking ───────────────────────────────────────────────────
+
+describe("quotaTracker — per-user quota tracking", () => {
+  let base: string;
+  let counter = 0;
+
+  beforeEach(() => {
+    base = `per-user-${++counter}-${Date.now()}`;
+  });
+
+  it("tracks user quota separately from global provider quota", () => {
+    recordUsage(base, 100);             // global
+    recordUsage(base, 200, "user-1");   // user-1
+
+    const global = getRemainingQuota(base, 100, 99999);
+    const user1 = getRemainingQuota(base, 100, 99999, "user-1");
+
+    expect(global.requests_used).toBe(1);
+    expect(global.tokens_used).toBe(100);
+    expect(user1.requests_used).toBe(1);
+    expect(user1.tokens_used).toBe(200);
+  });
+
+  it("canUse respects per-user limits independently of global", () => {
+    // Exhaust global
+    for (let i = 0; i < 5; i++) recordUsage(base, 10);
+    // User-1 untouched
+    expect(canUse(base, 5, 99999)).toBe(false);
+    expect(canUse(base, 5, 99999, "user-1")).toBe(true);
+  });
+
+  it("two different users have independent counters", () => {
+    recordUsage(base, 1000, "user-a");
+    recordUsage(base, 500, "user-b");
+
+    const a = getRemainingQuota(base, 10, 99999, "user-a");
+    const b = getRemainingQuota(base, 10, 99999, "user-b");
+
+    expect(a.tokens_used).toBe(1000);
+    expect(b.tokens_used).toBe(500);
+  });
+
+  it("resetQuota with userId only resets that user's entry", () => {
+    recordUsage(base, 999, "user-x");
+    recordUsage(base, 50);  // global
+
+    resetQuota(base, "user-x");
+
+    expect(getRemainingQuota(base, 10, 99999, "user-x").requests_used).toBe(0);
+    expect(getRemainingQuota(base, 10, 99999).requests_used).toBe(1);
+  });
+});
+
+// ── MAX_QUOTA_ENTRIES pruning ─────────────────────────────────────────────────
+
+describe("quotaTracker — MAX_QUOTA_ENTRIES stale pruning", () => {
+  it("does not throw when many unique providers are tracked", () => {
+    // Record 200 unique providers — pruning only triggers at 10_001, so this just
+    // verifies the happy path stays stable under higher-than-normal load.
+    const ts = Date.now();
+    for (let i = 0; i < 200; i++) {
+      expect(() => recordUsage(`prune-provider-${i}-${ts}`, 1)).not.toThrow();
+    }
   });
 });

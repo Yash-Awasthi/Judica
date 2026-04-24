@@ -25,7 +25,7 @@ vi.mock("../../../../src/lib/breaker.js", () => ({
 
 import { GoogleProvider } from "../../../../src/lib/providers/concrete/google.js";
 import { calculateCost } from "../../../../src/lib/cost.js";
-import { callTool } from "../../../../src/lib/tools/index.js";
+import { callTool, getToolDefinitions } from "../../../../src/lib/tools/index.js";
 
 function makeProvider(overrides = {}) {
   return new GoogleProvider({
@@ -40,6 +40,7 @@ function makeProvider(overrides = {}) {
 describe("GoogleProvider", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    (getToolDefinitions as any).mockReturnValue([]);
     vi.stubGlobal("fetch", vi.fn());
   });
 
@@ -255,5 +256,148 @@ describe("GoogleProvider", () => {
       expect.stringContaining("gemini-2.0-flash"),
       expect.anything()
     );
+  });
+});
+
+// ── Streaming (onChunk) tests ─────────────────────────────────────────────────
+
+function makeGoogleSseBody(lines: string[]) {
+  const encoder = new TextEncoder();
+  const chunks = lines.map((l) => encoder.encode(l + "\n"));
+  let index = 0;
+  return {
+    body: {
+      getReader: () => ({
+        read: vi.fn().mockImplementation(async () => {
+          if (index < chunks.length) return { done: false, value: chunks[index++] };
+          return { done: true, value: undefined };
+        }),
+      }),
+    },
+  };
+}
+
+describe("GoogleProvider — streaming (onChunk)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (getToolDefinitions as any).mockReturnValue([]);
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  it("calls onChunk for each text part and returns aggregated text", async () => {
+    const streamBody = makeGoogleSseBody([
+      `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: "Hello" }] } }] })}`,
+      `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: " world" }] } }], usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 2, totalTokenCount: 12 } })}`,
+    ]);
+
+    (global.fetch as any).mockResolvedValue({ ok: true, ...streamBody });
+
+    const chunks: string[] = [];
+    const provider = makeProvider();
+    const result = await provider.call({
+      messages: [{ role: "user", content: "hi" }],
+      onChunk: (c: string) => chunks.push(c),
+    });
+
+    expect(chunks).toEqual(["Hello", " world"]);
+    expect(result.text).toBe("Hello world");
+    expect(result.usage.promptTokens).toBe(10);
+    expect(result.usage.completionTokens).toBe(2);
+  });
+
+  it("captures usageMetadata from stream for token counts", async () => {
+    const streamBody = makeGoogleSseBody([
+      `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: "done" }] } }], usageMetadata: { promptTokenCount: 50, candidatesTokenCount: 25, totalTokenCount: 75 } })}`,
+    ]);
+
+    (global.fetch as any).mockResolvedValue({ ok: true, ...streamBody });
+
+    const provider = makeProvider();
+    const result = await provider.call({
+      messages: [{ role: "user", content: "test" }],
+      onChunk: () => {},
+    });
+
+    expect(result.usage.promptTokens).toBe(50);
+    expect(result.usage.completionTokens).toBe(25);
+    expect(result.usage.totalTokens).toBe(75);
+  });
+
+  it("handles malformed SSE lines without throwing", async () => {
+    const streamBody = makeGoogleSseBody([
+      "not-a-data-line",
+      "data: bad-json{{",
+      `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ text: "ok" }] } }] })}`,
+    ]);
+
+    (global.fetch as any).mockResolvedValue({ ok: true, ...streamBody });
+
+    const provider = makeProvider();
+    const result = await provider.call({
+      messages: [{ role: "user", content: "test" }],
+      onChunk: () => {},
+    });
+
+    expect(result.text).toBe("ok");
+  });
+
+  it("throws when SSE buffer exceeds MAX_BUFFER_SIZE", async () => {
+    const encoder = new TextEncoder();
+    let called = false;
+    const streamBody = {
+      body: {
+        getReader: () => ({
+          read: vi.fn().mockImplementation(async () => {
+            if (!called) {
+              called = true;
+              return { done: false, value: encoder.encode("x".repeat(11_000_000)) };
+            }
+            return { done: true, value: undefined };
+          }),
+        }),
+      },
+    };
+
+    (global.fetch as any).mockResolvedValue({ ok: true, ...streamBody });
+
+    const provider = makeProvider();
+    await expect(
+      provider.call({
+        messages: [{ role: "user", content: "test" }],
+        onChunk: () => {},
+      })
+    ).rejects.toThrow(/buffer exceeded/);
+  });
+
+  it("processes functionCall parts and makes recursive tool call", async () => {
+    const toolStreamBody = makeGoogleSseBody([
+      `data: ${JSON.stringify({ candidates: [{ content: { parts: [{ functionCall: { name: "search", args: { q: "test" } } }] } }] })}`,
+    ]);
+
+    (global.fetch as any)
+      .mockResolvedValueOnce({ ok: true, ...toolStreamBody })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: vi.fn().mockResolvedValue({
+          candidates: [{ content: { parts: [{ text: "Result" }] } }],
+          usageMetadata: { promptTokenCount: 10, candidatesTokenCount: 5, totalTokenCount: 15 },
+        }),
+      });
+
+    (callTool as any).mockResolvedValue({ result: "search data" });
+    (getToolDefinitions as any).mockReturnValue([
+      { name: "search", description: "Search", parameters: { type: "object", properties: {} } }
+    ]);
+
+    const provider = makeProvider();
+    const result = await provider.call({
+      messages: [{ role: "user", content: "search for test" }],
+      onChunk: () => {},
+    });
+
+    expect(callTool).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "search", arguments: { q: "test" } })
+    );
+    expect(result.text).toBe("Result");
   });
 });

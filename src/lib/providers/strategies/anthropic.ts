@@ -1,8 +1,8 @@
 // P2-05: DEPRECATED — Strictly inferior to src/adapters/anthropic.adapter.ts.
-import type { Message, Provider } from "../providers.js";
-import { getToolDefinitions, callTool } from "../tools/index.js";
-import { validateSafeUrl } from "../ssrf.js";
-import logger from "../logger.js";
+import type { Message, Provider } from "../../providers.js";
+import { getToolDefinitions, callTool } from "../../tools/index.js";
+import { validateSafeUrl } from "../../ssrf.js";
+import logger from "../../logger.js";
 
 // P7-40: Maximum tool-call recursion depth to prevent stack overflow
 const MAX_TOOL_RECURSION_DEPTH = 5;

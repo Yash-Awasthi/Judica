@@ -265,3 +265,135 @@ describe("OpenAIProvider", () => {
     ).rejects.toThrow("AbortError");
   });
 });
+
+// ── Streaming (onChunk) tests ─────────────────────────────────────────────────
+
+function makeOpenAiSseBody(lines: string[]) {
+  const encoder = new TextEncoder();
+  const chunks = lines.map((l) => encoder.encode(l + "\n"));
+  let index = 0;
+  return {
+    body: {
+      getReader: () => ({
+        read: vi.fn().mockImplementation(async () => {
+          if (index < chunks.length) return { done: false, value: chunks[index++] };
+          return { done: true, value: undefined };
+        }),
+      }),
+    },
+  };
+}
+
+describe("OpenAIProvider — streaming (onChunk)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    (getToolDefinitions as any).mockReturnValue([]);
+    vi.stubGlobal("fetch", vi.fn());
+  });
+
+  it("calls onChunk for each text delta and returns aggregated text", async () => {
+    const streamBody = makeOpenAiSseBody([
+      `data: ${JSON.stringify({ choices: [{ delta: { content: "Hello" } }] })}`,
+      `data: ${JSON.stringify({ choices: [{ delta: { content: " world" } }] })}`,
+      `data: ${JSON.stringify({ choices: [{ delta: {} }], usage: { prompt_tokens: 10, completion_tokens: 2, total_tokens: 12 } })}`,
+      "data: [DONE]",
+    ]);
+
+    (global.fetch as any).mockResolvedValue({ ok: true, ...streamBody });
+
+    const chunks: string[] = [];
+    const provider = makeProvider();
+    const result = await provider.call({
+      messages: [{ role: "user", content: "hi" }],
+      onChunk: (c: string) => chunks.push(c),
+    });
+
+    expect(chunks).toEqual(["Hello", " world"]);
+    expect(result.text).toBe("Hello world");
+    expect(result.usage.promptTokens).toBe(10);
+    expect(result.usage.completionTokens).toBe(2);
+  });
+
+  it("handles [DONE] marker without error", async () => {
+    const streamBody = makeOpenAiSseBody([
+      `data: ${JSON.stringify({ choices: [{ delta: { content: "done" } }] })}`,
+      "data: [DONE]",
+    ]);
+
+    (global.fetch as any).mockResolvedValue({ ok: true, ...streamBody });
+
+    const provider = makeProvider();
+    const result = await provider.call({
+      messages: [{ role: "user", content: "test" }],
+      onChunk: () => {},
+    });
+
+    expect(result.text).toBe("done");
+  });
+
+  it("handles malformed SSE chunks gracefully", async () => {
+    const streamBody = makeOpenAiSseBody([
+      "not-a-data-line",
+      "data: {{invalid json",
+      `data: ${JSON.stringify({ choices: [{ delta: { content: "ok" } }] })}`,
+      "data: [DONE]",
+    ]);
+
+    (global.fetch as any).mockResolvedValue({ ok: true, ...streamBody });
+
+    const provider = makeProvider();
+    const result = await provider.call({
+      messages: [{ role: "user", content: "test" }],
+      onChunk: () => {},
+    });
+
+    expect(result.text).toBe("ok");
+  });
+
+  it("throws when SSE buffer exceeds MAX_BUFFER_SIZE", async () => {
+    const hugeChunk = "x".repeat(11_000_000);
+    const encoder = new TextEncoder();
+    let called = false;
+    const streamBody = {
+      body: {
+        getReader: () => ({
+          read: vi.fn().mockImplementation(async () => {
+            if (!called) {
+              called = true;
+              return { done: false, value: encoder.encode(hugeChunk) };
+            }
+            return { done: true, value: undefined };
+          }),
+        }),
+      },
+    };
+
+    (global.fetch as any).mockResolvedValue({ ok: true, ...streamBody });
+
+    const provider = makeProvider();
+    await expect(
+      provider.call({
+        messages: [{ role: "user", content: "test" }],
+        onChunk: () => {},
+      })
+    ).rejects.toThrow(/buffer exceeded/);
+  });
+
+  it("uses estimated completion tokens when stream provides no usage", async () => {
+    const streamBody = makeOpenAiSseBody([
+      `data: ${JSON.stringify({ choices: [{ delta: { content: "text" } }] })}`,
+      "data: [DONE]",
+    ]);
+
+    (global.fetch as any).mockResolvedValue({ ok: true, ...streamBody });
+
+    const provider = makeProvider();
+    const result = await provider.call({
+      messages: [{ role: "user", content: "test" }],
+      onChunk: () => {},
+    });
+
+    // No usage in stream → falls back to estimated completionTokens = ceil(text.length / 4) = 1
+    expect(result.usage.completionTokens).toBeGreaterThan(0);
+  });
+});

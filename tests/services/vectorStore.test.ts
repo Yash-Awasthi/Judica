@@ -28,6 +28,11 @@ vi.mock("../../src/lib/logger.js", () => ({
   default: { info: vi.fn(), debug: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
+const mockRouteAndCollect = vi.fn();
+vi.mock("../../src/router/index.js", () => ({
+  routeAndCollect: (...args: any[]) => mockRouteAndCollect(...args),
+}));
+
 // ── Import SUT after mocks ──────────────────────────────────────────────────
 
 import {
@@ -38,6 +43,9 @@ import {
   deleteKBChunks,
   deleteDocChunks,
   safeVectorLiteral,
+  enrichWithParentContext,
+  hydeSearch,
+  enhancedHybridSearch,
 } from "../../src/services/vectorStore.service.js";
 
 // ── Helpers ─────────────────────────────────────────────────────────────────
@@ -60,6 +68,7 @@ describe("vectorStore.service", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockEmbed.mockResolvedValue(FAKE_EMBEDDING);
+    mockRouteAndCollect.mockResolvedValue({ text: "Hypothetical document answer." });
   });
 
   // ── storeChunk ──────────────────────────────────────────────────────────
@@ -452,6 +461,184 @@ describe("vectorStore.service", () => {
       // Should not contain any SQL-injectable characters
       expect(result).not.toMatch(/[;'"\\]/);
       expect(result).toMatch(/^\[[\d.,-]+\]$/);
+    });
+
+    it("rejects vectors exceeding 4096 dimensions", () => {
+      const bigVec = Array.from({ length: 4097 }, () => 0.1);
+      expect(() => safeVectorLiteral(bigVec)).toThrow(/exceeds maximum 4096/);
+    });
+  });
+
+  // ── enrichWithParentContext ─────────────────────────────────────────────────
+
+  describe("enrichWithParentContext", () => {
+    it("returns chunks unchanged when input is empty", async () => {
+      const result = await enrichWithParentContext([]);
+      expect(result).toEqual([]);
+      expect(mockExecute).not.toHaveBeenCalled();
+    });
+
+    it("returns chunks unchanged when none have parentChunkId", async () => {
+      // First execute: returns rows with no parentChunkId
+      mockExecute.mockResolvedValueOnce({ rows: [] }); // parentInfo query returns no rows with parentChunkId
+
+      const chunks = [makeChunk({ id: "c1" }), makeChunk({ id: "c2" })];
+      const result = await enrichWithParentContext(chunks);
+
+      expect(result).toEqual(chunks);
+    });
+
+    it("prepends parent context to child chunks", async () => {
+      const chunks = [makeChunk({ id: "child-1", content: "Child content." })];
+
+      // First execute: parentInfo rows (id → parentChunkId mapping)
+      mockExecute.mockResolvedValueOnce({
+        rows: [{ id: "child-1", parentChunkId: "parent-1" }],
+      });
+
+      // Second execute: parent content
+      mockExecute.mockResolvedValueOnce({
+        rows: [{ id: "parent-1", content: "Parent context." }],
+      });
+
+      const result = await enrichWithParentContext(chunks);
+
+      expect(result[0].content).toContain("[PARENT CONTEXT]");
+      expect(result[0].content).toContain("Parent context.");
+      expect(result[0].content).toContain("Child content.");
+    });
+
+    it("leaves chunks unmodified when parent content is not found", async () => {
+      const chunks = [makeChunk({ id: "child-1", content: "Child." })];
+
+      mockExecute.mockResolvedValueOnce({
+        rows: [{ id: "child-1", parentChunkId: "parent-missing" }],
+      });
+
+      // Parent not found in second query
+      mockExecute.mockResolvedValueOnce({ rows: [] });
+
+      const result = await enrichWithParentContext(chunks);
+      expect(result[0].content).toBe("Child.");
+    });
+
+    it("passes ids to the first query and parentIds to the second", async () => {
+      const chunks = [makeChunk({ id: "c1" })];
+
+      mockExecute.mockResolvedValueOnce({ rows: [{ id: "c1", parentChunkId: "p1" }] });
+      mockExecute.mockResolvedValueOnce({ rows: [{ id: "p1", content: "Parent." }] });
+
+      await enrichWithParentContext(chunks);
+
+      expect(mockExecute).toHaveBeenCalledTimes(2);
+      // First call should include "c1" for fetching parentChunkId info
+      const firstCall = JSON.stringify(mockExecute.mock.calls[0][0]);
+      expect(firstCall).toContain("c1");
+      // Second call should include "p1" for fetching parent content
+      const secondCall = JSON.stringify(mockExecute.mock.calls[1][0]);
+      expect(secondCall).toContain("p1");
+    });
+  });
+
+  // ── hydeSearch ─────────────────────────────────────────────────────────────
+
+  describe("hydeSearch", () => {
+    it("generates a hypothetical document and embeds it before querying", async () => {
+      mockRouteAndCollect.mockResolvedValue({ text: "Hypothetical answer text." });
+      mockExecute.mockResolvedValue({ rows: [] });
+
+      await hydeSearch(1, "What is the capital of France?");
+
+      // routeAndCollect called to generate hypothetical doc
+      expect(mockRouteAndCollect).toHaveBeenCalledTimes(1);
+      // embed called with the hypothetical text, NOT the raw query
+      expect(mockEmbed).toHaveBeenCalledWith("Hypothetical answer text.");
+    });
+
+    it("falls back to raw query embedding when routeAndCollect fails", async () => {
+      mockRouteAndCollect.mockRejectedValue(new Error("LLM unavailable"));
+      mockExecute.mockResolvedValue({ rows: [] });
+
+      await hydeSearch(1, "my query");
+
+      // Falls back to raw query
+      expect(mockEmbed).toHaveBeenCalledWith("my query");
+    });
+
+    it("returns rows from the db query", async () => {
+      const rows = [makeChunk({ id: "hyde-1", score: 0.88 })];
+      mockRouteAndCollect.mockResolvedValue({ text: "Hypothetical." });
+      mockExecute.mockResolvedValue({ rows });
+
+      const result = await hydeSearch(1, "query");
+      expect(result).toEqual(rows);
+    });
+
+    it("clamps limit to MAX_SEARCH_LIMIT (100)", async () => {
+      mockRouteAndCollect.mockResolvedValue({ text: "Hypothetical." });
+      mockExecute.mockResolvedValue({ rows: [] });
+
+      await hydeSearch(1, "q", null, 999);
+
+      const sqlObj = mockExecute.mock.calls[0][0];
+      // Should use clamped limit, not 999
+      const limitValue = sqlObj.values.find((v: unknown) => typeof v === "number" && (v as number) <= 100);
+      expect(limitValue).toBeDefined();
+    });
+  });
+
+  // ── enhancedHybridSearch ───────────────────────────────────────────────────
+
+  describe("enhancedHybridSearch", () => {
+    it("runs 2 searches (vector + keyword) by default without HyDE", async () => {
+      mockExecute.mockResolvedValue({ rows: [] });
+
+      await enhancedHybridSearch(1, "q");
+
+      expect(mockEmbed).toHaveBeenCalledTimes(1); // only vector search calls embed
+      expect(mockExecute).toHaveBeenCalledTimes(2);
+    });
+
+    it("runs 3 searches when useHyde=true", async () => {
+      mockRouteAndCollect.mockResolvedValue({ text: "Hypothetical." });
+      mockExecute.mockResolvedValue({ rows: [] });
+
+      await enhancedHybridSearch(1, "q", null, 5, true);
+
+      // searchSimilar + keywordSearch + hydeSearch each call execute once
+      expect(mockExecute).toHaveBeenCalledTimes(3);
+    });
+
+    it("merges results with RRF and returns top N", async () => {
+      const vecRows = [makeChunk({ id: "v1" }), makeChunk({ id: "v2" })];
+      const kwRows = [makeChunk({ id: "v2" }), makeChunk({ id: "kw1" })];
+      mockExecute
+        .mockResolvedValueOnce({ rows: vecRows })
+        .mockResolvedValueOnce({ rows: kwRows });
+
+      const result = await enhancedHybridSearch(1, "q", null, 3);
+
+      // v2 overlaps → highest RRF score
+      expect(result[0].id).toBe("v2");
+      expect(result.length).toBeLessThanOrEqual(3);
+    });
+
+    it("returns empty array when all searches yield no results", async () => {
+      mockExecute.mockResolvedValue({ rows: [] });
+
+      const result = await enhancedHybridSearch(1, "q");
+      expect(result).toEqual([]);
+    });
+
+    it("passes kbId to sub-searches", async () => {
+      mockExecute.mockResolvedValue({ rows: [] });
+
+      await enhancedHybridSearch(1, "q", "kb-test");
+
+      const allCalls = mockExecute.mock.calls;
+      for (const call of allCalls) {
+        expect(JSON.stringify(call[0].values)).toContain("kb-test");
+      }
     });
   });
 });

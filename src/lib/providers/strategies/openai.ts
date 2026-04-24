@@ -1,9 +1,9 @@
 // P2-05: DEPRECATED — Strictly inferior to src/adapters/openai.adapter.ts.
 // Has regressions vs adapter layer (no tool streaming, missing features).
 // Will be deleted once all callers migrate to adapter.generate().
-import type { Message, Provider } from "../providers.js";
-import { getToolDefinitions, callTool } from "../tools/index.js";
-import { validateSafeUrl } from "../ssrf.js";
+import type { Message, Provider } from "../../providers.js";
+import { getToolDefinitions, callTool } from "../../tools/index.js";
+import { validateSafeUrl } from "../../ssrf.js";
 
 // P7-40: Maximum tool-call recursion depth to prevent stack overflow
 const MAX_TOOL_RECURSION_DEPTH = 5;

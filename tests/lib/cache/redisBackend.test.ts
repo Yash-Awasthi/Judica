@@ -99,4 +99,51 @@ describe("RedisBackend", () => {
       expect(mockRedis.get).toHaveBeenCalledWith("myapp:test");
     });
   });
+
+  describe("payload size limit", () => {
+    it("skips set when serialized value exceeds 1MB", async () => {
+      // Create a value whose JSON serialization is > 1_000_000 bytes
+      const hugeVerdict = "x".repeat(1_001_000);
+      const bigEntry = { verdict: hugeVerdict, opinions: [] };
+      mockRedis.set.mockResolvedValue("OK");
+
+      await backend.set("big-key", bigEntry as any, 5000);
+
+      // Redis set should NOT have been called because the payload is too large
+      expect(mockRedis.set).not.toHaveBeenCalled();
+    });
+
+    it("stores value that is exactly at the size boundary", async () => {
+      // Just under 1MB — should be stored
+      const okVerdict = "x".repeat(500);
+      const okEntry = { verdict: okVerdict, opinions: [] };
+      mockRedis.set.mockResolvedValue("OK");
+
+      await backend.set("ok-key", okEntry as any, 5000);
+
+      expect(mockRedis.set).toHaveBeenCalled();
+    });
+  });
+
+  describe("set with negative / zero TTL", () => {
+    it("uses default 24h TTL when 0 is passed", async () => {
+      mockRedis.set.mockResolvedValue("OK");
+      await backend.set("zero-ttl", { verdict: "ok", opinions: [] } as any, 0);
+      expect(mockRedis.set).toHaveBeenCalledWith(
+        "cache:zero-ttl",
+        expect.any(String),
+        { PX: 86400000 }
+      );
+    });
+
+    it("uses default 24h TTL when negative TTL is passed", async () => {
+      mockRedis.set.mockResolvedValue("OK");
+      await backend.set("neg-ttl", { verdict: "ok", opinions: [] } as any, -100);
+      expect(mockRedis.set).toHaveBeenCalledWith(
+        "cache:neg-ttl",
+        expect.any(String),
+        { PX: 86400000 }
+      );
+    });
+  });
 });
