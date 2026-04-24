@@ -26,7 +26,13 @@ export const users = pgTable("User", {
   // Explicit auth method flag instead of relying on empty passwordHash
   authMethod: text("authMethod", { enum: ["password", "github", "google"] }).default("password").notNull(),
   customInstructions: text("customInstructions").default("").notNull(),
+  displayName: text("displayName"),
+  /** Auth provider: "password" | "github" | "google" | "scim" | "saml" */
+  provider: text("provider").default("password"),
+  /** External ID from SCIM / SSO identity provider */
+  externalId: text("externalId"),
   createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).defaultNow(),
   role: text("role").default("member").notNull(),
   isActive: boolean("isActive").default(true).notNull(),
 });
