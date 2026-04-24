@@ -30,7 +30,7 @@ export const providerSchema = z.object({
     .or(z.literal("").transform(() => undefined))
     .optional(),
   model: z.string().min(1).max(100),
-  // P1-24: Restrict baseUrl to http/https protocols only
+  // Restrict baseUrl to http/https protocols only
   // L-10: Warn if http:// (not https://) is used — https strongly preferred
   baseUrl: z.string().url().refine(
     (url) => /^https?:\/\//i.test(url),
@@ -50,7 +50,7 @@ export const askSchema = z
       .min(1, "Question cannot be empty")
       .max(4000, "Question too long"),
     conversationId: z.string().uuid().optional(),
-    // P8-53: Cap members array to prevent cost explosion (archetypes × member count)
+    // Cap members array to prevent cost explosion (archetypes × member count)
     members: z
       .array(providerSchema)
       .min(1, "At least one council member required")
@@ -104,7 +104,7 @@ export const authSchema = z.object({
     .min(3, "Username must be at least 3 characters")
     .max(30)
     .regex(/^[a-zA-Z0-9_]+$/, "Username can only contain letters, numbers, underscores"),
-  // P8-54: NIST SP 800-63B recommends min 12 chars + at least one non-alpha character
+  // NIST SP 800-63B recommends min 12 chars + at least one non-alpha character
   password: z.string()
     .min(12, "Password must be at least 12 characters")
     .max(100)
@@ -113,7 +113,7 @@ export const authSchema = z.object({
     }),
 });
 
-// P1-15: Strict schema for PUT /settings — whitelist known keys
+// Strict schema for PUT /settings — whitelist known keys
 export const userSettingsSchema = z.object({
   theme: z.enum(["light", "dark", "system"]).optional(),
   language: z.string().min(2).max(10).optional(),

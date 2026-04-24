@@ -277,7 +277,7 @@ Task: ${description}`,
   }
 
   return {
-    id: `chain_${crypto.randomUUID()}`, // P27-10: Use crypto.randomUUID instead of timestamp
+    id: `chain_${crypto.randomUUID()}`, // Use crypto.randomUUID instead of timestamp
     name: parsed.name,
     steps: parsed.steps,
     createdAt: new Date().toISOString(),

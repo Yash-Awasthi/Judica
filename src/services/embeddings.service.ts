@@ -26,14 +26,14 @@ export async function embed(text: string): Promise<number[]> {
     });
     if (!res.ok) throw new Error(`OpenAI embeddings failed: ${res.status} ${await res.text()}`);
     const data = await res.json() as { data: Array<{ embedding: number[] }> };
-    // P38-04: Validate API response structure before accessing
+    // Validate API response structure before accessing
     if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
       throw new Error("OpenAI embeddings returned empty or malformed response");
     }
     embedding = data.data[0].embedding;
   } else if (env.GOOGLE_API_KEY) {
     const TARGET_DIMENSIONS = 1536;
-    // P25-09: Move API key from URL query parameter to header to prevent key leaking in logs
+    // Move API key from URL query parameter to header to prevent key leaking in logs
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/text-embedding-004:embedContent`,
       {
@@ -47,7 +47,7 @@ export async function embed(text: string): Promise<number[]> {
     );
     if (!res.ok) throw new Error(`Gemini embeddings failed: ${res.status} ${await res.text()}`);
     const data = await res.json() as { embedding: { values: number[] } };
-    // P38-05: Validate Gemini response structure
+    // Validate Gemini response structure
     if (!data.embedding || !Array.isArray(data.embedding.values) || data.embedding.values.length === 0) {
       throw new Error("Gemini embeddings returned empty or malformed response");
     }
@@ -77,7 +77,7 @@ export async function embed(text: string): Promise<number[]> {
 }
 
 export async function embedBatch(texts: string[]): Promise<number[][]> {
-  // P25-10: Cap batch size to prevent memory exhaustion
+  // Cap batch size to prevent memory exhaustion
   const MAX_BATCH_SIZE = 200;
   if (texts.length > MAX_BATCH_SIZE) {
     texts = texts.slice(0, MAX_BATCH_SIZE);

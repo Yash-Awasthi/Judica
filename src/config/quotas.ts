@@ -1,7 +1,7 @@
 
-// P2-28: Quota limits are now configurable via env vars with sensible defaults.
+// Quota limits are now configurable via env vars with sensible defaults.
 // Supports tiered overrides per user role in the future.
-// P22-03: NaN guards — fall back to defaults if env vars are non-numeric
+// NaN guards — fall back to defaults if env vars are non-numeric
 const _parsedDailyReq = parseInt(process.env.QUOTA_DAILY_REQUESTS || "100", 10);
 export const DAILY_REQUEST_LIMIT = Number.isFinite(_parsedDailyReq) && _parsedDailyReq > 0 ? _parsedDailyReq : 100;
 const _parsedDailyTokens = parseInt(process.env.QUOTA_DAILY_TOKENS || "1000000", 10);

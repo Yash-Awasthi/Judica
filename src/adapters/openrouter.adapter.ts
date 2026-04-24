@@ -1,5 +1,5 @@
-// P1-09: OpenRouter adapter now extends the shared OpenAICompatibleAdapter base class.
-// P1-08: Added OpenRouter-specific transforms/route/provider.order support.
+// OpenRouter adapter now extends the shared OpenAICompatibleAdapter base class.
+// Added OpenRouter-specific transforms/route/provider.order support.
 import type { AdapterRequest } from "./types.js";
 import { OpenAICompatibleAdapter } from "./openaiCompatible.adapter.js";
 
@@ -14,7 +14,7 @@ export class OpenRouterAdapter extends OpenAICompatibleAdapter {
     return "OpenRouter";
   }
 
-  // P7-31: Read referer from env to support white-label deployments
+  // Read referer from env to support white-label deployments
   protected override getExtraHeaders(): Record<string, string> {
     return {
       "HTTP-Referer": process.env.OPENROUTER_REFERER || "https://aibyai.app",
@@ -61,7 +61,7 @@ export class OpenRouterAdapter extends OpenAICompatibleAdapter {
   }
 
   protected override getExtraBody(req: AdapterRequest): Record<string, unknown> {
-    // P1-08: Use OpenRouter's built-in routing features
+    // Use OpenRouter's built-in routing features
     const extra: Record<string, unknown> = {
       transforms: ["middle-out"],
       route: "fallback",

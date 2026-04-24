@@ -9,7 +9,7 @@ export interface CodeSearchResult {
   score: number;
 }
 
-// P19-03: Cap search limit to prevent excessive DB load
+// Cap search limit to prevent excessive DB load
 const MAX_SEARCH_LIMIT = 50;
 
 export async function searchRepo(

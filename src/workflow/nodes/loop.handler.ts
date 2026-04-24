@@ -2,18 +2,18 @@ import ivm from "isolated-vm";
 import type { NodeHandler } from "../types.js";
 
 /**
- * P3-27: User-supplied expressions run in isolated-vm, NOT eval().
+ * User-supplied expressions run in isolated-vm, NOT eval().
  * The sandbox has no access to process, require, fs, or any Node.js globals.
  * Expression length is capped to prevent excessive compilation overhead.
  */
 const MAX_EXPR_LENGTH = 2000;
 
-// P10-110: Configurable global loop timeout (default 5 minutes)
-// P19-07: Guard against NaN from invalid env var
+// Configurable global loop timeout (default 5 minutes)
+// Guard against NaN from invalid env var
 const _parsedLoopTimeout = parseInt(process.env.LOOP_TOTAL_TIMEOUT_MS || "300000", 10);
 const LOOP_TOTAL_TIMEOUT_MS = Number.isFinite(_parsedLoopTimeout) && _parsedLoopTimeout > 0 ? _parsedLoopTimeout : 300000;
 
-// P10-107: Reuse a single isolate across iterations to avoid 100x startup overhead
+// Reuse a single isolate across iterations to avoid 100x startup overhead
 async function safeEvalExpr(
   isolate: ivm.Isolate,
   expr: string,
@@ -21,7 +21,7 @@ async function safeEvalExpr(
   index: number,
   items: unknown[],
 ): Promise<unknown> {
-  // P3-27: Reject excessively long expressions to prevent compilation DoS
+  // Reject excessively long expressions to prevent compilation DoS
   if (expr.length > MAX_EXPR_LENGTH) {
     throw new Error(`Expression exceeds maximum length of ${MAX_EXPR_LENGTH} characters`);
   }
@@ -31,7 +31,7 @@ async function safeEvalExpr(
 
   await jail.set("__item", new ivm.ExternalCopy(item).copyInto());
   await jail.set("__index", index);
-  // P10-108: Pass only current item count instead of full items array to avoid O(n²) copying
+  // Pass only current item count instead of full items array to avoid O(n²) copying
   await jail.set("__length", items.length);
 
   const script = await isolate.compileScript(
@@ -56,18 +56,18 @@ export const loopHandler: NodeHandler = async (ctx) => {
   const accumulator = (ctx.nodeData.accumulator as string) || "collect";
 
   const results: unknown[] = [];
-  const errors: { index: number; error: string }[] = []; // P10-109: Track per-iteration errors
+  const errors: { index: number; error: string }[] = []; // Track per-iteration errors
   const limit = Math.min(items.length, maxIterations);
 
-  // P10-110: Global loop timeout
+  // Global loop timeout
   const loopStart = Date.now();
 
-  // P10-107: Create one isolate for all iterations
+  // Create one isolate for all iterations
   const isolate = new ivm.Isolate({ memoryLimit: 64 });
 
   try {
     for (let i = 0; i < limit; i++) {
-      // P10-110: Check global timeout
+      // Check global timeout
       if (Date.now() - loopStart > LOOP_TOTAL_TIMEOUT_MS) {
         errors.push({ index: i, error: `Loop terminated: exceeded total timeout of ${LOOP_TOTAL_TIMEOUT_MS}ms` });
         break;
@@ -102,7 +102,7 @@ export const loopHandler: NodeHandler = async (ctx) => {
       }
     }
   } finally {
-    // P10-107: Dispose shared isolate once after all iterations
+    // Dispose shared isolate once after all iterations
     try { isolate.dispose(); } catch { /* dispose may throw if already disposed */ }
   }
 

@@ -61,14 +61,14 @@ interface MemberResponse {
   memberName: string;
   text: string;
   usage: { prompt_tokens: number; completion_tokens: number };
-  // P8-18: Track what model actually served the request
+  // Track what model actually served the request
   resolvedModel?: string;
 }
 
 
 const HUMAN_GATE_TIMEOUT_MS = 5 * 60 * 1000;
 const MAX_PENDING_GATES = 100;
-// P8-19: Redis key prefix for persisted gate state
+// Redis key prefix for persisted gate state
 const GATE_REDIS_PREFIX = "human_gate:";
 
 const pendingHumanGates = new Map<
@@ -76,7 +76,7 @@ const pendingHumanGates = new Map<
   { resolve: (choice: string) => void; promise: Promise<string>; timer: ReturnType<typeof setTimeout>; createdAt: number }
 >();
 
-// P8-19: Persist gate to Redis so it survives server restarts
+// Persist gate to Redis so it survives server restarts
 async function _persistGate(gateId: string, data: { conversationId?: string; createdAt: number }): Promise<void> {
   try {
     await redis.set(`${GATE_REDIS_PREFIX}${gateId}`, JSON.stringify(data), { EX: Math.ceil(HUMAN_GATE_TIMEOUT_MS / 1000) });
@@ -122,7 +122,7 @@ export class DeliberationOrchestrator {
   }
 
   async *run(input: OrchestrationInput): AsyncGenerator<OrchestrationEvent> {
-    // P8-16: Guarantee bus.reset() even if an exception is thrown mid-orchestration
+    // Guarantee bus.reset() even if an exception is thrown mid-orchestration
     try {
       yield* this._runInner(input);
     } finally {
@@ -213,7 +213,7 @@ export class DeliberationOrchestrator {
         memberName: member.name,
         text: result.text,
         usage: result.usage,
-        // P5-09: Use typed interface instead of unsafe any cast
+        // Use typed interface instead of unsafe any cast
         resolvedModel: (result as { resolvedModel?: string }).resolvedModel || member.model || "auto",
       };
     });
@@ -313,7 +313,7 @@ export class DeliberationOrchestrator {
           temperature: memberB.temperature ?? 0.7,
         });
 
-        // P8-13: Use structured JSON detection instead of string matching
+        // Use structured JSON detection instead of string matching
         // to prevent prompt injection where model outputs "concede" to manipulate flow
         const rebuttalText = rebuttalResult.text;
         let rebuttalType: "concession" | "rebuttal" = "rebuttal";
@@ -359,7 +359,7 @@ export class DeliberationOrchestrator {
     // ── 6. RELIABILITY UPDATE ──────────────────────────────────────────────────
 
     // Build member->model map and track concessions for reliability scoring
-    // P8-18: Use resolvedModel (actual provider used) instead of configured model
+    // Use resolvedModel (actual provider used) instead of configured model
     const memberModels = new Map<string, string>();
     for (const resp of memberResponses) {
       memberModels.set(resp.memberId, resp.resolvedModel || "auto");
@@ -482,7 +482,7 @@ export class DeliberationOrchestrator {
       );
     }
 
-    // P8-17: Check token budget before synthesis — truncate if too large
+    // Check token budget before synthesis — truncate if too large
     const MAX_SYNTHESIS_INPUT_CHARS = 60_000; // ~15k tokens conservative estimate
     let synthesisContent = synthesisInput.join("\n");
     if (synthesisContent.length > MAX_SYNTHESIS_INPUT_CHARS) {
@@ -491,7 +491,7 @@ export class DeliberationOrchestrator {
       synthesisContent = synthesisContent.slice(0, MAX_SYNTHESIS_INPUT_CHARS) + "\n\n[... truncated for token budget ...]";
     }
 
-    // P8-15: Use structured prompt builder — user-controlled strings are
+    // Use structured prompt builder — user-controlled strings are
     // wrapped in [USER_INPUT] delimiters so LLMs treat them as data not instructions
     const consensusBias = promptDna?.consensusBias || "neutral";
     const synthesisPrompt = `You are a master synthesizer for an AI deliberation council.
@@ -514,7 +514,7 @@ ${synthesisContent}
 
 Produce the final synthesis:`;
 
-    // P8-14: Pass userId so "auto"-model synthesis calls are attributed to user's quota
+    // Pass userId so "auto"-model synthesis calls are attributed to user's quota
     const synthesisResult = await routeAndCollect({
       model: "auto",
       messages: [{ role: "user", content: synthesisPrompt }],
@@ -562,6 +562,6 @@ Produce the final synthesis:`;
     };
 
     // ── 11. CLEANUP ──────────────────────────────────────────────────────────
-    // P8-16: bus.reset() moved to finally block in run() wrapper
+    // bus.reset() moved to finally block in run() wrapper
   }
 }

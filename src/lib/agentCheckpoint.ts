@@ -1,5 +1,5 @@
 /**
- * P4-15: Redis-backed checkpoints for background agents.
+ * Redis-backed checkpoints for background agents.
  *
  * Background agents (research, ingestion, etc.) run via BullMQ workers.
  * If the process restarts, in-progress work is lost. This module provides

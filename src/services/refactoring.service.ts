@@ -107,7 +107,7 @@ Return ONLY the JSON array.`,
 
     const match = result.text.match(/\[[\s\S]*\]/);
     if (match) {
-      // P32-09: Safe JSON.parse with try-catch + cap results
+      // Safe JSON.parse with try-catch + cap results
       try {
         const opps = JSON.parse(match[0]) as RefactoringOpportunity[];
         return Array.isArray(opps) ? opps.slice(0, 50) : [];
@@ -267,7 +267,7 @@ export async function refactorCode(
   // Limit to top N by severity
   const severityOrder: Record<string, number> = { critical: 0, warning: 1, suggestion: 2 };
   opportunities.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
-  // P28-10: Hard cap maxOpportunities to prevent unbounded parallel LLM calls
+  // Hard cap maxOpportunities to prevent unbounded parallel LLM calls
   const maxOps = Math.min(options?.maxOpportunities ?? 5, 20);
   opportunities = opportunities.slice(0, maxOps);
 

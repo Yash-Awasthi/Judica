@@ -17,7 +17,7 @@ export const conversations = pgTable(
   "Conversation",
   {
     id: text("id").primaryKey(),
-    // P8-35: userId must be NOT NULL — prevents orphaned conversations
+    // userId must be NOT NULL — prevents orphaned conversations
     userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
     title: text("title").default("New Conversation").notNull(),
     createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
@@ -26,7 +26,7 @@ export const conversations = pgTable(
     sessionSummary: text("sessionSummary"),
     projectId: text("projectId").references(() => projects.id, { onDelete: "set null" }),
     activeTab: text("activeTab").default("discussion").notNull(),
-    // P8-42: TODO — summaryData is a large JSON blob stored inline; move to ConversationSummary side table
+    // TODO — summaryData is a large JSON blob stored inline; move to ConversationSummary side table
     summaryData: jsonb("summaryData"),
   },
   (table) => [
@@ -40,7 +40,7 @@ export const chats = pgTable(
   "Chat",
   {
     id: serial("id").primaryKey(),
-    // P55-02: userId must be NOT NULL — prevents orphaned chats without an owner
+    // userId must be NOT NULL — prevents orphaned chats without an owner
     userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
     question: text("question").notNull(),
     verdict: text("verdict").notNull(),
@@ -90,12 +90,12 @@ export const auditLogs = pgTable(
   "AuditLog",
   {
     id: serial("id").primaryKey(),
-    // P55-03: userId must be NOT NULL — audit logs require user attribution for accountability
+    // userId must be NOT NULL — audit logs require user attribution for accountability
     userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
     conversationId: text("conversationId").references(() => conversations.id, {
       onDelete: "cascade",
     }),
-    // P9-07: sessionId as first-class indexed column (was only in metadata JSON)
+    // sessionId as first-class indexed column (was only in metadata JSON)
     sessionId: text("sessionId"),
     modelName: text("modelName").notNull(),
     prompt: text("prompt").notNull(),
@@ -112,9 +112,9 @@ export const auditLogs = pgTable(
       table.createdAt,
     ),
     index("AuditLog_userId_createdAt_idx").on(table.userId, table.createdAt),
-    // P9-06: GIN index on metadata JSONB to avoid full-table scans on audit queries
+    // GIN index on metadata JSONB to avoid full-table scans on audit queries
     index("AuditLog_metadata_gin_idx").using("gin", table.metadata),
-    // P9-07: Index on sessionId for direct lookups
+    // Index on sessionId for direct lookups
     index("AuditLog_sessionId_idx").on(table.sessionId),
   ],
 );
@@ -135,7 +135,7 @@ export const semanticCache = pgTable(
   (table) => [
     index("SemanticCache_embedding_hnsw_idx")
       .using("hnsw", table.embedding.op("vector_cosine_ops")),
-    // P55-08: Index for cache expiry cleanup queries (DELETE WHERE expiresAt < NOW())
+    // Index for cache expiry cleanup queries (DELETE WHERE expiresAt < NOW())
     index("SemanticCache_expiresAt_idx").on(table.expiresAt),
   ],
 );
@@ -154,7 +154,7 @@ export const topicNodes = pgTable(
     summary: text("summary"),
     embedding: vector("embedding", { dimensions: 1536 }),
     conversationIds: jsonb("conversationIds").$type<string[]>().default([]).notNull(),
-    // P8-43: Denormalized counter — should use DB trigger or atomic increment
+    // Denormalized counter — should use DB trigger or atomic increment
     // to prevent concurrent race drift. See migration script.
     strength: integer("strength").default(1).notNull(),
     createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),

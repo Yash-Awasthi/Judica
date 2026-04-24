@@ -1,5 +1,5 @@
 /**
- * P5-05: Replaced passport-github2 (abandoned) with @fastify/oauth2.
+ * Replaced passport-github2 (abandoned) with @fastify/oauth2.
  *
  * This module provides a Fastify plugin that registers GitHub OAuth2 routes:
  *   GET /api/auth/github          — redirects to GitHub login
@@ -126,7 +126,7 @@ export async function githubOAuthPlugin(fastify: FastifyInstance): Promise<void>
         .limit(1);
 
       if (existing) {
-        // P8-34: Use explicit authMethod instead of checking passwordHash === ""
+        // Use explicit authMethod instead of checking passwordHash === ""
         if (existing.authMethod === "password") {
           return reply.code(409).send({ error: "An account with this email already exists from a different sign-in method." });
         }

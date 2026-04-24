@@ -52,7 +52,7 @@ export async function evaluateCouncilSession(
     const efficiency = calculateEfficiency(totalTokens, agentOutputs.length, duration);
 
     const weights = { coherence: 0.25, consensus: 0.25, diversity: 0.2, quality: 0.2, efficiency: 0.1 };
-    // P10-52: All criteria normalized to [0,1]; overallScore is [0,100] (criteria * 100)
+    // All criteria normalized to [0,1]; overallScore is [0,100] (criteria * 100)
     const overallScore = Math.max(0, Math.min(100, (
       coherence * weights.coherence +
       consensus * weights.consensus +
@@ -142,7 +142,7 @@ function calculateDiversity(outputs: AgentOutput[]): number {
   const meanLength = lengths.reduce((sum, l) => sum + l, 0) / lengths.length;
   const lengthVariance = lengths.reduce((sum, l) => sum + Math.pow(l - meanLength, 2), 0) / lengths.length;
 
-  // P10-49: Normalize diversity scores relative to council size
+  // Normalize diversity scores relative to council size
   // Larger councils naturally have more variance; normalize to make scores comparable
   const sizeFactor = Math.log2(outputs.length) / Math.log2(10); // Normalize to ~10 agents
   const confidenceDiversity = Math.min(variance * 4 / Math.max(sizeFactor, 0.5), 1);
@@ -154,7 +154,7 @@ function calculateDiversity(outputs: AgentOutput[]): number {
     keywords.forEach(k => allKeywords.add(k));
   });
 
-  // P10-49: Normalize keyword diversity by expected keywords per agent
+  // Normalize keyword diversity by expected keywords per agent
   const expectedKeywordsPerAgent = 8;
   const keywordDiversity = Math.min(allKeywords.size / (outputs.length * expectedKeywordsPerAgent), 1);
 
@@ -167,7 +167,7 @@ function calculateQuality(outputs: AgentOutput[]): number {
   for (const output of outputs) {
     let quality = 0;
 
-    // P10-47: Use semantic quality metrics instead of pure length
+    // Use semantic quality metrics instead of pure length
     // Structural completeness: has answer, reasoning, key points
     const hasSubstantiveAnswer = output.answer.length >= 50;
     const hasReasoning = output.reasoning.length >= 50;
@@ -194,15 +194,15 @@ function calculateQuality(outputs: AgentOutput[]): number {
   return outputs.length > 0 ? totalQuality / outputs.length : 0;
 }
 
-// P10-48: Configurable efficiency baselines via environment variables
+// Configurable efficiency baselines via environment variables
 const _parsedDuration = parseInt(process.env.EVAL_OPTIMAL_DURATION_PER_AGENT_MS || "10000", 10);
 const _parsedTokens = parseInt(process.env.EVAL_OPTIMAL_TOKENS_PER_AGENT || "1000", 10);
-// P29-07: NaN guards on env var parses
+// NaN guards on env var parses
 const OPTIMAL_DURATION_PER_AGENT_MS = Number.isFinite(_parsedDuration) && _parsedDuration > 0 ? _parsedDuration : 10000;
 const OPTIMAL_TOKENS_PER_AGENT = Number.isFinite(_parsedTokens) && _parsedTokens > 0 ? _parsedTokens : 1000;
 
 function calculateEfficiency(totalTokens: number, agentCount: number, duration: number): number {
-  // P29-08: Guard against division by zero when agentCount is 0
+  // Guard against division by zero when agentCount is 0
   if (agentCount <= 0) return 0;
   const tokensPerAgent = totalTokens / agentCount;
 
@@ -215,7 +215,7 @@ function calculateEfficiency(totalTokens: number, agentCount: number, duration: 
 }
 
 function extractKeywords(text: string): string[] {
-  // P10-53: Improved keyword extraction — handle punctuation, multi-word terms, stopwords
+  // Improved keyword extraction — handle punctuation, multi-word terms, stopwords
   const words = text.toLowerCase()
     .replace(/[^\w\s-]/g, ' ') // Keep hyphens for compound words
     .replace(/\s+/g, ' ')
@@ -306,7 +306,7 @@ async function storeEvaluationResult(result: EvaluationResult): Promise<void> {
       timestamp: result.timestamp
     });
   } catch (err) {
-    // P10-55: Log at error level with structured context for alerting
+    // Log at error level with structured context for alerting
     logger.error({
       err: (err as Error).message,
       sessionId: result.sessionId,
@@ -345,7 +345,7 @@ export async function getUserEvaluationMetrics(userId: number, days: number = 30
     };
   }
 
-  // P10-54: Require minimum sample size for stable rolling averages
+  // Require minimum sample size for stable rolling averages
   const MIN_SAMPLE_SIZE = 3;
   const stableResults = results.length >= MIN_SAMPLE_SIZE;
 
@@ -354,7 +354,7 @@ export async function getUserEvaluationMetrics(userId: number, days: number = 30
   const averageQuality = results.reduce((sum, e) => sum + e.quality, 0) / results.length;
   const averageEfficiency = results.reduce((sum, e) => sum + e.efficiency, 0) / results.length;
 
-  // P10-54: Only compute trend when enough samples exist
+  // Only compute trend when enough samples exist
   const midpoint = Math.floor(results.length / 2);
   const firstHalf = results.slice(0, midpoint);
   const secondHalf = results.slice(midpoint);
@@ -362,7 +362,7 @@ export async function getUserEvaluationMetrics(userId: number, days: number = 30
   const firstHalfAvg = firstHalf.length > 0 ? firstHalf.reduce((sum, e) => sum + e.overallScore, 0) / firstHalf.length : 0;
   const secondHalfAvg = secondHalf.length > 0 ? secondHalf.reduce((sum, e) => sum + e.overallScore, 0) / secondHalf.length : 0;
 
-  const improvementTrend = stableResults ? (secondHalfAvg - firstHalfAvg) : 0; // P10-54: No trend from <3 samples
+  const improvementTrend = stableResults ? (secondHalfAvg - firstHalfAvg) : 0; // No trend from <3 samples
 
   return {
     averageConsensus,
@@ -371,7 +371,7 @@ export async function getUserEvaluationMetrics(userId: number, days: number = 30
     averageEfficiency,
     totalEvaluations: results.length,
     improvementTrend,
-    // P10-51: userSatisfaction requires user feedback integration (thumbs up/down)
+    // userSatisfaction requires user feedback integration (thumbs up/down)
     // Currently returns 0 until feedback collection is wired up in the UI
     userSatisfaction: 0
   };
@@ -401,7 +401,7 @@ export async function benchmarkCouncilPerformance(
   const userScore = metrics.averageConsensus * 25 + metrics.averageQuality * 25 + metrics.averageDiversity * 25 + metrics.averageEfficiency * 25;
   const benchmarkScore = (Number(benchmarks?.avgOverallScore) || 0) * 100;
 
-  // P10-50: Fix percentile — use proper ratio with NaN guard
+  // Fix percentile — use proper ratio with NaN guard
   const percentile = benchmarkScore > 0
     ? Math.max(0, Math.min(100, (userScore / benchmarkScore) * 50)) // 50 = at benchmark average
     : (userScore > 0 ? 75 : 50); // No benchmark data: default to above-average if user has score

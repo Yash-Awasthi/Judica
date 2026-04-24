@@ -19,7 +19,7 @@ const outputHandler: NodeHandler = async (ctx) => ({ ...ctx.inputs });
 // Placeholder for HUMAN_GATE — actual logic lives in the executor
 const humanGateHandler: NodeHandler = async (ctx) => ({ ...ctx.inputs });
 
-// P59-06: Exported as ReadonlyMap to prevent handler registry mutation
+// Exported as ReadonlyMap to prevent handler registry mutation
 export const nodeHandlers: ReadonlyMap<NodeType, NodeHandler> = new Map<NodeType, NodeHandler>([
   [NodeType.INPUT, inputHandler],
   [NodeType.OUTPUT, outputHandler],

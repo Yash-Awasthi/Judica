@@ -1,11 +1,11 @@
-// P2-05: DEPRECATED — Strictly inferior to src/adapters/openai.adapter.ts.
+// DEPRECATED — Strictly inferior to src/adapters/openai.adapter.ts.
 // Has regressions vs adapter layer (no tool streaming, missing features).
 // Will be deleted once all callers migrate to adapter.generate().
 import type { Message, Provider } from "../../providers.js";
 import { getToolDefinitions, callTool } from "../../tools/index.js";
 import { validateSafeUrl } from "../../ssrf.js";
 
-// P7-40: Maximum tool-call recursion depth to prevent stack overflow
+// Maximum tool-call recursion depth to prevent stack overflow
 const MAX_TOOL_RECURSION_DEPTH = 5;
 
 interface ProviderResult {
@@ -58,7 +58,7 @@ export async function askOpenAI(
 
   const msg = data.choices?.[0]?.message;
   if (msg?.tool_calls?.length) {
-    // P7-40: Prevent infinite recursion
+    // Prevent infinite recursion
     if (_depth >= MAX_TOOL_RECURSION_DEPTH) {
       throw new Error(`Tool-call recursion limit (${MAX_TOOL_RECURSION_DEPTH}) exceeded`);
     }
@@ -68,7 +68,7 @@ export async function askOpenAI(
       const safeResult = `[UNTRUSTED TOOL OUTPUT]\n${result}\n[/UNTRUSTED TOOL OUTPUT]`;
       nextMessages.push({ role: "tool", tool_call_id: tc.id, name: tc.function.name, content: safeResult });
     }
-    // P1-12: Pass abort signal through to recursive tool call
+    // Pass abort signal through to recursive tool call
     return askFn(provider, nextMessages, isFallback, signal);
   }
 
@@ -132,7 +132,7 @@ export async function streamOpenAI(
   let usage: ProviderResult["usage"];
   let inThink = false;
   const toolCalls: Array<{ id: string; name: string; args: string }> = [];
-  // P1-10: Buffer across reads and split on \n boundary properly
+  // Buffer across reads and split on \n boundary properly
   let buffer = "";
 
   while (true) {
@@ -190,7 +190,7 @@ export async function streamOpenAI(
   }
 
   if (toolCalls.length > 0) {
-    // P7-40: Prevent infinite recursion
+    // Prevent infinite recursion
     if (_depth >= MAX_TOOL_RECURSION_DEPTH) {
       throw new Error(`Tool-call recursion limit (${MAX_TOOL_RECURSION_DEPTH}) exceeded`);
     }
@@ -207,7 +207,7 @@ export async function streamOpenAI(
       const safeResult = `[UNTRUSTED TOOL OUTPUT]\n${result.result}\n[/UNTRUSTED TOOL OUTPUT]`;
       nextMessages.push({ role: "tool", tool_call_id: tc.id, name: tc.name, content: safeResult });
     }
-    // P1-12: Pass abort signal through to recursive tool call
+    // Pass abort signal through to recursive tool call
     return streamFn(provider, nextMessages, onChunk, isFallback, signal);
   }
 

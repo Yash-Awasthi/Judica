@@ -75,7 +75,7 @@ export async function recordContradiction(
   conversationId: string,
   contradiction: DetectedContradiction,
 ): Promise<string> {
-  // P25-01: Use crypto.randomUUID for unpredictable IDs
+  // Use crypto.randomUUID for unpredictable IDs
   const id = `contra_${randomUUID()}`;
 
   await db.insert(contradictionRecords).values({
@@ -127,7 +127,7 @@ export async function resolveContradiction(
     reason,
   };
 
-  // P25-08: Cap versions array to prevent unbounded growth
+  // Cap versions array to prevent unbounded growth
   const MAX_CONTRADICTION_VERSIONS = 50;
   const updatedVersions = [...(existing.versions || []), newVersion];
   if (updatedVersions.length > MAX_CONTRADICTION_VERSIONS) {

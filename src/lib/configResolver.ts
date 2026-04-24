@@ -1,12 +1,12 @@
 
 
-// P10-16: Priority scoring semantics:
+// Priority scoring semantics:
 // - Priority is a 0-1000 integer scale (higher = more preferred)
 // - Default priority for system providers: 100
 // - User-specified priorities override system defaults
 // - All code paths use the same scale via the `priority` field on ResolvedProvider.
 
-// P10-19: This module imports CouncilServiceError from services/councilService.ts,
+// This module imports CouncilServiceError from services/councilService.ts,
 // creating a lib → services dependency. This is acceptable as a thin error type import.
 // TODO: Move CouncilServiceError to a shared types/errors.ts to eliminate the cycle.
 import type { Provider } from "./providers.js";
@@ -56,10 +56,10 @@ export function validateUserConfig(
       warnings.push(`Multiple masters specified (${masters.length}), will select highest priority`);
     }
 
-    // P10-18: Deduplicate by (name + model) pair, not just name.
+    // Deduplicate by (name + model) pair, not just name.
     // Same provider with different models (e.g., openai/gpt-4o and openai/gpt-4o-mini)
     // should be treated as distinct providers.
-    // P22-09: Replace unsafe (as any) cast with proper type access
+    // Replace unsafe (as any) cast with proper type access
     const nameModelPairs = config.providers.map(p => `${p.name}:${(p as UserProviderConfig & { model?: string }).model || ""}`);
     const duplicates = nameModelPairs.filter((pair, index) => nameModelPairs.indexOf(pair) !== index);
     if (duplicates.length > 0) {
@@ -83,7 +83,7 @@ export function loadSystemProviders(): Provider[] {
       type: "api",
       provider: "openai",
       apiKey: env.OPENAI_API_KEY,
-      // P10-14: Model names configurable via env vars instead of hardcoded
+      // Model names configurable via env vars instead of hardcoded
       model: process.env.OPENAI_MODEL || "gpt-4o",
       baseUrl: "https://api.openai.com/v1"
     });
@@ -109,7 +109,7 @@ export function loadSystemProviders(): Provider[] {
     });
   }
 
-  // P10-13: Ollama is opt-in — only added when OLLAMA_ENABLED=true is explicitly set.
+  // Ollama is opt-in — only added when OLLAMA_ENABLED=true is explicitly set.
   // Previously injected unconditionally, causing silent failures when no Ollama is running.
   if (process.env.OLLAMA_ENABLED === "true") {
     providers.push({
@@ -244,7 +244,7 @@ function enforceConstraints(
   }
 
   if (valid.length > maxAgents) {
-    // P10-15: Warn with names of dropped providers instead of silently truncating
+    // Warn with names of dropped providers instead of silently truncating
     const dropped = valid.slice(maxAgents).map(p => p.name);
     logger.warn({ dropped, maxAgents, total: valid.length }, "Provider list truncated — excess providers dropped");
     constraints.push(`Limited to ${maxAgents} agents (had ${valid.length}); dropped: ${dropped.join(", ")}`);
@@ -304,7 +304,7 @@ export function composeCouncil(
   );
   appliedConstraints.push(...constraints);
 
-  // P10-17: preferLocalMix flag is deprecated — the local-mix routing strategy
+  // preferLocalMix flag is deprecated — the local-mix routing strategy
   // was never implemented. This check is kept for backward compatibility with
   // existing user configs but has no functional effect.
   if (userConfig?.preferLocalMix && members.length > 1) {

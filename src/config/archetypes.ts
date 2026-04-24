@@ -34,7 +34,7 @@ export interface Archetype {
   colorBg?: string;
 }
 
-// P7-43: Tool assignment policy:
+// Tool assignment policy:
 // - Archetypes that need external data get ["web_search", "read_webpage"]
 // - Archetypes that need computation get ["execute_code"]
 // - Pure reasoning archetypes get no tools (they synthesize from other agents' findings)
@@ -201,7 +201,7 @@ Be precise, clinical, and merciless. Do not soften criticism. The council is str
   }
 };
 
-// P7-42: SUMMONS defines priority-ordered subsets per task type.
+// SUMMONS defines priority-ordered subsets per task type.
 // Only the first 5 archetypes are summoned by default (configurable via council size).
 // Previously all 13+ were listed making filtering a no-op.
 export const SUMMONS: Record<string, string[]> = {
@@ -268,7 +268,7 @@ export const COUNCIL_TEMPLATES: Record<string, CouncilTemplate> = {
 
 export const UNIVERSAL_PROMPT = "You are a highly capable, balanced AI assistant. Provide a direct, factual, and comprehensive answer without any specific persona bias.";
 
-// P4-04: Zod validation for archetypes config at module load time
+// Zod validation for archetypes config at module load time
 import { z } from "zod";
 
 const archetypeSchema = z.object({
@@ -298,7 +298,7 @@ archetypesMapSchema.parse(ARCHETYPES);
 summonsMapSchema.parse(SUMMONS);
 templatesMapSchema.parse(COUNCIL_TEMPLATES);
 
-// P22-05: Freeze config objects to prevent runtime mutation bypassing Zod validation
+// Freeze config objects to prevent runtime mutation bypassing Zod validation
 Object.freeze(ARCHETYPES);
 Object.freeze(SUMMONS);
 Object.freeze(COUNCIL_TEMPLATES);

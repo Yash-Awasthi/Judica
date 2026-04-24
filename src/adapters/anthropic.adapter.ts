@@ -49,7 +49,7 @@ export class AnthropicAdapter implements IProviderAdapter {
         headers: {
           "Content-Type": "application/json",
           "x-api-key": this.apiKey,
-          // P1-07: Updated to 2023-10-01 for parallel tools and cache_control support
+          // Updated to 2023-10-01 for parallel tools and cache_control support
           "anthropic-version": "2023-10-01",
         },
         body: JSON.stringify(body),
@@ -57,7 +57,7 @@ export class AnthropicAdapter implements IProviderAdapter {
         signal: AbortSignal.timeout(DEFAULT_TIMEOUT_MS),
       });
 
-    // P3-04: Use minimal shape instead of legacy Provider type
+    // Use minimal shape instead of legacy Provider type
     const breaker = getBreaker({ name: this.providerId } as { name: string }, fetchMessages);
     const res: Response = await breaker.fire();
 
@@ -81,7 +81,7 @@ export class AnthropicAdapter implements IProviderAdapter {
       }
 
       if (m.role === "tool") {
-        // P7-26: Validate tool_call_id exists — Anthropic rejects requests without it
+        // Validate tool_call_id exists — Anthropic rejects requests without it
         if (!m.tool_call_id) {
           logger.warn("Skipping tool result with missing tool_call_id");
           continue;
@@ -124,7 +124,7 @@ export class AnthropicAdapter implements IProviderAdapter {
               source: { type: "base64", media_type: block.media_type, data: block.data },
             });
           } else if (block.type === "image_url" && block.url) {
-            // P1-02: Anthropic doesn't natively support image URLs; use text placeholder
+            // Anthropic doesn't natively support image URLs; use text placeholder
             content.push({ type: "text", text: `[Image: ${block.url}]` });
           } else {
             content.push({ type: "text", text: String(block.text || "") });
@@ -145,12 +145,12 @@ export class AnthropicAdapter implements IProviderAdapter {
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
-    // P1-01: Use a Map keyed by content block index to support parallel tool_use
+    // Use a Map keyed by content block index to support parallel tool_use
     // without clobbering. Previous scalar variables lost data when Anthropic
     // streamed multiple tool_use blocks concurrently.
     const pendingTools = new Map<number, { id: string; name: string; args: string }>();
     let currentBlockIndex = 0;
-    // P3-03: Accumulate usage across message_start (input) and message_delta (output)
+    // Accumulate usage across message_start (input) and message_delta (output)
     // chunks instead of emitting separately, which caused downstream code to
     // overwrite input_tokens with 0 from the second usage event.
     let totalPromptTokens = 0;
@@ -246,7 +246,7 @@ export class AnthropicAdapter implements IProviderAdapter {
   }
 
   async listModels(): Promise<string[]> {
-    // P3-06: Try the real /v1/models endpoint first, fall back to known models.
+    // Try the real /v1/models endpoint first, fall back to known models.
     // Anthropic's models API requires beta header and may not be available for all plans.
     try {
       await validateSafeUrl(this.baseUrl);
@@ -277,7 +277,7 @@ export class AnthropicAdapter implements IProviderAdapter {
     ];
   }
 
-  // P7-25: Validate key format — check prefix
+  // Validate key format — check prefix
   async isAvailable(): Promise<boolean> {
     if (typeof this.apiKey !== "string") return false;
     if (!this.apiKey.startsWith("sk-")) return false;

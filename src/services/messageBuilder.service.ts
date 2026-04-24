@@ -18,7 +18,7 @@ export interface FileContext {
  */
 export async function loadFileContext(uploadIds: string[], userId: number): Promise<FileContext> {
   if (!uploadIds || uploadIds.length === 0) return { text_documents: [], image_blocks: [] };
-  // P26-06: Cap uploadIds array to prevent unbounded DB queries
+  // Cap uploadIds array to prevent unbounded DB queries
   const MAX_UPLOAD_IDS = 50;
   if (uploadIds.length > MAX_UPLOAD_IDS) {
     uploadIds = uploadIds.slice(0, MAX_UPLOAD_IDS);
@@ -33,7 +33,7 @@ export async function loadFileContext(uploadIds: string[], userId: number): Prom
 
   const text_documents: string[] = [];
   const image_blocks: FileContext["image_blocks"] = [];
-  // P38-07: Cap image blocks to prevent unbounded base64 memory consumption
+  // Cap image blocks to prevent unbounded base64 memory consumption
   const MAX_IMAGE_BLOCKS = 20;
 
   for (const upload of results) {
@@ -140,7 +140,7 @@ export function buildEnrichedQuestion(
 
   const textContent = parts.join("\n\n");
 
-  // P1-25: Cap post-enrichment prompt size to prevent oversized prompts
+  // Cap post-enrichment prompt size to prevent oversized prompts
   const MAX_ENRICHED_SIZE = 200_000; // ~200KB after enrichment
   const cappedContent = textContent.length > MAX_ENRICHED_SIZE
     ? textContent.slice(0, MAX_ENRICHED_SIZE) + "\n\n[Context truncated due to size limits]"

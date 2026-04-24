@@ -1,20 +1,20 @@
 import type { NodeHandler } from "../types.js";
 
-// P10-111: Keys that would cause prototype pollution
+// Keys that would cause prototype pollution
 const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
-// P22-06: Cap conflict array size to prevent unbounded memory growth
+// Cap conflict array size to prevent unbounded memory growth
 const MAX_CONFLICT_ARRAY_SIZE = 100;
 
-// P10-113: Merge strategy types
+// Merge strategy types
 type MergeStrategy = "overwrite" | "array_append" | "deep_merge";
 
 function isSafeKey(key: string): boolean {
   return !DANGEROUS_KEYS.has(key);
 }
 
-// P10-113: Deep merge helper for nested objects
-// P22-02: Add recursion depth limit to prevent stack overflow from deeply nested objects
+// Deep merge helper for nested objects
+// Add recursion depth limit to prevent stack overflow from deeply nested objects
 const MAX_MERGE_DEPTH = 20;
 
 function deepMerge(target: Record<string, unknown>, source: Record<string, unknown>, depth = 0): Record<string, unknown> {
@@ -39,15 +39,15 @@ function deepMerge(target: Record<string, unknown>, source: Record<string, unkno
 }
 
 export const mergeHandler: NodeHandler = async (ctx) => {
-  // P10-113: Configurable merge strategy
+  // Configurable merge strategy
   const strategy = (ctx.nodeData.merge_strategy as MergeStrategy) || "overwrite";
-  // P10-112: Explicit precedence via ordered input_priority list
+  // Explicit precedence via ordered input_priority list
   const priority = (ctx.nodeData.input_priority as string[]) || [];
 
   const merged: Record<string, unknown> = {};
-  const conflicts: Record<string, unknown[]> = {}; // P10-113: Track conflicts
+  const conflicts: Record<string, unknown[]> = {}; // Track conflicts
 
-  // P10-112: Sort entries by priority (listed keys first, in order)
+  // Sort entries by priority (listed keys first, in order)
   const entries = Object.entries(ctx.inputs);
   entries.sort((a, b) => {
     const aIdx = priority.indexOf(a[0]);
@@ -62,14 +62,14 @@ export const mergeHandler: NodeHandler = async (ctx) => {
     if (typeof value === "object" && value !== null && !Array.isArray(value)) {
       const obj = value as Record<string, unknown>;
       for (const [k, v] of Object.entries(obj)) {
-        // P10-111: Skip prototype-polluting keys
+        // Skip prototype-polluting keys
         if (!isSafeKey(k)) continue;
 
         if (k in merged) {
-          // P10-113: Handle conflicts based on strategy
+          // Handle conflicts based on strategy
           if (strategy === "array_append") {
             if (!conflicts[k]) conflicts[k] = [merged[k]];
-            // P22-06: Cap conflict array to prevent unbounded growth
+            // Cap conflict array to prevent unbounded growth
             if (conflicts[k].length < MAX_CONFLICT_ARRAY_SIZE) {
               conflicts[k].push(v);
             }
@@ -88,7 +88,7 @@ export const mergeHandler: NodeHandler = async (ctx) => {
         }
       }
     } else {
-      // P10-111: Sanitize top-level keys
+      // Sanitize top-level keys
       if (!isSafeKey(key)) continue;
       merged[key] = value;
     }

@@ -1,5 +1,5 @@
 /**
- * P4-32: Pagination & filter standards.
+ * Pagination & filter standards.
  *
  * Provides reusable pagination helpers that enforce consistent
  * cursor-based and offset-based pagination across all list endpoints.
@@ -74,7 +74,7 @@ export function buildCursorMeta(limit: number, items: unknown[], cursorField?: s
   if (hasMore && items.length > 0) {
     const lastItem = items[items.length - 1] as Record<string, unknown>;
     const cursorValue = lastItem[cursorField || "id"];
-    // P57-07: Guard against undefined/null cursor values producing "undefined" strings
+    // Guard against undefined/null cursor values producing "undefined" strings
     nextCursor = cursorValue !== null && cursorValue !== undefined ? String(cursorValue) : null;
   }
 

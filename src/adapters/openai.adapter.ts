@@ -1,11 +1,11 @@
-// P1-09: OpenAI adapter now extends the shared OpenAICompatibleAdapter base class.
+// OpenAI adapter now extends the shared OpenAICompatibleAdapter base class.
 import { OpenAICompatibleAdapter } from "./openaiCompatible.adapter.js";
 
 export class OpenAIAdapter extends OpenAICompatibleAdapter {
   readonly providerId: string;
 
   constructor(apiKey: string, baseUrl = "https://api.openai.com/v1", providerId = "openai") {
-    // P60-01: Validate baseUrl to prevent SSRF via custom provider configuration
+    // Validate baseUrl to prevent SSRF via custom provider configuration
     let parsed: URL;
     try {
       parsed = new URL(baseUrl);
@@ -28,7 +28,7 @@ export class OpenAIAdapter extends OpenAICompatibleAdapter {
   }
 
   protected override filterModels(models: Array<{ id: string }>): string[] {
-    // P3-05: Use a regex allowlist pattern instead of hardcoded prefixes.
+    // Use a regex allowlist pattern instead of hardcoded prefixes.
     // Matches gpt-*, o1-*, o3-*, o4-*, and future model families.
     // Excludes embedding, tts, dall-e, whisper, and other non-chat models.
     const CHAT_MODEL_RE = /^(gpt-|o[1-9]|chatgpt-)/;

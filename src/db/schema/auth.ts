@@ -12,7 +12,7 @@ import { users } from "./users.js";
 // ─── RevokedToken ────────────────────────────────────────────────────────────
 export const revokedTokens = pgTable("RevokedToken", {
   id: serial("id").primaryKey(),
-  // P55-01: Store SHA-256 hash of the token, NOT the raw JWT.
+  // Store SHA-256 hash of the token, NOT the raw JWT.
   // Callers must hash before insert/lookup. Prevents token extraction if DB is compromised.
   tokenHash: text("tokenHash").notNull().unique(),
   expiresAt: timestamp("expiresAt", { mode: "date", withTimezone: true }).notNull(),

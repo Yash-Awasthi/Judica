@@ -63,7 +63,7 @@ const costsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   /**
-   * P4-28: Per-provider cost ledger — detailed breakdown by provider.
+   * Per-provider cost ledger — detailed breakdown by provider.
    * GET /api/costs/per-provider?days=30
    */
   fastify.get("/per-provider", { preHandler: fastifyRequireAuth }, async (request, reply) => {

@@ -1,7 +1,7 @@
 import type { NodeHandler } from "../types.js";
 
 /**
- * P10-122: Enhanced template engine with conditionals, loops, and filters.
+ * Enhanced template engine with conditionals, loops, and filters.
  * Supports:
  *   {{variable}} — basic interpolation
  *   {{#if condition}}...{{/if}} — conditionals
@@ -10,7 +10,7 @@ import type { NodeHandler } from "../types.js";
  *   \\{{ — escaped delimiters (P10-123)
  */
 
-// P10-123: Filters for template values
+// Filters for template values
 const FILTERS: Record<string, (val: string) => string> = {
   upper: (v) => v.toUpperCase(),
   lower: (v) => v.toLowerCase(),
@@ -34,11 +34,11 @@ function resolveVariable(path: string, vars: Record<string, unknown>): unknown {
 }
 
 function renderTemplate(template: string, vars: Record<string, unknown>): string {
-  // P10-123: Handle escaped delimiters — replace \\{{ with a placeholder
+  // Handle escaped delimiters — replace \\{{ with a placeholder
   const ESCAPE_PLACEHOLDER = "\x00LBRACE\x00";
   let text = template.replace(/\\\{\{/g, ESCAPE_PLACEHOLDER);
 
-  // P10-122: Process {{#each items}}...{{/each}} blocks
+  // Process {{#each items}}...{{/each}} blocks
   text = text.replace(/\{\{#each\s+(\w+)\}\}([\s\S]*?)\{\{\/each\}\}/g, (_, key, body) => {
     const items = resolveVariable(key, vars);
     if (!Array.isArray(items)) return "";
@@ -48,13 +48,13 @@ function renderTemplate(template: string, vars: Record<string, unknown>): string
     }).join("");
   });
 
-  // P10-122: Process {{#if condition}}...{{else}}...{{/if}} blocks
+  // Process {{#if condition}}...{{else}}...{{/if}} blocks
   text = text.replace(/\{\{#if\s+(\w+)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g, (_, key, truthy, falsy) => {
     const val = resolveVariable(key, vars);
     return val ? renderTemplate(truthy, vars) : renderTemplate(falsy || "", vars);
   });
 
-  // P10-122: Process {{variable|filter}} interpolation
+  // Process {{variable|filter}} interpolation
   text = text.replace(/\{\{(\w[\w.]*?)(?:\|(\w+))?\}\}/g, (match, key, filter) => {
     const val = resolveVariable(key, vars);
     if (val === undefined || val === null) return match;
@@ -65,13 +65,13 @@ function renderTemplate(template: string, vars: Record<string, unknown>): string
     return strVal;
   });
 
-  // P10-123: Restore escaped delimiters
+  // Restore escaped delimiters
   text = text.replace(new RegExp(ESCAPE_PLACEHOLDER, "g"), "{{");
 
   return text;
 }
 
-// P10-124: Validate template syntax at definition time
+// Validate template syntax at definition time
 export function validateTemplate(template: string): { valid: boolean; errors: string[] } {
   const errors: string[] = [];
 
@@ -102,7 +102,7 @@ export function validateTemplate(template: string): { valid: boolean; errors: st
 export const templateHandler: NodeHandler = async (ctx) => {
   const template = (ctx.nodeData.template as string) || "";
 
-  // P10-124: Validate template before rendering
+  // Validate template before rendering
   const validation = validateTemplate(template);
   if (!validation.valid) {
     throw new Error(`Template validation failed: ${validation.errors.join("; ")}`);

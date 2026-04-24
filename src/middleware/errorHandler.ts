@@ -3,7 +3,7 @@ import type { FastifyError, FastifyRequest, FastifyReply } from "fastify";
 import { ZodError } from "zod";
 import logger from "../lib/logger.js";
 
-// P4-09: Optional Sentry error tracking — only active when SENTRY_DSN is set.
+// Optional Sentry error tracking — only active when SENTRY_DSN is set.
 // Lazy-initialized to avoid import cost when not configured.
 let sentryReportError: ((err: Error, context?: Record<string, unknown>) => void) | null = null;
 
@@ -24,7 +24,7 @@ if (env.SENTRY_DSN) {
   });
 }
 
-// P8-52: Removed dead isOperational flag — was checked but never meaningfully used.
+// Removed dead isOperational flag — was checked but never meaningfully used.
 // AppError is always operational by definition; unexpected errors are always non-operational.
 export class AppError extends Error {
   constructor(
@@ -38,7 +38,7 @@ export class AppError extends Error {
 }
 
 export function fastifyErrorHandler(error: FastifyError | Error, request: FastifyRequest, reply: FastifyReply) {
-  // P8-51: Include request ID in error responses for log correlation (only when defined)
+  // Include request ID in error responses for log correlation (only when defined)
   const requestId = request.id;
 
   if (error instanceof AppError) {
@@ -54,7 +54,7 @@ export function fastifyErrorHandler(error: FastifyError | Error, request: Fastif
     return;
   }
 
-  // P40-09: Safer ZodError detection — verify issues is an array before sending
+  // Safer ZodError detection — verify issues is an array before sending
   if (error instanceof ZodError || ((error as any).name === "ZodError" && Array.isArray((error as any).issues))) {
     const body: Record<string, unknown> = { error: "Validation failed", details: (error as any).issues };
     if (requestId !== undefined) body.requestId = requestId;
@@ -64,9 +64,9 @@ export function fastifyErrorHandler(error: FastifyError | Error, request: Fastif
 
   logger.error({ err: error, requestId, url: request.url, method: request.method }, "Unhandled error");
 
-  // P4-09: Report unhandled errors to Sentry if configured
+  // Report unhandled errors to Sentry if configured
   if (sentryReportError) {
-    // P40-06: Cap error string to prevent unbounded memory in Sentry reports
+    // Cap error string to prevent unbounded memory in Sentry reports
     sentryReportError(error instanceof Error ? error : new Error(String(error).slice(0, 2000)), {
       requestId,
       url: request.url,
@@ -75,7 +75,7 @@ export function fastifyErrorHandler(error: FastifyError | Error, request: Fastif
     });
   }
 
-  // P40-07: Cap error message length even in development to prevent oversized responses
+  // Cap error message length even in development to prevent oversized responses
   const rawMessage = error.message || "Internal server error";
   const message = env.NODE_ENV === "production" ? "Internal server error" : rawMessage.slice(0, 2000);
   const body: Record<string, unknown> = {

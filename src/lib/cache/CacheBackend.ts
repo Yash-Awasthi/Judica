@@ -1,5 +1,5 @@
 
-// P9-20: Single source of truth for opinions type — import from here, don't duplicate
+// Single source of truth for opinions type — import from here, don't duplicate
 export interface CacheEntry {
   verdict: string;
   opinions: Array<{ name: string; opinion: string; [key: string]: unknown }>;
@@ -14,7 +14,7 @@ export interface SemanticSearchResult {
 }
 
 /**
- * P9-21: TTL contract:
+ * TTL contract:
  * - `ttlMs` is REQUIRED for set/setSemantic — backends must not store entries without expiry.
  * - A value of 0 or negative is invalid and should be treated as an error.
  * - Backends should store the absolute expiry time (Date.now() + ttlMs) for cleanup.
@@ -37,7 +37,7 @@ export interface CacheBackend {
 }
 
 /**
- * P56-10: TTL validation helper — call at the start of set/setSemantic implementations.
+ * TTL validation helper — call at the start of set/setSemantic implementations.
  * Throws if ttlMs is not a positive finite number.
  */
 export function validateTtl(ttlMs: number): void {

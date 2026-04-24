@@ -1,5 +1,5 @@
 /**
- * P10-136: Central Input Sanitization Layer
+ * Central Input Sanitization Layer
  *
  * Provides a unified defense against injection attacks across all surfaces:
  * - Prompt injection (LLM nodes)
@@ -11,7 +11,7 @@
  * All node handlers should pass untrusted input through this layer before use.
  */
 
-// P10-138: Dangerous keys that enable prototype pollution
+// Dangerous keys that enable prototype pollution
 const PROTOTYPE_POLLUTION_KEYS = new Set([
   "__proto__",
   "constructor",
@@ -23,7 +23,7 @@ const PROTOTYPE_POLLUTION_KEYS = new Set([
 ]);
 
 /**
- * P10-136: Strip prototype-polluting keys from any object recursively.
+ * Strip prototype-polluting keys from any object recursively.
  * Prevents pollution from propagating through workflow state.
  */
 export function sanitizeObject(obj: unknown, depth = 0): unknown {
@@ -44,7 +44,7 @@ export function sanitizeObject(obj: unknown, depth = 0): unknown {
 }
 
 /**
- * P10-136: Sanitize string content that will be used in prompts.
+ * Sanitize string content that will be used in prompts.
  * Strips common prompt injection patterns without breaking legitimate content.
  */
 export function sanitizeForPrompt(text: string): string {
@@ -62,7 +62,7 @@ export function sanitizeForPrompt(text: string): string {
 }
 
 /**
- * P10-136: Sanitize content for use in templates.
+ * Sanitize content for use in templates.
  * Escapes template delimiters to prevent template injection.
  */
 export function sanitizeForTemplate(text: string): string {
@@ -73,17 +73,17 @@ export function sanitizeForTemplate(text: string): string {
 }
 
 /**
- * P10-136: Validate HTTP headers for injection safety.
+ * Validate HTTP headers for injection safety.
  */
 export function sanitizeHeaders(headers: Record<string, string>): Record<string, string> {
   const clean: Record<string, string> = {};
-  // P45-09: Cap header count and value size to prevent resource exhaustion
+  // Cap header count and value size to prevent resource exhaustion
   const MAX_HEADERS = 100;
   const MAX_HEADER_VALUE_SIZE = 8192;
   let count = 0;
   for (const [key, value] of Object.entries(headers)) {
     if (count >= MAX_HEADERS) break;
-    // P10-102/P10-137: Reject headers with newlines (HTTP header injection)
+    // Reject headers with newlines (HTTP header injection)
     if (/[\r\n\0]/.test(key) || /[\r\n\0]/.test(value)) continue;
     clean[key] = typeof value === "string" && value.length > MAX_HEADER_VALUE_SIZE ? value.slice(0, MAX_HEADER_VALUE_SIZE) : value;
     count++;
@@ -92,7 +92,7 @@ export function sanitizeHeaders(headers: Record<string, string>): Record<string,
 }
 
 /**
- * P10-139: Sanitize code node output before passing to downstream LLM/template nodes.
+ * Sanitize code node output before passing to downstream LLM/template nodes.
  * Prevents sandbox escape via crafted output that gets interpreted as code.
  */
 export function sanitizeCodeOutput(output: string): string {
@@ -110,7 +110,7 @@ export function sanitizeCodeOutput(output: string): string {
 }
 
 /**
- * P10-136: Apply appropriate sanitization based on source and target node types.
+ * Apply appropriate sanitization based on source and target node types.
  */
 export function sanitizeInterNodeData(
   data: Record<string, unknown>,
@@ -120,7 +120,7 @@ export function sanitizeInterNodeData(
   // Always strip prototype pollution regardless of node types
   const clean = sanitizeObject(data) as Record<string, unknown>;
 
-  // P10-139: Extra sanitization for code → LLM/template chains
+  // Extra sanitization for code → LLM/template chains
   if (sourceType === "code" && (targetType === "llm" || targetType === "template")) {
     for (const [key, value] of Object.entries(clean)) {
       if (typeof value === "string") {

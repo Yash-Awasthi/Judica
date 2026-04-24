@@ -1,5 +1,5 @@
 /**
- * P4-47: Calibration curves and Brier score tracking.
+ * Calibration curves and Brier score tracking.
  *
  * Current confidence formula is heuristic with no ground truth.
  * This module provides tools to measure and improve calibration:
@@ -67,7 +67,7 @@ class CalibrationTracker {
       ? this.records.filter((r) => r.model === model)
       : this.records;
 
-    // P20-06: Return 0 instead of NaN for empty datasets — NaN propagates silently to callers
+    // Return 0 instead of NaN for empty datasets — NaN propagates silently to callers
     if (filtered.length === 0) return 0;
 
     const sum = filtered.reduce((acc, r) => {
@@ -129,7 +129,7 @@ class CalibrationTracker {
       ? this.records.filter((r) => r.model === model)
       : this.records;
 
-    // P20-06: Return 0 instead of NaN — prevents NaN propagation in JSON responses
+    // Return 0 instead of NaN — prevents NaN propagation in JSON responses
     if (filtered.length === 0) {
       return { totalPredictions: 0, brierScore: 0, avgConfidence: 0, avgAccuracy: 0, overconfidenceGap: 0 };
     }

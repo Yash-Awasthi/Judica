@@ -16,13 +16,13 @@ export interface UsageUpdateInput {
   isCacheHit: boolean;
 }
 
-// P0-42: Only bill tokens after successful completion.
+// Only bill tokens after successful completion.
 // Request count is already incremented atomically in fastifyCheckQuota (P0-41).
 // This function now ONLY updates token usage — never double-counts requests.
 export async function updateDailyUsage(input: UsageUpdateInput): Promise<void> {
   const { userId, tokensUsed, isCacheHit } = input;
 
-  // P38-08: Validate tokensUsed is a non-negative finite number
+  // Validate tokensUsed is a non-negative finite number
   if (!Number.isFinite(tokensUsed) || tokensUsed < 0) {
     logger.warn({ userId, tokensUsed }, "Invalid tokensUsed value — skipping usage update");
     return;
@@ -91,7 +91,7 @@ export async function getUsageStats(userId: number): Promise<{
     }).from(dailyUsage)
       .where(eq(dailyUsage.userId, userId));
 
-    // P24-09: Use Math.max(0, ...) to ensure non-negative values from DB aggregates
+    // Use Math.max(0, ...) to ensure non-negative values from DB aggregates
     return {
       totalTokens: Math.max(0, Number(result.totalTokens) || 0),
       totalRequests: Math.max(0, Number(result.totalRequests) || 0),

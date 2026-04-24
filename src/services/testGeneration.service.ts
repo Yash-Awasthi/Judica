@@ -91,7 +91,7 @@ Return ONLY the JSON array.`,
 
         const match = result.text.match(/\[[\s\S]*?\]/);
         if (match) {
-          // P32-01: Safe JSON.parse with try-catch on LLM output
+          // Safe JSON.parse with try-catch on LLM output
           let cases: Omit<EdgeCase, "suggestedBy">[];
           try {
             cases = JSON.parse(match[0]) as Omit<EdgeCase, "suggestedBy">[];
@@ -109,7 +109,7 @@ Return ONLY the JSON array.`,
     })
   );
 
-  // P28-07: Cap total edge cases to prevent unbounded accumulation from LLM
+  // Cap total edge cases to prevent unbounded accumulation from LLM
   const MAX_EDGE_CASES = 100;
   for (const cases of results) {
     for (const c of cases) {
@@ -188,7 +188,7 @@ Return ONLY the JSON array.`,
 
     const match = result.text.match(/\[[\s\S]*\]/);
     if (match) {
-      // P32-02: Safe JSON.parse with try-catch + cap on LLM output
+      // Safe JSON.parse with try-catch + cap on LLM output
       try {
         const tests = JSON.parse(match[0]) as GeneratedTest[];
         return Array.isArray(tests) ? tests.slice(0, 100) : [];

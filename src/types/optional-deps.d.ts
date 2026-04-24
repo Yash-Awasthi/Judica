@@ -16,7 +16,7 @@ declare module '@bull-board/express' {
   }
 }
 
-// P60-06: The project uses Fastify — add @bull-board/fastify stub
+// The project uses Fastify — add @bull-board/fastify stub
 declare module '@bull-board/fastify' {
   export class FastifyAdapter {
     setBasePath(path: string): void;

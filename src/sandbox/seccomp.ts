@@ -12,11 +12,11 @@
  * This is a denylist approach — safer than allowlist for Python
  * which legitimately needs many syscalls for stdlib to work.
  *
- * P0-33: Architecture check at filter entry blocks i386/x32 ABI bypass.
- * P0-34: Uses SECCOMP_RET_KILL_PROCESS instead of RET_ERRNO(EPERM).
- * P0-35: Blocks socket() syscall at kernel level (backup for Python monkey-patch).
- * P0-36: Blocks execve/execveat to prevent shelling out.
- * P0-37: Blocks clone3, process_vm_readv/writev for defense-in-depth.
+ * Architecture check at filter entry blocks i386/x32 ABI bypass.
+ * Uses SECCOMP_RET_KILL_PROCESS instead of RET_ERRNO(EPERM).
+ * Blocks socket() syscall at kernel level (backup for Python monkey-patch).
+ * Blocks execve/execveat to prevent shelling out.
+ * Blocks clone3, process_vm_readv/writev for defense-in-depth.
  */
 
 import fs from "fs";
@@ -36,7 +36,7 @@ const BPF_RET = 0x06;
 const SECCOMP_RET_KILL_PROCESS = 0x80000000;
 const SECCOMP_RET_ALLOW = 0x7fff0000;
 
-// P0-33: Architecture constants for seccomp_data.arch check
+// Architecture constants for seccomp_data.arch check
 const AUDIT_ARCH_X86_64 = 0xc000003e;
 const SECCOMP_DATA_ARCH_OFFSET = 4; // offset of arch in seccomp_data
 
@@ -93,13 +93,13 @@ const BLOCKED_SYSCALLS: Record<string, number> = {
   move_pages: 279,
   // open_by_handle_at (bypass DAC)
   open_by_handle_at: 304,
-  // P0-35: Block socket() at kernel level (backup for Python-level monkey-patch)
+  // Block socket() at kernel level (backup for Python-level monkey-patch)
   socket: 41,
   socketpair: 53,
-  // P0-36: Block execve/execveat to prevent shelling out
+  // Block execve/execveat to prevent shelling out
   execve: 59,
   execveat: 322,
-  // P0-37: Defense-in-depth — block process/memory manipulation
+  // Defense-in-depth — block process/memory manipulation
   clone3: 435,
   process_vm_readv: 310,
   process_vm_writev: 311,
@@ -127,7 +127,7 @@ function bpfJump(code: number, k: number, jt: number, jf: number): Buffer {
   return buf;
 }
 
-// P1-37: Cache the static BPF binary at module load — no need to regenerate per invocation
+// Cache the static BPF binary at module load — no need to regenerate per invocation
 let cachedBpfProgram: Buffer | null = null;
 
 function buildBpfProgram(): Buffer {
@@ -135,7 +135,7 @@ function buildBpfProgram(): Buffer {
 
   const instructions: Buffer[] = [];
 
-  // P0-33: Load architecture from seccomp_data and verify x86_64
+  // Load architecture from seccomp_data and verify x86_64
   instructions.push(bpfStmt(BPF_LD | BPF_W | BPF_ABS, SECCOMP_DATA_ARCH_OFFSET));
 
   const syscallNrs = Object.values(BLOCKED_SYSCALLS);
@@ -170,7 +170,7 @@ function buildBpfProgram(): Buffer {
 /**
  * Generate a seccomp-BPF binary policy file.
  *
- * P1-37: Uses a cached BPF program — the policy is static and identical for
+ * Uses a cached BPF program — the policy is static and identical for
  * every invocation, so we build it once and just write the cached bytes.
  *
  * Returns the path to the temporary BPF binary file.
@@ -193,7 +193,7 @@ export function getBlockedSyscalls(): string[] {
 
 /**
  * Check if seccomp filtering is available on this system.
- * P1-38: Check for Seccomp_filters support, not just the Seccomp: line.
+ * Check for Seccomp_filters support, not just the Seccomp: line.
  * The Seccomp: line exists even when CONFIG_SECCOMP_FILTER is disabled.
  */
 export function isSeccompAvailable(): boolean {

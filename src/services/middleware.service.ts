@@ -36,7 +36,7 @@ export interface MiddlewareHook {
 // ─── Middleware Registry ────────────────────────────────────────────────────
 
 const hooks = new Map<string, MiddlewareHook>();
-// P37-05: Cap hooks map to prevent unbounded memory growth
+// Cap hooks map to prevent unbounded memory growth
 const MAX_HOOKS = 500;
 
 /**
@@ -126,7 +126,7 @@ export function piiRedactionMiddleware(): MiddlewareHook {
 
       if (typeof data.content === "string") {
         let content = data.content;
-        // P37-06: Use simpler, non-backtracking email regex to prevent ReDoS
+        // Use simpler, non-backtracking email regex to prevent ReDoS
         content = content.replace(
           /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(?:\.[A-Za-z]{2,})+\b/g,
           "[EMAIL_REDACTED]",

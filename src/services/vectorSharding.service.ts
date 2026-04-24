@@ -1,5 +1,5 @@
 /**
- * P4-50: Shard pgvector HNSW indexes by user/workspace.
+ * Shard pgvector HNSW indexes by user/workspace.
  *
  * HNSW indexes don't rebuild cheaply, so we partition the vector store
  * by workspace to keep each index manageable and allow independent

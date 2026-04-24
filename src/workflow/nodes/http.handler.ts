@@ -2,7 +2,7 @@ import type { NodeHandler } from "../types.js";
 import { validateSafeUrl } from "../../lib/ssrf.js";
 import { resolve as dnsResolve } from "dns/promises";
 
-// P10-100: Configurable response size limit (bytes)
+// Configurable response size limit (bytes)
 const MAX_RESPONSE_SIZE = parseInt(process.env.HTTP_NODE_MAX_RESPONSE_BYTES || "10485760", 10); // 10MB default
 
 export const httpHandler: NodeHandler = async (ctx) => {
@@ -10,7 +10,7 @@ export const httpHandler: NodeHandler = async (ctx) => {
   const method = ((ctx.nodeData.method as string) || "GET").toUpperCase();
   const rawHeaders = (ctx.nodeData.headers as Record<string, string>) ?? {};
 
-  // P10-102: Reject headers containing newline characters (HTTP header injection)
+  // Reject headers containing newline characters (HTTP header injection)
   const headers: Record<string, string> = {};
   for (const [key, value] of Object.entries(rawHeaders)) {
     if (/[\r\n]/.test(key) || /[\r\n]/.test(value)) {
@@ -28,7 +28,7 @@ export const httpHandler: NodeHandler = async (ctx) => {
   // Validate URL against SSRF (blocks private IPs, localhost, cloud metadata)
   const url = await validateSafeUrl(rawUrl);
 
-  // P10-99: Pin resolved IP to prevent DNS rebinding attacks
+  // Pin resolved IP to prevent DNS rebinding attacks
   const parsedUrl = new URL(url);
   const hostname = parsedUrl.hostname;
   let resolvedIp: string | undefined;
@@ -47,7 +47,7 @@ export const httpHandler: NodeHandler = async (ctx) => {
     method,
     headers: { ...headers, Host: hostname },
     signal: AbortSignal.timeout(30000),
-    // P10-99: Disable redirect following to prevent SSRF bypass via redirects
+    // Disable redirect following to prevent SSRF bypass via redirects
     redirect: "error",
   };
 
@@ -74,7 +74,7 @@ export const httpHandler: NodeHandler = async (ctx) => {
 
   const response = await fetch(fetchUrl, fetchOptions);
 
-  // P10-100: Check content-length before reading body
+  // Check content-length before reading body
   const contentLength = parseInt(response.headers.get("content-length") || "0", 10);
   if (contentLength > MAX_RESPONSE_SIZE) {
     return {
@@ -85,7 +85,7 @@ export const httpHandler: NodeHandler = async (ctx) => {
     };
   }
 
-  // P10-100: Read body with size limit
+  // Read body with size limit
   let data: unknown;
   const contentType = response.headers.get("content-type") || "";
   const bodyText = await response.text();

@@ -97,7 +97,7 @@ export async function scoreOpinions(
       .reduce((sum, r) => sum + r.confidence_adjustment, 0));
     finalScore += vPenalty;
 
-    // P10-37: If validation finds critical failures, quarantine the response
+    // If validation finds critical failures, quarantine the response
     const criticalFailures = validationResults.filter(r => !r.valid && r.confidence_adjustment <= -0.2);
     if (criticalFailures.length > 0) {
       finalScore = Math.min(finalScore, 0.1); // Cap at 0.1 — effectively quarantined
@@ -108,14 +108,14 @@ export async function scoreOpinions(
       if (op.adversarial.stress_score > 0.4) {
         adversarialPenalty = -(op.adversarial.stress_score * 0.2);
       }
-      // P10-126: If adversarial parse failed (is_robust defaults to true on failure),
+      // If adversarial parse failed (is_robust defaults to true on failure),
       // apply penalty instead of rewarding the failure
       if (!op.adversarial.is_robust && op.adversarial.failures.length === 0) {
         // Suspicious: marked not robust but no failures identified — likely parse error
         adversarialPenalty = -0.1;
       }
     } else {
-      // P10-126: Missing adversarial result = could not validate = penalize, not reward
+      // Missing adversarial result = could not validate = penalize, not reward
       adversarialPenalty = -0.05;
     }
     finalScore += adversarialPenalty;
@@ -126,7 +126,7 @@ export async function scoreOpinions(
         groundingPenalty = -(op.grounding.unsupported_claims.length * 0.05);
       }
     } else {
-      // P10-126: Missing grounding result = could not verify = penalize, not assume grounded
+      // Missing grounding result = could not verify = penalize, not assume grounded
       groundingPenalty = -0.05;
     }
     finalScore += groundingPenalty;
@@ -140,7 +140,7 @@ export async function scoreOpinions(
       opinion: op.opinion,
       structured: op.structured,
       scores: {
-        // P10-42: Clamp confidence to [0, 1] to prevent out-of-range arithmetic
+        // Clamp confidence to [0, 1] to prevent out-of-range arithmetic
         confidence: Math.max(0, Math.min(1, op.structured.confidence)),
         agreement: Math.max(0, Math.min(1, agreement)),
         peerRanking: Math.max(0, Math.min(1, peerRanking)),

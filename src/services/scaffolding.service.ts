@@ -282,7 +282,7 @@ export function inferDependencies(
   };
 }
 
-// P26-01: Sanitize shell-interpolated values to prevent command injection
+// Sanitize shell-interpolated values to prevent command injection
 function shellSafe(name: string): string {
   return name.replace(/[^a-zA-Z0-9_.-]/g, "_");
 }

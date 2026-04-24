@@ -2,7 +2,7 @@
 // Previously this used `redis` (node-redis) while queue/rateLimit used `ioredis`.
 // Now all Redis access goes through ioredis for a single connection pool.
 //
-// P4-11: Redis Memory Cap Guidance
+// Redis Memory Cap Guidance
 // ─────────────────────────────────
 // Without a maxmemory policy, Redis will grow unbounded and OOM the host.
 // Recommended redis.conf settings for production:
@@ -126,8 +126,8 @@ const redisWrapper = {
     } catch { /* ignore */ }
   },
 
-  // P9-39: Use SCAN cursor to avoid blocking Redis event loop
-  // P42-05: Cap iteration count to prevent unbounded key accumulation
+  // Use SCAN cursor to avoid blocking Redis event loop
+  // Cap iteration count to prevent unbounded key accumulation
   async keys(pattern: string): Promise<string[]> {
     try {
       const c = getRedis();
@@ -168,7 +168,7 @@ const redisWrapper = {
     }
   },
 
-  // P9-36: flushAll requires explicit DANGER flag
+  // flushAll requires explicit DANGER flag
   async flushAll(options?: { DANGER_CONFIRM: true }): Promise<string> {
     if (!options?.DANGER_CONFIRM) {
       logger.error("flushAll() called without DANGER_CONFIRM flag — refusing to execute");

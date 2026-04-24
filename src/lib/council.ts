@@ -1,4 +1,4 @@
-// P2-23: Council logic is scattered across 7+ files in lib/ and services/:
+// Council logic is scattered across 7+ files in lib/ and services/:
 // lib/council.ts (this file), lib/deliberationPhases.ts, lib/evaluation.ts,
 // lib/grounding.ts, lib/reasoningModes.ts, services/councilService.ts,
 // services/contradictionResolution.service.ts
@@ -20,11 +20,11 @@ import { createController } from "./controller.js";
 import { updateReliability, getReliabilityScores } from "../services/reliability.service.js";
 import { createHash } from "crypto";
 
-// P10-128: Per-session prompt deduplication cache to avoid regenerating identical sub-prompts
+// Per-session prompt deduplication cache to avoid regenerating identical sub-prompts
 const promptCache = new Map<string, string>();
 const MAX_PROMPT_CACHE = 200;
 
-/** P10-128: Hash-and-cache for repeated sub-prompt evaluations within a deliberation */
+/** Hash-and-cache for repeated sub-prompt evaluations within a deliberation */
 export function getCachedPromptResult(key: string): string | undefined {
   return promptCache.get(key);
 }
@@ -37,7 +37,7 @@ export function setCachedPromptResult(key: string, result: string): void {
   promptCache.set(key, result);
 }
 
-// P10-46: Simple in-memory deliberation result cache with configurable TTL
+// Simple in-memory deliberation result cache with configurable TTL
 const _parsedTTL = parseInt(process.env.COUNCIL_CACHE_TTL_MS || "300000", 10);
 const CACHE_TTL_MS = Number.isFinite(_parsedTTL) ? _parsedTTL : 300000; // 5 min default
 const _parsedMaxEntries = parseInt(process.env.COUNCIL_CACHE_MAX || "50", 10);
@@ -47,7 +47,7 @@ let cacheWriteCount = 0;
 const CACHE_SWEEP_INTERVAL = 50;
 
 function getCacheKey(messages: Message[], memberNames: string[]): string {
-  // P30-10: Use slice to avoid mutating caller's array with sort()
+  // Use slice to avoid mutating caller's array with sort()
   const content = messages.map(m => m.content).join("|") + "||" + [...memberNames].sort().join(",");
   return createHash("sha256").update(content).digest("hex").slice(0, 32);
 }
@@ -111,7 +111,7 @@ export async function prepareCouncilMembers(members: CouncilMemberInput[], summo
   if (userId) {
     const [config] = await db.select().from(councilConfigs).where(eq(councilConfigs.userId, userId)).limit(1);
     if (config) {
-      // P2-30: Config is stored encrypted — decrypt before use
+      // Config is stored encrypted — decrypt before use
       let configData: { customArchetypes?: Archetype[] };
       try {
         configData = JSON.parse(decrypt(config.config as string));
@@ -124,7 +124,7 @@ export async function prepareCouncilMembers(members: CouncilMemberInput[], summo
       }
       const customs = configData.customArchetypes || [];
       customs.forEach((a) => {
-        // P10-25: Comprehensive prototype pollution guard — block all dangerous property keys
+        // Comprehensive prototype pollution guard — block all dangerous property keys
         const BLOCKED_KEYS = new Set(['__proto__', 'constructor', 'prototype', 'toString', 'valueOf', '__defineGetter__', '__defineSetter__']);
         if (typeof a?.id === 'string' && !BLOCKED_KEYS.has(a.id)) {
           userArchetypes[a.id] = a;
@@ -195,35 +195,35 @@ export async function* deliberate(
   maxTokens: number = 4096,
   onVerdictChunk?: (chunk: string) => void,
   onMemberChunk?: (name: string, chunk: string) => void,
-  // P10-130: Optional seed for deterministic reproducibility
+  // Optional seed for deterministic reproducibility
   seed?: number
 ): AsyncGenerator<DeliberationEvent> {
-  // P10-130: Log seed for reproducibility tracking
+  // Log seed for reproducibility tracking
   const effectiveSeed = seed ?? Math.floor(Math.random() * 2147483647);
   logger.info({ seed: effectiveSeed, members: members.length, rounds }, "Deliberation starting");
 
   const controller = createController();
-  // P10-129: Deep copy messages to prevent cross-phase mutation via shared references
+  // Deep copy messages to prevent cross-phase mutation via shared references
   const currentMessages = messages.map(m => ({ ...m }));
   let finalOpinions: { name: string; opinion: string }[] = [];
-  let bestOpinions: { name: string; opinion: string }[] = []; // P10-29: Track best scoring round
-  let bestRoundScore = -1; // P10-29: Track best round's max score
-  let lastConsensusScore = 0; // P10-32: Track actual consensus score for skip logic
+  let bestOpinions: { name: string; opinion: string }[] = []; // Track best scoring round
+  let bestRoundScore = -1; // Track best round's max score
+  let lastConsensusScore = 0; // Track actual consensus score for skip logic
   let totalTokens = 0;
-  let totalCost = 0; // P10-26: Aggregate real cost from provider responses
-  // P10-127: Per-query cost limit enforcement
-  // P34-01: NaN-safe parseFloat — NaN bypasses cost limit comparison
+  let totalCost = 0; // Aggregate real cost from provider responses
+  // Per-query cost limit enforcement
+  // NaN-safe parseFloat — NaN bypasses cost limit comparison
   const _parsedCost = parseFloat(process.env.MAX_DELIBERATION_COST || "0");
   const MAX_DELIBERATION_COST = Number.isFinite(_parsedCost) && _parsedCost > 0 ? _parsedCost : Infinity;
 
   for (let r = 1; r <= rounds; r++) {
-    // P10-34: Check for cancellation between rounds
+    // Check for cancellation between rounds
     if (abortSignal?.aborted) {
       yield { type: "status", round: r, message: "Deliberation cancelled by caller." };
       break;
     }
 
-    // P10-127: Enforce per-query cost limit
+    // Enforce per-query cost limit
     if (totalCost >= MAX_DELIBERATION_COST) {
       logger.warn({ totalCost, limit: MAX_DELIBERATION_COST }, "Deliberation cost limit reached — terminating early");
       yield { type: "status", round: r, message: `Cost limit reached ($${totalCost.toFixed(4)} >= $${MAX_DELIBERATION_COST}). Ending deliberation.` };
@@ -246,9 +246,9 @@ export async function* deliberate(
     });
     let opinions = _gatherOpinions;
     totalTokens += opinionTokens;
-    totalCost += opinionCost; // P10-26: accumulate real cost
+    totalCost += opinionCost; // accumulate real cost
 
-    // P10-28: Single-member fast path — skip quorum check for single-member councils
+    // Single-member fast path — skip quorum check for single-member councils
     const minRequired = members.length === 1 ? 1 : Math.max(2, Math.ceil(members.length * 0.5));
     if (opinions.length < minRequired) {
       yield { type: "status", round: r, message: `Quorum not met (${opinions.length}/${members.length} responses). Aborting.` };
@@ -272,7 +272,7 @@ export async function* deliberate(
         onMemberChunk
       });
       totalTokens += debateTokens;
-      totalCost += debateCost; // P10-26: accumulate debate cost
+      totalCost += debateCost; // accumulate debate cost
 
       opinions = refinedOpinions.map((refined: { name: string; opinion: string }) => {
         const original = opinions.find((o: OpinionResult) => o.name === refined.name);
@@ -284,7 +284,7 @@ export async function* deliberate(
       });
 
       for (const op of refinedOpinions) {
-        yield { type: "opinion", name: op.name + " (Refined)", text: op.opinion, round: r }; // P10-30: Use integer round index
+        yield { type: "opinion", name: op.name + " (Refined)", text: op.opinion, round: r }; // Use integer round index
       }
     }
 
@@ -293,8 +293,8 @@ export async function* deliberate(
     if (opinions.length >= 2) {
       yield { type: "status", round: r, message: `Peer review phase for Round ${r}...` };
 
-      // P10-31: Use public API instead of accessing private state
-      // P10-32: Use actual consensus score (not raw peak score) for skip decisions
+      // Use public API instead of accessing private state
+      // Use actual consensus score (not raw peak score) for skip decisions
       const skipAdversarial = lastConsensusScore > 0.92;
       const skipGrounding = lastConsensusScore > 0.95;
 
@@ -303,7 +303,7 @@ export async function* deliberate(
         opinions,
         currentMessages,
         round: r,
-        // P10-125: Use a different provider for validation to prevent systematic model bias.
+        // Use a different provider for validation to prevent systematic model bias.
         // If members have multiple distinct models, pick one that differs from the generation model.
         validatorProvider: members.find(m => m.model !== master.model) || master,
         skipAdversarial,
@@ -314,15 +314,15 @@ export async function* deliberate(
       reviews = reviewRes.reviews;
       currentScored = reviewRes.scored;
       totalTokens += reviewRes.totalTokens;
-      totalCost += reviewRes.cost; // P10-26: accumulate peer review cost
+      totalCost += reviewRes.cost; // accumulate peer review cost
 
       if (r > 1) {
         const accepted = controller.shouldAcceptRound(currentScored);
         if (!accepted) {
           yield { type: "status", round: r, message: "Round discarded: No improvement in quality/consensus. Reverting to previous best." };
         } else {
-          // P10-29: Update best opinions when round is accepted
-          // P34-02: NaN-safe Math.max — filter NaN scores before comparison
+          // Update best opinions when round is accepted
+          // NaN-safe Math.max — filter NaN scores before comparison
           const finalScores = currentScored.map(s => s.scores.final).filter(Number.isFinite);
           const roundMaxScore = finalScores.length > 0 ? Math.max(...finalScores) : 0;
           if (roundMaxScore > bestRoundScore) {
@@ -332,7 +332,7 @@ export async function* deliberate(
         }
       } else {
         controller.shouldAcceptRound(currentScored);
-        // P10-29: First round is always the initial best
+        // First round is always the initial best
         const roundMaxScore = Math.max(...currentScored.map(s => s.scores.final), 0);
         bestRoundScore = roundMaxScore;
         bestOpinions = [...opinions];
@@ -348,7 +348,7 @@ export async function* deliberate(
         }
         const conflicts: Array<{ agentA: string; agentB: string }> = [];
         const concessions: string[] = [];
-        // P34-03: Cap conflicts/concessions arrays to prevent unbounded growth
+        // Cap conflicts/concessions arrays to prevent unbounded growth
         const MAX_CONFLICTS = 500;
         for (const review of reviews) {
           for (const flaw of review.identified_flaws) {
@@ -367,7 +367,7 @@ export async function* deliberate(
     }
 
     finalOpinions = opinions;
-    // P10-29: If no peer review happened (single member), still track as best
+    // If no peer review happened (single member), still track as best
     if (bestOpinions.length === 0) {
       bestOpinions = [...opinions];
     }
@@ -388,8 +388,8 @@ export async function* deliberate(
         maxTokens
       });
       totalTokens += consensusTokens;
-      totalCost += consensusCost; // P10-26: accumulate consensus cost
-      lastConsensusScore = consensusScore; // P10-32: Track for next round's skip logic
+      totalCost += consensusCost; // accumulate consensus cost
+      lastConsensusScore = consensusScore; // Track for next round's skip logic
 
       yield { type: "opinion", name: "Qualitative Critic", text: criticEval, round: r };
       yield { type: "opinion", name: "Quantitative Scorer", text: scorerEval, round: r };
@@ -398,7 +398,7 @@ export async function* deliberate(
         type: "metrics",
         metrics: {
           totalTokens,
-          totalCost, // P10-26: Real cost from provider responses
+          totalCost, // Real cost from provider responses
           hallucinationCount: currentScored.reduce((sum, s) => sum + (s.grounding?.unsupported_claims.length || 0), 0),
           consensusScore
         }
@@ -439,7 +439,7 @@ export async function* deliberate(
       }).filter(Boolean);
       if (memberScores.length > 0) {
         const reliabilityContext = `\n\n[MODEL RELIABILITY SCORES - weight responses accordingly]\n${memberScores.join("\n")}\n[/MODEL RELIABILITY SCORES]`;
-        // P10-33: Clone message before mutation to avoid polluting shared reference
+        // Clone message before mutation to avoid polluting shared reference
         if (currentMessages.length > 0) {
           const lastMsg = { ...currentMessages[currentMessages.length - 1] };
           lastMsg.content = lastMsg.content + reliabilityContext;
@@ -459,9 +459,9 @@ export async function* deliberate(
     onVerdictChunk
   });
   totalTokens += verdictTokens;
-  totalCost += verdictCost; // P10-26: accumulate verdict cost
+  totalCost += verdictCost; // accumulate verdict cost
 
-  // P10-27: Aggregate hallucinationCount from validator result
+  // Aggregate hallucinationCount from validator result
   const hallucinationCount = validatorResult.issues
     ? validatorResult.issues.filter(i => i.toLowerCase().includes('hallucin') || i.toLowerCase().includes('unsupported')).length
     : 0;
@@ -470,11 +470,11 @@ export async function* deliberate(
   yield {
     type: "done",
     verdict,
-    opinions: bestOpinions.length > 0 ? bestOpinions : finalOpinions, // P10-29: Use best-scoring round
+    opinions: bestOpinions.length > 0 ? bestOpinions : finalOpinions, // Use best-scoring round
     metrics: {
       totalTokens,
-      totalCost, // P10-26: Real aggregated cost
-      hallucinationCount // P10-27: Real hallucination count from validator
+      totalCost, // Real aggregated cost
+      hallucinationCount // Real hallucination count from validator
     }
   } as DeliberationEvent;
 }
@@ -486,7 +486,7 @@ export async function askCouncil(
   maxTokens: number = 4096,
   rounds: number = 1
 ) {
-  // P10-46: Check cache for identical deliberation
+  // Check cache for identical deliberation
   const cacheKey = getCacheKey(messages, members.map(m => m.name));
   const cached = deliberationCache.get(cacheKey);
   if (cached && cached.expiresAt > Date.now()) {
@@ -512,7 +512,7 @@ export async function askCouncil(
 
   const result = { verdict, opinions, metrics };
 
-  // P10-46: Store in cache (evict oldest if full)
+  // Store in cache (evict oldest if full)
   if (deliberationCache.size >= MAX_CACHE_ENTRIES) {
     const firstKey = deliberationCache.keys().next().value;
     if (firstKey) deliberationCache.delete(firstKey);

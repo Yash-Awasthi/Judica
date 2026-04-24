@@ -40,7 +40,7 @@ export class AnthropicProvider extends BaseProvider {
         headers: {
           "Content-Type": "application/json",
           "x-api-key": this.config.apiKey,
-          // P1-07: Updated to 2023-10-01 for parallel tools and cache_control support
+          // Updated to 2023-10-01 for parallel tools and cache_control support
           "anthropic-version": "2023-10-01",
         },
         body: JSON.stringify({
@@ -74,8 +74,8 @@ export class AnthropicProvider extends BaseProvider {
         let buffer = "";
         let streamInputTokens = 0;
         let streamOutputTokens = 0;
-        // P1-04: Track tool calls during streaming so they aren't dropped
-        // P40-02: Cap pending tools to prevent unbounded memory growth
+        // Track tool calls during streaming so they aren't dropped
+        // Cap pending tools to prevent unbounded memory growth
         const MAX_PENDING_TOOLS = 100;
         const pendingTools = new Map<number, { id: string; name: string; args: string }>();
         let currentBlockIndex = 0;
@@ -116,7 +116,7 @@ export class AnthropicProvider extends BaseProvider {
                   }
                   if (parsed.delta?.type === "input_json_delta" && parsed.delta.partial_json) {
                     const tool = pendingTools.get(currentBlockIndex);
-                    // P40-03: Cap tool args to prevent unbounded string concatenation
+                    // Cap tool args to prevent unbounded string concatenation
                     if (tool && tool.args.length < 1_000_000) tool.args += parsed.delta.partial_json;
                   }
                 }
@@ -136,7 +136,7 @@ export class AnthropicProvider extends BaseProvider {
           }
         }
 
-        // P1-04: If tool calls were found in the stream, process them recursively
+        // If tool calls were found in the stream, process them recursively
         if (pendingTools.size > 0) {
           const assistantContent: Record<string, unknown>[] = [];
           if (text) assistantContent.push({ type: "text", text });

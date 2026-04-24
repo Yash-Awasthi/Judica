@@ -1,5 +1,5 @@
 /**
- * P4-48: Counterfactual debate mode.
+ * Counterfactual debate mode.
  *
  * Forces an agent to argue the opposite position of the current consensus,
  * then measures how robust the original verdict is to counterarguments.
@@ -57,7 +57,7 @@ Be rigorous and specific. Do not simply say "it could be wrong" — explain exac
 export function evaluateRobustness(rounds: DebateRound[]): number {
   if (rounds.length === 0) return 0.5;
 
-  // P36-03: Filter NaN/Infinity strength values before arithmetic
+  // Filter NaN/Infinity strength values before arithmetic
   const forStrengths = rounds.filter((r) => r.position === "for").map((r) => r.strength).filter(Number.isFinite);
   const againstStrengths = rounds.filter((r) => r.position === "against").map((r) => r.strength).filter(Number.isFinite);
 

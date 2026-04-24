@@ -74,7 +74,7 @@ Goal: ${sanitizeForPrompt(goal.substring(0, 2000))}${contextBlock}`,
       throw new Error("Failed to parse task decomposition");
     }
 
-    // P32-05: Safe JSON.parse with try-catch + cap tasks array
+    // Safe JSON.parse with try-catch + cap tasks array
     let parsed: { tasks: Omit<SubTask, "status">[] };
     try {
       parsed = JSON.parse(match[0]) as { tasks: Omit<SubTask, "status">[] };
@@ -88,7 +88,7 @@ Goal: ${sanitizeForPrompt(goal.substring(0, 2000))}${contextBlock}`,
       parsed.tasks = parsed.tasks.slice(0, 50);
     }
 
-    // P28-02: Cap decomposed tasks to prevent unbounded array from LLM output
+    // Cap decomposed tasks to prevent unbounded array from LLM output
     const MAX_SUBTASKS = 50;
     const rawTasks = Array.isArray(parsed.tasks) ? parsed.tasks.slice(0, MAX_SUBTASKS) : [];
     const tasks: SubTask[] = rawTasks.map((t) => ({
@@ -283,7 +283,7 @@ export async function runMCTS(
   }
 
   // ── Step 2: Generate N diverse reasoning branches in parallel ──────────
-  // P28-01: Cap branches to prevent OOM from unbounded parallel LLM calls
+  // Cap branches to prevent OOM from unbounded parallel LLM calls
   if (!Number.isFinite(branches) || branches < 1) branches = 3;
   branches = Math.min(Math.floor(branches), 10);
 

@@ -285,7 +285,7 @@ export class RPAProvider extends BaseProvider {
     const start = Date.now();
     let last = "";
     let stable = 0;
-    // P41-07: Cap response to prevent unbounded string accumulation
+    // Cap response to prevent unbounded string accumulation
     const MAX_RESPONSE_SIZE = 1_000_000;
     while (Date.now() - start < timeout) {
       if (abortSignal.aborted) throw new Error("Aborted");

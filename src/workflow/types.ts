@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// P10-95: Schema version for workflow definition compatibility
+// Schema version for workflow definition compatibility
 export const WORKFLOW_SCHEMA_VERSION = 1;
 
 export enum NodeType {
@@ -18,7 +18,7 @@ export enum NodeType {
   SPLIT = "split",
 }
 
-// P10-93: Discriminated union node data types for type-safe narrowing
+// Discriminated union node data types for type-safe narrowing
 export interface LLMNodeData {
   type: "llm";
   model?: string;
@@ -76,7 +76,7 @@ export interface GenericNodeData {
   [key: string]: unknown;
 }
 
-// P10-93: Union of all node data shapes
+// Union of all node data shapes
 export type TypedNodeData =
   | LLMNodeData
   | ConditionNodeData
@@ -116,7 +116,7 @@ export interface WorkflowOutput {
 }
 
 export interface WorkflowDefinition {
-  // P10-95: Version field for schema evolution
+  // Version field for schema evolution
   version?: number;
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
@@ -139,13 +139,13 @@ export interface NodeContext {
   inputs: Record<string, unknown>;
   nodeData: Record<string, unknown>;
   runId: string;
-  // P10-94: Consistent userId type — use string to match auth layer (UUIDs/JWTs)
+  // Consistent userId type — use string to match auth layer (UUIDs/JWTs)
   userId: string | number;
 }
 
 export type NodeHandler = (ctx: NodeContext) => Promise<Record<string, unknown>>;
 
-// ─── P10-92: Zod schema for runtime validation of workflow definitions ────────
+// ─── Zod schema for runtime validation of workflow definitions ────────
 
 const WorkflowNodeSchema = z.object({
   id: z.string().min(1),
@@ -177,14 +177,14 @@ const WorkflowOutputSchema = z.object({
 
 export const WorkflowDefinitionSchema = z.object({
   version: z.number().int().positive().optional(),
-  // P59-10: Cap array sizes to prevent memory exhaustion from malicious payloads
+  // Cap array sizes to prevent memory exhaustion from malicious payloads
   nodes: z.array(WorkflowNodeSchema).min(1, "Workflow must have at least one node").max(500, "Workflow cannot exceed 500 nodes"),
   edges: z.array(WorkflowEdgeSchema).max(2000, "Workflow cannot exceed 2000 edges"),
   inputs: z.array(WorkflowInputSchema).max(50, "Workflow cannot exceed 50 inputs"),
   outputs: z.array(WorkflowOutputSchema).max(50, "Workflow cannot exceed 50 outputs"),
 });
 
-/** P10-92: Validate a raw workflow definition at ingestion time.
+/** Validate a raw workflow definition at ingestion time.
  * Returns parsed WorkflowDefinition or throws with clear error messages. */
 export function parseWorkflowDefinition(raw: unknown): WorkflowDefinition {
   const result = WorkflowDefinitionSchema.safeParse(raw);
@@ -194,7 +194,7 @@ export function parseWorkflowDefinition(raw: unknown): WorkflowDefinition {
       .join("; ");
     throw new Error(`Invalid workflow definition: ${issues}`);
   }
-  // P59-08: Detect cycles in the workflow graph to prevent infinite execution loops
+  // Detect cycles in the workflow graph to prevent infinite execution loops
   const def = result.data as WorkflowDefinition;
   const adjacency = new Map<string, string[]>();
   for (const node of def.nodes) adjacency.set(node.id, []);

@@ -23,7 +23,7 @@ export const workflows = pgTable(
     version: integer("version").default(1).notNull(),
     published: boolean("published").default(false).notNull(),
     createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
-    // P60-04: Add defaultNow to prevent insert failures when updatedAt is omitted
+    // Add defaultNow to prevent insert failures when updatedAt is omitted
     updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [

@@ -69,7 +69,7 @@ export class OpenAIProvider extends BaseProvider {
         const decoder = new TextDecoder();
         let text = "";
         let buffer = "";
-        // P40-10: Cap buffer to prevent unbounded memory from malicious streams
+        // Cap buffer to prevent unbounded memory from malicious streams
         const MAX_BUFFER_SIZE = 10_000_000;
         let streamUsage: { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number } | null = null;
 
@@ -135,7 +135,7 @@ export class OpenAIProvider extends BaseProvider {
 
         const nextMessages = [...messages, msg];
         for (const tc of msg.tool_calls) {
-          // P40-01: Safe JSON.parse on tool arguments from API response
+          // Safe JSON.parse on tool arguments from API response
           let toolArgs: Record<string, unknown> = {};
           try { toolArgs = JSON.parse(tc.function.arguments); } catch { /* malformed args */ }
           const result = await callTool({

@@ -1,6 +1,6 @@
 import type { AdapterMessage } from "../adapters/types.js";
 
-// P9-66: Token estimation uses character-based heuristics (NOT actual provider billing).
+// Token estimation uses character-based heuristics (NOT actual provider billing).
 // Actual billed tokens come from provider API responses (`usage.prompt_tokens`, etc.).
 // This estimator is used PRE-FLIGHT for quota checks and routing decisions only.
 // Post-flight, always prefer the actual token counts from the provider response.
@@ -11,7 +11,7 @@ import type { AdapterMessage } from "../adapters/types.js";
 // CJK Unified Ideographs and common CJK ranges
 const CJK_REGEX = /[\u2E80-\u9FFF\uF900-\uFAFF\uFE30-\uFE4F\u{20000}-\u{2FA1F}]/u;
 
-// P52-08: Cap iteration length to avoid blocking the event loop on very long strings.
+// Cap iteration length to avoid blocking the event loop on very long strings.
 const MAX_ESTIMATE_LENGTH = 500_000; // 500K chars max for estimation
 
 /**
@@ -79,7 +79,7 @@ export function estimateTokens(messages: AdapterMessage[]): number {
     }
 
     // Tool calls add overhead
-    // P43-07: Cap tool calls and argument size to prevent DoS
+    // Cap tool calls and argument size to prevent DoS
     if (m.tool_calls) {
       for (const tc of m.tool_calls.slice(0, 100)) {
         const argStr = JSON.stringify(tc.arguments);

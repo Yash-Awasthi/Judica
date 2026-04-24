@@ -67,7 +67,7 @@ export interface StepContext {
 
 // ─── Store ──────────────────────────────────────────────────────────────────
 
-// P24-03: Cap in-memory maps to prevent unbounded growth
+// Cap in-memory maps to prevent unbounded growth
 const MAX_BACKGROUND_AGENTS = 500;
 
 const agents = new Map<string, BackgroundAgent>();
@@ -132,7 +132,7 @@ export async function createAgent(input: CreateAgentInput): Promise<BackgroundAg
     metadata: input.metadata ?? {},
   };
 
-  // P24-03: Enforce agent map cap
+  // Enforce agent map cap
   if (agents.size >= MAX_BACKGROUND_AGENTS) {
     // Evict oldest completed/failed/cancelled agent
     let evicted = false;

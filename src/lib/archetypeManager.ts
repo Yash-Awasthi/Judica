@@ -6,11 +6,11 @@ import { ARCHETYPES } from "../config/archetypes.js";
 import type { Archetype } from "../config/archetypes.js";
 import { randomUUID } from "crypto";
 
-// P10-06: Import size limits to prevent OOM and DB bloat
+// Import size limits to prevent OOM and DB bloat
 const MAX_IMPORT_COUNT = 50;
 const MAX_IMPORT_PAYLOAD_BYTES = 512 * 1024; // 512KB
 
-// P10-11: Externalized tool registry — add new tools here without modifying archetype defs.
+// Externalized tool registry — add new tools here without modifying archetype defs.
 // Each archetype's `tools` array references IDs from this registry.
 export const TOOL_REGISTRY: Record<string, { id: string; name: string; description: string }> = {
   web_search: { id: "web_search", name: "Web Search", description: "Search the internet for real-time information" },
@@ -66,7 +66,7 @@ export async function upsertUserArchetype(
   archetype: UserArchetypeInput,
   archetypeId?: string
 ): Promise<Archetype> {
-  // P10-10: Use UUID instead of Date.now() to prevent ID collision on concurrent imports
+  // Use UUID instead of Date.now() to prevent ID collision on concurrent imports
   const aid = archetypeId || `custom_${randomUUID()}`;
   const data = {
     userId,
@@ -155,7 +155,7 @@ export function validateArchetype(data: UserArchetypeInput): { valid: boolean; e
   }
 
   if (data.tools && Array.isArray(data.tools)) {
-    // P10-11: Validate against externalized tool registry instead of hardcoded list
+    // Validate against externalized tool registry instead of hardcoded list
     const validTools = getValidTools();
     const invalidTools = data.tools.filter(tool => !validTools.includes(tool));
     if (invalidTools.length > 0) {
@@ -170,7 +170,7 @@ export function validateArchetype(data: UserArchetypeInput): { valid: boolean; e
 }
 
 export async function getArchetypeUsage(userId: number): Promise<Record<string, number>> {
-  // P10-07: Add LIMIT to prevent full table scan for users with extensive chat history
+  // Add LIMIT to prevent full table scan for users with extensive chat history
   const rows = await db.select({ opinions: chats.opinions, createdAt: chats.createdAt })
     .from(chats)
     .where(eq(chats.userId, userId))
@@ -205,7 +205,7 @@ export async function getArchetypeUsage(userId: number): Promise<Record<string, 
 /**
  * Recommend archetypes for a user based on their engagement patterns.
  * Returns archetype IDs sorted by weighted usage (most engaged first).
- * P10-09: Includes both built-in AND custom archetypes in ranking.
+ * Includes both built-in AND custom archetypes in ranking.
  */
 export function rankArchetypesByEngagement(
   usage: Record<string, number>,
@@ -241,7 +241,7 @@ export function cloneDefaultArchetype(archetypeId: string): UserArchetypeInput {
   };
 }
 
-// P10-08: Sanitize export to public DTO — exclude internal fields (IDs, timestamps, userId)
+// Sanitize export to public DTO — exclude internal fields (IDs, timestamps, userId)
 export async function exportUserArchetypes(userId: number): Promise<string> {
   const archetypes = await db.select().from(userArchetypes)
     .where(eq(userArchetypes.userId, userId))
@@ -288,7 +288,7 @@ export async function importArchetypes(userId: number, jsonData: string): Promis
   const errors: string[] = [];
   let imported = 0;
 
-  // P10-06: Reject oversized payloads before parsing
+  // Reject oversized payloads before parsing
   if (jsonData.length > MAX_IMPORT_PAYLOAD_BYTES) {
     errors.push(`Payload too large: ${jsonData.length} bytes exceeds ${MAX_IMPORT_PAYLOAD_BYTES} byte limit`);
     return { imported, errors };
@@ -308,13 +308,13 @@ export async function importArchetypes(userId: number, jsonData: string): Promis
     return { imported, errors };
   }
 
-  // P10-06: Enforce maximum import count
+  // Enforce maximum import count
   if (data.length > MAX_IMPORT_COUNT) {
     errors.push(`Too many archetypes: ${data.length} exceeds maximum of ${MAX_IMPORT_COUNT}`);
     return { imported, errors };
   }
 
-  // P10-12: Wrap bulk import in a transaction — all-or-nothing semantics
+  // Wrap bulk import in a transaction — all-or-nothing semantics
   try {
     await db.transaction(async (tx) => {
       for (const item of data) {

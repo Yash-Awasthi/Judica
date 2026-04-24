@@ -1,10 +1,10 @@
-// P2-05: DEPRECATED — Strictly inferior to src/adapters/anthropic.adapter.ts.
+// DEPRECATED — Strictly inferior to src/adapters/anthropic.adapter.ts.
 import type { Message, Provider } from "../../providers.js";
 import { getToolDefinitions, callTool } from "../../tools/index.js";
 import { validateSafeUrl } from "../../ssrf.js";
 import logger from "../../logger.js";
 
-// P7-40: Maximum tool-call recursion depth to prevent stack overflow
+// Maximum tool-call recursion depth to prevent stack overflow
 const MAX_TOOL_RECURSION_DEPTH = 5;
 
 interface ProviderResult {
@@ -23,7 +23,7 @@ export async function askAnthropic(
   signal: AbortSignal,
   _depth = 0
 ): Promise<ProviderResult> {
-  // P7-41: SSRF validation on strategy-level fetch
+  // SSRF validation on strategy-level fetch
   await validateSafeUrl("https://api.anthropic.com/v1/messages");
 
   const res = await fetch("https://api.anthropic.com/v1/messages", {
@@ -53,7 +53,7 @@ export async function askAnthropic(
   const toolCalls = content.filter(c => c.type === "tool_use");
 
   if (toolCalls.length > 0) {
-    // P7-40: Prevent infinite recursion
+    // Prevent infinite recursion
     if (_depth >= MAX_TOOL_RECURSION_DEPTH) {
       throw new Error(`Tool-call recursion limit (${MAX_TOOL_RECURSION_DEPTH}) exceeded`);
     }
@@ -115,10 +115,10 @@ export async function streamAnthropic(
   const reader = res.body!.getReader();
   const decoder = new TextDecoder();
   let fullText = "";
-  // P21-07: Cap accumulated stream buffer to prevent memory exhaustion on very large responses
+  // Cap accumulated stream buffer to prevent memory exhaustion on very large responses
   const MAX_STREAM_BUFFER = 2_000_000; // ~2MB
   const usage = { promptTokens: 0, completionTokens: 0, totalTokens: 0 };
-  // P1-10: Buffer across reads and split on \n boundary properly
+  // Buffer across reads and split on \n boundary properly
   let buffer = "";
 
   while (true) {

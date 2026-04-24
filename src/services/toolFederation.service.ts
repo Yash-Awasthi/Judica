@@ -57,7 +57,7 @@ export interface ToolSearchOptions {
 
 // ─── Registry (in-memory, upgradeable to external registry) ─────────────────
 
-// P27-05: Cap registry and installed maps to prevent unbounded memory growth
+// Cap registry and installed maps to prevent unbounded memory growth
 const MAX_REGISTRY_SIZE = 1000;
 const MAX_INSTALLED_SIZE = 5000;
 

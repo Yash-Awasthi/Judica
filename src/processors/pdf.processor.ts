@@ -3,7 +3,7 @@ import type { ProcessedFile } from "./types.js";
 import { assertFileSizeLimit } from "./types.js";
 
 /**
- * P5-03: pdf-parse 2.4.5 CVE audit.
+ * pdf-parse 2.4.5 CVE audit.
  *
  * Known risks mitigated:
  * - File size limit enforced via assertFileSizeLimit() before parsing (prevents DoS via large PDFs)

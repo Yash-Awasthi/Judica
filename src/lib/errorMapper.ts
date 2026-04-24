@@ -1,7 +1,7 @@
 import logger from "./logger.js";
 
 /**
- * P9-82: Structured error result with clear field semantics:
+ * Structured error result with clear field semantics:
  * - `httpStatus`: always a numeric HTTP status code (e.g., 429, 500)
  * - `errorCode`: always a machine-readable string (e.g., "RATE_LIMITED", "AUTH_FAILED")
  * - `message`: human-readable message for the end user
@@ -29,7 +29,7 @@ function getStatusCode(err: unknown): number | undefined {
       const val = e[key];
       if (typeof val === "number" && val >= 100 && val < 600) return val;
     }
-    // P9-82: Only use `code` if it's numeric (not a string error type)
+    // Only use `code` if it's numeric (not a string error type)
     if (typeof e.code === "number" && e.code >= 100 && e.code < 600) return e.code;
     // Some SDKs nest it under response
     if (typeof e.response === "object" && e.response !== null) {
@@ -48,7 +48,7 @@ function getStatusCode(err: unknown): number | undefined {
 function getErrorType(err: unknown): string | undefined {
   if (typeof err === "object" && err !== null) {
     const e = err as Record<string, unknown>;
-    // Direct fields — only string-typed `code` (P9-82: avoid conflict with numeric status)
+    // Direct fields — only string-typed `code` (avoid conflict with numeric status)
     for (const key of ["type", "error_type"]) {
       if (typeof e[key] === "string") return (e[key] as string).toLowerCase();
     }
@@ -63,7 +63,7 @@ function getErrorType(err: unknown): string | undefined {
   return undefined;
 }
 
-// P9-85: Extract structured metadata from provider error (retry-after, rate limit info)
+// Extract structured metadata from provider error (retry-after, rate limit info)
 function extractMetadata(err: unknown): { retryAfterMs?: number; metadata?: Record<string, unknown> } {
   if (typeof err !== "object" || err === null) return {};
 
@@ -119,7 +119,7 @@ const messageLower = (err: unknown): string => {
  *   1. Structured fields — status code, error type/code (most reliable)
  *   2. String matching on message text (fallback for unstructured errors)
  *
- * P9-83: Status codes are now semantically correct:
+ * Status codes are now semantically correct:
  *   - 429 for rate limiting (not 403)
  *   - 401 for auth failures (not 403)
  *   - 402 only for actual billing/quota issues
@@ -133,7 +133,7 @@ export function mapProviderErrorStructured(err: unknown): MappedError {
   const msg = messageLower(err);
   const { retryAfterMs, metadata } = extractMetadata(err);
 
-  // --- Rate limiting --- (P9-84: retryable)
+  // --- Rate limiting --- (retryable)
   if (status === 429
     || errType === "rate_limit_error"
     || errType === "rate_limit_exceeded"
@@ -148,7 +148,7 @@ export function mapProviderErrorStructured(err: unknown): MappedError {
     };
   }
 
-  // --- Authentication --- (P9-83: Use 401, not 403)
+  // --- Authentication --- (Use 401, not 403)
   if (status === 401
     || errType === "authentication_error"
     || errType === "invalid_api_key"
@@ -162,7 +162,7 @@ export function mapProviderErrorStructured(err: unknown): MappedError {
     };
   }
 
-  // --- Permission --- (P9-83: 403 only for actual permission denied)
+  // --- Permission --- (403 only for actual permission denied)
   if (status === 403
     || errType === "permission_error"
     || msg.includes("forbidden") || msg.includes("permission denied")) {
@@ -175,7 +175,7 @@ export function mapProviderErrorStructured(err: unknown): MappedError {
     };
   }
 
-  // --- Billing / quota --- (P9-83: 402 correctly for payment issues)
+  // --- Billing / quota --- (402 correctly for payment issues)
   if (status === 402
     || errType === "insufficient_quota"
     || errType === "billing_error"
@@ -219,7 +219,7 @@ export function mapProviderErrorStructured(err: unknown): MappedError {
     };
   }
 
-  // --- Timeout --- (P9-84: retryable)
+  // --- Timeout --- (retryable)
   if (errType === "timeout"
     || msg.includes("timeout") || msg.includes("etimedout") || msg.includes("econnaborted")) {
     return {
@@ -232,7 +232,7 @@ export function mapProviderErrorStructured(err: unknown): MappedError {
     };
   }
 
-  // --- Server errors (5xx) --- (P9-84: retryable, P9-83: 503 for overload)
+  // --- Server errors (5xx) --- (retryable, 503 for overload)
   if (status !== undefined && status >= 500 && status < 600) {
     return {
       httpStatus: 503,
@@ -256,7 +256,7 @@ export function mapProviderErrorStructured(err: unknown): MappedError {
     };
   }
 
-  // --- Network errors --- (P9-84: retryable)
+  // --- Network errors --- (retryable)
   if (msg.includes("enotfound") || msg.includes("econnrefused") || msg.includes("econnreset")
     || msg.includes("network") || msg.includes("fetch failed")) {
     return {

@@ -35,7 +35,7 @@ export class CustomAdapter implements IProviderAdapter {
     this.config = config;
   }
 
-  // P7-37: Wrap decrypt in try/catch to avoid leaking internal state
+  // Wrap decrypt in try/catch to avoid leaking internal state
   private getApiKey(): string {
     if (!this.config.auth_key_encrypted) return "";
     try {
@@ -47,7 +47,7 @@ export class CustomAdapter implements IProviderAdapter {
 
   async generate(req: AdapterRequest): Promise<AdapterStreamResult> {
     const baseUrl = this.config.base_url.replace(/\/$/, "");
-    // P7-39: Validate base URL against SSRF in all paths (streaming & non-streaming)
+    // Validate base URL against SSRF in all paths (streaming & non-streaming)
     await validateSafeUrl(baseUrl);
 
     // DNS rebinding protection: pin resolved IP
@@ -82,7 +82,7 @@ export class CustomAdapter implements IProviderAdapter {
         // API key will be appended as a query parameter to the URL
         break;
       case "basic": {
-        // P7-38: Validate basic auth credentials are non-empty before encoding
+        // Validate basic auth credentials are non-empty before encoding
         const [username, password] = apiKey.includes(":") ? [apiKey.split(":")[0], apiKey.split(":").slice(1).join(":")] : [apiKey, ""];
         if (!username) {
           throw new Error(`Basic auth for "${this.config.name}" requires a non-empty username`);
@@ -185,7 +185,7 @@ export class CustomAdapter implements IProviderAdapter {
     const reader = res.body.getReader();
     const decoder = new TextDecoder();
     let buffer = "";
-    // P7-36: Track tool calls across streaming chunks
+    // Track tool calls across streaming chunks
     const pendingToolCalls = new Map<number, { id: string; name: string; args: string }>();
 
     try {
@@ -217,7 +217,7 @@ export class CustomAdapter implements IProviderAdapter {
             const content = delta?.content;
             if (content) yield { type: "text", text: content };
 
-            // P7-36: Parse tool calls from delta
+            // Parse tool calls from delta
             if (delta?.tool_calls) {
               for (const tc of delta.tool_calls) {
                 const i = tc.index ?? pendingToolCalls.size;
@@ -294,7 +294,7 @@ export class CustomAdapter implements IProviderAdapter {
           break;
         }
         case "api_key_query":
-          // P7-35: Use header instead of query param
+          // Use header instead of query param
           headers["X-API-Key"] = apiKey;
           break;
         case "basic": {

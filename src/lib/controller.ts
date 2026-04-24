@@ -13,8 +13,8 @@ export interface ControllerDecision {
  * beyond the tolerance band. Prevents artificial convergence and logic
  * degradation across subsequent debate rounds.
  */
-// P10-21: Convergence tolerance configurable via env var (default 0.03 = 3% dip tolerance)
-// P19-05: Guard against NaN from invalid env var
+// Convergence tolerance configurable via env var (default 0.03 = 3% dip tolerance)
+// Guard against NaN from invalid env var
 const _parsedTolerance = parseFloat(process.env.BLOOM_GATE_TOLERANCE || "0.03");
 const BLOOM_GATE_TOLERANCE = Number.isFinite(_parsedTolerance) && _parsedTolerance >= 0 ? _parsedTolerance : 0.03;
 
@@ -31,7 +31,7 @@ export class DeliberationController {
   }
 
   decide(round: number, maxRounds: number, consensusScore: number): ControllerDecision {
-    // P45-06: Cap roundScores to prevent unbounded memory growth
+    // Cap roundScores to prevent unbounded memory growth
     if (this.roundScores.length >= 1000) {
       return { shouldHalt: true, reason: "Exceeded maximum round limit (1000)", selectTopK: 0 };
     }
@@ -79,7 +79,7 @@ export class DeliberationController {
     return { shouldHalt: false, selectTopK: 0 };
   }
 
-  // P10-22: Validate that rounds have responses before accepting
+  // Validate that rounds have responses before accepting
   validateRoundResponses(responseCount: number): boolean {
     if (responseCount === 0) {
       logger.warn("Empty round detected — zero archetype responses. Round rejected.");
@@ -89,12 +89,12 @@ export class DeliberationController {
   }
 
   shouldAcceptRound(currentScored: ScoredOpinion[]): boolean {
-    // P10-22: Reject empty rounds
+    // Reject empty rounds
     if (currentScored.length === 0) {
       logger.warn("shouldAcceptRound called with empty scored list — rejecting");
       return false;
     }
-    // P45-07: Filter NaN scores before Math.max to prevent NaN propagation
+    // Filter NaN scores before Math.max to prevent NaN propagation
     const validScores = currentScored.map((s) => s.scores.final).filter(Number.isFinite);
     const currentMax = validScores.length > 0 ? Math.max(...validScores) : 0;
 
@@ -109,7 +109,7 @@ export class DeliberationController {
   }
 
   /**
-   * P10-20: Actually revert state when a round is discarded.
+   * Actually revert state when a round is discarded.
    * Callers MUST invoke this when shouldAcceptRound() returns false
    * to remove the discarded round's score from history.
    */
@@ -132,7 +132,7 @@ export class DeliberationController {
 
   selectTopK(scored: ScoredOpinion[], k = 3): ScoredOpinion[] {
     const qualified = scored.filter((s) => s.scores.final >= 0.5);
-    // P10-23: Log filtering stats so callers can distinguish "no good" from "no responses"
+    // Log filtering stats so callers can distinguish "no good" from "no responses"
     if (qualified.length < scored.length) {
       logger.debug({
         total: scored.length,
@@ -147,7 +147,7 @@ export class DeliberationController {
   }
 
   /**
-   * P10-24: Returns the peak consensus score observed across all rounds.
+   * Returns the peak consensus score observed across all rounds.
    * Exposed for use in deliberation metadata (trace, audit log, response headers).
    * Callers: endTrace(), councilService response assembly.
    */

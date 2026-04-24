@@ -3,7 +3,7 @@ export interface Message {
   content: string | ContentBlock[];
   name?: string;
   tool_call_id?: string;
-  // P7-21: Add tool_calls for assistant messages that invoke tools
+  // Add tool_calls for assistant messages that invoke tools
   tool_calls?: Array<{
     id: string;
     name: string;
@@ -11,7 +11,7 @@ export interface Message {
   }>;
 }
 
-// P7-19: Discriminated union for content blocks (replaces permissive index signature)
+// Discriminated union for content blocks (replaces permissive index signature)
 export type ContentBlock =
   | { type: "text"; text: string }
   | { type: "image_url"; url: string }
@@ -45,6 +45,6 @@ export interface ProviderConfig {
   maxTokens?: number;
   timeoutMs?: number;
   tools?: string[];
-  // P7-20: Accept both number and string for userId (supports UUID-based auth)
+  // Accept both number and string for userId (supports UUID-based auth)
   userId?: string | number;
 }

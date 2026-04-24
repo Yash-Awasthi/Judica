@@ -1,5 +1,5 @@
 /**
- * P4-49: Ensemble distillation.
+ * Ensemble distillation.
  *
  * Uses council deliberation outputs to generate training datasets
  * for fine-tuning smaller local models. The council acts as a "teacher"
@@ -34,7 +34,7 @@ const DEFAULT_CONFIG: DistillationConfig = {
   format: "jsonl",
 };
 
-// P36-02: Hard cap on maxSamples to prevent memory exhaustion
+// Hard cap on maxSamples to prevent memory exhaustion
 const ABSOLUTE_MAX_SAMPLES = 50_000;
 
 /**
@@ -48,7 +48,7 @@ export function filterForTraining(
     .filter((s) => s.confidence >= config.minConfidence)
     .filter((s) => s.quality === "high" || s.quality === "medium")
     .sort((a, b) => b.confidence - a.confidence)
-    .slice(0, Math.min(config.maxSamples, ABSOLUTE_MAX_SAMPLES)); // P36-02: Enforce hard cap
+    .slice(0, Math.min(config.maxSamples, ABSOLUTE_MAX_SAMPLES)); // Enforce hard cap
 }
 
 /**

@@ -130,7 +130,7 @@ export async function handleMCPRequest(request: MCPRequest): Promise<MCPResponse
 
       case "tools/call": {
         const toolName = request.params?.name as string;
-        // P36-01: Validate toolName is a non-empty string within bounds
+        // Validate toolName is a non-empty string within bounds
         if (!toolName || typeof toolName !== "string" || toolName.length > 200) {
           return {
             ...baseResponse,
@@ -138,7 +138,7 @@ export async function handleMCPRequest(request: MCPRequest): Promise<MCPResponse
           };
         }
         const args = (request.params?.arguments as Record<string, unknown>) || {};
-        // P36-01: Cap args keys to prevent unbounded object processing
+        // Cap args keys to prevent unbounded object processing
         if (Object.keys(args).length > 100) {
           return {
             ...baseResponse,

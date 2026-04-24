@@ -1,5 +1,5 @@
 /**
- * P4-34: Artifact storage abstraction.
+ * Artifact storage abstraction.
  *
  * The current artifact streaming service stores artifacts in-memory (Map).
  * This module provides a pluggable storage interface so artifacts can be
@@ -39,7 +39,7 @@ export interface ArtifactStore {
  * In-memory artifact store — the current default.
  * Suitable for single-process deployments and development.
  */
-// P19-08: Cap in-memory artifact store to prevent unbounded memory growth
+// Cap in-memory artifact store to prevent unbounded memory growth
 const MAX_STREAMS = 500;
 const MAX_ARTIFACTS_PER_STREAM = 100;
 

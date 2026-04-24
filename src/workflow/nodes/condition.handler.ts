@@ -5,7 +5,7 @@ export const conditionHandler: NodeHandler = async (ctx) => {
   const operator = (ctx.nodeData.operator as string) || "equals";
   const compareTo = ctx.nodeData.compare_to;
 
-  // P44-01: Cap string lengths before comparison to prevent DoS
+  // Cap string lengths before comparison to prevent DoS
   const strValue = String(value ?? "").slice(0, 100_000);
   const strCompare = String(compareTo ?? "").slice(0, 100_000);
 
@@ -22,7 +22,7 @@ export const conditionHandler: NodeHandler = async (ctx) => {
       result = strValue.includes(strCompare);
       break;
     case "gt": {
-      // P44-02: NaN guard on numeric comparisons
+      // NaN guard on numeric comparisons
       const numVal = Number(value);
       const numCmp = Number(compareTo);
       result = Number.isFinite(numVal) && Number.isFinite(numCmp) ? numVal > numCmp : false;

@@ -215,7 +215,7 @@ export async function findRelatedConversations(
 }
 
 /**
- * P5-10: Garbage-collect stale topic nodes.
+ * Garbage-collect stale topic nodes.
  *
  * Removes topic nodes that haven't been updated in `ttlDays` days
  * and have low strength (fewer than `minStrength` connections).

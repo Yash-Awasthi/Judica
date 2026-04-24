@@ -20,7 +20,7 @@ const kbPlugin: FastifyPluginAsync = async (fastify) => {
       .orderBy(desc(knowledgeBases.createdAt))
       .limit(200);
 
-    // P30-06: Cap parallel queries to prevent DB connection pool exhaustion
+    // Cap parallel queries to prevent DB connection pool exhaustion
     const MAX_KB_ENRICHMENT = 100;
     const result = await Promise.all(
       kbs.slice(0, MAX_KB_ENRICHMENT).map(async (kb) => {

@@ -4,7 +4,7 @@ import { eq, sql } from "drizzle-orm";
 import logger from "../logger.js";
 import type { CacheBackend, CacheEntry, SemanticSearchResult } from "./CacheBackend.js";
 
-// P9-20: Import type from CacheBackend.ts — don't duplicate
+// Import type from CacheBackend.ts — don't duplicate
 type CacheOpinion = CacheEntry['opinions'][number];
 
 interface SemanticCacheRow {
@@ -18,7 +18,7 @@ interface SemanticCacheRow {
 export class PostgresBackend implements CacheBackend {
 
   async get(key: string): Promise<CacheEntry | null> {
-    // P9-25: Filter expired rows in SQL — don't fetch then filter in app code
+    // Filter expired rows in SQL — don't fetch then filter in app code
     const [hit] = await db
       .select()
       .from(semanticCache)
@@ -40,7 +40,7 @@ export class PostgresBackend implements CacheBackend {
   }
 
   async set(key: string, value: CacheEntry, ttlMs: number): Promise<void> {
-    // P9-21: TTL is required — validate
+    // TTL is required — validate
     if (!ttlMs || ttlMs <= 0) {
       logger.warn({ key, ttlMs }, "Invalid TTL for cache set — using default 24h");
       ttlMs = 24 * 60 * 60 * 1000;
@@ -62,7 +62,7 @@ export class PostgresBackend implements CacheBackend {
           verdict: value.verdict,
           opinions: value.opinions,
           expiresAt,
-          // P9-24: Do NOT reset createdAt on update — preserve original creation time for TTL logic
+          // Do NOT reset createdAt on update — preserve original creation time for TTL logic
         },
       });
   }
@@ -73,21 +73,21 @@ export class PostgresBackend implements CacheBackend {
         .delete(semanticCache)
         .where(eq(semanticCache.keyHash, key));
     } catch (err) {
-      // P9-26: Log delete failures instead of silently swallowing
+      // Log delete failures instead of silently swallowing
       logger.warn({ err: (err as Error).message, key }, "Failed to delete cache entry");
     }
   }
 
   async searchSemantic(embedding: number[], threshold = 0.15): Promise<SemanticSearchResult | null> {
     try {
-      // P21-03: Validate embedding array contains only finite numbers to prevent SQL injection
+      // Validate embedding array contains only finite numbers to prevent SQL injection
       if (!embedding.every(n => Number.isFinite(n))) {
         logger.warn("searchSemantic: embedding contains non-finite values — rejecting");
         return null;
       }
       const embeddingStr = `[${embedding.join(',')}]`;
-      // P9-22: Check that HNSW index exists — warn if falling back to seqscan
-      // P9-23: Push similarity threshold into WHERE clause to reduce sort cost
+      // Check that HNSW index exists — warn if falling back to seqscan
+      // Push similarity threshold into WHERE clause to reduce sort cost
       const result = await db.execute(sql`
         SELECT id, "keyHash", verdict, opinions, embedding <-> ${embeddingStr}::vector as distance
         FROM "SemanticCache"
@@ -103,8 +103,8 @@ export class PostgresBackend implements CacheBackend {
         return {
           keyHash: rows[0].keyHash,
           verdict: rows[0].verdict,
-          // P9-27: Handle mixed opinions field schema — may be string or JSON
-          // P51-07: Safe-parse opinions so malformed JSON doesn't discard a valid row
+          // Handle mixed opinions field schema — may be string or JSON
+          // Safe-parse opinions so malformed JSON doesn't discard a valid row
           opinions: (() => {
             let opinions: CacheOpinion[];
             try {
@@ -134,7 +134,7 @@ export class PostgresBackend implements CacheBackend {
     embedding: number[] | null,
     ttlMs: number
   ): Promise<void> {
-    // P9-21: TTL is required
+    // TTL is required
     if (!ttlMs || ttlMs <= 0) {
       ttlMs = 24 * 60 * 60 * 1000;
     }
@@ -142,7 +142,7 @@ export class PostgresBackend implements CacheBackend {
 
     if (embedding) {
       const embeddingStr = `[${embedding.join(',')}]`;
-      // P9-24: Do NOT reset createdAt on conflict update
+      // Do NOT reset createdAt on conflict update
       await db.execute(sql`
         INSERT INTO "SemanticCache" ("keyHash", prompt, verdict, opinions, "expiresAt", embedding)
         VALUES (${key}, ${prompt.slice(0, 500)}, ${value.verdict}, ${JSON.stringify(value.opinions)}::jsonb, ${expiresAt.toISOString()}::timestamptz, ${embeddingStr}::vector)
@@ -164,7 +164,7 @@ export class PostgresBackend implements CacheBackend {
       `);
       logger.debug({ deleted: (result as { rowCount?: number }).rowCount }, "Cleaned up expired cache entries");
     } catch (err) {
-      // P9-26: Log cleanup failures
+      // Log cleanup failures
       logger.warn({ err: (err as Error).message }, "Failed to clean up expired cache entries");
     }
   }

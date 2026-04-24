@@ -5,7 +5,7 @@ import { z } from "zod";
 // enabling IP spoofing (e.g. "0.0.0.0/0" would trust any X-Forwarded-For).
 const CIDR_RE = /^(\d{1,3}\.){3}\d{1,3}(\/\d{1,2})?$/;
 
-// P1-31: TRUST_PROXY validation — accept boolean, number, or comma-separated CIDRs
+// TRUST_PROXY validation — accept boolean, number, or comma-separated CIDRs
 const trustProxySchema = z.string().optional().transform((val, ctx) => {
   if (!val) return undefined;
   if (val === "true") return true;
@@ -31,16 +31,16 @@ const envSchema = z.object({
   REDIS_URL: z.string().url("REDIS_URL must be a valid URL").default("redis://localhost:6379"),
   JWT_SECRET: z.string().min(32, "JWT_SECRET must be at least 32 characters"),
   MASTER_ENCRYPTION_KEY: z.string().regex(/^[0-9a-f]{64}$/i, "MASTER_ENCRYPTION_KEY must be a hex-encoded 32-byte (64 hex chars) key"),
-  // P1-30: Coerce PORT to a validated integer
+  // Coerce PORT to a validated integer
   PORT: z.coerce.number().int().positive().max(65535).default(3000),
   NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
   RATE_LIMIT_WINDOW_MS: z.coerce.number().int().positive().default(60_000),
-  // P40-05: Add upper bound on rate limit to prevent accidental disabling
+  // Add upper bound on rate limit to prevent accidental disabling
   RATE_LIMIT_MAX: z.coerce.number().int().positive().max(10000).default(10),
   ALLOWED_ORIGINS: z.string().optional(),
   TAVILY_API_KEY: z.string().optional(),
   SYSTEM_PROMPT: z.string().optional(),
-  // P1-31: Validate TRUST_PROXY as boolean/number/CIDR
+  // Validate TRUST_PROXY as boolean/number/CIDR
   TRUST_PROXY: trustProxySchema,
   OPENAI_API_KEY: z.string().optional(),
   ANTHROPIC_API_KEY: z.string().optional(),
@@ -56,7 +56,7 @@ const envSchema = z.object({
   SERP_API_KEY: z.string().optional(),
   LANGFUSE_SECRET_KEY: z.string().optional(),
   LANGFUSE_PUBLIC_KEY: z.string().optional(),
-  // P1-32: Add missing env vars
+  // Add missing env vars
   LANGFUSE_BASEURL: z.string().url().optional(),
   OTEL_EXPORTER_OTLP_ENDPOINT: z.string().url().optional(),
   SENTRY_DSN: z.string().url().optional(),
@@ -77,7 +77,7 @@ const envSchema = z.object({
   OAUTH_CALLBACK_BASE_URL: z.string().optional().default("http://localhost:3000"),
 });
 
-// P1-34: Warn about unknown env vars that look like typos of known keys
+// Warn about unknown env vars that look like typos of known keys
 const KNOWN_KEYS = new Set(Object.keys(envSchema.shape));
 const ENV_PREFIXES = ["DATABASE_", "REDIS_", "JWT_", "MASTER_", "PORT", "NODE_", "RATE_LIMIT_", "ALLOWED_", "TAVILY_", "SYSTEM_", "TRUST_", "OPENAI_", "ANTHROPIC_", "GOOGLE_", "OPENROUTER_", "NVIDIA_", "XIAOMI_", "GROQ_", "MISTRAL_", "CEREBRAS_", "COHERE_", "OLLAMA_", "SERP_", "LANGFUSE_", "PROVIDER_", "FRONTEND_", "CURRENT_", "ENABLE_", "GITHUB_", "OAUTH_", "OTEL_", "SENTRY_", "SMTP_", "GRACEFUL_"];
 for (const key of Object.keys(process.env)) {
@@ -89,7 +89,7 @@ for (const key of Object.keys(process.env)) {
 const parsed = envSchema.safeParse(process.env);
 
 if (!parsed.success) {
-  // P1-33: Throw instead of process.exit(1) — allows test runners to catch
+  // Throw instead of process.exit(1) — allows test runners to catch
   const messages = parsed.error.issues.map(i => `   ${i.path.join(".")}: ${i.message}`).join("\n");
   throw new Error(`Invalid environment variables:\n${messages}`);
 }

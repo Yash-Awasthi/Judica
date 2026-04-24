@@ -1,4 +1,4 @@
-// P2-02: DEPRECATED — This module is the legacy provider entry point.
+// DEPRECATED — This module is the legacy provider entry point.
 // New code should use src/adapters/ + src/router/smartRouter.ts instead.
 // This file will be removed once all callers are migrated.
 import { withRetry } from "./retry.js";
@@ -14,7 +14,7 @@ import type {
 
 export type { Message, ProviderResponse, ProviderUsage, Provider };
 
-// P7-13: Typed error classes replace brittle string matching
+// Typed error classes replace brittle string matching
 export class ProviderConfigError extends Error {
   constructor(message: string, options?: ErrorOptions) {
     super(message, options);
@@ -29,10 +29,10 @@ export class ProviderRateLimitError extends Error {
   }
 }
 
-// P7-14: Max total attempts guard — caps retry × fallback explosion
+// Max total attempts guard — caps retry × fallback explosion
 const MAX_TOTAL_ATTEMPTS = 6;
 
-// P7-15: Request context object replaces manual isFallback threading
+// Request context object replaces manual isFallback threading
 interface RequestContext {
   isFallback: boolean;
   totalAttempts: number;
@@ -47,12 +47,12 @@ export async function askProvider(
   onChunk?: (chunk: string) => void,
   _ctx?: RequestContext,
 ): Promise<ProviderResponse> {
-  // P7-15: Use context object for propagation
+  // Use context object for propagation
   const ctx: RequestContext = _ctx || { isFallback, totalAttempts: 0, triedProviders: [] };
   ctx.totalAttempts++;
   ctx.triedProviders.push(providerConfig.name);
 
-  // P7-14: Guard against retry × fallback explosion
+  // Guard against retry × fallback explosion
   if (ctx.totalAttempts > MAX_TOTAL_ATTEMPTS) {
     throw new Error(`Max total attempts (${MAX_TOTAL_ATTEMPTS}) exceeded. Tried: ${ctx.triedProviders.join(", ")}`);
   }
@@ -85,7 +85,7 @@ export async function askProvider(
       totalAttempts: ctx.totalAttempts,
     }, "Provider request failed, checking for fallback");
 
-    // P7-13: Use typed error classes instead of string matching
+    // Use typed error classes instead of string matching
     if (err instanceof ProviderConfigError) {
       throw err;
     }
@@ -118,7 +118,7 @@ export async function askProviderStream(
   try {
     return await withRetry(async () => {
       ctx.totalAttempts++;
-      // P7-14: Check max attempts inside retry loop
+      // Check max attempts inside retry loop
       if (ctx.totalAttempts > MAX_TOTAL_ATTEMPTS) {
         throw new Error(`Max total attempts (${MAX_TOTAL_ATTEMPTS}) exceeded`);
       }
@@ -130,7 +130,7 @@ export async function askProviderStream(
     });
   } catch (_err: unknown) {
     if (!ctx.isFallback && (!abortSignal || !abortSignal.aborted)) {
-      // P7-14: Check guard before fallback
+      // Check guard before fallback
       if (ctx.totalAttempts < MAX_TOTAL_ATTEMPTS) {
         const fallback = getFallbackProvider(providerConfig);
         if (fallback) {
@@ -139,7 +139,7 @@ export async function askProviderStream(
         }
       }
     }
-    // P7-13: Use typed error class
+    // Use typed error class
     if (_err instanceof ProviderConfigError) {
       throw _err;
     }

@@ -4,12 +4,12 @@ import { askProvider } from "./providers.js";
 import logger from "./logger.js";
 import { z } from "zod";
 
-// P10-04: Configurable timeout for adversarial LLM calls
-// P19-06: Guard against NaN from invalid env var
+// Configurable timeout for adversarial LLM calls
+// Guard against NaN from invalid env var
 const _parsedAdvTimeout = parseInt(process.env.ADVERSARIAL_TIMEOUT_MS || "15000", 10);
 const ADVERSARIAL_TIMEOUT_MS = Number.isFinite(_parsedAdvTimeout) && _parsedAdvTimeout > 0 ? _parsedAdvTimeout : 15000;
 
-// P10-03: Zod schema for shape validation of parsed output
+// Zod schema for shape validation of parsed output
 const adversarialResponseSchema = z.object({
   counter_arguments: z.array(z.string()).default([]),
   edge_cases: z.array(z.string()).default([]),
@@ -41,7 +41,7 @@ Return STRICT JSON:
 }`;
 
     try {
-      // P10-04: Enforce timeout via AbortSignal to prevent hanging on slow providers
+      // Enforce timeout via AbortSignal to prevent hanging on slow providers
       const timeoutSignal = AbortSignal.timeout(ADVERSARIAL_TIMEOUT_MS);
       const combinedSignal = abortSignal
         ? AbortSignal.any([abortSignal, timeoutSignal])
@@ -49,13 +49,13 @@ Return STRICT JSON:
 
       const response = await askProvider(adversaryProvider, [{ role: "user", content: prompt }], false, combinedSignal);
 
-      // P10-02: Extract last complete JSON block (not greedy first match)
+      // Extract last complete JSON block (not greedy first match)
       // This handles cases where the LLM includes prose before/after JSON
       const jsonBlocks = response.text.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g);
       const jsonStr = jsonBlocks ? jsonBlocks[jsonBlocks.length - 1] : null;
 
       if (!jsonStr) {
-        // P10-01: Fail closed — parsing failure must return is_robust=false
+        // Fail closed — parsing failure must return is_robust=false
         logger.warn({ responsePreview: response.text.slice(0, 200) }, "Adversarial: no JSON found in response — failing closed");
         return {
           is_robust: false,
@@ -68,7 +68,7 @@ Return STRICT JSON:
       try {
         rawParsed = JSON.parse(jsonStr);
       } catch {
-        // P10-01: Fail closed on JSON parse error
+        // Fail closed on JSON parse error
         logger.warn({ jsonStr: jsonStr.slice(0, 200) }, "Adversarial: JSON parse failed — failing closed");
         return {
           is_robust: false,
@@ -77,7 +77,7 @@ Return STRICT JSON:
         };
       }
 
-      // P10-03: Validate shape with Zod — reject missing required fields
+      // Validate shape with Zod — reject missing required fields
       const parseResult = adversarialResponseSchema.safeParse(rawParsed);
       if (!parseResult.success) {
         logger.warn({ errors: parseResult.error.issues }, "Adversarial: response failed shape validation — failing closed");
@@ -90,7 +90,7 @@ Return STRICT JSON:
 
       const parsed = parseResult.data;
 
-      // P10-05: Clamp stress_score to [0, 1] — LLM may return out-of-range values
+      // Clamp stress_score to [0, 1] — LLM may return out-of-range values
       const clampedScore = Math.max(0, Math.min(1, parsed.stress_score));
 
       return {
@@ -99,7 +99,7 @@ Return STRICT JSON:
         stress_score: clampedScore,
       };
     } catch (err) {
-      // P10-01: Fail closed — any unhandled error means we can't trust the response
+      // Fail closed — any unhandled error means we can't trust the response
       logger.warn({ err: (err as Error).message }, "Adversarial challenge failed — failing closed (is_robust=false)");
       return {
         is_robust: false,

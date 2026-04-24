@@ -162,7 +162,7 @@ export async function getRecentHistory(conversationId: string, userId?: number):
 }
 
 export async function getConversationList(userId: number, limit: number = 50, offset: number = 0, filters?: { projectId?: string; after?: Date; before?: Date }): Promise<{ data: Conversation[]; total: number }> {
-  // P38-02: Validate limit/offset to prevent negative or oversized queries
+  // Validate limit/offset to prevent negative or oversized queries
   const safeLimit = Math.min(Math.max(1, Number.isFinite(limit) ? limit : 50), 200);
   const safeOffset = Math.max(0, Number.isFinite(offset) ? offset : 0);
   try {
@@ -193,7 +193,7 @@ export async function getConversationList(userId: number, limit: number = 50, of
 
 export async function searchChats(userId: number, q: string, limit: number = 10, filters?: { projectId?: string; after?: Date; before?: Date }): Promise<Chat[]> {
   try {
-    // P41-09: Cap search term to prevent oversized LIKE queries
+    // Cap search term to prevent oversized LIKE queries
     const searchTerm = q.trim().slice(0, 1000);
     const escapedTerm = searchTerm
       .replace(/\\/g, "\\\\")
@@ -292,7 +292,7 @@ export async function retrieveRelevantContext(
   query: string,
   maxResults: number = 3
 ): Promise<RelevantContext[]> {
-  // P24-07: Cap maxResults to prevent excessive memory use
+  // Cap maxResults to prevent excessive memory use
   const MAX_CONTEXT_RESULTS = 50;
   maxResults = Math.min(Math.max(1, maxResults), MAX_CONTEXT_RESULTS);
 
@@ -430,13 +430,13 @@ Respond ONLY with a JSON object in this format:
     const response = await askProvider(providerConfig as Provider, prompt);
     const content = response.text;
 
-    // P41-08: Use non-greedy regex to avoid ReDoS on large AI responses
+    // Use non-greedy regex to avoid ReDoS on large AI responses
     const jsonMatch = content.match(/\{[\s\S]*?\}/);
     if (!jsonMatch) {
       throw new Error("Failed to extract JSON from AI response");
     }
 
-    // P38-01: Safe JSON.parse with validation
+    // Safe JSON.parse with validation
     let summaryData: Record<string, unknown>;
     try {
       summaryData = JSON.parse(jsonMatch[0]);

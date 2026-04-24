@@ -12,7 +12,7 @@ import { ProviderConfigError } from "../providers.js";
 export function createProvider(config: ProviderConfig): BaseProvider {
   const decryptedConfig = { ...config };
 
-  // P0-17: Try to decrypt the API key if it looks encrypted
+  // Try to decrypt the API key if it looks encrypted
   if (decryptedConfig.apiKey) {
     // Only attempt decryption if the key appears to be encrypted
     // Raw API keys follow known formats: sk-..., gsk_..., key-..., etc.
@@ -29,7 +29,7 @@ export function createProvider(config: ProviderConfig): BaseProvider {
     }
   }
 
-  // P7-16: Use typed ProviderConfigError instead of raw strings
+  // Use typed ProviderConfigError instead of raw strings
   if (!config.type) {
     throw new ProviderConfigError("missing required 'type' field");
   }
@@ -44,7 +44,7 @@ export function createProvider(config: ProviderConfig): BaseProvider {
       case "claude":
       case "deepseek":
       case "gemini":    return new RPAProvider(decryptedConfig);
-      // P37-09: Log unknown provider values that fall through the switch
+      // Log unknown provider values that fall through the switch
       default:
         logger.warn({ provider: decryptedConfig.provider }, "Unknown provider value — falling through to type-based resolution");
     }
@@ -52,7 +52,7 @@ export function createProvider(config: ProviderConfig): BaseProvider {
 
   const type = (decryptedConfig.type || "").toLowerCase();
 
-  // P7-16: Typed error + P7-17: removed dead "openai-compat" branch
+  // Typed error: removed dead "openai-compat" branch
   if (!["api", "local", "rpa"].includes(type)) {
     throw new ProviderConfigError(`invalid type '${type}'. Must be 'api', 'local', or 'rpa'`);
   }
@@ -76,7 +76,7 @@ export function createProvider(config: ProviderConfig): BaseProvider {
       return new OllamaProvider(decryptedConfig);
 
     default:
-      // P7-16: Typed error class
+      // Typed error class
       throw new ProviderConfigError(`Unsupported provider type: ${decryptedConfig.type}`);
   }
 }

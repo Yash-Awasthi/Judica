@@ -19,7 +19,7 @@ export function createGoogleStrategy() {
         // account takeover via unverified email claims.
         const emailObj = profile.emails?.[0];
         if (!emailObj?.value) return done(new Error("No email from Google"));
-        // P8-32: Use strict !== true check — `verified === false` passes for undefined/null
+        // Use strict !== true check — `verified === false` passes for undefined/null
         if (emailObj.verified !== true) return done(new Error("Google email not verified"));
         const email = emailObj.value;
 
@@ -30,7 +30,7 @@ export function createGoogleStrategy() {
           .limit(1);
 
         if (existing) {
-          // P8-34: Use explicit authMethod instead of checking passwordHash
+          // Use explicit authMethod instead of checking passwordHash
           if (existing.authMethod === "password") {
             return done(new Error("An account with this email already exists from a different sign-in method. Please use your original sign-in method."));
           }

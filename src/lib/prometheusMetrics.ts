@@ -1,6 +1,6 @@
 import client from "prom-client";
 
-// P9-62: Use the default registry from prom-client.
+// Use the default registry from prom-client.
 export const registry = client.register;
 
 // Clear the registry to prevent double-registration errors in tests/hot-reload
@@ -27,7 +27,7 @@ export const httpRequestTotal = new client.Counter({
 });
 
 // Deliberation (ask) duration histogram
-// P9-61: Extended buckets for long-running deliberations (multi-agent can take minutes)
+// Extended buckets for long-running deliberations (multi-agent can take minutes)
 export const deliberationDuration = new client.Histogram({
   name: "aibyai_deliberation_duration_seconds",
   help: "Duration of council deliberations in seconds",
@@ -53,7 +53,7 @@ export const tokenUsageTotal = new client.Counter({
 
 });
 
-// P9-63: Active SSE connections gauge — updated on connection open/close events.
+// Active SSE connections gauge — updated on connection open/close events.
 // Stale if server crashes without cleanup; consider periodic reconciliation.
 export const activeSSEConnections = new client.Gauge({
   name: "aibyai_active_sse_connections",
@@ -61,7 +61,7 @@ export const activeSSEConnections = new client.Gauge({
 
 });
 
-// P9-63: Queue depth gauge — must be updated by a periodic collector (e.g., every 10s)
+// Queue depth gauge — must be updated by a periodic collector (e.g., every 10s)
 // to avoid stale values. Consider using a collect() callback for on-demand refresh.
 export const queueDepth = new client.Gauge({
   name: "aibyai_queue_depth",
@@ -70,7 +70,7 @@ export const queueDepth = new client.Gauge({
 
 });
 
-// P9-64: Cache hit/miss counter with `backend` label to distinguish Redis vs Postgres
+// Cache hit/miss counter with `backend` label to distinguish Redis vs Postgres
 export const cacheOperations = new client.Counter({
   name: "aibyai_cache_operations_total",
   help: "Cache hit/miss counter",
@@ -78,7 +78,7 @@ export const cacheOperations = new client.Counter({
 
 });
 
-// P0-43: Anonymous request tracking counter
+// Anonymous request tracking counter
 export const anonymousRequests = new client.Counter({
   name: "aibyai_anonymous_requests_total",
   help: "Total anonymous (unauthenticated) requests",
@@ -94,7 +94,7 @@ export const dbPoolStats = new client.Gauge({
 
 });
 
-// P57-03: CARDINALITY WARNING — tenant_id labels create O(tenants) time series.
+// CARDINALITY WARNING — tenant_id labels create O(tenants) time series.
 // At >1000 tenants, this WILL degrade Prometheus performance.
 // Mitigation options:
 //   1. Use recording rules to pre-aggregate by tenant bucket (small/medium/large)
@@ -102,7 +102,7 @@ export const dbPoolStats = new client.Gauge({
 //   3. Cap tenant_id labels to top-N tenants by volume, bucket rest as "other"
 // Monitor aibyai_tenant_* series count via `count({__name__=~"aibyai_tenant_.*"})`.
 
-// P4-12: Per-tenant metrics for SLO tracking.
+// Per-tenant metrics for SLO tracking.
 // Use userId or orgId as the tenant label to enable per-tenant dashboards.
 export const tenantRequestDuration = new client.Histogram({
   name: "aibyai_tenant_request_duration_seconds",
@@ -126,7 +126,7 @@ export const tenantRequestTotal = new client.Counter({
 
 });
 
-// P4-13: Router exhaustion counter — tracks when all providers are unavailable.
+// Router exhaustion counter — tracks when all providers are unavailable.
 export const routerExhaustedTotal = new client.Counter({
   name: "aibyai_router_exhausted_total",
   help: "Number of times all providers were exhausted (no available provider)",
@@ -134,8 +134,8 @@ export const routerExhaustedTotal = new client.Counter({
 
 });
 
-// P4-16: Worker autoscaling signals — expose BullMQ job-lag metrics for HPA.
-// P9-61: Extended buckets to capture workflow durations up to 5 minutes.
+// Worker autoscaling signals — expose BullMQ job-lag metrics for HPA.
+// Extended buckets to capture workflow durations up to 5 minutes.
 export const queueJobLag = new client.Histogram({
   name: "aibyai_queue_job_lag_seconds",
   help: "Time jobs spend waiting in queue before being picked up (seconds)",

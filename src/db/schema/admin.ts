@@ -25,7 +25,7 @@ export const adminAuditLogs = pgTable(
     details: jsonb("details").default({}).notNull(), // JSON representation of changes { old: ..., new: ... }
     status: text("status").default("success").notNull(), // 'success', 'failure'
     errorMessage: text("errorMessage"),
-    // P60-05: Contains PII — subject to data-retention / GDPR right-to-erasure policies
+    // Contains PII — subject to data-retention / GDPR right-to-erasure policies
     ipAddress: text("ipAddress"),
     createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
@@ -54,7 +54,7 @@ export const systemConfigs = pgTable(
   (table) => [uniqueIndex("SystemConfig_key_idx").on(table.key)],
 );
 
-// P8-44: OrgGroup system is defined here but not enforced in application routes.
+// OrgGroup system is defined here but not enforced in application routes.
 // Either add orgIsolation middleware to all data routes (conversations, chats, usage)
 // or remove these tables. Current state: partially implemented via admin.service.ts.
 // Decision: KEEP — wire up org isolation via middleware/orgIsolation.ts.

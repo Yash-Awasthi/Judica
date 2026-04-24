@@ -18,7 +18,7 @@ export const codeRepositories = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
     source: text("source").notNull(),
-    // P60-07: Validate against SSRF at ingestion time (see src/lib/ssrf.ts)
+    // Validate against SSRF at ingestion time (see src/lib/ssrf.ts)
     repoUrl: text("repoUrl"),
     name: text("name").notNull(),
     indexed: boolean("indexed").default(false).notNull(),
@@ -46,7 +46,7 @@ export const codeFiles = pgTable(
   },
   (table) => [
     index("CodeFile_repoId_idx").on(table.repoId),
-    // P5-06: Verified HNSW index DDL works with Drizzle 0.45.x — .using() + .op() syntax
+    // Verified HNSW index DDL works with Drizzle 0.45.x — .using() + .op() syntax
     index("CodeFile_embedding_hnsw_idx")
       .using("hnsw", table.embedding.op("vector_cosine_ops")),
   ],

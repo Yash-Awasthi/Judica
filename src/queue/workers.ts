@@ -104,9 +104,9 @@ export function startWorkers() {
       logger.info({ jobId: job?.id, queue: worker.name }, "Worker job completed");
     });
 
-    // P4-16: Track job lag (time spent waiting in queue before pickup)
+    // Track job lag (time spent waiting in queue before pickup)
     worker.on("active", (job) => {
-      // P44-05: NaN guard on job timestamp metrics
+      // NaN guard on job timestamp metrics
       if (job?.processedOn && job?.timestamp && Number.isFinite(job.processedOn) && Number.isFinite(job.timestamp)) {
         const lagMs = job.processedOn - job.timestamp;
         if (lagMs >= 0) queueJobLag.observe({ queue: worker.name }, lagMs / 1000);
@@ -114,7 +114,7 @@ export function startWorkers() {
     });
   }
 
-  // P4-16: Periodically scrape queue depths for autoscaling signals
+  // Periodically scrape queue depths for autoscaling signals
   autoscaleInterval = setInterval(async () => {
     const queues = [
       { name: "ingestion", q: ingestionQueue },

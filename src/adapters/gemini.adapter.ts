@@ -23,7 +23,7 @@ export class GeminiAdapter implements IProviderAdapter {
     await validateSafeUrl(this.baseUrl);
 
     const model = req.model || "gemini-2.0-flash";
-    // P5-08: Validate model name to prevent URL path injection
+    // Validate model name to prevent URL path injection
     if (!/^[a-zA-Z0-9._-]+$/.test(model)) {
       throw new Error(`Invalid model name: "${model}"`);
     }
@@ -53,7 +53,7 @@ export class GeminiAdapter implements IProviderAdapter {
       ];
     }
 
-    // P3-08: Configurable safety settings — default to BLOCK_ONLY_HIGH
+    // Configurable safety settings — default to BLOCK_ONLY_HIGH
     // to avoid overly aggressive blocking on legitimate council deliberations.
     body.safetySettings = [
       { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_ONLY_HIGH" },
@@ -130,7 +130,7 @@ export class GeminiAdapter implements IProviderAdapter {
           } else if (block.type === "image_base64") {
             parts.push({ inlineData: { mimeType: block.media_type, data: block.data } });
           } else if (block.type === "image_url" && block.url) {
-            // P11-17: Degrade image_url to text placeholder directly (no fetch to avoid SSRF)
+            // Degrade image_url to text placeholder directly (no fetch to avoid SSRF)
             parts.push({ text: `[Image: ${block.url}]` });
           } else {
             parts.push({ text: String(block.text || "") });
@@ -175,7 +175,7 @@ export class GeminiAdapter implements IProviderAdapter {
           try {
             const parsed = JSON.parse(dataStr);
 
-            // P7-28: Handle Gemini stream error events (e.g. safety filter, quota)
+            // Handle Gemini stream error events (e.g. safety filter, quota)
             if (parsed.error) {
               yield { type: "text", text: `[Gemini error: ${parsed.error.message || parsed.error.status || "unknown"}]` };
               continue;
@@ -189,7 +189,7 @@ export class GeminiAdapter implements IProviderAdapter {
                   yield { type: "text", text: part.text };
                 }
                 if (part.functionCall) {
-                  // P7-27: Use crypto.randomUUID() for deterministic-length unique IDs
+                  // Use crypto.randomUUID() for deterministic-length unique IDs
                   // instead of Date.now() + Math.random() which produces collisions under load
                   yield {
                     type: "tool_call",
@@ -203,7 +203,7 @@ export class GeminiAdapter implements IProviderAdapter {
               }
             }
 
-            // P7-29: Accumulate usage — only emit once at end (not progressively)
+            // Accumulate usage — only emit once at end (not progressively)
             if (parsed.usageMetadata) {
               totalPromptTokens = parsed.usageMetadata.promptTokenCount || totalPromptTokens;
               totalCompletionTokens = parsed.usageMetadata.candidatesTokenCount || totalCompletionTokens;

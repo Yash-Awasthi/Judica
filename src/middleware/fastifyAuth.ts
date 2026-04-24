@@ -9,7 +9,7 @@ import { eq } from "drizzle-orm";
 import redis from "../lib/redis.js";
 import logger from "../lib/logger.js";
 
-// P8-46: Sanitize URLs for logging — strip tokens, keys, PII from query strings
+// Sanitize URLs for logging — strip tokens, keys, PII from query strings
 function sanitizeUrlForLog(url: string): string {
   try {
     const parsed = new URL(url, "http://localhost");
@@ -38,7 +38,7 @@ declare module "fastify" {
   }
 }
 
-// P0-03: Hash tokens before storage/lookup to avoid storing plaintext JWTs
+// Hash tokens before storage/lookup to avoid storing plaintext JWTs
 function hashToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
@@ -66,7 +66,7 @@ export async function fastifyOptionalAuth(request: FastifyRequest, _reply: Fasti
 
     if (await isTokenRevoked(token)) return;
 
-    // P0-12: Check suspension status in optionalAuth too
+    // Check suspension status in optionalAuth too
     const userStatus = await redis.get(`user:status:${payload.userId}`);
     if (userStatus === "suspended") return;
 
@@ -93,7 +93,7 @@ export async function fastifyRequireAuth(request: FastifyRequest, reply: Fastify
     const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'], issuer: "aibyai", audience: env.NODE_ENV, clockTolerance: 30 });
     const payload = jwtPayloadSchema.parse(decoded);
 
-    // P1-23: Unified revocation check — always use hashed token
+    // Unified revocation check — always use hashed token
     const tokenHash = hashToken(token);
     const pipeline = redis.pipeline();
     pipeline.get(`revoked:${tokenHash}`);
@@ -119,7 +119,7 @@ export async function fastifyRequireAuth(request: FastifyRequest, reply: Fastify
     request.role = payload.role;
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e);
-    // P8-46: Sanitize URL before logging to prevent leaking tokens/keys
+    // Sanitize URL before logging to prevent leaking tokens/keys
     logger.debug({ error: message, url: sanitizeUrlForLog(request.url) }, "JWT Verification failed");
     reply.code(401).send({ error: "Invalid or expired token" });
   }

@@ -1,5 +1,5 @@
 /**
- * P4-21: Embedding model abstraction.
+ * Embedding model abstraction.
  *
  * Decouples embedding generation from a specific provider. The RAG pipeline,
  * federated search, and vector store can call `getEmbeddingProvider().embed(text)`

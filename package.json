@@ -50,7 +50,7 @@
   "author": "Yash Awasthi",
   "license": "MIT",
   "packageManager": "npm@10.9.2",
-  "description": "A production-grade multi-model AI orchestration engine with agentic tools and semantic caching.",
+  "description": "A multi-model AI orchestration engine with agentic tools and semantic caching.",
   "_dependencyNotes": {
     "ioredis": "Unified Redis client for all operations: general caching (src/lib/redis.ts), BullMQ queues (src/queue/connection.ts), and rate-limit state (src/middleware/rateLimit.ts)."
   },

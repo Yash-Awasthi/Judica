@@ -1,7 +1,7 @@
 import type { ProviderConfig, ProviderResponse, Message } from "./types.js";
 import { getBreaker } from "../breaker.js";
 
-// P7-18: Default per-request timeout (30s) to prevent indefinite hangs
+// Default per-request timeout (30s) to prevent indefinite hangs
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 
 export abstract class BaseProvider {
@@ -26,14 +26,14 @@ export abstract class BaseProvider {
    * Wraps a fetch call through the circuit breaker for this provider.
    * All concrete providers should use this instead of calling fetch() directly
    * so that repeated failures trigger the breaker and prevent cascading outages.
-   * P7-18: Adds AbortSignal.timeout() fallback if no signal is provided.
+   * Adds AbortSignal.timeout() fallback if no signal is provided.
    */
   protected async protectedFetch(
     url: string,
     init: RequestInit,
   ): Promise<Response> {
-    // P7-18: Enforce a timeout even when no AbortSignal is supplied
-    // P29-03: NaN guard on timeoutMs
+    // Enforce a timeout even when no AbortSignal is supplied
+    // NaN guard on timeoutMs
     let timeoutMs = this.config.timeoutMs || DEFAULT_REQUEST_TIMEOUT_MS;
     if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) timeoutMs = DEFAULT_REQUEST_TIMEOUT_MS;
     timeoutMs = Math.min(timeoutMs, 300_000); // Hard cap at 5 minutes
@@ -50,7 +50,7 @@ export abstract class BaseProvider {
   protected maskConfig() {
     const masked = { ...this.config };
     if (masked.apiKey) {
-      // P29-04: Only reveal prefix for keys longer than 8 chars
+      // Only reveal prefix for keys longer than 8 chars
       masked.apiKey = masked.apiKey.length > 8
         ? masked.apiKey.slice(0, 4) + "****"
         : "****";

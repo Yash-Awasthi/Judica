@@ -1,9 +1,9 @@
-// P2-05: DEPRECATED — Strictly inferior to src/adapters/gemini.adapter.ts.
+// DEPRECATED — Strictly inferior to src/adapters/gemini.adapter.ts.
 import type { Message, Provider } from "../../providers.js";
 import { getToolDefinitions, callTool } from "../../tools/index.js";
 import { validateSafeUrl } from "../../ssrf.js";
 
-// P7-40: Maximum tool-call recursion depth to prevent stack overflow
+// Maximum tool-call recursion depth to prevent stack overflow
 const MAX_TOOL_RECURSION_DEPTH = 5;
 
 interface ProviderResult {
@@ -27,10 +27,10 @@ export async function askGoogle(
     parts: [{ text: m.content }],
   }));
 
-  // P21-04: Validate model name to prevent URL path injection / SSRF
+  // Validate model name to prevent URL path injection / SSRF
   const modelName = (provider.model || "gemini-2.5-flash-preview-05-20").replace(/[^a-zA-Z0-9._-]/g, "");
   const apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${modelName}:generateContent`;
-  // P7-41: SSRF validation on strategy-level fetch
+  // SSRF validation on strategy-level fetch
   await validateSafeUrl(apiUrl);
 
   const res = await fetch(
@@ -65,7 +65,7 @@ export async function askGoogle(
   const part = candidate?.content?.parts?.[0];
 
   if (part?.functionCall) {
-    // P7-40: Prevent infinite recursion
+    // Prevent infinite recursion
     if (_depth >= MAX_TOOL_RECURSION_DEPTH) {
       throw new Error(`Tool-call recursion limit (${MAX_TOOL_RECURSION_DEPTH}) exceeded`);
     }
@@ -98,7 +98,7 @@ export async function streamGoogle(
   onChunk: (chunk: string) => void
 ): Promise<ProviderResult> {
   const res = await fetch(
-    // P21-09: Sanitize model name in streaming URL to prevent path injection
+    // Sanitize model name in streaming URL to prevent path injection
     `https://generativelanguage.googleapis.com/v1beta/models/${(provider.model || "gemini-2.5-flash-preview-05-20").replace(/[^a-zA-Z0-9._-]/g, "")}:streamGenerateContent?alt=sse`,
     {
       method: "POST",
@@ -121,9 +121,9 @@ export async function streamGoogle(
   const decoder = new TextDecoder();
   let fullText = "";
   let usage: ProviderResult["usage"];
-  // P21-08: Cap accumulated stream buffer to prevent memory exhaustion
+  // Cap accumulated stream buffer to prevent memory exhaustion
   const MAX_STREAM_BUFFER = 2_000_000; // ~2MB
-  // P1-10: Buffer across reads and split on \n boundary properly
+  // Buffer across reads and split on \n boundary properly
   let buffer = "";
 
   while (true) {

@@ -1,9 +1,9 @@
 import { randomUUID } from "crypto";
 import logger from "../lib/logger.js";
 
-// P8-26: Maximum messages to retain per deliberation session
+// Maximum messages to retain per deliberation session
 const MAX_MESSAGES = 500;
-// P19-09: Maximum messages per agent inbox to prevent unbounded memory growth
+// Maximum messages per agent inbox to prevent unbounded memory growth
 const MAX_INBOX_SIZE = 200;
 
 export interface Message {
@@ -53,24 +53,24 @@ export class AgentMessageBus {
       timestamp: new Date(),
     };
 
-    // P8-28: Warn on messages to unknown agents
+    // Warn on messages to unknown agents
     if (to !== "all" && !this.agents.has(to)) {
       logger.warn({ from, to, type }, "Message sent to unknown agent — dropped");
       return msg;
     }
 
-    // P19-09: Deliver to inbox with size cap
+    // Deliver to inbox with size cap
     const inbox = this.inboxes.get(to);
     if (inbox) {
       if (inbox.length >= MAX_INBOX_SIZE) inbox.shift();
       inbox.push(msg);
     }
 
-    // P8-27: Snapshot subscriber list before iterating to prevent iterator invalidation
+    // Snapshot subscriber list before iterating to prevent iterator invalidation
     const subs = [...(this.subscribers.get(to) || [])];
     for (const handler of subs) handler(msg);
 
-    // P8-26: Cap allMessages to prevent unbounded memory growth
+    // Cap allMessages to prevent unbounded memory growth
     if (this.allMessages.length >= MAX_MESSAGES) {
       this.allMessages.shift(); // drop oldest
     }

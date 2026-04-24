@@ -1,4 +1,4 @@
-// P1-09: Groq adapter now extends the shared OpenAICompatibleAdapter base class.
+// Groq adapter now extends the shared OpenAICompatibleAdapter base class.
 
 import { OpenAICompatibleAdapter } from "./openaiCompatible.adapter.js";
 
@@ -22,7 +22,7 @@ export class GroqAdapter extends OpenAICompatibleAdapter {
     return null;
   }
 
-  // P7-30: Filter model listing to only chat-capable models (exclude whisper, embedding, guard)
+  // Filter model listing to only chat-capable models (exclude whisper, embedding, guard)
   protected override filterModels(models: Array<{ id: string }>): string[] {
     return models
       .map((m) => m.id)

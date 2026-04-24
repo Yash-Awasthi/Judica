@@ -1,4 +1,4 @@
-// P2-01: src/adapters/ is the canonical provider layer.
+// src/adapters/ is the canonical provider layer.
 // All other layers (lib/providers/, lib/strategies/, config/providerConfig.ts) are legacy
 // and should be migrated to delegate to this adapter registry.
 import type { IProviderAdapter } from "./types.js";
@@ -13,7 +13,7 @@ import logger from "../lib/logger.js";
 
 const adapters = new Map<string, IProviderAdapter>();
 
-// P7-01: Lazy initialization via memoized getter — prevents side-effects at module load
+// Lazy initialization via memoized getter — prevents side-effects at module load
 let _initialized = false;
 
 function ensureInitialized(): void {
@@ -64,13 +64,13 @@ export function hasAdapter(providerId: string): boolean {
   return adapters.has(providerId);
 }
 
-/** P7-04: Reset registry — for testing and hot-reload */
+/** Reset registry — for testing and hot-reload */
 export function resetRegistry(): void {
   adapters.clear();
   _initialized = false;
 }
 
-// P7-02: Structured model → provider routing table (replaces error-prone substring heuristics)
+// Structured model → provider routing table (replaces error-prone substring heuristics)
 const MODEL_PROVIDER_RULES: Array<{ test: (m: string) => boolean; provider: string }> = [
   // OpenAI
   { test: (m) => m.startsWith("gpt-") || m.startsWith("o1") || m.startsWith("o3") || m.startsWith("o4") || m.startsWith("chatgpt"), provider: "openai" },
@@ -80,7 +80,7 @@ const MODEL_PROVIDER_RULES: Array<{ test: (m: string) => boolean; provider: stri
   { test: (m) => m.startsWith("gemini"), provider: "gemini" },
   // Groq-hosted models — check BEFORE Ollama since Groq uses explicit model IDs
   { test: (m) => m.includes("groq/") || m.startsWith("llama-") || m.startsWith("llama3") || m.includes("-versatile") || m.includes("-specdec"), provider: "groq" },
-  // P7-03: Mixtral — prefer Mistral adapter (native), fallback to Groq
+  // Mixtral — prefer Mistral adapter (native), fallback to Groq
   { test: (m) => m.startsWith("mixtral-") || m.includes("mixtral"), provider: "mistral" },
   { test: (m) => m.startsWith("mixtral-") || m.includes("mixtral"), provider: "groq" },
   { test: (m) => m.startsWith("gemma-") || m.startsWith("gemma2-"), provider: "groq" },
@@ -94,7 +94,7 @@ const MODEL_PROVIDER_RULES: Array<{ test: (m: string) => boolean; provider: stri
 
 /**
  * Resolve a provider ID from a model name.
- * P7-02: Uses structured routing table instead of ambiguous substring matching.
+ * Uses structured routing table instead of ambiguous substring matching.
  */
 export function resolveProviderFromModel(model: string): string | null {
   const m = model.toLowerCase();
@@ -109,7 +109,7 @@ export function resolveProviderFromModel(model: string): string | null {
 }
 
 function initBuiltinAdapters(): void {
-  // P7-04: Clear before re-populating to prevent duplicate registrations on reload
+  // Clear before re-populating to prevent duplicate registrations on reload
   adapters.clear();
 
   if (env.OPENAI_API_KEY) {
@@ -157,10 +157,10 @@ function initBuiltinAdapters(): void {
     logger.debug("NVIDIA adapter loaded (OpenAI-compat)");
   }
 
-  // P4-19: Additional providers — Azure OpenAI, Bedrock-proxy, Vertex-proxy, Fireworks, Together, DeepInfra.
+  // Additional providers — Azure OpenAI, Bedrock-proxy, Vertex-proxy, Fireworks, Together, DeepInfra.
   // All are OpenAI-compatible endpoints; users just need to set the env var.
   // Azure OpenAI uses a custom base URL with deployment names as model IDs.
-  // P19-04: Validate AZURE_OPENAI_ENDPOINT to prevent SSRF via env-var injection
+  // Validate AZURE_OPENAI_ENDPOINT to prevent SSRF via env-var injection
   const azureEndpoint = process.env.AZURE_OPENAI_ENDPOINT || "https://YOUR_RESOURCE.openai.azure.com/openai/deployments";
   const isAzureEndpointSafe = /^https:\/\/[a-z0-9-]+\.openai\.azure\.com\b/i.test(azureEndpoint);
   if (process.env.AZURE_OPENAI_ENDPOINT && !isAzureEndpointSafe) {
@@ -171,7 +171,7 @@ function initBuiltinAdapters(): void {
     { id: "fireworks", envKey: "FIREWORKS_API_KEY", baseUrl: "https://api.fireworks.ai/inference/v1" },
     { id: "together", envKey: "TOGETHER_API_KEY", baseUrl: "https://api.together.xyz/v1" },
     { id: "deepinfra", envKey: "DEEPINFRA_API_KEY", baseUrl: "https://api.deepinfra.com/v1/openai" },
-    // P4-41: Perplexity adapter — tests/adapters/perplexity.test.ts exercises this path
+    // Perplexity adapter — tests/adapters/perplexity.test.ts exercises this path
     { id: "perplexity", envKey: "PERPLEXITY_API_KEY", baseUrl: "https://api.perplexity.ai" },
   ];
 
@@ -187,5 +187,5 @@ function initBuiltinAdapters(): void {
   logger.info({ count, providers: listAvailableProviders() }, "Adapter registry initialized");
 }
 
-// P7-01: Removed eager initBuiltinAdapters() call — now lazy via ensureInitialized()
-// P7-04: clearRegistry() added above for clean re-init on reload
+// Removed eager initBuiltinAdapters() call — now lazy via ensureInitialized()
+// clearRegistry() added above for clean re-init on reload

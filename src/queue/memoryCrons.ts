@@ -1,4 +1,4 @@
-// P5-11: Moved from lib/ to queue/ — these are background job schedulers, not library utilities
+// Moved from lib/ to queue/ — these are background job schedulers, not library utilities
 import { db } from "../lib/drizzle.js";
 import { conversations } from "../db/schema/conversations.js";
 import { chats } from "../db/schema/conversations.js";
@@ -8,8 +8,8 @@ import { compact } from "../services/memoryCompaction.service.js";
 import logger from "../lib/logger.js";
 import { isNull, lt, or, eq, count, sql } from "drizzle-orm";
 
-// P10-64: Externalized compaction thresholds via environment/config
-// P53-06: NaN guards for all parseInt calls
+// Externalized compaction thresholds via environment/config
+// NaN guards for all parseInt calls
 const _parsedSummarizationInterval = parseInt(process.env.MEMORY_SUMMARIZATION_INTERVAL_MS || "3600000", 10);
 const SUMMARIZATION_INTERVAL_MS = Number.isNaN(_parsedSummarizationInterval) ? 3600000 : _parsedSummarizationInterval; // 1 hour
 const _parsedCompactionInterval = parseInt(process.env.MEMORY_COMPACTION_INTERVAL_MS || "604800000", 10);
@@ -19,21 +19,21 @@ const MIN_MESSAGES_FOR_SUMMARIZATION = Number.isNaN(_parsedMinMessages) ? 30 : _
 const _parsedMinMemories = parseInt(process.env.MEMORY_MIN_MEMORIES || "50", 10);
 const MIN_MEMORIES_FOR_COMPACTION = Number.isNaN(_parsedMinMemories) ? 50 : _parsedMinMemories;
 const _parsedBatchSize = parseInt(process.env.MEMORY_COMPACTION_BATCH_SIZE || "100", 10);
-const COMPACTION_BATCH_SIZE = Number.isNaN(_parsedBatchSize) ? 100 : _parsedBatchSize; // P10-62: Bounded query
+const COMPACTION_BATCH_SIZE = Number.isNaN(_parsedBatchSize) ? 100 : _parsedBatchSize; // Bounded query
 
 let summarizationTimer: ReturnType<typeof setTimeout> | null = null;
 let compactionTimer: ReturnType<typeof setTimeout> | null = null;
 let jitterTimer: ReturnType<typeof setTimeout> | null = null;
-// P10-65: Track whether a job is currently running to prevent stacking
+// Track whether a job is currently running to prevent stacking
 let summarizationRunning = false;
 let compactionRunning = false;
-// P10-63: Track last summarized conversation to avoid re-processing
+// Track last summarized conversation to avoid re-processing
 const summarizedSessions = new Set<string>();
-// P53-06: Cap summarizedSessions to prevent unbounded growth
+// Cap summarizedSessions to prevent unbounded growth
 const MAX_SUMMARIZED_SESSIONS = 50_000;
 
 async function runAutoSummarization(): Promise<void> {
-  // P10-65: Prevent overlapping invocations
+  // Prevent overlapping invocations
   if (summarizationRunning) {
     logger.warn("Auto-summarization already running — skipping this tick");
     return;
@@ -45,7 +45,7 @@ async function runAutoSummarization(): Promise<void> {
   try {
     const oneHourAgo = new Date(Date.now() - SUMMARIZATION_INTERVAL_MS);
 
-    // P10-62: Bounded query with LIMIT to prevent OOM
+    // Bounded query with LIMIT to prevent OOM
     const convos = await db
       .select({ id: conversations.id, userId: conversations.userId })
       .from(conversations)
@@ -58,7 +58,7 @@ async function runAutoSummarization(): Promise<void> {
       .limit(COMPACTION_BATCH_SIZE);
 
     for (const convo of convos) {
-      // P10-63: Skip already-summarized sessions in this run cycle
+      // Skip already-summarized sessions in this run cycle
       if (summarizedSessions.has(convo.id)) continue;
 
       const [result] = await db
@@ -71,7 +71,7 @@ async function runAutoSummarization(): Promise<void> {
       if (msgCount > MIN_MESSAGES_FOR_SUMMARIZATION) {
         try {
           await summarizeSession(convo.id, convo.userId as number);
-          summarizedSessions.add(convo.id); // P10-63: Mark as processed
+          summarizedSessions.add(convo.id); // Mark as processed
           // Cap the tracking set to prevent unbounded growth
           if (summarizedSessions.size > 10000) {
             summarizedSessions.clear();
@@ -90,7 +90,7 @@ async function runAutoSummarization(): Promise<void> {
 }
 
 async function runWeeklyCompaction(): Promise<void> {
-  // P10-65: Prevent overlapping invocations
+  // Prevent overlapping invocations
   if (compactionRunning) {
     logger.warn("Weekly compaction already running — skipping this tick");
     return;
@@ -100,7 +100,7 @@ async function runWeeklyCompaction(): Promise<void> {
   logger.info("Running weekly memory compaction job");
 
   try {
-    // P10-62: Bounded query with LIMIT and cursor-based pagination
+    // Bounded query with LIMIT and cursor-based pagination
     const userCounts = await db
       .select({
         userId: memories.userId,
@@ -129,7 +129,7 @@ async function runWeeklyCompaction(): Promise<void> {
   }
 }
 
-// P10-65: Use setTimeout-based scheduling to prevent overlapping invocations
+// Use setTimeout-based scheduling to prevent overlapping invocations
 function scheduleSummarization(): void {
   summarizationTimer = setTimeout(async () => {
     await runAutoSummarization();
@@ -145,7 +145,7 @@ function scheduleCompaction(): void {
 }
 
 export function startMemoryCrons(): void {
-  // P10-66: Add random startup jitter (0-30s) to prevent thundering herd
+  // Add random startup jitter (0-30s) to prevent thundering herd
   const jitter = Math.floor(Math.random() * 30000);
 
   jitterTimer = setTimeout(() => {

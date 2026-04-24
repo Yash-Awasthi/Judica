@@ -1,5 +1,5 @@
 /**
- * P4-49: Ensemble distillation.
+ * Ensemble distillation.
  *
  * Use the council to generate training datasets for smaller local models.
  * After a deliberation reaches high-confidence consensus, the query-answer
@@ -69,7 +69,7 @@ export function recordDistillationSample(sample: {
   }
 
   const entry: DistillationSample = {
-    // P20-03: Use crypto.randomUUID for collision-resistant IDs instead of Math.random
+    // Use crypto.randomUUID for collision-resistant IDs instead of Math.random
     id: `ds_${randomUUID()}`,
     query: sample.query,
     answer: sample.answer,

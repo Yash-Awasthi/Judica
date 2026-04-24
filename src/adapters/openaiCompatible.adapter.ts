@@ -1,8 +1,8 @@
 /**
- * P1-09: Extracted base class for OpenAI-compatible adapters.
+ * Extracted base class for OpenAI-compatible adapters.
  * Deduplicates OpenAI/Groq/OpenRouter which share 95% identical code.
  *
- * P3-28: Each adapter instance holds its own apiKey, scoped to its vendor.
+ * Each adapter instance holds its own apiKey, scoped to its vendor.
  * Keys are set at construction time from provider-specific env vars
  * (e.g. OPENAI_API_KEY for OpenAI, GROQ_API_KEY for Groq).
  * The base URL is also per-instance, so keys are never sent cross-vendor.
@@ -24,7 +24,7 @@ export abstract class OpenAICompatibleAdapter implements IProviderAdapter {
   abstract readonly providerId: string;
   protected baseUrl: string;
   protected apiKey: string;
-  // P3-28: Store the original base URL origin to detect if requests
+  // Store the original base URL origin to detect if requests
   // would leak the key to a different host.
   private readonly _originHost: string;
 
@@ -35,7 +35,7 @@ export abstract class OpenAICompatibleAdapter implements IProviderAdapter {
   }
 
   /**
-   * P3-28: Verify that the request URL matches the adapter's configured origin.
+   * Verify that the request URL matches the adapter's configured origin.
    * Prevents API key from being sent to a different vendor if baseUrl is mutated.
    */
   private assertSameOrigin(url: string): void {
@@ -86,7 +86,7 @@ export abstract class OpenAICompatibleAdapter implements IProviderAdapter {
 
   async generate(req: AdapterRequest): Promise<AdapterStreamResult> {
     await validateSafeUrl(this.baseUrl);
-    // P3-28: Ensure key isn't sent to a different host
+    // Ensure key isn't sent to a different host
     this.assertSameOrigin(`${this.baseUrl}/chat/completions`);
 
     const body: Record<string, unknown> = {
@@ -193,7 +193,7 @@ export abstract class OpenAICompatibleAdapter implements IProviderAdapter {
 
         buffer += decoder.decode(value, { stream: true });
         let idx: number;
-        // P7-22: Handle both \r\n (Windows/proxy) and \n line endings
+        // Handle both \r\n (Windows/proxy) and \n line endings
         while ((idx = buffer.search(/\r?\n/)) >= 0) {
           const line = buffer.slice(0, idx).trim();
           // Skip past \r\n or \n
@@ -208,7 +208,7 @@ export abstract class OpenAICompatibleAdapter implements IProviderAdapter {
               try { args = JSON.parse(tc.args); } catch { logger.warn({ toolName: tc.name }, "Failed to parse tool call JSON arguments"); }
               yield { type: "tool_call", tool_call: { id: tc.id, name: tc.name, arguments: args } };
             }
-            // P7-24: Emit usage exactly once at stream end (not per-chunk)
+            // Emit usage exactly once at stream end (not per-chunk)
             if (lastUsage) {
               yield { type: "usage", usage: lastUsage };
             }
@@ -222,7 +222,7 @@ export abstract class OpenAICompatibleAdapter implements IProviderAdapter {
 
             if (delta?.tool_calls) {
               for (const tc of delta.tool_calls) {
-                // P7-23: Use tc.index if present; generate sequential index if missing
+                // Use tc.index if present; generate sequential index if missing
                 const i = tc.index ?? pendingToolCalls.size;
                 if (!pendingToolCalls.has(i)) {
                   pendingToolCalls.set(i, { id: tc.id || "", name: tc.function?.name || "", args: "" });
@@ -234,7 +234,7 @@ export abstract class OpenAICompatibleAdapter implements IProviderAdapter {
               }
             }
 
-            // P7-24: Accumulate usage — only emit once at [DONE]
+            // Accumulate usage — only emit once at [DONE]
             const usage = this.extractUsage(parsed);
             if (usage) {
               lastUsage = usage;

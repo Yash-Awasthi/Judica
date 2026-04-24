@@ -16,7 +16,7 @@ export interface SharedFactData {
   createdAt: Date;
 }
 
-// P8-24: Validate that conversationId belongs to the requesting user
+// Validate that conversationId belongs to the requesting user
 // This is checked at the service layer before calling these functions.
 // Adding a comment to document the contract: callers MUST verify ownership
 // via conversationService.findConversationById(conversationId, userId)
@@ -52,7 +52,7 @@ export async function getFacts(conversationId: string): Promise<SharedFactData[]
   return facts as SharedFactData[];
 }
 
-// P8-23: Use atomic SQL array operations to prevent race conditions
+// Use atomic SQL array operations to prevent race conditions
 export async function confirmFact(factId: string, agentId: string): Promise<void> {
   // Check if fact exists first
   const [existing] = await db
@@ -71,7 +71,7 @@ export async function confirmFact(factId: string, agentId: string): Promise<void
     .where(eq(sharedFacts.id, factId));
 }
 
-// P8-23: Use atomic SQL array operations to prevent race conditions
+// Use atomic SQL array operations to prevent race conditions
 export async function disputeFact(factId: string, agentId: string): Promise<void> {
   // Check if fact exists first
   const [existing] = await db
@@ -112,7 +112,7 @@ export async function extractAndStoreFacts(
   responseText: string,
   userId?: number
 ): Promise<SharedFactData[]> {
-  // P8-25: Pass userId so LLM calls are attributed to user's quota
+  // Pass userId so LLM calls are attributed to user's quota
   const result = await routeAndCollect({
     model: "auto",
     messages: [

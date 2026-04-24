@@ -94,7 +94,7 @@ export async function compact(userId: number): Promise<CompactionResult> {
   }
 
   // Cluster by cosine similarity > 0.85
-  // P32-10: Cap chunks to prevent O(n²) blowup
+  // Cap chunks to prevent O(n²) blowup
   const MAX_CHUNKS_FOR_CLUSTERING = 500;
   const chunksToCuster = chunksWithEmbeddings.length > MAX_CHUNKS_FOR_CLUSTERING
     ? chunksWithEmbeddings.slice(0, MAX_CHUNKS_FOR_CLUSTERING)
@@ -107,7 +107,7 @@ export async function compact(userId: number): Promise<CompactionResult> {
     visited.add(chunk.id);
 
     const cluster: MemoryChunkWithEmbedding[] = [chunk];
-    // P28-05: Cap cluster size to prevent unbounded growth and oversized LLM prompts
+    // Cap cluster size to prevent unbounded growth and oversized LLM prompts
     const MAX_CLUSTER_SIZE = 50;
 
     for (const other of chunksToCuster) {

@@ -56,7 +56,7 @@ async function extractClaims(agentId: string, text: string): Promise<Claim[]> {
   });
 
   try {
-    // P8-21: Use JSON.parse() with proper validation instead of regex-only extraction
+    // Use JSON.parse() with proper validation instead of regex-only extraction
     const match = result.text.match(/\[[\s\S]*\]/);
     if (!match) return [];
     const parsed = JSON.parse(match[0]);
@@ -125,7 +125,7 @@ export async function detectConflicts(responses: AgentResponse[]): Promise<Confl
     responses.map((r) => extractClaims(r.agentId, r.text))
   );
 
-  // P8-20: Pre-filter using text similarity to avoid O(n²) LLM calls.
+  // Pre-filter using text similarity to avoid O(n²) LLM calls.
   // Only compare pairs whose claim texts have meaningful overlap (cosine-like check).
   const comparisons: Promise<Conflict[]>[] = [];
   for (let i = 0; i < responses.length; i++) {
@@ -148,7 +148,7 @@ export async function detectConflicts(responses: AgentResponse[]): Promise<Confl
     conflicts.push(...result);
   }
 
-  // P8-22: Configurable severity threshold (default 3)
+  // Configurable severity threshold (default 3)
   const parsedThreshold = parseInt(process.env.CONFLICT_SEVERITY_THRESHOLD || "3", 10);
   const severityThreshold = Number.isNaN(parsedThreshold) ? 3 : parsedThreshold;
   return conflicts.filter((c) => c.severity >= severityThreshold);
@@ -156,7 +156,7 @@ export async function detectConflicts(responses: AgentResponse[]): Promise<Confl
 
 const STOP_WORDS = new Set(["the", "a", "an", "is", "are", "was", "were", "be", "been", "has", "have", "had", "do", "does", "did", "will", "would", "could", "should", "may", "might", "can", "shall", "this", "that", "these", "those", "it", "its", "of", "in", "on", "at", "to", "for", "with", "by", "from", "and", "or", "but", "not", "no"]);
 
-// P8-20: Simple keyword overlap check to pre-filter unlikely-to-conflict pairs
+// Simple keyword overlap check to pre-filter unlikely-to-conflict pairs
 function hasTopicOverlap(claimsA: Claim[], claimsB: Claim[]): boolean {
   if (claimsA.length === 0 || claimsB.length === 0) return false;
   const wordsA = new Set(

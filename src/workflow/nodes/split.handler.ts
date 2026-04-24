@@ -1,13 +1,13 @@
 import type { NodeHandler } from "../types.js";
 
-// P10-116: Keys that would cause prototype pollution
+// Keys that would cause prototype pollution
 const DANGEROUS_KEYS = new Set(["__proto__", "constructor", "prototype"]);
 
 export const splitHandler: NodeHandler = async (ctx) => {
   // Take the first input value and split it into multiple named outputs
   const keys = (ctx.nodeData.output_keys as string[]) ?? [];
 
-  // P10-114: Use named input_key instead of positional first-value lookup
+  // Use named input_key instead of positional first-value lookup
   const inputKey = (ctx.nodeData.input_key as string) || "";
   let source: unknown;
 
@@ -18,14 +18,14 @@ export const splitHandler: NodeHandler = async (ctx) => {
     source = ctx.inputs["data"] ?? Object.values(ctx.inputs)[0];
   }
 
-  // P59-07: Return result wrapped in {outputs} to match executor's output extraction
+  // Return result wrapped in {outputs} to match executor's output extraction
   const result: Record<string, unknown> = {};
 
   if (Array.isArray(source) && keys.length > 0) {
     // Distribute array elements across output keys
     for (let i = 0; i < keys.length; i++) {
       const key = keys[i];
-      // P10-116: Skip dangerous keys
+      // Skip dangerous keys
       if (DANGEROUS_KEYS.has(key)) continue;
       result[key] = source[i] ?? null;
     }
@@ -34,7 +34,7 @@ export const splitHandler: NodeHandler = async (ctx) => {
     const obj = source as Record<string, unknown>;
     if (keys.length > 0) {
       for (const key of keys) {
-        // P10-116: Skip dangerous keys
+        // Skip dangerous keys
         if (DANGEROUS_KEYS.has(key)) continue;
         result[key] = obj[key] ?? null;
       }

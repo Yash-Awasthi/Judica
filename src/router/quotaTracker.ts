@@ -15,7 +15,7 @@
  * budgeting), replace the `quotas` Map below with a Redis-backed store using
  * INCRBY + TTL-based daily expiry.
  *
- * P2-14: Known TOCTOU race — canUse() reads then recordUsage() writes,
+ * Known TOCTOU race — canUse() reads then recordUsage() writes,
  * creating a window where concurrent requests may both pass the check.
  * This is acceptable because upstream providers enforce hard limits,
  * and the in-memory map doesn't survive restarts anyway.
@@ -65,7 +65,7 @@ function getOrReset(provider: string): QuotaEntry {
 
 /**
  * Check if a provider/user combo can still make requests today.
- * P3-15: Supports optional userId for per-user quota tracking.
+ * Supports optional userId for per-user quota tracking.
  * Without userId, falls back to global per-provider quotas (backward compatible).
  */
 export function canUse(
@@ -103,7 +103,7 @@ export function getRemainingQuota(
 }
 
 /**
- * P3-16: Reset quota for a provider.
+ * Reset quota for a provider.
  */
 export function resetQuota(provider: string, userId?: string): void {
   const key = userId ? `${provider}:${userId}` : provider;

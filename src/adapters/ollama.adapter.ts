@@ -8,7 +8,7 @@ import { createStreamResult } from "./types.js";
 import { getBreaker } from "../lib/breaker.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
 
-// P3-07: Configurable timeout for local model inference (default 120s)
+// Configurable timeout for local model inference (default 120s)
 const OLLAMA_TIMEOUT_MS = parseInt(process.env.OLLAMA_TIMEOUT_MS || "120000", 10);
 
 interface OllamaChunk {
@@ -31,7 +31,7 @@ export class OllamaAdapter implements IProviderAdapter {
   }
 
   async generate(req: AdapterRequest): Promise<AdapterStreamResult> {
-    // P0-22: Proper localhost check via URL parsing instead of string prefix match
+    // Proper localhost check via URL parsing instead of string prefix match
     const parsedUrl = new URL(this.baseUrl);
     const hostname = parsedUrl.hostname.toLowerCase().replace(/^\[|\]$/g, "");
     const isLocalhost = hostname === "localhost" || hostname === "127.0.0.1" || hostname === "::1" || hostname === "0.0.0.0";
@@ -46,7 +46,7 @@ export class OllamaAdapter implements IProviderAdapter {
     if (req.system_prompt) messages.push({ role: "system", content: req.system_prompt });
 
     for (const m of req.messages) {
-      // P7-33: Ollama only accepts "system", "user", "assistant" roles.
+      // Ollama only accepts "system", "user", "assistant" roles.
       // Map "tool" to "user" (Ollama has no native tool-result role).
       const role = m.role === "tool" ? "user" : m.role;
       messages.push({
@@ -61,7 +61,7 @@ export class OllamaAdapter implements IProviderAdapter {
       stream: true,
     };
 
-    // P1-03: Send tools in body for Ollama tool call support
+    // Send tools in body for Ollama tool call support
     if (req.tools?.length) {
       body.tools = req.tools.map((t) => ({
         type: "function",
@@ -76,7 +76,7 @@ export class OllamaAdapter implements IProviderAdapter {
       body.options = { ...(body.options as object || {}), num_predict: req.max_tokens };
     }
 
-    // P7-32: Use AbortSignal.timeout() instead of manual AbortController + setTimeout.
+    // Use AbortSignal.timeout() instead of manual AbortController + setTimeout.
     // The previous approach conflicted with the circuit breaker's own timeout logic,
     // causing premature aborts when the breaker retried.
     const fetchChat = async () =>
@@ -127,7 +127,7 @@ export class OllamaAdapter implements IProviderAdapter {
               yield { type: "text", text: content };
             }
 
-            // P1-03: Parse tool calls from message.tool_calls
+            // Parse tool calls from message.tool_calls
             if (parsed.message?.tool_calls) {
               for (const tc of parsed.message.tool_calls) {
                 yield {

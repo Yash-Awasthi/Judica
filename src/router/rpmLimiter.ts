@@ -1,4 +1,4 @@
-// P3-13: Sliding window rate limiter per provider using a ring buffer approach.
+// Sliding window rate limiter per provider using a ring buffer approach.
 // Previous implementation used Array.shift() which is O(n) per prune.
 // Now uses a start-index pointer for O(1) amortized pruning.
 
@@ -49,7 +49,7 @@ function activeCount(win: SlidingWindow): number {
 /**
  * Check if a provider is within its RPM limit.
  * Uses a sliding window of 60 seconds.
- * P3-14: Supports optional userId for per-user scoping. Without userId,
+ * Supports optional userId for per-user scoping. Without userId,
  * falls back to global per-provider tracking (backward compatible).
  */
 export function checkRPM(provider: string, limitPerMin: number, userId?: string): boolean {

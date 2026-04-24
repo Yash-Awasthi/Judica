@@ -4,9 +4,9 @@ import { askProvider } from "./providers.js";
 import logger from "./logger.js";
 import { createHash } from "crypto";
 
-// P10-59: Grounding result cache — keyed by (response_hash, source_hash)
+// Grounding result cache — keyed by (response_hash, source_hash)
 const groundingCache = new Map<string, { result: GroundingResult; expiresAt: number }>();
-// P20-02: NaN guard — fall back to 10 min default if env var is non-numeric
+// NaN guard — fall back to 10 min default if env var is non-numeric
 const _parsedGroundingTtl = parseInt(process.env.GROUNDING_CACHE_TTL_MS || "600000", 10);
 const GROUNDING_CACHE_TTL = Number.isFinite(_parsedGroundingTtl) && _parsedGroundingTtl > 0 ? _parsedGroundingTtl : 600000; // 10 min
 const MAX_GROUNDING_CACHE = 200;
@@ -18,7 +18,7 @@ function hashContent(content: string): string {
 export class GroundingModule {
 
   async verify(output: AgentOutput, context: AgentOutput[], validatorProvider: Provider, abortSignal?: AbortSignal): Promise<GroundingResult> {
-    // P10-59: Check cache first
+    // Check cache first
     const responseHash = hashContent(output.answer);
     const contextHash = hashContent(context.map(c => c.answer).join("|"));
     const cacheKey = `${responseHash}:${contextHash}`;
@@ -33,7 +33,7 @@ export class GroundingModule {
 
     const contextText = context.map((c, i) => `Response ${i+1}: ${c.answer}`).join("\n\n");
 
-    // P10-57: Distinguish "unsupported" (no source) from "contradicted" (conflicting source)
+    // Distinguish "unsupported" (no source) from "contradicted" (conflicting source)
     const prompt = `You are a facts-grounding auditor.
 
     1. Extract 2-5 specific FACTUAL CLAIMS from the target answer.
@@ -63,21 +63,21 @@ export class GroundingModule {
     try {
       const response = await askProvider(validatorProvider, [{ role: "user", content: prompt }], false, abortSignal);
 
-      // P10-58: Use last JSON block (non-greedy) to avoid malformed captures
+      // Use last JSON block (non-greedy) to avoid malformed captures
       const jsonMatches = response.text.match(/\{[^{}]*(?:\{[^{}]*\}[^{}]*)*\}/g);
       const jsonStr = jsonMatches ? jsonMatches[jsonMatches.length - 1] : null;
 
       if (jsonStr) {
         const parsed = JSON.parse(jsonStr);
 
-        // P10-60: Validate required fields before using result
+        // Validate required fields before using result
         if (typeof parsed.grounded !== "boolean") {
           logger.warn("Grounding result missing 'grounded' boolean field — failing closed");
           return this.failClosed(cacheKey);
         }
 
         const result: GroundingResult = {
-          // P10-57: Only fail grounding on contradictions, not mere lack of support
+          // Only fail grounding on contradictions, not mere lack of support
           grounded: parsed.contradicted_claims?.length > 0 ? false : !!parsed.grounded,
           unsupported_claims: [
             ...(Array.isArray(parsed.unsupported_claims) ? parsed.unsupported_claims : []),
@@ -85,17 +85,17 @@ export class GroundingModule {
           ]
         };
 
-        // P10-59: Store in cache
+        // Store in cache
         this.cacheResult(cacheKey, result);
         return result;
       }
 
-      // P10-56: Fail closed on unparseable output
+      // Fail closed on unparseable output
       logger.warn("Grounding verification returned no valid JSON — failing closed");
       return this.failClosed(cacheKey);
 
     } catch (err) {
-      // P10-56: Fail closed (is_grounded=false) on grounding failure
+      // Fail closed (is_grounded=false) on grounding failure
       logger.warn({ err: (err as Error).message }, "Grounding verification failed — failing closed (not defaulting to grounded)");
       return this.failClosed(cacheKey);
     }

@@ -23,7 +23,7 @@ export const customProviders = pgTable(
     name: text("name").notNull(),
     baseUrl: text("baseUrl").notNull(),
     authType: text("authType").notNull(),
-    // P55-09: SECURITY — authKey is stored as text. Application layer (routes/customProviders.ts)
+    // SECURITY — authKey is stored as text. Application layer (routes/customProviders.ts)
     // MUST encrypt before INSERT and decrypt on SELECT. Use lib/crypto.ts encrypt/decrypt functions.
     // TODO: migrate to pgcrypto or application-level AES-256-GCM encryption.
     authKey: text("authKey").notNull(),
@@ -43,7 +43,7 @@ export const sharedFacts = pgTable(
   "SharedFact",
   {
     id: text("id").primaryKey(),
-    // P8-36: Add FK constraint — was missing, orphaned rows could accumulate
+    // Add FK constraint — was missing, orphaned rows could accumulate
     conversationId: text("conversationId").notNull().references(() => conversations.id, { onDelete: "cascade" }),
     content: text("content").notNull(),
     sourceAgent: text("sourceAgent").notNull(),
@@ -65,7 +65,7 @@ export const customPersonas = pgTable(
     id: text("id").primaryKey(),
     userId: integer("userId")
       .notNull()
-      // P55-05: Cascade delete when user is removed
+      // Cascade delete when user is removed
       .references(() => users.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     systemPrompt: text("systemPrompt").notNull(),
@@ -77,7 +77,7 @@ export const customPersonas = pgTable(
   },
   (table) => [
     index("CustomPersona_userId_idx").on(table.userId),
-    // P8-40: Add unique constraint — one persona per name per user
+    // Add unique constraint — one persona per name per user
     uniqueIndex("CustomPersona_userId_name_key").on(table.userId, table.name),
   ],
 );
@@ -107,7 +107,7 @@ export const contradictionRecords = pgTable(
   "ContradictionRecord",
   {
     id: text("id").primaryKey(),
-    // P55-04: Add FK constraint to prevent orphaned contradiction records
+    // Add FK constraint to prevent orphaned contradiction records
     conversationId: text("conversationId").notNull().references(() => conversations.id, { onDelete: "cascade" }),
     userId: integer("userId")
       .notNull()

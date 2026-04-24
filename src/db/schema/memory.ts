@@ -34,7 +34,7 @@ export const memories = pgTable(
   },
   (table) => [
     index("Memory_userId_kbId_idx").on(table.userId, table.kbId),
-    // P5-06: Verified HNSW index DDL works with Drizzle 0.45.x — .using() + .op() syntax
+    // Verified HNSW index DDL works with Drizzle 0.45.x — .using() + .op() syntax
     // For tuning: m=16, ef_construction=64 must be set via raw SQL migration (see vectorPartitioning.ts)
     index("Memory_embedding_hnsw_idx")
       .using("hnsw", table.embedding.op("vector_cosine_ops")),
@@ -49,7 +49,7 @@ export const memoryBackends = pgTable("MemoryBackend", {
     .unique()
     .references(() => users.id, { onDelete: "cascade" }),
   type: text("type").notNull(),
-  // P55-07: Use jsonb for structured config — enables JSON validation and query operators
+  // Use jsonb for structured config — enables JSON validation and query operators
   config: jsonb("config").notNull(),
   active: boolean("active").default(true).notNull(),
   createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),

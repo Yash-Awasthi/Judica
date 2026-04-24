@@ -1,5 +1,5 @@
 /**
- * P4-46: Demo URL / video configuration.
+ * Demo URL / video configuration.
  * Provides a demo endpoint and metadata for project showcase.
  */
 
@@ -36,7 +36,7 @@ export function getDemoConfig(): DemoConfig {
  * Format demo metadata for README or API response.
  */
 export function formatDemoSection(config: DemoConfig): string {
-  // P30-08: Escape markdown special characters in URLs to prevent injection
+  // Escape markdown special characters in URLs to prevent injection
   // Fix CodeQL alert #66: Escape all markdown special chars, not just brackets/parens
   const escMd = (s: string) => s.replace(/[[\]()\\`*_{}#|!~>+-]/g, "\\$&");
   let output = `## Demo\n\n`;

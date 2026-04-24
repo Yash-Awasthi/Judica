@@ -1,14 +1,14 @@
-// P2-20: This file should live inside lib/cache/ directory.
+// This file should live inside lib/cache/ directory.
 // It's the cache CLIENT that uses backends from lib/cache/.
 // Keeping it here for now to avoid import breakage, but new code should import from lib/cache/.
 import crypto from "crypto";
 import logger from "./logger.js";
 import { env } from "../config/env.js";
 import { redisBackend, postgresBackend } from "./cache/backends.js";
-// P9-20: Import CacheEntry type — opinions type defined once in CacheBackend.ts
+// Import CacheEntry type — opinions type defined once in CacheBackend.ts
 import type { CacheEntry } from "./cache/CacheBackend.js";
 
-// P9-20: Use CacheEntry['opinions'] type from CacheBackend.ts — single source of truth
+// Use CacheEntry['opinions'] type from CacheBackend.ts — single source of truth
 type CachedOpinion = CacheEntry['opinions'][number];
 
 interface EmbeddingResponse {
@@ -27,17 +27,17 @@ interface CacheMessage {
   content: string | unknown[];
 }
 
-// P9-17: Externalize semantic similarity threshold to env
+// Externalize semantic similarity threshold to env
 const _parsedThreshold = Number(process.env.SEMANTIC_CACHE_THRESHOLD);
 const SEMANTIC_THRESHOLD = Number.isFinite(_parsedThreshold) ? _parsedThreshold : 0.15;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 
-// P9-12: Bounded lock map with TTL eviction — prevents unbounded growth under burst traffic
+// Bounded lock map with TTL eviction — prevents unbounded growth under burst traffic
 const MAX_LOCKS = 1000;
 const LOCK_TTL_MS = 60_000; // 60 seconds max lock lifetime
 const embeddingLocks = new Map<string, { promise: Promise<number[] | null>; createdAt: number }>();
 
-// P9-12: Periodic cleanup of stale locks
+// Periodic cleanup of stale locks
 setInterval(() => {
   const now = Date.now();
   for (const [key, entry] of embeddingLocks) {
@@ -47,7 +47,7 @@ setInterval(() => {
   }
 }, 30_000).unref();
 
-// P9-13: Log once at startup if embedding key is missing
+// Log once at startup if embedding key is missing
 let embeddingKeyWarned = false;
 
 export async function getEmbeddingWithLock(text: string): Promise<number[] | null> {
@@ -58,7 +58,7 @@ export async function getEmbeddingWithLock(text: string): Promise<number[] | nul
     return await existing.promise;
   }
 
-  // P9-12: Evict oldest entry if at capacity
+  // Evict oldest entry if at capacity
   if (embeddingLocks.size >= MAX_LOCKS) {
     const firstKey = embeddingLocks.keys().next().value;
     if (firstKey) embeddingLocks.delete(firstKey);
@@ -75,7 +75,7 @@ export async function getEmbeddingWithLock(text: string): Promise<number[] | nul
 }
 
 /**
- * P3-21: Cache key now includes userId to prevent cross-tenant data leakage.
+ * Cache key now includes userId to prevent cross-tenant data leakage.
  * Anonymous user cache entries are scoped to "anon" and won't be served to
  * authenticated users (and vice versa).
  */
@@ -87,19 +87,19 @@ export function generateCacheKey(prompt: string, members: CacheMemberConfig[], m
     tools: m.tools ? [...m.tools].sort() : []
   })).sort((a, b) => JSON.stringify(a).localeCompare(JSON.stringify(b)));
 
-  // P9-15: Stable, minimal history serialization — only role + string content
+  // Stable, minimal history serialization — only role + string content
   const stableHistory = history.map(h => ({
     role: h.role,
     content: typeof h.content === "string" ? h.content : JSON.stringify(h.content),
   }));
 
   const data = JSON.stringify({
-    // P9-14: Use .trim() only, NOT .toLowerCase() — case-sensitive prompts are semantically different
+    // Use .trim() only, NOT .toLowerCase() — case-sensitive prompts are semantically different
     prompt: prompt.trim(),
     history: stableHistory,
     members: memberConfigs,
     master: master ? { model: master.model, system: master.systemPrompt } : null,
-    // P3-21: Scope cache by tenant to prevent cross-tenant reads
+    // Scope cache by tenant to prevent cross-tenant reads
     tenant: userId ?? "anon"
   });
   return crypto.createHash("sha256").update(data).digest("hex");
@@ -108,7 +108,7 @@ export function generateCacheKey(prompt: string, members: CacheMemberConfig[], m
 async function getEmbedding(text: string): Promise<number[] | null> {
   const apiKey = env.OPENAI_API_KEY;
   if (!apiKey) {
-    // P9-13: Warn once when embedding key is missing — semantic cache silently disabled
+    // Warn once when embedding key is missing — semantic cache silently disabled
     if (!embeddingKeyWarned) {
       logger.warn("OPENAI_API_KEY not set — semantic vector cache is disabled. Set the key to enable similarity-based caching.");
       embeddingKeyWarned = true;
@@ -143,7 +143,7 @@ async function getEmbedding(text: string): Promise<number[] | null> {
   return null;
 }
 
-// P9-16: Deterministic cleanup counter replaces probabilistic Math.random()
+// Deterministic cleanup counter replaces probabilistic Math.random()
 let cleanupCounter = 0;
 const CLEANUP_INTERVAL = 100; // cleanup every 100th read
 
@@ -156,7 +156,7 @@ export async function getCachedResponse(prompt: string, members: CacheMemberConf
     return redisHit;
   }
 
-  // P9-16: Deterministic cleanup — every Nth request instead of probabilistic
+  // Deterministic cleanup — every Nth request instead of probabilistic
   cleanupCounter++;
   if (cleanupCounter >= CLEANUP_INTERVAL) {
     cleanupCounter = 0;
@@ -210,11 +210,11 @@ export async function setCachedResponse(
   };
 
   try {
-    // P9-18: Write Redis first — subsequent reads check Redis first,
+    // Write Redis first — subsequent reads check Redis first,
     // so a Redis failure after Postgres write causes missed cache hits.
     await redisBackend.set(keyHash, cacheEntry, CACHE_TTL_MS);
 
-    // P9-19: Call setSemantic directly — method is always defined on PostgresBackend
+    // Call setSemantic directly — method is always defined on PostgresBackend
     await postgresBackend.setSemantic(keyHash, prompt, cacheEntry, embedding, CACHE_TTL_MS);
   } catch (e) {
     logger.warn({ error: (e as Error).message }, "Failed to write to semantic cache");

@@ -44,7 +44,7 @@ export const knowledgeBases = pgTable(
     name: text("name").notNull(),
     description: text("description"),
     createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
-    // P60-03: Add defaultNow to prevent insert failures when updatedAt is omitted
+    // Add defaultNow to prevent insert failures when updatedAt is omitted
     updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [

@@ -2,14 +2,14 @@ import ivm from "isolated-vm";
 
 export interface SandboxResult {
   output: string;
-  // P7-46: Separate stdout and stderr arrays
+  // Separate stdout and stderr arrays
   stdout: string[];
   stderr: string[];
   error: string | null;
   elapsedMs: number;
 }
 
-// P1-35: Cap output array to prevent Node heap exhaustion
+// Cap output array to prevent Node heap exhaustion
 const MAX_OUTPUT_LINES = 1000;
 const MAX_OUTPUT_BYTES = 1_000_000; // 1MB total output cap
 
@@ -34,7 +34,7 @@ export async function executeJS(code: string, timeout: number = 5000): Promise<S
   }
 
   const output: string[] = [];
-  // P7-46: Separate stdout/stderr tracking
+  // Separate stdout/stderr tracking
   const stdout: string[] = [];
   const stderr: string[] = [];
   let totalBytes = 0;
@@ -46,17 +46,17 @@ export async function executeJS(code: string, timeout: number = 5000): Promise<S
     const context = await isolate.createContext();
     const jail = context.global;
 
-    // P7-45: Use applySync with batching — the callback is already non-blocking
+    // Use applySync with batching — the callback is already non-blocking
     // since it just pushes to an array. The synchronous path is required by
     // isolated-vm's Reference API but doesn't block the event loop because
     // we avoid any I/O (no stdout flush) inside the callback.
     const logCallback = new ivm.Reference((args: string) => {
-      // P1-35: Enforce output limits
+      // Enforce output limits
       if (output.length >= MAX_OUTPUT_LINES || totalBytes >= MAX_OUTPUT_BYTES) return;
       const line = args.slice(0, MAX_OUTPUT_BYTES - totalBytes);
       output.push(line);
       totalBytes += line.length;
-      // P7-46: Route to stdout/stderr based on prefix
+      // Route to stdout/stderr based on prefix
       if (line.startsWith("ERROR: ") || line.startsWith("WARN: ")) {
         stderr.push(line);
       } else {
@@ -66,12 +66,12 @@ export async function executeJS(code: string, timeout: number = 5000): Promise<S
 
     await jail.set("_logCallback", logCallback);
 
-    // P1-36: Prepend "use strict" to user code for safer execution
-    // P7-47: Allowlist of globals — deny everything not explicitly permitted.
+    // Prepend "use strict" to user code for safer execution
+    // Allowlist of globals — deny everything not explicitly permitted.
     // This prevents access to any new globals added in future Node/V8 versions.
     const wrappedCode = `
       "use strict";
-      // P7-47: Remove non-allowlisted globals
+      // Remove non-allowlisted globals
       (function() {
         const ALLOWED_GLOBALS = new Set([
           'undefined', 'NaN', 'Infinity', 'null',

@@ -56,6 +56,6 @@ export const TEMPLATES: readonly CouncilTemplate[] = [
   },
 ];
 
-// P57-05: Freeze built-in templates to prevent runtime mutation
+// Freeze built-in templates to prevent runtime mutation
 Object.freeze(TEMPLATES);
 for (const t of TEMPLATES) { Object.freeze(t); Object.freeze(t.members); for (const m of t.members) Object.freeze(m); }

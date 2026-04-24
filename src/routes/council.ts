@@ -9,7 +9,7 @@ import logger from "../lib/logger.js";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { AppError } from "../middleware/errorHandler.js";
 
-// P3-26: Cap customArchetypes array length and systemPrompt size per archetype
+// Cap customArchetypes array length and systemPrompt size per archetype
 // to prevent unbounded storage and potential DoS via huge payloads.
 const MAX_CUSTOM_ARCHETYPES = 20;
 const MAX_SYSTEM_PROMPT_LENGTH = 10_000;
@@ -78,7 +78,7 @@ const councilPlugin: FastifyPluginAsync = async (fastify) => {
         .where(eq(councilConfigs.userId, userId))
         .limit(1);
       if (!row) return { config: null };
-      // P2-30: Decrypt config to match auth.ts encryption pattern
+      // Decrypt config to match auth.ts encryption pattern
       try {
         const decrypted = JSON.parse(decrypt(row.config as string));
         return { config: decrypted };

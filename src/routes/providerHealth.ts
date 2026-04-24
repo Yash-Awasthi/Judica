@@ -1,5 +1,5 @@
 /**
- * P4-26: Provider health probes endpoint.
+ * Provider health probes endpoint.
  *
  * Exposes circuit breaker state for all registered providers,
  * enabling dashboards and alerting on provider availability.

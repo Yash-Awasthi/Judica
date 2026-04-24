@@ -4,7 +4,7 @@ import { eq, desc, asc, and } from "drizzle-orm";
 import type { Message } from "./providers.js";
 import { estimateStringTokens } from "../router/tokenEstimator.js";
 
-// P9-89: Summarization Limitation
+// Summarization Limitation
 // ─────────────────────────────────
 // Current "summaries" are truncated text (first ~80 chars of Q/A), not semantic compression.
 // True summarization requires an LLM call (e.g., GPT-4 or Claude) to distill meaning.
@@ -14,7 +14,7 @@ import { estimateStringTokens } from "../router/tokenEstimator.js";
 //   3. Store the semantic summary in contextSummaries table
 //   4. Use token budget awareness to decide when to summarize
 //
-// P9-90: Retrieval Limitation
+// Retrieval Limitation
 // ─────────────────────────────
 // Current retrieval uses keyword matching (extractKeywords + hasKeywordOverlap).
 // This misses paraphrased or semantically similar content.
@@ -24,10 +24,10 @@ import { estimateStringTokens } from "../router/tokenEstimator.js";
 //   3. Replace hasKeywordOverlap() with cosine similarity search
 //   4. Fall back to keyword match when embeddings unavailable
 
-// P9-93: Token-aware history window — configurable budget prevents oversized context.
+// Token-aware history window — configurable budget prevents oversized context.
 const MAX_HISTORY_TOKENS = parseInt(process.env.MAX_HISTORY_TOKENS || "4000", 10);
 
-// P9-96: Validate message structure before it's used in model calls
+// Validate message structure before it's used in model calls
 function isValidMessage(msg: Message): boolean {
   if (!msg || typeof msg !== "object") return false;
   if (!["user", "assistant", "system"].includes(msg.role)) return false;
@@ -35,10 +35,10 @@ function isValidMessage(msg: Message): boolean {
   return true;
 }
 
-// P9-91: History fetch uses LIMIT to cap query results (prevents full table scan).
+// History fetch uses LIMIT to cap query results (prevents full table scan).
 // The limit(5) on getRecentHistory and limit(20) on extractRelevantMemories
 // prevent O(n) scans. For very long conversations, add a cursor-based pagination API.
-// P9-97: userId parameter added for ownership validation — prevents cross-tenant history leaks.
+// userId parameter added for ownership validation — prevents cross-tenant history leaks.
 export async function getRecentHistory(conversationId: string, userId?: number): Promise<Message[]> {
   const whereClause = userId
     ? and(eq(chats.conversationId, conversationId), eq(chats.userId, userId))
@@ -56,11 +56,11 @@ export async function getRecentHistory(conversationId: string, userId?: number):
     { role: "assistant" as const, content: c.verdict },
   ]);
 
-  // P9-93: Enforce token budget — trim oldest messages if total exceeds budget
+  // Enforce token budget — trim oldest messages if total exceeds budget
   let totalTokens = 0;
   const budgetedMessages: Message[] = [];
   for (let i = messages.length - 1; i >= 0; i--) {
-    // P9-96: Skip malformed messages that would cause model call failures
+    // Skip malformed messages that would cause model call failures
     if (!isValidMessage(messages[i])) continue;
     const tokens = estimateStringTokens(messages[i].content as string);
     if (totalTokens + tokens > MAX_HISTORY_TOKENS) break;
@@ -90,7 +90,7 @@ export async function getHistoryWithContext(conversationId: string, userId?: num
   const messages: Message[] = [];
 
   if (summary) {
-    // P9-95: Use system role for injected summaries — user role confuses model context
+    // Use system role for injected summaries — user role confuses model context
     messages.push({
       role: "system" as const,
       content: `[Previous conversation summary (${summary.messageCount} messages summarized)]: ${summary.summary}`
@@ -136,10 +136,10 @@ export async function getEnhancedContext(conversationId: string, currentQuery: s
   };
 }
 
-// P9-94: Improved keyword extraction with basic suffix stripping (poor man's stemmer)
+// Improved keyword extraction with basic suffix stripping (poor man's stemmer)
 // and n-gram support for multi-word phrases.
 function extractKeywords(text: string): string[] {
-  // P30-05: Cap input length to prevent regex DoS on very large strings
+  // Cap input length to prevent regex DoS on very large strings
   const safeText = text.length > 10_000 ? text.slice(0, 10_000) : text;
   const words = safeText.toLowerCase()
     .replace(/[^\w\s]/g, ' ')
@@ -170,11 +170,11 @@ function hasKeywordOverlap(text: string, keywords: string[]): boolean {
 const stopWords = new Set(['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'what', 'which', 'who', 'when', 'where', 'why', 'how', 'not', 'no', 'yes', 'if', 'then', 'else', 'because', 'since', 'until', 'while', 'during', 'before', 'after', 'above', 'below', 'under', 'over', 'between', 'among', 'through', 'against', 'without', 'within', 'upon', 'about', 'along', 'around', 'behind', 'beyond', 'inside', 'outside', 'toward', 'towards', 'into', 'onto', 'onto', 'off']);
 
 function isStopWord(word: string): boolean {
-  // P34-08: Moved stopWords to module level to avoid re-creation per call; fixed duplicate 'onto'
+  // Moved stopWords to module level to avoid re-creation per call; fixed duplicate 'onto'
   return HISTORY_STOP_WORDS.has(word);
 }
 
-// P34-08: Module-level Set avoids re-allocation on every call
+// Module-level Set avoids re-allocation on every call
 const HISTORY_STOP_WORDS = new Set(['the', 'and', 'or', 'but', 'in', 'on', 'at', 'to', 'for', 'of', 'with', 'by', 'from', 'as', 'is', 'was', 'are', 'were', 'been', 'be', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'could', 'should', 'may', 'might', 'must', 'can', 'this', 'that', 'these', 'those', 'what', 'which', 'who', 'when', 'where', 'why', 'how', 'not', 'no', 'yes', 'if', 'then', 'else', 'because', 'since', 'until', 'while', 'during', 'before', 'after', 'above', 'below', 'under', 'over', 'between', 'among', 'through', 'against', 'without', 'within', 'upon', 'about', 'along', 'around', 'behind', 'beyond', 'inside', 'outside', 'toward', 'towards', 'into', 'onto', 'off']);
 
 async function extractRelevantMemories(conversationId: string, keywords: string[]): Promise<string[]> {
@@ -186,12 +186,12 @@ async function extractRelevantMemories(conversationId: string, keywords: string[
   const relevantMemories: string[] = [];
 
   for (const chat of pastChats) {
-    // P34-09: Early exit once we have enough relevant memories
+    // Early exit once we have enough relevant memories
     if (relevantMemories.length >= 5) break;
     const combinedText = `${chat.question} ${chat.verdict}`;
     if (hasKeywordOverlap(combinedText, keywords)) {
       const opinions = chat.opinions as { name: string; opinion: string }[];
-      // P34-09: Validate opinions is actually an array before use
+      // Validate opinions is actually an array before use
       if (Array.isArray(opinions) && opinions.length > 0) {
         const relevantOpinion = opinions.find((op: { opinion: string }) =>
           hasKeywordOverlap(op.opinion, keywords)
@@ -214,7 +214,7 @@ export async function updateEnhancedContextSummary(conversationId: string): Prom
 
   if (allChats.length <= 8) return; // Wait for more substantial conversation
 
-  // P9-92: Check existing summary count to avoid duplicate generation on concurrent requests.
+  // Check existing summary count to avoid duplicate generation on concurrent requests.
   // Only generate new summaries if message count has grown beyond what's already summarized.
   const existingSummaries = await db.select().from(contextSummaries)
     .where(eq(contextSummaries.conversationId, conversationId));

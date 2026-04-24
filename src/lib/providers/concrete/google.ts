@@ -76,11 +76,11 @@ export class GoogleProvider extends BaseProvider {
         const decoder = new TextDecoder();
         let text = "";
         let buffer = "";
-        // P40-08: Cap buffer to prevent unbounded memory from malicious streams
+        // Cap buffer to prevent unbounded memory from malicious streams
         const MAX_BUFFER_SIZE = 10_000_000;
         let streamUsage: { promptTokenCount?: number; candidatesTokenCount?: number; totalTokenCount?: number } | null = null;
-        // P1-04: Track tool calls (functionCall parts) during streaming
-        // P40-04: Cap pending tool calls to prevent unbounded array growth
+        // Track tool calls (functionCall parts) during streaming
+        // Cap pending tool calls to prevent unbounded array growth
         const MAX_PENDING_TOOLS = 100;
         const pendingToolCalls: Array<{ name: string; args: Record<string, unknown> }> = [];
 
@@ -110,7 +110,7 @@ export class GoogleProvider extends BaseProvider {
                       text += part.text;
                       onChunk(part.text);
                     }
-                    // P1-04: Capture function calls from streaming response
+                    // Capture function calls from streaming response
                     if (part.functionCall && pendingToolCalls.length < MAX_PENDING_TOOLS) {
                       pendingToolCalls.push({
                         name: part.functionCall.name,
@@ -128,7 +128,7 @@ export class GoogleProvider extends BaseProvider {
           }
         }
 
-        // P1-04: If tool calls were found in the stream, process them recursively
+        // If tool calls were found in the stream, process them recursively
         if (pendingToolCalls.length > 0) {
           for (const tc of pendingToolCalls) {
             const result = await callTool({

@@ -17,12 +17,12 @@ export interface AdapterContentBlock {
 export interface AdapterToolCall {
   id: string;
   name: string;
-  // P7-05: Accept both JSON string and object — providers differ in what they emit
+  // Accept both JSON string and object — providers differ in what they emit
   arguments: string | Record<string, unknown>;
 }
 
 /**
- * P7-05: Normalize tool call arguments to a consistent object form.
+ * Normalize tool call arguments to a consistent object form.
  * Call this at the adapter boundary before passing to downstream code.
  */
 export function normalizeToolArguments(args: string | Record<string, unknown>): Record<string, unknown> {
@@ -50,13 +50,13 @@ export interface AdapterRequest {
   temperature?: number;
   max_tokens?: number;
   top_p?: number;
-  // P7-09: system_prompt is the CANONICAL way to pass system instructions.
+  // system_prompt is the CANONICAL way to pass system instructions.
   // If messages also contains role:"system", adapters should use normalizeSystemPrompt() to merge.
   system_prompt?: string;
 }
 
 /**
- * P7-09: Normalize system prompt — merges system_prompt field with any system-role messages.
+ * Normalize system prompt — merges system_prompt field with any system-role messages.
  * Adapters should call this once before dispatching to the provider.
  * Returns { systemPrompt, messages } where messages has no system-role entries.
  */
@@ -83,16 +83,16 @@ export interface AdapterChunk {
   tool_call?: AdapterToolCall;
   usage?: AdapterUsage;
   error?: string;
-  // P7-06: Finish reason — only present on "done" chunks
+  // Finish reason — only present on "done" chunks
   finish_reason?: "stop" | "length" | "tool_calls" | "content_filter";
 }
 
-// P2-06: This is the CANONICAL Usage type (snake_case).
+// This is the CANONICAL Usage type (snake_case).
 // Legacy ProviderUsage in lib/providers/types.ts uses camelCase — it should migrate here.
 export interface AdapterUsage {
   prompt_tokens: number;
   completion_tokens: number;
-  // P7-07: Extended metadata for cost accounting and SLO tracking
+  // Extended metadata for cost accounting and SLO tracking
   cost?: number;
   latency_ms?: number;
   provider_id?: string;
@@ -115,13 +115,13 @@ export interface AdapterCollectedResponse {
   text: string;
   tool_calls: AdapterToolCall[];
   usage: AdapterUsage;
-  // P7-06: Propagate finish_reason from the done chunk
+  // Propagate finish_reason from the done chunk
   finish_reason?: "stop" | "length" | "tool_calls" | "content_filter";
 }
 
 /**
  * Helper to create an AdapterStreamResult from an async generator.
- * P3-11: Note — `.stream` and `.collect()` both consume the same generator.
+ * Note — `.stream` and `.collect()` both consume the same generator.
  * Callers must use ONE or the OTHER, never both. Calling collect() first
  * then iterating stream will yield nothing (generator is exhausted).
  * collect() is idempotent: subsequent calls return the cached result.
@@ -180,7 +180,7 @@ export function createStreamResult(
         }
       }
 
-      // P7-08: Reject incomplete streams (no "done" chunk received)
+      // Reject incomplete streams (no "done" chunk received)
       // Exception: if no chunks were received at all (empty/null body), return empty result
       const hasAnyContent = text !== "" || tool_calls.length > 0 || usage.prompt_tokens > 0 || usage.completion_tokens > 0;
       if (!complete && hasAnyContent) {

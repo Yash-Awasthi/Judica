@@ -1,4 +1,4 @@
-// P2-18: This file provides ValidationModule (truth-awareness checks).
+// This file provides ValidationModule (truth-awareness checks).
 // Related: lib/validator.ts provides AI-driven validation via askProvider.
 // Both share types from lib/schemas.ts. Future: merge into a single validation/ directory.
 import type { AgentOutput, ValidationResult } from "./schemas.js";
@@ -93,7 +93,7 @@ export class ValidationModule {
    * Supports +, -, *, /, parentheses, and decimal numbers.
    */
   private safeMathEval(expr: string): number | null {
-    // P50-09: Cap expression length to prevent abuse via deeply nested or very long expressions
+    // Cap expression length to prevent abuse via deeply nested or very long expressions
     const MAX_EXPR_LENGTH = 200;
     if (expr.length > MAX_EXPR_LENGTH) return null;
 
@@ -108,12 +108,12 @@ export class ValidationModule {
     // Rebuild and verify it matches original (no extra chars)
     if (tokens.join("") !== sanitized) return null;
 
-    // P50-09: Cap token count to bound loop iterations
+    // Cap token count to bound loop iterations
     const MAX_TOKENS = 100;
     if (tokens.length > MAX_TOKENS) return null;
 
     let pos = 0;
-    // P50-09: Recursion depth guard to prevent stack overflow from deeply nested parentheses
+    // Recursion depth guard to prevent stack overflow from deeply nested parentheses
     let depth = 0;
     const MAX_DEPTH = 20;
     const peek = () => tokens[pos];
@@ -164,7 +164,7 @@ export class ValidationModule {
     try {
       const result = parseExpr();
       if (pos !== tokens.length) return null; // leftover tokens
-      if (!isFinite(result)) return null; // P50-09: guard against Infinity from division by zero
+      if (!isFinite(result)) return null; // guard against Infinity from division by zero
       return result;
     } catch {
       return null;
@@ -178,7 +178,7 @@ export class ValidationModule {
     const errors: string[] = [];
     const combined = output.answer + " " + output.reasoning;
 
-    // P50-09: Cap input length to prevent ReDoS on long strings with many numerical patterns
+    // Cap input length to prevent ReDoS on long strings with many numerical patterns
     const MAX_MATH_INPUT_LENGTH = 10_000;
     if (combined.length > MAX_MATH_INPUT_LENGTH) {
       logger.debug("Skipping math integrity check: input exceeds length cap");
@@ -191,7 +191,7 @@ export class ValidationModule {
     }
 
     // Look for simple arithmetic: 5 + 5 = 10
-    // P50-09: Use atomic-style grouping via non-backtracking pattern — match digits/ops
+    // Use atomic-style grouping via non-backtracking pattern — match digits/ops
     // but limit each side to 100 chars to prevent catastrophic backtracking
     const mathRegex = /([\d\s+\-*/().]{1,100})\s*=\s*([\d\s+\-*/().]{1,100})/g;
     let match;

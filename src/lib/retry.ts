@@ -1,13 +1,13 @@
 import logger from "./logger.js";
 
-// P9-33: Global retry budget — prevents retry amplification across layers
+// Global retry budget — prevents retry amplification across layers
 // Each layer (provider, strategy, router) retries independently; this cap
 // limits total concurrent retries system-wide.
 const MAX_CONCURRENT_RETRIES = 50;
 let activeRetries = 0;
 
-// P9-34: Retry metrics for observability
-// P22-08: Cap retriesByProvider Map to prevent unbounded growth from many distinct labels
+// Retry metrics for observability
+// Cap retriesByProvider Map to prevent unbounded growth from many distinct labels
 const MAX_PROVIDER_METRIC_ENTRIES = 200;
 const retryMetrics = {
   totalRetries: 0,
@@ -25,7 +25,7 @@ export function getRetryMetrics() {
 }
 
 /**
- * P9-32: Retry count semantics clarified:
+ * Retry count semantics clarified:
  * - `maxRetries` means ADDITIONAL retries after the first attempt.
  * - `maxRetries: 2` = 1 initial attempt + 2 retries = 3 total attempts.
  */
@@ -39,7 +39,7 @@ export async function withRetry<T>(
     onRetry?: (error: unknown, attempt: number) => void;
     shouldRetry?: (error: unknown) => boolean;
     signal?: AbortSignal;
-    label?: string; // P9-34: optional label for metrics tracking
+    label?: string; // optional label for metrics tracking
   } = {}
 ): Promise<T> {
   const {
@@ -47,7 +47,7 @@ export async function withRetry<T>(
     signal,
   } = options;
 
-  // P50-07: Guard numeric options against NaN, negative, and non-finite values.
+  // Guard numeric options against NaN, negative, and non-finite values.
   // Fall back to safe defaults so delay calculations never produce NaN.
   const maxRetries = Number.isFinite(options.maxRetries) && (options.maxRetries as number) >= 0
     ? (options.maxRetries as number) : 2;
@@ -67,7 +67,7 @@ export async function withRetry<T>(
     } catch (error) {
       attempt++;
 
-      // P9-31: AbortError must never retry — check BEFORE shouldRetry predicate
+      // AbortError must never retry — check BEFORE shouldRetry predicate
       if ((error as Error).name === "AbortError" || signal?.aborted) {
         throw error;
       }
@@ -76,7 +76,7 @@ export async function withRetry<T>(
         throw error;
       }
 
-      // P9-33: Check global retry budget
+      // Check global retry budget
       if (activeRetries >= MAX_CONCURRENT_RETRIES) {
         retryMetrics.budgetExhausted++;
         logger.warn({ activeRetries, label: options.label }, "Global retry budget exhausted — not retrying");
@@ -84,12 +84,12 @@ export async function withRetry<T>(
       }
 
       activeRetries++;
-      // P9-34: Track retry metrics
+      // Track retry metrics
       retryMetrics.totalRetries++;
       if (options.label) {
         const prev = retryMetrics.retriesByProvider.get(options.label) || 0;
         retryMetrics.retriesByProvider.set(options.label, prev + 1);
-        // P22-08: Evict oldest entry if map exceeds cap
+        // Evict oldest entry if map exceeds cap
         if (retryMetrics.retriesByProvider.size > MAX_PROVIDER_METRIC_ENTRIES) {
           const oldest = retryMetrics.retriesByProvider.keys().next().value;
           if (oldest !== undefined) retryMetrics.retriesByProvider.delete(oldest);
@@ -100,10 +100,10 @@ export async function withRetry<T>(
         onRetry(error, attempt);
       }
 
-      // P9-35: Check AbortSignal during backoff sleep — don't wait if already aborted
+      // Check AbortSignal during backoff sleep — don't wait if already aborted
       try {
-        // P9-34: Track retry metrics
-        // P50-07: Cap counter to prevent overflow past Number.MAX_SAFE_INTEGER
+        // Track retry metrics
+        // Cap counter to prevent overflow past Number.MAX_SAFE_INTEGER
         if (retryMetrics.totalRetries < Number.MAX_SAFE_INTEGER) {
           retryMetrics.totalRetries++;
         }
@@ -116,7 +116,7 @@ export async function withRetry<T>(
           onRetry(error, attempt);
         }
 
-        // P9-35: Check AbortSignal during backoff sleep — don't wait if already aborted
+        // Check AbortSignal during backoff sleep — don't wait if already aborted
         await new Promise<void>((resolve, reject) => {
           let onAbort: (() => void) | undefined;
           const timer = setTimeout(() => {

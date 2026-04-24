@@ -40,7 +40,7 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
       const limitNum = Math.min(Math.max(parseInt(limit, 10) || 10, 1), 50);
       const filters = {
         projectId,
-        // P39-04: Validate date parsing in search handler too
+        // Validate date parsing in search handler too
         after: after && !isNaN(new Date(after).getTime()) ? new Date(after) : undefined,
         before: before && !isNaN(new Date(before).getTime()) ? new Date(before) : undefined,
       };
@@ -58,7 +58,7 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
 
     const filters = {
       projectId,
-      // P39-04: Validate date parsing to prevent NaN/Invalid Date propagation
+      // Validate date parsing to prevent NaN/Invalid Date propagation
       after: after && !isNaN(new Date(after).getTime()) ? new Date(after) : undefined,
       before: before && !isNaN(new Date(before).getTime()) ? new Date(before) : undefined,
     };
@@ -145,7 +145,7 @@ const historyPlugin: FastifyPluginAsync = async (fastify) => {
       .where(
         and(
           eq(chats.conversationId, id),
-          // P30-09: NaN guard on toChatId numeric conversion
+          // NaN guard on toChatId numeric conversion
           lte(chats.id, Number.isFinite(Number(toChatId)) ? Number(toChatId) : 0)
         )
       )

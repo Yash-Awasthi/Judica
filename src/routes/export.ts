@@ -72,7 +72,7 @@ const exportPlugin: FastifyPluginAsync = async (fastify) => {
           },
         };
 
-        // P5-10: Sanitize id in Content-Disposition to prevent header injection
+        // Sanitize id in Content-Disposition to prevent header injection
         const safeId = String(id).replace(/[^a-zA-Z0-9_-]/g, "_");
         reply.header(
           "Content-Disposition",
@@ -97,7 +97,7 @@ const exportPlugin: FastifyPluginAsync = async (fastify) => {
       try {
         const userId = request.userId!;
 
-        // P5-01: Limit export to most recent 200 conversations to prevent OOM on large accounts
+        // Limit export to most recent 200 conversations to prevent OOM on large accounts
         const MAX_EXPORT_CONVERSATIONS = 200;
         const convRows = await db
           .select()

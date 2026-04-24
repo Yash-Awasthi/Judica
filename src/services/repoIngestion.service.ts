@@ -70,7 +70,7 @@ export async function ingestGitHubRepo(
         item.type === "blob" &&
         item.path &&
         SUPPORTED_EXTENSIONS.includes(getExtension(item.path))
-    // P35-08: Cap files to prevent unbounded memory from large repos
+    // Cap files to prevent unbounded memory from large repos
     ).slice(0, 5000);
 
     logger.info(

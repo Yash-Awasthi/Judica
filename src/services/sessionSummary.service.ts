@@ -85,7 +85,7 @@ export function buildLayeredContext(
   // This function just provides the context preamble
 
   // Layer 3: Retrieved memory chunks
-  // P30-04: Cap ragChunks to prevent unbounded concatenation
+  // Cap ragChunks to prevent unbounded concatenation
   const MAX_RAG_CHUNKS = 20;
   const boundedChunks = ragChunks.slice(0, MAX_RAG_CHUNKS);
   if (boundedChunks.length > 0) {

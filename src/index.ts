@@ -10,7 +10,7 @@ import { startMemoryCrons } from "./queue/memoryCrons.js";
 import { cleanupRateLimitRedis } from "./middleware/rateLimit.js";
 import { cleanupCostTrackerInterval } from "./lib/realtimeCost.js";
 
-// P8-10: Wrap buildApp() in try/catch with error classification
+// Wrap buildApp() in try/catch with error classification
 let app;
 try {
   app = await buildApp();
@@ -45,13 +45,13 @@ try {
   process.exit(1);
 }
 
-// P8-11: Guard against double-signal race
+// Guard against double-signal race
 let isShuttingDown = false;
 
 // Graceful shutdown
-// P4-10: Use GRACEFUL_SHUTDOWN_MS from env instead of hardcoded 5s
+// Use GRACEFUL_SHUTDOWN_MS from env instead of hardcoded 5s
 const shutdown = async (signal: string) => {
-  // P8-11: Second signal force-exits immediately
+  // Second signal force-exits immediately
   if (isShuttingDown) {
     logger.warn({ signal }, "Second shutdown signal received, forcing exit");
     process.exit(1);
@@ -108,13 +108,13 @@ const shutdown = async (signal: string) => {
   process.exit(0);
 };
 
-// P8-12: Remove any existing listeners before registering to prevent stacking
+// Remove any existing listeners before registering to prevent stacking
 process.removeAllListeners("SIGTERM");
 process.removeAllListeners("SIGINT");
 process.on("SIGTERM", () => shutdown("SIGTERM"));
 process.on("SIGINT",  () => shutdown("SIGINT"));
 
-// P8-09: Don't exit immediately on uncaught exceptions — attempt graceful drain
+// Don't exit immediately on uncaught exceptions — attempt graceful drain
 process.on("uncaughtException", (err) => {
   logger.fatal({ err }, "Uncaught exception — initiating graceful shutdown");
   shutdown("uncaughtException").catch(() => process.exit(1));

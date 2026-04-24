@@ -5,7 +5,7 @@
  * long-running agent tasks. Consumers subscribe to a stream ID
  * and receive typed events as artifacts are produced.
  *
- * P4-14: Redis Streams for multi-replica deployments.
+ * Redis Streams for multi-replica deployments.
  * Artifacts are published to Redis Streams for cross-process delivery.
  * Local EventEmitter provides low-latency same-process fan-out.
  * Falls back gracefully when Redis is unavailable.
@@ -49,7 +49,7 @@ export interface StreamInfo {
 const emitter = new EventEmitter();
 emitter.setMaxListeners(100);
 
-// P24-04: Cap stream maps to prevent unbounded memory growth
+// Cap stream maps to prevent unbounded memory growth
 const MAX_STREAMS = 1000;
 
 const streams = new Map<string, StreamInfo>();

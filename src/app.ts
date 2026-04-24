@@ -9,7 +9,7 @@ import path from "path";
 import fs from "fs";
 import crypto from "crypto";
 
-// P8-08: Embed version at build time instead of runtime createRequire
+// Embed version at build time instead of runtime createRequire
 const APP_VERSION = process.env.APP_VERSION || "0.0.0-dev";
 
 import { env } from "./config/env.js";
@@ -74,12 +74,12 @@ import { ingestionQueue, researchQueue, repoQueue, compactionQueue } from "./que
 export async function buildApp() {
   const fastify = Fastify({
     logger: false,
-    // P0-11: Only trust proxy when explicitly configured; prevents IP spoofing via X-Forwarded-For
+    // Only trust proxy when explicitly configured; prevents IP spoofing via X-Forwarded-For
     trustProxy: env.TRUST_PROXY === "true" ? true
       : env.TRUST_PROXY === "false" ? false
       : env.TRUST_PROXY && !isNaN(Number(env.TRUST_PROXY)) ? Number(env.TRUST_PROXY)
       : env.TRUST_PROXY || false,
-    // P8-03: No global bodyLimit — each route sets its own limit via route config
+    // No global bodyLimit — each route sets its own limit via route config
     // Default Fastify limit is 1MB which is reasonable as a safety net
   });
 
@@ -92,7 +92,7 @@ export async function buildApp() {
       if (!origin || allowedOrigins.includes(origin)) {
         return cb(null, true);
       }
-      // P8-02: Only allow localhost origins in non-production environments
+      // Only allow localhost origins in non-production environments
       if (env.NODE_ENV !== "production" && (origin.startsWith("http://localhost:") || origin.startsWith("http://127.0.0.1:"))) {
         return cb(null, true);
       }
@@ -103,12 +103,12 @@ export async function buildApp() {
 
   await fastify.register(fastifyCompress);
   await fastify.register(fastifyCookie);
-  // P4-02: Helmet with environment-configurable CSP and HSTS
+  // Helmet with environment-configurable CSP and HSTS
   await fastify.register(fastifyHelmet, {
     contentSecurityPolicy: false, // CSP is handled by cspNonce middleware with per-request nonces
     crossOriginEmbedderPolicy: false, // Allow loading external resources (CDN scripts, images)
     referrerPolicy: { policy: "strict-origin-when-cross-origin" },
-    // P4-02: Enable HSTS in production with configurable max-age
+    // Enable HSTS in production with configurable max-age
     hsts: env.NODE_ENV === "production"
       ? { maxAge: 31536000, includeSubDomains: true, preload: true }
       : false,
@@ -128,12 +128,12 @@ export async function buildApp() {
     ...(rateLimitRedis ? { redis: rateLimitRedis } : {}),
   });
 
-  // P8-05: Only register Swagger UI in non-production environments
+  // Only register Swagger UI in non-production environments
   if (env.NODE_ENV !== "production") {
     await registerSwagger(fastify);
   }
 
-  // P8-04: Static file paths defined here, but middleware registered AFTER API routes
+  // Static file paths defined here, but middleware registered AFTER API routes
   //         to prevent HTML 404s for API errors.
   const publicPath = fs.existsSync(path.join(process.cwd(), "frontend/dist"))
     ? path.join(process.cwd(), "frontend/dist")
@@ -147,14 +147,14 @@ export async function buildApp() {
   fastify.setErrorHandler(fastifyErrorHandler);
 
   // Health and Metrics
-  // P8-01: Fixed with constant-time comparison and rate limiting
+  // Fixed with constant-time comparison and rate limiting
   fastify.get("/metrics", {
     config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
   }, async (request, reply) => {
     const authHeader = request.headers.authorization;
     const metricsToken = process.env.METRICS_TOKEN;
     if (metricsToken) {
-      // P8-01: Use crypto.timingSafeEqual to prevent timing oracle attacks
+      // Use crypto.timingSafeEqual to prevent timing oracle attacks
       const provided = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : "";
       const expected = metricsToken;
       const providedBuf = Buffer.from(provided.padEnd(expected.length));
@@ -199,7 +199,7 @@ export async function buildApp() {
       checks.redis = "unreachable";
       healthy = false;
     }
-    // P1-20: Include rate-limit Redis health
+    // Include rate-limit Redis health
     checks.rateLimitRedis = isRateLimitRedisHealthy() ? "ok" : "fallback_inmemory";
 
     const status = healthy ? "ok" : "degraded";
@@ -217,7 +217,7 @@ export async function buildApp() {
     };
   });
 
-  // P8-07: Liveness probe — always 200 if process is up (no dependency checks)
+  // Liveness probe — always 200 if process is up (no dependency checks)
   fastify.get("/live", {
     config: { rateLimit: { max: 60, timeWindow: "1 minute" } },
   }, async (_request, reply) => {
@@ -225,7 +225,7 @@ export async function buildApp() {
     return { live: true };
   });
 
-  // P1-20: Readiness probe — returns 503 until critical dependencies are connected
+  // Readiness probe — returns 503 until critical dependencies are connected
   fastify.get("/ready", {
     config: { rateLimit: { max: 60, timeWindow: "1 minute" } },
   }, async (_request, reply) => {
@@ -256,7 +256,7 @@ export async function buildApp() {
   await fastify.register(voicePlugin,           { prefix: "/api/voice" });
   await fastify.register(researchPlugin,        { prefix: "/api/research" });
   await fastify.register(artifactsPlugin,       { prefix: "/api/artifacts" });
-  // P4-05: Sandbox gets a stricter rate limit (10/min) vs the global 120/min
+  // Sandbox gets a stricter rate limit (10/min) vs the global 120/min
   await fastify.register(async (scope) => {
     await scope.register(fastifyRateLimit, { max: 10, timeWindow: "1 minute" });
     await scope.register(sandboxPlugin, { prefix: "/api/sandbox" });
@@ -277,11 +277,11 @@ export async function buildApp() {
   await fastify.register(costsPlugin,           { prefix: "/api/costs" });
   await fastify.register(evaluationPlugin,      { prefix: "/api/evaluation" });
   await fastify.register(projectsPlugin,        { prefix: "/api/v1/projects" });
-  // P4-26: Provider health probes endpoint (mounted under admin prefix)
+  // Provider health probes endpoint (mounted under admin prefix)
   await fastify.register(providerHealthPlugin,  { prefix: "/api/admin" });
-  // P4-27: Consensus explainability API
+  // Consensus explainability API
   await fastify.register(deliberationsPlugin,   { prefix: "/api/deliberations" });
-  // P4-24: Per-route rate limit differentiation.
+  // Per-route rate limit differentiation.
   // /ask is the most expensive route (triggers full deliberation); cap at 30/min.
   // Uploads are I/O-heavy; cap at 20/min.
   // Other routes inherit the global 120/min limit.
@@ -295,7 +295,7 @@ export async function buildApp() {
     await scope.register(uploadsPlugin, { prefix: "/api/uploads" });
   });
 
-  // P8-04: Static middleware registered AFTER all API routes
+  // Static middleware registered AFTER all API routes
   await fastify.register(fastifyStatic, {
     root: publicPath,
     prefix: "/",
@@ -311,7 +311,7 @@ export async function buildApp() {
     },
   });
 
-  // P19-01: Cache index.html in memory — avoid blocking readFileSync on every request
+  // Cache index.html in memory — avoid blocking readFileSync on every request
   let cachedIndexHtml: string | null = null;
   const indexPath = path.join(publicPath, "index.html");
 
@@ -377,7 +377,7 @@ export async function buildApp() {
     });
   }
 
-  // P19-02: Don't reflect raw request.url in response — prevents info disclosure / log injection
+  // Don't reflect raw request.url in response — prevents info disclosure / log injection
   fastify.setNotFoundHandler((request, reply) => {
     if (request.url.startsWith("/api/")) {
       const safeRoute = request.routeOptions?.url || request.url.split("?")[0].slice(0, 200);

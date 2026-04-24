@@ -171,7 +171,7 @@ const researchPlugin: FastifyPluginAsync = async (fastify) => {
           reply.raw.end();
         }
       } catch (err) {
-        // P31-10: Clear interval on repeated errors to prevent polling zombie
+        // Clear interval on repeated errors to prevent polling zombie
         logger.error({ err }, "Research stream poll error");
       }
     }, 2000);

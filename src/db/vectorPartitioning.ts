@@ -1,5 +1,5 @@
 /**
- * P4-50: pgvector HNSW index sharding guidance.
+ * pgvector HNSW index sharding guidance.
  *
  * HNSW indexes don't rebuild cheaply — on large tables (>1M vectors),
  * inserts become progressively slower as the graph grows. Partitioning
@@ -54,7 +54,7 @@ export function generatePartitionMigration(
   }
 
   const lines: string[] = [
-    `-- P4-50: Partition ${tableName} by userId for HNSW index sharding`,
+    `-- Partition ${tableName} by userId for HNSW index sharding`,
     `-- Run this migration when ${tableName} exceeds ~500K rows`,
     `-- Estimated downtime: depends on table size (use pg_repack for zero-downtime)`,
     ``,

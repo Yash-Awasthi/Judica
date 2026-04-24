@@ -9,7 +9,7 @@ import { findConversationById } from "../services/conversation.service.js";
 
 let wss: WebSocketServer | null = null;
 const MAX_MESSAGE_SIZE = 4096;
-// P8-06: Track per-user connection count to prevent FD exhaustion
+// Track per-user connection count to prevent FD exhaustion
 const MAX_CONNECTIONS_PER_USER = 10;
 const MAX_CONNECTIONS_GLOBAL = 5000;
 const userConnectionCount = new Map<number, number>();
@@ -76,7 +76,7 @@ export function initSocket(server: HttpServer): WebSocketServer {
       }
 
       wss!.handleUpgrade(req, socket, head, (ws: ClientSocket) => {
-        // P8-06: Enforce per-user and global connection limits
+        // Enforce per-user and global connection limits
         const currentGlobal = wss!.clients.size;
         if (currentGlobal >= MAX_CONNECTIONS_GLOBAL) {
           ws.close(1013, "Server at capacity");
@@ -158,7 +158,7 @@ export function initSocket(server: HttpServer): WebSocketServer {
     });
 
     ws.on("close", () => {
-      // P8-06: Decrement per-user connection counter
+      // Decrement per-user connection counter
       if (ws.userId) {
         const count = userConnectionCount.get(ws.userId) || 1;
         if (count <= 1) userConnectionCount.delete(ws.userId);

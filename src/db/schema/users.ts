@@ -12,18 +12,18 @@ import {
 } from "drizzle-orm/pg-core";
 import { councilConfigs } from "./auth.js";
 
-// P8-39: Standardize ID types — use UUID primary keys throughout.
+// Standardize ID types — use UUID primary keys throughout.
 // Existing serial IDs retained for backward compatibility; new tables should use uuid().
 
 // ─── User ────────────────────────────────────────────────────────────────────
 export const users = pgTable("User", {
   id: serial("id").primaryKey(),
-  // P8-38: email must be NOT NULL — nullable + unique allows multiple NULLs in PostgreSQL
+  // email must be NOT NULL — nullable + unique allows multiple NULLs in PostgreSQL
   email: text("email").notNull().unique(),
   username: text("username").notNull().unique(),
-  // P56-05: Nullable for OAuth users (github/google). Required for password auth — enforce in app layer.
+  // Nullable for OAuth users (github/google). Required for password auth — enforce in app layer.
   passwordHash: text("passwordHash"),
-  // P8-34: Explicit auth method flag instead of relying on empty passwordHash
+  // Explicit auth method flag instead of relying on empty passwordHash
   authMethod: text("authMethod", { enum: ["password", "github", "google"] }).default("password").notNull(),
   customInstructions: text("customInstructions").default("").notNull(),
   createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
@@ -118,7 +118,7 @@ export const userArchetypes = pgTable(
     userId: integer("userId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    // P56-04: Add FK to council configs
+    // Add FK to council configs
     councilConfigId: integer("councilConfigId").references(() => councilConfigs.id, { onDelete: "set null" }),
     archetypeId: text("archetypeId").default("").notNull(),
     name: text("name").notNull(),
@@ -141,7 +141,7 @@ export const userArchetypes = pgTable(
   ],
 );
 
-// P8-41: Define Drizzle relations for type-safe joins
+// Define Drizzle relations for type-safe joins
 import { relations } from "drizzle-orm";
 
 export const usersRelations = relations(users, ({ many, one }) => ({

@@ -139,7 +139,7 @@ export async function routedSearch(
   kbId?: string,
   limit: number = 5
 ): Promise<Array<{ content: string; score: number; source?: string }>> {
-  // P26-03: Cap limit to prevent unbounded query results
+  // Cap limit to prevent unbounded query results
   limit = Math.min(Math.max(1, limit), 100);
 
   const backend = await getBackend(userId);

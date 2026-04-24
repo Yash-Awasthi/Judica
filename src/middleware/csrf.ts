@@ -1,13 +1,13 @@
 import type { FastifyRequest, FastifyReply } from "fastify";
 
 /**
- * P0-09 / P4-01: CSRF protection for cookie-authenticated state-mutating requests.
+ * CSRF protection for cookie-authenticated state-mutating requests.
  *
  * Strategy: Require a custom header (X-Requested-With) for all non-GET/HEAD/OPTIONS
  * requests that use cookie-based authentication. Browsers won't send custom headers
  * in cross-origin requests without CORS preflight approval.
  *
- * P4-01: This approach is equivalent to @fastify/csrf-protection's "custom request header"
+ * This approach is equivalent to @fastify/csrf-protection's "custom request header"
  * strategy but without the extra dependency. The X-Requested-With header acts as a CSRF
  * token since browsers enforce CORS preflight for custom headers on cross-origin requests.
  * Origin/Referer validation is added as defense-in-depth.
@@ -35,7 +35,7 @@ export async function fastifyCsrfProtection(request: FastifyRequest, reply: Fast
     return;
   }
 
-  // P4-01: Defense-in-depth — validate Origin header when present
+  // Defense-in-depth — validate Origin header when present
   const origin = request.headers.origin;
   if (origin) {
     const allowedOrigins = process.env.ALLOWED_ORIGINS

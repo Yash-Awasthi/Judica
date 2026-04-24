@@ -16,7 +16,7 @@ export interface ChainEntry {
 }
 
 /**
- * P4-22: Load a provider chain from env/config JSON if provided.
+ * Load a provider chain from env/config JSON if provided.
  * Format: PROVIDER_CHAIN_FREE / PROVIDER_CHAIN_PAID as JSON array of ChainEntry.
  * Falls back to the hardcoded defaults below.
  *
@@ -31,7 +31,7 @@ function loadChainFromEnv(envKey: string, fallback: ChainEntry[]): ChainEntry[] 
       logger.warn({ envKey }, "Invalid provider chain config (not a non-empty array), using default");
       return fallback;
     }
-    // P20-07: Validate types and numeric ranges — reject nonsensical values like negative RPM
+    // Validate types and numeric ranges — reject nonsensical values like negative RPM
     for (const entry of parsed) {
       if (!entry.provider || !entry.model) {
         logger.warn({ envKey, entry }, "Invalid chain entry (missing provider/model), using default chain");
@@ -61,7 +61,7 @@ function loadChainFromEnv(envKey: string, fallback: ChainEntry[]): ChainEntry[] 
 /**
  * Free-tier provider chain — ordered by preference.
  * These are providers with generous free tiers.
- * P4-22: Overridable via PROVIDER_CHAIN_FREE env var (JSON array).
+ * Overridable via PROVIDER_CHAIN_FREE env var (JSON array).
  */
 export const FREE_TIER_CHAIN: ChainEntry[] = loadChainFromEnv("PROVIDER_CHAIN_FREE", [
   {
@@ -83,7 +83,7 @@ export const FREE_TIER_CHAIN: ChainEntry[] = loadChainFromEnv("PROVIDER_CHAIN_FR
     model: "meta-llama/llama-3.1-8b-instruct:free",
     rpm: 20,
     daily_tokens: 200_000,
-    // P3-17: OpenRouter :free models have a ~20 req/day actual limit,
+    // OpenRouter :free models have a ~20 req/day actual limit,
     // not 200 as previously configured. Align with upstream reality.
     daily_requests: 20,
   },
@@ -105,7 +105,7 @@ export const FREE_TIER_CHAIN: ChainEntry[] = loadChainFromEnv("PROVIDER_CHAIN_FR
 
 /**
  * Paid provider chain — used when user has API keys and prefers quality.
- * P4-22: Overridable via PROVIDER_CHAIN_PAID env var (JSON array).
+ * Overridable via PROVIDER_CHAIN_PAID env var (JSON array).
  */
 export const PAID_CHAIN: ChainEntry[] = loadChainFromEnv("PROVIDER_CHAIN_PAID", [
   {
@@ -141,7 +141,7 @@ export const PAID_CHAIN: ChainEntry[] = loadChainFromEnv("PROVIDER_CHAIN_PAID", 
 /**
  * Select the best available provider from a chain based on current quotas and RPM.
  * Returns null if all providers are exhausted.
- * P2-11: estimatedTokens is checked against daily_tokens quota.
+ * estimatedTokens is checked against daily_tokens quota.
  */
 export function selectProvider(
   estimatedTokens: number,
@@ -151,7 +151,7 @@ export function selectProvider(
     // Skip if adapter not registered
     if (!hasAdapter(entry.provider)) continue;
 
-    // Check daily quota (P2-11: factor in estimated tokens for this request)
+    // Check daily quota (factor in estimated tokens for this request)
     if (!canUse(entry.provider, entry.daily_requests, entry.daily_tokens)) {
       logger.debug({ provider: entry.provider }, "Provider daily quota exceeded, skipping");
       continue;
@@ -166,7 +166,7 @@ export function selectProvider(
     return { provider: entry.provider, model: entry.model };
   }
 
-  // P4-13: Track when all providers in a chain are exhausted
+  // Track when all providers in a chain are exhausted
   const chainName = chain === FREE_TIER_CHAIN ? "free" : chain === PAID_CHAIN ? "paid" : "custom";
   routerExhaustedTotal.inc({ chain: chainName });
 
@@ -175,7 +175,7 @@ export function selectProvider(
 
 /**
  * Get chain entry for a specific provider (used to look up limits).
- * P2-10: When provider appears in both chains, prefer PAID limits (higher).
+ * When provider appears in both chains, prefer PAID limits (higher).
  */
 export function getChainEntry(
   provider: string,

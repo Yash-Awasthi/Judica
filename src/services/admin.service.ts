@@ -57,7 +57,7 @@ export class AdminService {
       .from(usageLogs);
 
     return {
-      // P44-08: NaN-safe Number() conversions on SQL aggregation results
+      // NaN-safe Number() conversions on SQL aggregation results
       totalUsers: Number(userCount.value) || 0,
       totalConversations: Number(convCount.value) || 0,
       totalMessages: Number(msgCount.value) || 0,
@@ -87,7 +87,7 @@ export class AdminService {
 
   static async getConfig() {
     const configs = await db.select().from(systemConfigs);
-    // P34-04: Use Object.create(null) to prevent prototype pollution via __proto__ key
+    // Use Object.create(null) to prevent prototype pollution via __proto__ key
     const BLOCKED_KEYS = new Set(["__proto__", "constructor", "prototype"]);
     return configs.reduce((acc, curr) => {
       if (!BLOCKED_KEYS.has(curr.key)) {
@@ -333,7 +333,7 @@ export class AdminService {
     const [user] = await db.select().from(users).where(eq(users.id, userId)).limit(1);
     if (!user) throw new Error("User not found");
 
-    // P1-18: Soft-delete — deactivate and anonymize instead of hard delete
+    // Soft-delete — deactivate and anonymize instead of hard delete
     await db.update(users).set({
       isActive: false,
       email: `deleted_${userId}@removed.local`,
@@ -351,7 +351,7 @@ export class AdminService {
   }
 
   static async updateUserRole(userId: number, role: string, adminId: number) {
-    // P1-17: Prevent admin self-demotion
+    // Prevent admin self-demotion
     if (userId === adminId && role !== "admin" && role !== "owner") {
       throw new Error("Cannot demote yourself");
     }

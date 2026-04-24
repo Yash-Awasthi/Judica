@@ -1,5 +1,5 @@
 /**
- * P4-27: Consensus explainability API.
+ * Consensus explainability API.
  *
  * Exposes the scoring breakdown for a deliberation — agreement scores,
  * peer ranking, adversarial/grounding penalties, and final weighted score
@@ -53,7 +53,7 @@ const deliberationsPlugin: FastifyPluginAsync = async (fastify) => {
       };
     }>;
 
-    // P30-07: Cap scoredOpinions to prevent unbounded array processing
+    // Cap scoredOpinions to prevent unbounded array processing
     const boundedOpinions = scoredOpinions.slice(0, 200);
 
     const members = boundedOpinions.map((op) => ({
@@ -85,7 +85,7 @@ const deliberationsPlugin: FastifyPluginAsync = async (fastify) => {
     });
   });
   /**
-   * P4-30: GET /:id/replay — Full deliberation replay.
+   * GET /:id/replay — Full deliberation replay.
    *
    * Returns the ordered sequence of events: opinions gathered,
    * peer reviews, scoring, consensus check, synthesis/verdict.

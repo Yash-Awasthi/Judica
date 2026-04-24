@@ -48,7 +48,7 @@ export async function runLoginHelper(targetName: "chatgpt" | "claude" | "deepsee
 
   logger.info({ sessionFile }, "Saving storage state...");
   await context.storageState({ path: sessionFile });
-  // P19-10: Restrict session file permissions — contains sensitive auth tokens
+  // Restrict session file permissions — contains sensitive auth tokens
   try { chmodSync(sessionFile, 0o600); } catch { /* may fail on some OS */ }
 
   logger.info("Session saved successfully. You can now close the browser.");

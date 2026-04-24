@@ -2,7 +2,7 @@ import type { FastifyRequest, FastifyReply } from "fastify";
 import logger from "../lib/logger.js";
 
 /**
- * P4-06: Multi-tenant / organization isolation middleware.
+ * Multi-tenant / organization isolation middleware.
  *
  * Architecture:
  * - Each user belongs to an org (default: personal org = user's own ID).

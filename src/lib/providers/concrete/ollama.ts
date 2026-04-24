@@ -78,7 +78,7 @@ export class OllamaProvider extends BaseProvider {
           if (done) break;
 
           buffer += decoder.decode(value, { stream: true });
-          // P41-05: Cap buffer to prevent unbounded memory from malicious streams
+          // Cap buffer to prevent unbounded memory from malicious streams
           if (buffer.length > 10_000_000) {
             throw new Error("Ollama stream buffer exceeded maximum size");
           }
@@ -95,7 +95,7 @@ export class OllamaProvider extends BaseProvider {
                 text += parsed.response;
                 onChunk(parsed.response);
               }
-              // P41-06: Use nullish coalescing to distinguish 0 from missing
+              // Use nullish coalescing to distinguish 0 from missing
               if (parsed.done) {
                 streamPromptTokens = parsed.prompt_eval_count ?? 0;
                 streamCompletionTokens = parsed.eval_count ?? 0;

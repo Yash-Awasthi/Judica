@@ -19,7 +19,7 @@ export async function ingestDocument(
   filename: string,
   extractedText: string
 ): Promise<number> {
-  // P36-10: Cap extracted text and chunks to prevent resource exhaustion
+  // Cap extracted text and chunks to prevent resource exhaustion
   const MAX_TEXT_LENGTH = 5_000_000; // 5MB
   const MAX_CHUNKS = 10_000;
   if (extractedText.length > MAX_TEXT_LENGTH) {

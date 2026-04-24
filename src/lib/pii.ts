@@ -7,16 +7,16 @@ export interface PIIDetection {
   recommendations: string[];
 }
 
-// P10-67/P10-69: Improved PII patterns with algorithmic validation
+// Improved PII patterns with algorithmic validation
 const PII_PATTERNS: { type: string; pattern: RegExp; severity: 'low' | 'medium' | 'high'; validate?: (match: string) => boolean }[] = [
   {
     type: "ssn",
     pattern: /\b(?!000|666|9\d{2})\d{3}[-\s](?!00)\d{2}[-\s](?!0000)\d{4}\b/g,
     severity: "high",
-    // P10-69: SSN area number validation (exclude invalid ranges)
+    // SSN area number validation (exclude invalid ranges)
     validate: (m) => {
       const digits = m.replace(/[-\s]/g, '');
-      const area = parseInt(digits.slice(0, 3), 10); // P24-06: Explicit radix
+      const area = parseInt(digits.slice(0, 3), 10); // Explicit radix
       return area > 0 && area !== 666 && area < 900;
     }
   },
@@ -24,7 +24,7 @@ const PII_PATTERNS: { type: string; pattern: RegExp; severity: 'low' | 'medium' 
     type: "credit_card",
     pattern: /\b(?:4\d{3}|5[1-5]\d{2}|3[47]\d{2}|6(?:011|5\d{2}))\s?[-]?\s?\d{4}\s?[-]?\s?\d{4}\s?[-]?\s?\d{3,4}\b/g,
     severity: "high",
-    // P10-69: Luhn checksum validation
+    // Luhn checksum validation
     validate: (m) => {
       const digits = m.replace(/[-\s]/g, '');
       if (digits.length < 13 || digits.length > 19) return false;
@@ -47,7 +47,7 @@ const PII_PATTERNS: { type: string; pattern: RegExp; severity: 'low' | 'medium' 
     type: "passport",
     pattern: /\b[A-Z]{1,2}\d{7,9}\b/g,
     severity: "high",
-    // P10-67: Reduce false positives — require context words nearby
+    // Reduce false positives — require context words nearby
     validate: (m) => m.length >= 8 && m.length <= 11
   },
   // L-2: Add IBAN pattern for international bank account detection
@@ -74,7 +74,7 @@ const PII_PATTERNS: { type: string; pattern: RegExp; severity: 'low' | 'medium' 
     type: "phone",
     pattern: /(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g,
     severity: "medium",
-    // P10-69: Basic E.164 format validation — reject version-number-like matches
+    // Basic E.164 format validation — reject version-number-like matches
     validate: (m) => {
       const digits = m.replace(/[^\d]/g, '');
       // Must have 10-11 digits for US, reject short matches (version numbers etc)
@@ -87,7 +87,7 @@ const PII_PATTERNS: { type: string; pattern: RegExp; severity: 'low' | 'medium' 
     type: "driver_license",
     pattern: /\b[A-Z]{1,2}\d{6,8}\b/g,
     severity: "medium",
-    // P10-67: Reduce false positives — require at least 2 letters prefix
+    // Reduce false positives — require at least 2 letters prefix
     validate: (m) => /^[A-Z]{2}/.test(m)
   },
 
@@ -100,13 +100,13 @@ const PII_PATTERNS: { type: string; pattern: RegExp; severity: 'low' | 'medium' 
 const MAX_INPUT_LENGTH = 100_000;
 
 export function detectPII(text: string): PIIDetection {
-  // P45-05: Cap input length to prevent regex DoS on very large inputs
+  // Cap input length to prevent regex DoS on very large inputs
   const safeText = text.length > 1_000_000 ? text.slice(0, 1_000_000) : text;
   const matches: PIIDetection["matches"] = [];
   const types = new Set<string>();
   let riskScore = 0;
 
-  // P10-68: Collect all matches, then resolve overlaps by specificity
+  // Collect all matches, then resolve overlaps by specificity
   const rawMatches: Array<PIIDetection["matches"][0] & { specificity: number }> = [];
   const MAX_MATCHES = 10_000;
 
@@ -115,10 +115,10 @@ export function detectPII(text: string): PIIDetection {
     let match;
     while ((match = pattern.exec(safeText)) !== null) {
       if (rawMatches.length >= MAX_MATCHES) break;
-      // P10-69: Apply algorithmic validation if available
+      // Apply algorithmic validation if available
       if (validate && !validate(match[0])) continue;
 
-      // P10-67: Skip matches that look like version numbers (e.g., 1.2.3.4)
+      // Skip matches that look like version numbers (e.g., 1.2.3.4)
       if (type === "phone" && /^\d+\.\d+\.\d+/.test(match[0])) continue;
 
       rawMatches.push({
@@ -132,7 +132,7 @@ export function detectPII(text: string): PIIDetection {
     }
   }
 
-  // P10-68: Resolve overlapping patterns — keep most specific match
+  // Resolve overlapping patterns — keep most specific match
   rawMatches.sort((a, b) => a.start - b.start || b.specificity - a.specificity);
   const resolved: typeof rawMatches = [];
   for (const m of rawMatches) {
@@ -153,10 +153,10 @@ export function detectPII(text: string): PIIDetection {
     else riskScore += 2;
   }
 
-  // P10-71: Sort by position descending for safe string replacement
+  // Sort by position descending for safe string replacement
   matches.sort((a, b) => b.start - a.start);
 
-  // P10-71: Normalize redaction format consistently
+  // Normalize redaction format consistently
   let anonymized = text;
   for (const m of matches) {
     const placeholder = `[${m.type.toUpperCase()}_REDACTED]`;
@@ -165,7 +165,7 @@ export function detectPII(text: string): PIIDetection {
 
   const recommendations = generateRecommendations(types, matches);
 
-  // P10-70: Log when PII density is high (may indicate over-detection / false positive risk)
+  // Log when PII density is high (may indicate over-detection / false positive risk)
   const normalizedRiskScore = Math.min(riskScore, 100);
   const wordCount = text.split(/\s+/).filter(Boolean).length;
   if (wordCount > 0 && matches.length / wordCount > 0.1) {

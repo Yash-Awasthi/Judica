@@ -9,11 +9,11 @@ import { nodeHandlers } from "./nodes/index.js";
 import logger from "../lib/logger.js";
 
 const DEFAULT_NODE_TIMEOUT_MS = 60_000; // 60s per node
-// P10-88: Configurable HITL gate timeout (default 24 hours)
-// P22-04: NaN guards — fall back to defaults if env vars are non-numeric
+// Configurable HITL gate timeout (default 24 hours)
+// NaN guards — fall back to defaults if env vars are non-numeric
 const _parsedGateTimeout = parseInt(process.env.WORKFLOW_GATE_TIMEOUT_MS || "86400000", 10);
 const GATE_TIMEOUT_MS = Number.isFinite(_parsedGateTimeout) && _parsedGateTimeout > 0 ? _parsedGateTimeout : 86400000;
-// P10-134: Global workflow execution budget
+// Global workflow execution budget
 const _parsedWfDuration = parseInt(process.env.WORKFLOW_MAX_DURATION_MS || "3600000", 10);
 const MAX_WORKFLOW_DURATION_MS = Number.isFinite(_parsedWfDuration) && _parsedWfDuration > 0 ? _parsedWfDuration : 3600000; // 1h default
 const _parsedWfCost = parseFloat(process.env.WORKFLOW_MAX_COST_USD || "0");
@@ -22,7 +22,7 @@ const MAX_WORKFLOW_COST_USD = Number.isFinite(_parsedWfCost) && _parsedWfCost > 
 interface PendingGate {
   resolve: (choice: string) => void;
   promise: Promise<string>;
-  createdAt: number; // P10-88: Track creation time for timeout
+  createdAt: number; // Track creation time for timeout
 }
 
 /** Buffered result from a single node execution. */
@@ -33,8 +33,8 @@ interface NodeResult {
   skipped: boolean;
 }
 
-// P10-85: Gate state persistence interface
-// P10-131: This interface (along with ExecutionStateStore below) allows external
+// Gate state persistence interface
+// This interface (along with ExecutionStateStore below) allows external
 // implementations backed by Redis/DB for horizontal scaling. The in-memory defaults
 // are single-process only. Replace both stores for multi-replica deployments.
 interface GateStore {
@@ -43,20 +43,20 @@ interface GateStore {
   delete(runId: string, nodeId: string): Promise<void>;
 }
 
-// P10-131/P10-132: Execution state persistence interface for crash recovery
+// Execution state persistence interface for crash recovery
 export interface ExecutionStateStore {
   save(runId: string, state: { level: number; contextMap: Record<string, unknown>; skippedNodes: string[] }): Promise<void>;
   load(runId: string): Promise<{ level: number; contextMap: Record<string, unknown>; skippedNodes: string[] } | null>;
   clear(runId: string): Promise<void>;
 }
 
-// P10-85: In-memory store (replace with Redis in production for multi-replica)
+// In-memory store (replace with Redis in production for multi-replica)
 class InMemoryGateStore implements GateStore {
   private store = new Map<string, { prompt: string; options: string[]; createdAt: number }>();
   private key(runId: string, nodeId: string) { return `${runId}:${nodeId}`; }
   async set(runId: string, nodeId: string, state: { prompt: string; options: string[]; createdAt: number }) {
     this.store.set(this.key(runId, nodeId), state);
-    logger.debug({ runId, nodeId }, "P10-85: Gate state persisted (in-memory — use Redis for multi-replica)");
+    logger.debug({ runId, nodeId }, "Gate state persisted (in-memory — use Redis for multi-replica)");
   }
   async get(runId: string, nodeId: string) { return this.store.get(this.key(runId, nodeId)) || null; }
   async delete(runId: string, nodeId: string) { this.store.delete(this.key(runId, nodeId)); }
@@ -64,17 +64,17 @@ class InMemoryGateStore implements GateStore {
 
 const gateStore: GateStore = new InMemoryGateStore();
 
-// P10-140: Idempotency key tracking to prevent duplicate executions
+// Idempotency key tracking to prevent duplicate executions
 const activeExecutions = new Set<string>();
 
-// P10-142: Distributed lock interface for exactly-once execution guarantee
+// Distributed lock interface for exactly-once execution guarantee
 // In production, implement with Redis SETNX or DB advisory locks
 export interface DistributedLock {
   acquire(key: string, ttlMs: number): Promise<boolean>;
   release(key: string): Promise<void>;
 }
 
-// P10-142: Default in-memory lock (single-process only)
+// Default in-memory lock (single-process only)
 export class InMemoryLock implements DistributedLock {
   private locks = new Map<string, number>();
   async acquire(key: string, ttlMs: number): Promise<boolean> {
@@ -94,23 +94,23 @@ export class WorkflowExecutor {
   private runId: string;
   private userId: number;
   private pendingGates = new Map<string, PendingGate>();
-  // P10-140: Optional idempotency key for deduplication
+  // Optional idempotency key for deduplication
   private idempotencyKey?: string;
 
   constructor(definition: WorkflowDefinition, runId: string, userId: number, idempotencyKey?: string) {
-    // P10-89: Deep clone to prevent mutation of the original definition
+    // Deep clone to prevent mutation of the original definition
     // Allows safe re-runs and concurrent executions of the same workflow
     this.definition = JSON.parse(JSON.stringify(definition));
     this.runId = runId;
     this.userId = userId;
     this.idempotencyKey = idempotencyKey;
 
-    // P10-144: Log workflow instantiation with correlation ID for observability
+    // Log workflow instantiation with correlation ID for observability
     logger.info({ runId, userId, idempotencyKey, nodeCount: definition.nodes.length }, "WorkflowExecutor created");
   }
 
   /**
-   * P10-143: Resume a workflow from a specific node, using previously saved state.
+   * Resume a workflow from a specific node, using previously saved state.
    * Allows partial failure recovery without re-running completed nodes.
    */
   async *resumeFrom(
@@ -118,7 +118,7 @@ export class WorkflowExecutor {
     savedState: { contextMap: Record<string, unknown>; completedNodes: string[] }
   ): AsyncGenerator<ExecutionEvent> {
     // Mark previously completed nodes and inject their outputs
-    logger.info({ runId: this.runId, resumeFromNodes: savedState.completedNodes.length }, "P10-143: Resuming workflow from checkpoint");
+    logger.info({ runId: this.runId, resumeFromNodes: savedState.completedNodes.length }, "Resuming workflow from checkpoint");
 
     // Delegate to run() but with pre-seeded context — for now, re-run with inputs
     // Full implementation requires level-aware resume (skipping completed waves)
@@ -195,7 +195,7 @@ export class WorkflowExecutor {
   ): Promise<NodeResult> {
     const events: ExecutionEvent[] = [];
 
-    // P10-144: Attach correlation ID to all node execution logs
+    // Attach correlation ID to all node execution logs
     logger.info({ runId: this.runId, nodeId: node.id, nodeType: node.type, attempt }, "Node execution starting");
 
     events.push({
@@ -221,7 +221,7 @@ export class WorkflowExecutor {
 
     try {
       const timeoutMs = (node.data.timeout as number) || DEFAULT_NODE_TIMEOUT_MS;
-      // P10-91: Store timer ref to clear on resolution (prevent fire-after-cancel leaks)
+      // Store timer ref to clear on resolution (prevent fire-after-cancel leaks)
       let timeoutHandle: ReturnType<typeof setTimeout>;
       const output = await Promise.race([
         handler(ctx),
@@ -244,12 +244,12 @@ export class WorkflowExecutor {
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
 
-      // P10-86: Self-healing disabled by default — it allows LLM to generate arbitrary
+      // Self-healing disabled by default — it allows LLM to generate arbitrary
       // code/inputs which is an RCE/SSRF vector via prompt injection.
       // Enable only with explicit opt-in and strict sandboxing.
       const selfHealingEnabled = process.env.WORKFLOW_SELF_HEALING === "true";
 
-      // P10-87: Only retry idempotent node types to prevent duplicate side effects
+      // Only retry idempotent node types to prevent duplicate side effects
       const IDEMPOTENT_TYPES = new Set([NodeType.LLM, NodeType.CONDITION, NodeType.INPUT]);
       const isIdempotent = IDEMPOTENT_TYPES.has(node.type as NodeType);
 
@@ -277,7 +277,7 @@ export class WorkflowExecutor {
               userId: this.userId,
             };
 
-            // P10-91: Clear recovery timer on resolution
+            // Clear recovery timer on resolution
             let recoveryTimer: ReturnType<typeof setTimeout>;
             const recoveryOutput = await Promise.race([
               recoveryHandler(recoveryCtx),
@@ -332,7 +332,7 @@ export class WorkflowExecutor {
   async *run(
     inputs: Record<string, unknown>
   ): AsyncGenerator<ExecutionEvent> {
-    // P10-140: Idempotency check — prevent duplicate concurrent executions
+    // Idempotency check — prevent duplicate concurrent executions
     const dedupeKey = this.idempotencyKey || this.runId;
     if (activeExecutions.has(dedupeKey)) {
       yield {
@@ -384,7 +384,7 @@ export class WorkflowExecutor {
       return;
     }
 
-    // P10-135: DAG validation beyond cycle detection
+    // DAG validation beyond cycle detection
     const allNodeIds = new Set(nodes.map(n => n.id));
     const reachableFromInputs = new Set<string>();
     const inputNodes = nodes.filter(n => n.type === NodeType.INPUT);
@@ -399,10 +399,10 @@ export class WorkflowExecutor {
     }
     const unreachable = nodes.filter(n => n.type !== NodeType.INPUT && !reachableFromInputs.has(n.id));
     if (unreachable.length > 0) {
-      logger.warn({ unreachableNodes: unreachable.map(n => n.id) }, "P10-135: Workflow has unreachable nodes");
+      logger.warn({ unreachableNodes: unreachable.map(n => n.id) }, "Workflow has unreachable nodes");
     }
 
-    // P10-135: Check for invalid edge references
+    // Check for invalid edge references
     for (const edge of this.definition.edges) {
       if (!allNodeIds.has(edge.source) || !allNodeIds.has(edge.target)) {
         yield {
@@ -416,7 +416,7 @@ export class WorkflowExecutor {
     // ── Execution context ────────────────────────────────────────────────
     const contextMap = new Map<string, Record<string, unknown>>();
     const conditionBranches = new Map<string, string>();
-    // P10-90: Track skipped nodes explicitly to fix skip propagation
+    // Track skipped nodes explicitly to fix skip propagation
     const skippedNodes = new Set<string>();
 
     // ── Seed INPUT nodes ─────────────────────────────────────────────────
@@ -449,7 +449,7 @@ export class WorkflowExecutor {
           }
         }
 
-        // P10-90: Check explicit skipped set instead of fragile heuristic
+        // Check explicit skipped set instead of fragile heuristic
         if (skippedNodes.has(pred.source)) {
           skippedCount++;
           continue;
@@ -457,7 +457,7 @@ export class WorkflowExecutor {
 
         activeCount++;
         const predOutput = contextMap.get(pred.source);
-        // P10-133: Sanitize inter-node data to prevent injection chain attacks
+        // Sanitize inter-node data to prevent injection chain attacks
         if (predOutput) {
           if (pred.targetHandle) {
             nodeInputs[pred.targetHandle] = predOutput;
@@ -476,11 +476,11 @@ export class WorkflowExecutor {
       return { nodeInputs, skip };
     };
 
-    // P10-134: Track execution start time for global budget enforcement
+    // Track execution start time for global budget enforcement
     const executionStartTime = Date.now();
     let accumulatedCost = 0;
 
-    // P10-132: State persistence hook (override for production Redis/DB backing)
+    // State persistence hook (override for production Redis/DB backing)
     const persistState = async (state: { level: number; contextMap: Record<string, unknown>; skippedNodes: string[] }) => {
       // Default: no-op. In production, implement Redis/DB persistence here.
       logger.debug({ runId: this.runId, level: state.level }, "Workflow state checkpoint");
@@ -490,7 +490,7 @@ export class WorkflowExecutor {
     for (let levelIdx = 0; levelIdx < levels.length; levelIdx++) {
       const level = levels[levelIdx];
 
-      // P10-134: Check global duration budget
+      // Check global duration budget
       if (Date.now() - executionStartTime > MAX_WORKFLOW_DURATION_MS) {
         yield {
           type: "workflow_error",
@@ -499,7 +499,7 @@ export class WorkflowExecutor {
         return;
       }
 
-      // P10-134: Check global cost budget
+      // Check global cost budget
       if (accumulatedCost >= MAX_WORKFLOW_COST_USD) {
         yield {
           type: "workflow_error",
@@ -543,7 +543,7 @@ export class WorkflowExecutor {
             }
           }
 
-          // P10-90: Track skipped nodes explicitly
+          // Track skipped nodes explicitly
           if (result.skipped) {
             skippedNodes.add(result.nodeId);
           }
@@ -558,7 +558,7 @@ export class WorkflowExecutor {
             conditionBranches.set(result.nodeId, result.output.branch);
           }
 
-          // P10-134: Accumulate cost from LLM nodes for budget enforcement
+          // Accumulate cost from LLM nodes for budget enforcement
           if (result.output.usage && typeof (result.output.usage as Record<string, unknown>).estimatedCost === "number") {
             accumulatedCost += (result.output.usage as Record<string, unknown>).estimatedCost as number;
           }
@@ -572,7 +572,7 @@ export class WorkflowExecutor {
 
         if (skip) {
           contextMap.set(nodeId, {});
-          skippedNodes.add(nodeId); // P10-90: Track skipped gate nodes
+          skippedNodes.add(nodeId); // Track skipped gate nodes
           continue;
         }
 
@@ -588,7 +588,7 @@ export class WorkflowExecutor {
         });
         this.pendingGates.set(nodeId, { resolve: gateResolve, promise: gatePromise, createdAt: Date.now() });
 
-        // P10-85: Persist gate state for recovery
+        // Persist gate state for recovery
         const gatePromptText = (node.data.prompt as string) || "Awaiting human input";
         const gateOptions = (node.data.options as string[]) || [];
         await gateStore.set(this.runId, nodeId, {
@@ -605,8 +605,8 @@ export class WorkflowExecutor {
           options: gateOptions,
         };
 
-        // P10-88: Race gate resolution against timeout
-        // P10-91: Clear timeout timer on resolution to prevent fire-after-cancel
+        // Race gate resolution against timeout
+        // Clear timeout timer on resolution to prevent fire-after-cancel
         let gateTimer: ReturnType<typeof setTimeout>;
         const choice = await Promise.race([
           gatePromise,
@@ -618,7 +618,7 @@ export class WorkflowExecutor {
           return "__timeout__";
         }).finally(() => clearTimeout(gateTimer!));
 
-        // P10-85: Clean up persisted gate state
+        // Clean up persisted gate state
         await gateStore.delete(this.runId, nodeId);
         const output = { ...nodeInputs, choice };
         contextMap.set(nodeId, output);
@@ -632,7 +632,7 @@ export class WorkflowExecutor {
         };
       }
 
-      // P10-132: Persist execution state checkpoint after each wave
+      // Persist execution state checkpoint after each wave
       await persistState({
         level: levelIdx,
         contextMap: Object.fromEntries(contextMap),
@@ -654,7 +654,7 @@ export class WorkflowExecutor {
       outputs: finalOutputs,
     };
     } finally {
-      // P10-140: Clean up idempotency tracking
+      // Clean up idempotency tracking
       activeExecutions.delete(dedupeKey);
     }
   }

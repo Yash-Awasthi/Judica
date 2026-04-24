@@ -57,8 +57,8 @@ const MAX_OUTPUT_LINES = 1000;
 const MAX_OUTPUT_BYTES = 1_000_000; // 1MB total output cap
 
 // Python preamble that blocks dangerous modules and network access
-// P0-30: Use closure-captured import ref and make __import__ non-writable
-// P0-31: Prevents _restricted_import reassignment
+// Use closure-captured import ref and make __import__ non-writable
+// Prevents _restricted_import reassignment
 const SANDBOX_PREAMBLE = [
   // Block ctypes and FFI (primary escape vector)
   `import importlib`,
@@ -102,7 +102,7 @@ const SANDBOX_PREAMBLE = [
   `    if hasattr(_os, _attr):`,
   `        setattr(_os, _attr, (lambda name: lambda *a, **k: (_ for _ in ()).throw(PermissionError(f"os.{name} is disabled in sandbox")))(_attr))`,
   ``,
-  // P0-38: Block socket.fromfd/socketpair as well
+  // Block socket.fromfd/socketpair as well
   // Block network access at socket level
   `import socket as _original_socket`,
   `class _BlockedSocket(_original_socket.socket):`,
@@ -152,7 +152,7 @@ const SANDBOX_PREAMBLE = [
   ``,
 ].join("\n");
 
-// P0-39: Return structured command to avoid bash -c shell interpolation
+// Return structured command to avoid bash -c shell interpolation
 interface SandboxCommand {
   cmd: string;
   args: string[];
@@ -217,7 +217,7 @@ function buildCommand(tmpFile: string, tmpDir: string): SandboxCommand {
 }
 
 export async function executePython(code: string, timeout: number = 10000): Promise<SandboxResult> {
-  // P28-03: Validate timeout to prevent hangs or negative values
+  // Validate timeout to prevent hangs or negative values
   if (!Number.isFinite(timeout) || timeout < 100) timeout = 10000;
   timeout = Math.min(timeout, 60_000); // Hard cap at 60s
   const start = Date.now();
@@ -266,8 +266,8 @@ export async function executePython(code: string, timeout: number = 10000): Prom
         stdioDef.push(bpfFd); // becomes fd 3 in the child
       }
 
-      // P0-39: Use execFile-style spawn (no shell) to prevent interpolation
-      // P0-40: Use SIGKILL to ensure sandbox processes are terminated
+      // Use execFile-style spawn (no shell) to prevent interpolation
+      // Use SIGKILL to ensure sandbox processes are terminated
       const proc = spawn(cmd, args, {
         timeout,
         killSignal: "SIGKILL",
@@ -286,7 +286,7 @@ export async function executePython(code: string, timeout: number = 10000): Prom
         cwd: tmpDir,
       });
 
-      // P28-04: Cap stdout/stderr to prevent OOM from malicious print loops
+      // Cap stdout/stderr to prevent OOM from malicious print loops
       const MAX_OUTPUT_LINES = 5000;
       if (proc.stdout) {
         proc.stdout.on("data", (data) => {

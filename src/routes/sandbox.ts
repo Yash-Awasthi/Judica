@@ -6,17 +6,17 @@ import { executePython } from "../sandbox/pythonSandbox.js";
 import logger from "../lib/logger.js";
 import redis from "../lib/redis.js";
 
-// P4-05: Per-route rate limit is enforced below (1 exec/min for sandbox via custom limiter).
+// Per-route rate limit is enforced below (1 exec/min for sandbox via custom limiter).
 // The sandbox has a much tighter rate limit (10/min) compared to the global 120/min.
 const ALLOWED_LANGUAGES = new Set(["javascript", "python", "typescript"]);
 const MAX_EXECUTIONS_PER_MINUTE = 10;
-const MAX_CONCURRENT_PER_USER = 3; // P1-22: cap concurrent sandbox executions
+const MAX_CONCURRENT_PER_USER = 3; // cap concurrent sandbox executions
 
-// P1-22: Track in-flight executions per user
+// Track in-flight executions per user
 const inflightMap = new Map<string, number>();
 
-// P1-21: Redis-backed rate limiter with in-memory fallback
-// P44-06: Cap memoryBuckets to prevent unbounded growth
+// Redis-backed rate limiter with in-memory fallback
+// Cap memoryBuckets to prevent unbounded growth
 const MAX_MEMORY_BUCKETS = 10_000;
 const memoryBuckets = new Map<string, { count: number; resetAt: number }>();
 const MAX_BUCKETS = 10_000;
@@ -38,7 +38,7 @@ async function sandboxRateLimiter(request: FastifyRequest, reply: FastifyReply) 
   const userId = (request as unknown as { userId?: number }).userId || request.ip;
   const key = `sandbox:rl:${userId}`;
 
-  // P1-21: Try Redis first for multi-replica consistency
+  // Try Redis first for multi-replica consistency
   try {
     const count = await redis.incr(key);
     if (count === 1) {
@@ -55,7 +55,7 @@ async function sandboxRateLimiter(request: FastifyRequest, reply: FastifyReply) 
 
   // In-memory fallback
   const now = Date.now();
-  // P31-03: Evict expired buckets when map grows too large
+  // Evict expired buckets when map grows too large
   if (memoryBuckets.size >= MAX_MEMORY_BUCKETS) {
     for (const [k, v] of memoryBuckets) {
       if (now >= v.resetAt) memoryBuckets.delete(k);
@@ -79,9 +79,9 @@ async function sandboxRateLimiter(request: FastifyRequest, reply: FastifyReply) 
   }
 }
 
-// P1-22: Concurrency guard
+// Concurrency guard
 function acquireConcurrency(userId: string): boolean {
-  // P31-03: Cap inflight entries
+  // Cap inflight entries
   if (inflightMap.size >= MAX_INFLIGHT_ENTRIES && !inflightMap.has(userId)) {
     for (const [k, v] of inflightMap) {
       if (v <= 0) { inflightMap.delete(k); break; }
@@ -118,7 +118,7 @@ const sandboxPlugin: FastifyPluginAsync = async (fastify) => {
 
     const userKey = String((request as unknown as { userId?: number }).userId || request.ip);
 
-    // P1-22: Enforce concurrency cap
+    // Enforce concurrency cap
     if (!acquireConcurrency(userKey)) {
       throw new AppError(429, `Max ${MAX_CONCURRENT_PER_USER} concurrent sandbox executions allowed`, "SANDBOX_CONCURRENCY_LIMIT");
     }

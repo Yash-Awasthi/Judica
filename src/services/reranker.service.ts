@@ -68,7 +68,7 @@ export async function rerank<T extends RerankableItem>(
         model: COHERE_MODEL,
         query,
         documents,
-        top_n: (topN !== null && topN !== undefined && topN > 0) ? topN : items.length, // P26-10: Explicit null check to avoid falsy-0 bug
+        top_n: (topN !== null && topN !== undefined && topN > 0) ? topN : items.length, // Explicit null check to avoid falsy-0 bug
         return_documents: false,
       }),
     });

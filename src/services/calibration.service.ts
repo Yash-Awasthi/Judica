@@ -1,5 +1,5 @@
 /**
- * P4-47: Calibration curves and Brier score tracking.
+ * Calibration curves and Brier score tracking.
  *
  * Measures how well the council's confidence scores predict actual correctness.
  * - Brier score: lower is better (0 = perfect, 1 = worst)
@@ -34,7 +34,7 @@ const predictions: PredictionRecord[] = [];
  * Record a prediction and its outcome for calibration tracking.
  */
 export function recordPrediction(confidence: number, wasCorrect: boolean): void {
-  // P25-02: Evict oldest entries when cap exceeded
+  // Evict oldest entries when cap exceeded
   if (predictions.length >= MAX_PREDICTIONS) {
     predictions.splice(0, predictions.length - MAX_PREDICTIONS + 1);
   }
@@ -73,7 +73,7 @@ export function computeBrierScore(): BrierScore {
  * Generate calibration curve data (10 buckets from 0.0-1.0).
  */
 export function computeCalibrationCurve(bucketCount: number = 10): CalibrationPoint[] {
-  // P25-03: Validate bucketCount to prevent division by zero or excessive iteration
+  // Validate bucketCount to prevent division by zero or excessive iteration
   if (!Number.isFinite(bucketCount) || bucketCount < 1) bucketCount = 10;
   bucketCount = Math.min(Math.floor(bucketCount), 100);
 

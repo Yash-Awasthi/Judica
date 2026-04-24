@@ -62,7 +62,7 @@ Return ONLY the JSON object.`,
 
     const match = result.text.match(/\{[\s\S]*\}/);
     if (match) {
-      // P32-03: Safe JSON.parse with try-catch on LLM output
+      // Safe JSON.parse with try-catch on LLM output
       try {
         const parsed = JSON.parse(match[0]) as { title: string; content: string; description: string };
         return { type: "mermaid", ...parsed };
@@ -134,7 +134,7 @@ Return ONLY the JSON object.`,
 
     const match = result.text.match(/\{[\s\S]*\}/);
     if (match) {
-      // P32-04: Safe JSON.parse with try-catch on LLM output
+      // Safe JSON.parse with try-catch on LLM output
       try {
         return JSON.parse(match[0]) as ChartSpec;
       } catch {
@@ -160,13 +160,13 @@ export async function visualizeDeliberation(
 ): Promise<VisualOutput[]> {
   const outputs: VisualOutput[] = [];
 
-  // P28-08: Cap opinions array to prevent unbounded output and sanitize topic for Mermaid
+  // Cap opinions array to prevent unbounded output and sanitize topic for Mermaid
   const MAX_OPINIONS = 50;
   const safeOpinions = opinions.slice(0, MAX_OPINIONS);
   const safeTopic = topic.substring(0, 40).replace(/[()]/g, "");
 
   // 1. Generate a Mermaid mindmap of agent positions
-  // P34-06: Cap opinions array to prevent unbounded rendering
+  // Cap opinions array to prevent unbounded rendering
   const cappedOpinions = opinions.slice(0, 50);
   const mindmapContent = [
     "mindmap",
@@ -182,7 +182,7 @@ export async function visualizeDeliberation(
   });
 
   // 2. Generate a confidence comparison table
-  // P34-07: NaN guard on confidence + use capped opinions
+  // NaN guard on confidence + use capped opinions
   const tableRows = cappedOpinions
     .map((o) => {
       const conf = Number.isFinite(o.confidence) ? o.confidence : 0;

@@ -48,13 +48,13 @@ export const marketplaceReviews = pgTable(
     userId: integer("userId")
       .notNull()
       .references(() => users.id, { onDelete: "cascade" }),
-    // P55-06: Rating must be 1-5. Enforce in application layer (routes/marketplace.ts).
+    // Rating must be 1-5. Enforce in application layer (routes/marketplace.ts).
     // DB CHECK: ALTER TABLE "MarketplaceReview" ADD CONSTRAINT rating_range CHECK (rating >= 1 AND rating <= 5);
     rating: integer("rating").notNull(),
     comment: text("comment"),
     createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
   },
-  // P2-29: Composite indexes for common query patterns
+  // Composite indexes for common query patterns
   (table) => [
     index("MarketplaceReview_itemId_idx").on(table.itemId),
     index("MarketplaceReview_userId_createdAt_idx").on(table.userId, table.createdAt),
@@ -90,7 +90,7 @@ export const userSkills = pgTable(
     createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
     active: boolean("active").default(true).notNull(),
   },
-  // P2-29: Composite index for user skill lookups ordered by creation
+  // Composite index for user skill lookups ordered by creation
   (table) => [
     index("UserSkill_userId_idx").on(table.userId),
     index("UserSkill_userId_createdAt_idx").on(table.userId, table.createdAt),

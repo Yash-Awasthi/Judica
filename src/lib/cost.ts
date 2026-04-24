@@ -1,4 +1,4 @@
-// P2-22: Cost/usage logic is scattered across 5 places:
+// Cost/usage logic is scattered across 5 places:
 // 1. lib/cost.ts (this file) — cost calculation
 // 2. lib/realtimeCost.ts — per-session cost tracking
 // 3. services/usageService.ts — daily usage recording
@@ -38,7 +38,7 @@ export interface CostBreakdown {
   byTimeframe: Record<string, { cost: number; tokens: number; requests: number }>;
 }
 
-// P9-65: Externalized pricing table — loaded from config/pricing.json if available,
+// Externalized pricing table — loaded from config/pricing.json if available,
 // falling back to compiled defaults. Update pricing without redeploying by editing the JSON file.
 const PRICING_CONFIG_PATH = resolve(process.cwd(), "config/pricing.json");
 
@@ -106,7 +106,7 @@ const BUILTIN_COST_CONFIG: CostConfig[] = [
   { provider: "openrouter", model: "mistral/mistral-small-2501", inputTokenPrice: 0.0001, outputTokenPrice: 0.0003, currency: "USD" },
 ];
 
-// P9-65: Load from external config file, fall back to built-in defaults
+// Load from external config file, fall back to built-in defaults
 export const DEFAULT_COST_CONFIG: CostConfig[] = loadPricingConfig();
 
 export function calculateCost(
@@ -116,7 +116,7 @@ export function calculateCost(
   outputTokens: number,
   customConfig?: CostConfig[]
 ): number {
-  // P29-09: Non-negative guard on token counts
+  // Non-negative guard on token counts
   inputTokens = Number.isFinite(inputTokens) && inputTokens > 0 ? inputTokens : 0;
   outputTokens = Number.isFinite(outputTokens) && outputTokens > 0 ? outputTokens : 0;
 
@@ -124,7 +124,7 @@ export function calculateCost(
   const pricing = config.find(c => c.provider === provider && c.model === model);
 
   if (!pricing) {
-    // P9-69: Unknown model — use conservative estimate based on pricing table median
+    // Unknown model — use conservative estimate based on pricing table median
     // instead of near-zero fallback that lets usage go unaccounted.
     logger.warn({ provider, model }, "No pricing config found — using conservative estimate");
     // Use median of known models' prices as a reasonable upper bound
@@ -138,7 +138,7 @@ export function calculateCost(
     return (inputTokens * 0.003 + outputTokens * 0.015) / 1000; // fallback to mid-tier pricing
   }
 
-  // P41-04: Guard against NaN/Infinity in pricing calculation
+  // Guard against NaN/Infinity in pricing calculation
   if (!Number.isFinite(pricing.inputTokenPrice) || !Number.isFinite(pricing.outputTokenPrice)) {
     return (inputTokens * 0.003 + outputTokens * 0.015) / 1000;
   }
@@ -149,7 +149,7 @@ export function calculateCost(
   return inputCost + outputCost;
 }
 
-// P9-67: Cost is persisted via dailyUsage table (aggregated per user per day).
+// Cost is persisted via dailyUsage table (aggregated per user per day).
 // Individual request costs are logged but not stored in a per-request ledger.
 // TODO: Add a `usage_ledger` table for per-request cost records if audit trail needed.
 export async function trackTokenUsage(
@@ -203,7 +203,7 @@ export async function trackTokenUsage(
   }
 }
 
-// P9-68: Note — byProvider and byModel are not populated here because dailyUsage
+// Note — byProvider and byModel are not populated here because dailyUsage
 // table stores only aggregate tokens/requests per day (no provider/model breakdown).
 // These fields exist for future use when per-request ledger (P9-67) is implemented.
 export async function getUserCostBreakdown(
@@ -251,10 +251,10 @@ export async function getUserCostBreakdown(
   return breakdown;
 }
 
-// P9-66: Use actual weighted average from pricing table instead of a magic constant.
+// Use actual weighted average from pricing table instead of a magic constant.
 // This tracks closer to real costs as the model mix changes.
 function estimateCostFromTokens(tokens: number): number {
-  // P41-03: Guard against NaN/Infinity/negative tokens
+  // Guard against NaN/Infinity/negative tokens
   if (!Number.isFinite(tokens) || tokens < 0) return 0;
   if (DEFAULT_COST_CONFIG.length === 0) {
     return tokens * 0.00002; // fallback: ~$0.02 per 1K tokens
@@ -415,7 +415,7 @@ export async function getCostEfficiencyMetrics(userId: number, days: number = 30
   const avgCostPerRequest = breakdown.totalCost / totalRequests;
   const avgTokensPerRequest = breakdown.totalTokens / totalRequests;
 
-  // P9-70: Fixed efficiency formula — clamp to [0, 100] range.
+  // Fixed efficiency formula — clamp to [0, 100] range.
   // Lower cost per request = better efficiency.
   // Score inversely proportional to cost, normalized to $1 as "expensive".
   const costScore = Math.max(0, Math.min(100, 100 * (1 - Math.min(avgCostPerRequest, 1))));

@@ -2,7 +2,7 @@ import dns from "dns";
 import net from "net";
 import { URL } from "url";
 
-// P0-26: Allowed ports whitelist
+// Allowed ports whitelist
 const ALLOWED_PORTS = new Set([80, 443, 8080, 8443]);
 
 export function isPrivateIP(ip: string): boolean {
@@ -20,10 +20,10 @@ export function isPrivateIP(ip: string): boolean {
     if (parts[0] >= 224 && parts[0] <= 239) return true;
     if (parts[0] >= 240 && parts[0] <= 255) return true;
 
-    // P0-24: Block CGN (Carrier-Grade NAT) range — covers Alibaba metadata 100.100.100.200
+    // Block CGN (Carrier-Grade NAT) range — covers Alibaba metadata 100.100.100.200
     if (parts[0] === 100 && parts[1] >= 64 && parts[1] <= 127) return true;
 
-    // P0-25: Block TEST-NET ranges
+    // Block TEST-NET ranges
     if (parts[0] === 192 && parts[1] === 0 && parts[2] === 2) return true;       // 192.0.2.0/24
     if (parts[0] === 198 && parts[1] === 51 && parts[2] === 100) return true;     // 198.51.100.0/24
     if (parts[0] === 203 && parts[1] === 0 && parts[2] === 113) return true;      // 203.0.113.0/24
@@ -53,7 +53,7 @@ export function isPrivateIP(ip: string): boolean {
   return false;
 }
 
-// P0-27: DNS lookup with timeout
+// DNS lookup with timeout
 const DNS_TIMEOUT_MS = 2000;
 
 async function safeLookup(hostname: string): Promise<dns.LookupAddress[]> {
@@ -73,7 +73,7 @@ async function safeLookup(hostname: string): Promise<dns.LookupAddress[]> {
   }
 }
 
-// P0-22: Proper hostname validation for Ollama (parse URL, check hostname)
+// Proper hostname validation for Ollama (parse URL, check hostname)
 function isLocalhostHostname(hostname: string): boolean {
   const lower = hostname.toLowerCase();
   return lower === "localhost" ||
@@ -96,7 +96,7 @@ export async function validateSafeUrl(urlInput: string, options?: { allowLocalho
 
 /**
  * Validates a URL and returns both the URL and resolved IP for DNS pinning.
- * P0-23: Caller should fetch by IP with Host header preserved to prevent DNS rebinding.
+ * Caller should fetch by IP with Host header preserved to prevent DNS rebinding.
  */
 export async function validateSafeUrlWithIP(urlInput: string, options?: { allowLocalhost?: boolean }): Promise<{ url: string; resolvedIP: string }> {
   let url: URL;
@@ -116,7 +116,7 @@ export async function validateSafeUrlWithIP(urlInput: string, options?: { allowL
     throw new Error("URL must not contain userinfo components");
   }
 
-  // P0-26: Port whitelist
+  // Port whitelist
   const port = url.port ? parseInt(url.port, 10) : (url.protocol === "https:" ? 443 : 80);
   if (!ALLOWED_PORTS.has(port)) {
     throw new Error(`Port ${port} is not allowed. Permitted: ${[...ALLOWED_PORTS].join(", ")}`);
@@ -128,7 +128,7 @@ export async function validateSafeUrlWithIP(urlInput: string, options?: { allowL
     // L-3: Strip IPv6 zone ID (e.g. fe80::1%eth0) before validation to prevent bypass
     .replace(/%[a-zA-Z0-9._~-]+$/, "");
 
-  // P0-22: Proper localhost check via parsed hostname
+  // Proper localhost check via parsed hostname
   if (!options?.allowLocalhost && isLocalhostHostname(hostname)) {
     throw new Error("Hostname is restricted");
   }
@@ -150,12 +150,12 @@ export async function validateSafeUrlWithIP(urlInput: string, options?: { allowL
 
     for (const res of result) {
       if (isPrivateIP(res.address)) {
-        // P0-28: Don't leak the resolved IP in error messages
+        // Don't leak the resolved IP in error messages
         throw new Error("URL resolves to a restricted network address");
       }
     }
 
-    // P0-23: Return first resolved IP for DNS rebinding protection
+    // Return first resolved IP for DNS rebinding protection
     return { url: url.toString(), resolvedIP: result[0].address };
   } catch (err) {
     if ((err as Error).message.includes("restricted")) {

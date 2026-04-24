@@ -46,8 +46,8 @@ import { anonymousRequests } from "../lib/prometheusMetrics.js";
 
 type AskBody = z.infer<typeof askSchema>;
 
-// P0-01: Anonymous rate limiting — 5 requests per minute per IP, direct mode only
-// P0-43: Anonymous requests are now tracked in Prometheus metrics
+// Anonymous rate limiting — 5 requests per minute per IP, direct mode only
+// Anonymous requests are now tracked in Prometheus metrics
 const ANON_RATE_LIMIT = 5;
 const ANON_RATE_WINDOW_SECS = 60;
 
@@ -81,7 +81,7 @@ async function fastifyAnonGuard(request: FastifyRequest, reply: FastifyReply) {
     return;
   }
 
-  // P0-43: Track successful anonymous request
+  // Track successful anonymous request
   anonymousRequests.inc({ mode, status: "allowed" });
 }
 
@@ -92,9 +92,9 @@ function handleCouncilError(err: unknown): never {
   throw err;
 }
 
-// P0-44: Removed inline fastifyCheckQuota — now imported from middleware/quota.ts
+// Removed inline fastifyCheckQuota — now imported from middleware/quota.ts
 
-// P3-19: Fastify preHandler expects async functions — make validateAskBody async.
+// Fastify preHandler expects async functions — make validateAskBody async.
 async function validateAskBody(request: FastifyRequest, reply: FastifyReply) {
   const result = askSchema.safeParse(request.body);
   if (!result.success) {
@@ -122,10 +122,10 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     const startTime = Date.now();
 
     const { question, conversationId, summon, maxTokens, rounds = 1, context, mode, userConfig } = request.body as AskBody;
-    // P37-10: Cap rounds to safe range to prevent excessive deliberation cycles
+    // Cap rounds to safe range to prevent excessive deliberation cycles
     const safeRounds = Math.min(Math.max(1, Number.isFinite(rounds) ? rounds : 1), 10);
     let upload_ids: string[] | undefined = (request.body as AskBody).upload_ids;
-    // P37-04: Cap upload_ids to prevent unbounded file loading
+    // Cap upload_ids to prevent unbounded file loading
     if (upload_ids && upload_ids.length > 50) upload_ids.length = 50;
     const kb_id: string | undefined = (request.body as AskBody).kb_id;
     const deliberation_mode: ReasoningMode = (request.body as AskBody).deliberation_mode ?? "standard";
@@ -150,7 +150,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       }, "Auto-router: strict mode - ignoring user members/summon");
     } else if (mode === "direct") {
       logger.info({ question: question.slice(0, 50) }, "Baseline Mode: Skipping council deliberation");
-      // P3-18: Use undefined instead of [] — empty array is truthy and
+      // Use undefined instead of [] — empty array is truthy and
       // would bypass the `effectiveMembers || getDefaultMembers()` fallback.
       effectiveMembers = undefined;
       effectiveRounds = 0; // Skip rounds
@@ -182,12 +182,12 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     let messages: Message[] = [];
 
     if (effectiveConversationId) {
-      // P8-64: Verify requesting user owns the conversation — prevents IDOR
+      // Verify requesting user owns the conversation — prevents IDOR
       const convo = await findConversationById(effectiveConversationId, userId ?? undefined);
       if (!convo) {
         throw new AppError(404, "Conversation not found or does not belong to you");
       }
-      // P8-64: Double-check userId match for authenticated users
+      // Double-check userId match for authenticated users
       if (userId && convo.userId && convo.userId !== userId) {
         throw new AppError(403, "Access denied: conversation belongs to another user");
       }
@@ -202,7 +202,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       memoryContext = formatContextForInjection(relevantChats);
     }
 
-    // P3-20: Reject anonymous users for file loading instead of falling back to user 0.
+    // Reject anonymous users for file loading instead of falling back to user 0.
     // userId 0 could access another user's data. Skip file loading for unauthenticated users.
     const fileContext = userId ? await loadFileContext(upload_ids || [], userId) : { text_documents: [], image_blocks: [] } as FileContext;
     let ragContext = "";
@@ -253,8 +253,8 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       ? startTrace(userId, "chat", { conversationId: effectiveConversationId || undefined })
       : null;
 
-    // P3-21: Pass userId to scope cache per tenant
-    // P8-66: Quota is already decremented by fastifyCheckQuota preHandler —
+    // Pass userId to scope cache per tenant
+    // Quota is already decremented by fastifyCheckQuota preHandler —
     // cache hits DO count against quota (request was counted before reaching this code).
     const cached = await getCachedResponse(question, councilMembers, master, messages, userId);
 
@@ -287,7 +287,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       } else if (deliberation_mode === "red_blue") {
         const result = await runRedBlueDebate(question, councilMembers);
         verdict = result.judgeVerdict;
-        // P8-65: Track tokens for all deliberation paths
+        // Track tokens for all deliberation paths
         tokensUsed = (result as { totalTokens?: number }).totalTokens ?? 0;
         finalOpinions = [
           { name: "Red Team (FOR)", opinion: result.redArguments },
@@ -297,7 +297,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       } else if (deliberation_mode === "hypothesis") {
         const result = await runHypothesisRefinement(question, councilMembers);
         verdict = result.finalSynthesis;
-        // P8-65: Track tokens for all deliberation paths
+        // Track tokens for all deliberation paths
         tokensUsed = (result as { totalTokens?: number }).totalTokens ?? 0;
         finalOpinions = result.rounds.flatMap((r) =>
           r.hypotheses.map((h) => ({ name: `${h.agent} [${r.phase} R${r.round}]`, opinion: h.text }))
@@ -305,7 +305,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       } else if (deliberation_mode === "confidence") {
         const result = await runConfidenceCalibration(question, councilMembers);
         verdict = result.weightedSynthesis;
-        // P8-65: Track tokens for all deliberation paths
+        // Track tokens for all deliberation paths
         tokensUsed = (result as { totalTokens?: number }).totalTokens ?? 0;
         finalOpinions = result.opinions.map((o) => ({
           name: o.agent,
@@ -395,7 +395,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     try {
       const { question, conversationId, summon, maxTokens, rounds = 1, context, mode } = request.body as AskBody;
       const upload_ids: string[] | undefined = (request.body as AskBody).upload_ids;
-      // P37-04: Cap upload_ids in stream handler too
+      // Cap upload_ids in stream handler too
       if (upload_ids && upload_ids.length > 50) upload_ids.length = 50;
       const kb_id: string | undefined = (request.body as AskBody).kb_id;
       const deliberation_mode: ReasoningMode = (request.body as AskBody).deliberation_mode ?? "standard";
@@ -403,7 +403,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       let effectiveSummon: string = summon || "default";
       let effectiveMembers = (request.body as AskBody).members;
       let routerDecision: ReturnType<typeof classifyQuery> | null = null;
-      // P37-10: Cap rounds in stream handler too
+      // Cap rounds in stream handler too
       let effectiveRounds = Math.min(Math.max(1, Number.isFinite(rounds) ? rounds : 1), 10);
 
       if (mode === "auto") {
@@ -421,7 +421,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         }, "Stream auto-router: strict mode - ignoring user members/summon");
       } else if (mode === "direct") {
         logger.info({ question: question.slice(0, 50) }, "Stream Baseline Mode: Skipping council deliberation");
-        // P3-18: Use undefined instead of [] — empty array is truthy
+        // Use undefined instead of [] — empty array is truthy
         effectiveMembers = undefined;
         effectiveRounds = 0; // Skip rounds
       }
@@ -447,7 +447,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
           reply.raw.end();
           return;
         }
-        // P8-64: Double-check userId match for authenticated users
+        // Double-check userId match for authenticated users
         if (userId && convo.userId && convo.userId !== userId) {
           reply.raw.write(`data: ${JSON.stringify({ type: "error", message: "Access denied: conversation belongs to another user" })}\n\n`);
           reply.raw.end();
@@ -472,7 +472,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         memoryContext = formatContextForInjection(relevantChats);
       }
 
-      // P3-20: Use userId check instead of 0 to prevent anonymous access to user 0's files
+      // Use userId check instead of 0 to prevent anonymous access to user 0's files
       const fileContext = userId ? await loadFileContext(upload_ids || [], userId) : { text_documents: [], image_blocks: [] } as FileContext;
       let ragContext = "";
       if (kb_id && userId) {
@@ -507,7 +507,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         finalVerdict = cached.verdict;
         finalOpinions = cached.opinions;
 
-        // P8-63: Detect and save artifacts from cached verdict (was previously discarded)
+        // Detect and save artifacts from cached verdict (was previously discarded)
         let cachedArtifactId: string | undefined;
         if (cached.verdict && userId) {
           const detected = detectArtifact(cached.verdict);
@@ -635,7 +635,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       }
 
     } catch (e: unknown) {
-      // P8-62: Send properly formatted SSE error event then close — prevents client from hanging
+      // Send properly formatted SSE error event then close — prevents client from hanging
       const message = e instanceof Error ? e.message : "Internal error";
       logger.error({ err: e }, "SSE stream error");
       if (!reply.raw.writableEnded) {

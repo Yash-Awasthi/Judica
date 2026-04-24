@@ -1,5 +1,5 @@
-// P0-44: Single source of truth for quota checking.
-// P0-41: Atomic INSERT ... ON CONFLICT DO UPDATE RETURNING — no TOCTOU race.
+// Single source of truth for quota checking.
+// Atomic INSERT ... ON CONFLICT DO UPDATE RETURNING — no TOCTOU race.
 import type { FastifyRequest, FastifyReply } from "fastify";
 import { db } from "../lib/drizzle.js";
 import { dailyUsage } from "../db/schema/users.js";
@@ -39,7 +39,7 @@ export async function fastifyCheckQuota(request: FastifyRequest, reply: FastifyR
 
   // Reject if post-increment value exceeds limits
   if (usage.requests > MAX_DAILY_REQUESTS || usage.tokens > MAX_DAILY_TOKENS) {
-    // P58-07: KNOWN RACE — Under high concurrency, another request may increment between
+    // KNOWN RACE — Under high concurrency, another request may increment between
     // our check (line 41) and this rollback. The decrement could "steal" their quota slot.
     // Fix: Use a CTE with conditional increment: INSERT ... ON CONFLICT DO UPDATE SET
     //   requests = CASE WHEN requests < MAX THEN requests + 1 ELSE requests END
@@ -59,7 +59,7 @@ export async function fastifyCheckQuota(request: FastifyRequest, reply: FastifyR
       requests: usage.requests,
       tokens: usage.tokens,
     }, "User exceeded daily quota limit");
-    // P8-48: Use post-rollback values in 429 headers — request was decremented
+    // Use post-rollback values in 429 headers — request was decremented
     const rolledBackRequests = Math.max(0, usage.requests - 1);
     reply
       .header("X-Quota-Limit", MAX_DAILY_REQUESTS.toString())

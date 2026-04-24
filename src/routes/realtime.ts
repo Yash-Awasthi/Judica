@@ -57,14 +57,14 @@ const realtimePlugin: FastifyPluginAsync = async (fastify) => {
             ws.send(JSON.stringify({ event: 'cost-update', data: costData }));
           }
         } else if (msg.type === 'set-limits' && ws.userId) {
-          // P5-04: Validate limit values to prevent abuse
+          // Validate limit values to prevent abuse
           const dailyLimit = typeof msg.dailyLimit === 'number' && msg.dailyLimit > 0 && msg.dailyLimit <= 10_000 ? msg.dailyLimit : undefined;
           const monthlyLimit = typeof msg.monthlyLimit === 'number' && msg.monthlyLimit > 0 && msg.monthlyLimit <= 100_000 ? msg.monthlyLimit : undefined;
           if (dailyLimit !== undefined || monthlyLimit !== undefined) {
             realTimeCostTracker.setLimits(ws.userId, dailyLimit, monthlyLimit);
           }
         } else if (msg.type === 'get-statistics' && ws.userId) {
-          // P5-05: Validate hours param
+          // Validate hours param
           const hours = typeof msg.hours === 'number' && msg.hours > 0 && msg.hours <= 8760 ? msg.hours : 24;
           const stats = realTimeCostTracker.getStatistics(ws.userId, hours);
           ws.send(JSON.stringify({ event: 'statistics-update', data: stats }));
@@ -143,7 +143,7 @@ const realtimePlugin: FastifyPluginAsync = async (fastify) => {
     try {
       const { hours = "24" } = request.query as { hours?: string };
 
-      // P5-05: Validate and clamp hours parameter
+      // Validate and clamp hours parameter
       const parsedHours = Math.min(Math.max(parseInt(hours as string, 10) || 24, 1), 8760);
       const stats = realTimeCostTracker.getStatistics(request.userId!, parsedHours);
 

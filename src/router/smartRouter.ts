@@ -1,4 +1,4 @@
-// P2-17: This directory is src/router/ (provider routing logic).
+// This directory is src/router/ (provider routing logic).
 // Not to be confused with src/routes/ (HTTP route handlers).
 // src/router/ handles AI provider selection; src/routes/ handles HTTP endpoints.
 import type { AdapterRequest, AdapterChunk, AdapterStreamResult } from "../adapters/types.js";
@@ -21,7 +21,7 @@ export interface RouteOptions {
   /** Use paid providers instead of free tier chain */
   usePaid?: boolean;
   /**
-   * P4-23: Priority tags to influence provider selection.
+   * Priority tags to influence provider selection.
    * - "fast": prefer low-latency providers (Groq, Cerebras)
    * - "quality": prefer high-quality models (GPT-4o, Claude)
    * - "tool-capable": only use providers that support tool calling
@@ -29,11 +29,11 @@ export interface RouteOptions {
    * Tags are hints — the router still respects quota and RPM limits.
    */
   /**
-   * P4-25: AbortSignal for cancellation propagation.
+   * AbortSignal for cancellation propagation.
    * When the client disconnects, the signal aborts to stop wasting provider calls.
    */
   signal?: AbortSignal;
-  /** P4-23: Priority tags */
+  /** Priority tags */
   tags?: string[];
   /** User ID for quota attribution */
   userId?: number;
@@ -56,7 +56,7 @@ export async function route(
   const triedProviders = new Set<string>();
   let lastError: Error | null = null;
 
-  // P4-25: Check abort signal before each attempt
+  // Check abort signal before each attempt
   function checkAborted() {
     if (options.signal?.aborted) {
       throw new AppError(499, "Request aborted by client", "REQUEST_ABORTED");
@@ -76,7 +76,7 @@ export async function route(
       const routedReq = req.model ? req : { ...req, model: "auto" };
       const result = await adapter.generate(routedReq);
 
-      // P2-13: Record request AFTER successful generation, not before
+      // Record request AFTER successful generation, not before
       recordRequest(preferred);
 
       // Wrap to record usage after stream completes
@@ -93,7 +93,7 @@ export async function route(
   // Step 2: Try chain-based selection
   const chain = options.usePaid ? [...PAID_CHAIN] : [...FREE_TIER_CHAIN];
 
-  // P4-23: Reorder chain based on priority tags
+  // Reorder chain based on priority tags
   if (options.tags?.length) {
     const FAST_PROVIDERS = new Set(["groq", "cerebras", "fireworks"]);
     const QUALITY_PROVIDERS = new Set(["openai", "anthropic"]);
@@ -139,7 +139,7 @@ export async function route(
 
       const result = await adapter.generate(routedReq);
 
-      // P2-13: Record request AFTER successful generation
+      // Record request AFTER successful generation
       recordRequest(selected.provider);
 
       logger.info({
@@ -204,7 +204,7 @@ function wrapWithUsageTracking(
 
 /**
  * Quick route for simple text completion — non-streaming, returns collected text.
- * P2-12: Track the actual provider used instead of returning "auto".
+ * Track the actual provider used instead of returning "auto".
  */
 export async function routeAndCollect(
   req: AdapterRequest,

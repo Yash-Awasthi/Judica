@@ -9,15 +9,15 @@ import { routeAndCollect } from "../router/index.js";
 import logger from "./logger.js";
 import type { Provider } from "./providers.js";
 
-// P10-75: Configurable max reasoning output length
-// P20-01: NaN guard — fall back to default if env var is non-numeric
+// Configurable max reasoning output length
+// NaN guard — fall back to default if env var is non-numeric
 const _parsedMaxReasoning = parseInt(process.env.MAX_REASONING_OUTPUT_CHARS || "10000", 10);
 const MAX_REASONING_LENGTH = Number.isFinite(_parsedMaxReasoning) && _parsedMaxReasoning > 0 ? _parsedMaxReasoning : 10000;
 
-// P10-78: Track reasoning mode costs for billing
+// Track reasoning mode costs for billing
 let _lastReasoningUsage = { promptTokens: 0, completionTokens: 0 };
 
-/** P10-78: Get accumulated usage from last reasoning mode run for billing */
+/** Get accumulated usage from last reasoning mode run for billing */
 export function getLastReasoningUsage() {
   return { ..._lastReasoningUsage };
 }
@@ -31,7 +31,7 @@ function resetUsageTracking() {
   _lastReasoningUsage = { promptTokens: 0, completionTokens: 0 };
 }
 
-// P10-75: Truncate with warning indicator
+// Truncate with warning indicator
 function safeTruncate(text: string, label: string): string {
   if (text.length <= MAX_REASONING_LENGTH) return text;
   logger.warn({ label, originalLength: text.length, maxLength: MAX_REASONING_LENGTH }, "Reasoning output truncated");
@@ -63,19 +63,19 @@ export interface ModeEvent {
 export async function runSocraticPrelude(
   question: string,
   members: Provider[],
-  abortSignal?: AbortSignal // P10-76: Accept abort signal
+  abortSignal?: AbortSignal // Accept abort signal
 ): Promise<{ augmentedContext: string; qa: { q: string; a: string }[] }> {
-  resetUsageTracking(); // P10-78: Reset usage tracking for this run
+  resetUsageTracking(); // Reset usage tracking for this run
   logger.info({ memberCount: members.length }, "Socratic prelude: collecting clarifying questions");
 
   // Each agent generates up to 2 clarifying questions
   const questionPromises = members.slice(0, 6).map(async (m) => {
     try {
-      // P10-76: Check abort before each call
+      // Check abort before each call
       if (abortSignal?.aborted) return [];
 
       const res = await routeAndCollect({
-        model: m.model || "auto", // P10-72: Respect provider model config
+        model: m.model || "auto", // Respect provider model config
         messages: [
           {
             role: "system",
@@ -85,7 +85,7 @@ export async function runSocraticPrelude(
         ],
         temperature: 0.3,
       });
-      // P10-73: Use JSON.parse with proper error handling instead of fragile string splitting
+      // Use JSON.parse with proper error handling instead of fragile string splitting
       const match = res.text.match(/\[[\s\S]*?\]/);
       if (!match) return [];
       try {
@@ -100,7 +100,7 @@ export async function runSocraticPrelude(
     }
   });
 
-  // P39-09: Cap questions before deduplication to prevent unbounded intermediate array
+  // Cap questions before deduplication to prevent unbounded intermediate array
   const allQuestions = (await Promise.all(questionPromises)).flat().slice(0, 50);
   // Deduplicate similar questions
   const uniqueQ = [...new Set(allQuestions)].slice(0, 8);
@@ -152,9 +152,9 @@ export interface RedBlueResult {
 export async function runRedBlueDebate(
   question: string,
   members: Provider[],
-  abortSignal?: AbortSignal // P10-76: Accept abort signal
+  abortSignal?: AbortSignal // Accept abort signal
 ): Promise<RedBlueResult> {
-  // P10-74: Reject debate mode for single-archetype councils
+  // Reject debate mode for single-archetype councils
   if (members.length < 2) {
     logger.warn("Red/Blue debate requires at least 2 members — falling back to single-agent response");
     const res = await routeAndCollect({
@@ -174,14 +174,14 @@ export async function runRedBlueDebate(
 
   logger.info({ red: redTeam.length, blue: blueTeam.length }, "Red/Blue debate starting");
 
-  // P10-76: Check abort signal
+  // Check abort signal
   if (abortSignal?.aborted) {
     return { redArguments: "", blueArguments: "", judgeVerdict: "Debate cancelled." };
   }
 
   const [redRes, blueRes] = await Promise.all([
     routeAndCollect({
-      model: redTeam[0]?.model || "auto", // P10-72: Use provider model
+      model: redTeam[0]?.model || "auto", // Use provider model
       messages: [
         {
           role: "system",
@@ -195,7 +195,7 @@ export async function runRedBlueDebate(
       temperature: 0.6,
     }),
     routeAndCollect({
-      model: blueTeam[0]?.model || "auto", // P10-72: Use provider model
+      model: blueTeam[0]?.model || "auto", // Use provider model
       messages: [
         {
           role: "system",
@@ -396,7 +396,7 @@ export async function runConfidenceCalibration(
           ],
           temperature: 0.5,
         });
-        // P39-03: Use non-greedy match to avoid spanning multiple JSON objects
+        // Use non-greedy match to avoid spanning multiple JSON objects
         const match = res.text.match(/\{[\s\S]*?\}/);
         if (!match) throw new Error("no JSON");
         const parsed = JSON.parse(match[0]) as {
@@ -404,7 +404,7 @@ export async function runConfidenceCalibration(
           confidence: number;
           reasoning: string;
         };
-        // P39-02: NaN-safe confidence normalization
+        // NaN-safe confidence normalization
         const confValue = Number(parsed.confidence);
         const safeConfidence = Number.isFinite(confValue) ? confValue : 50;
         return {

@@ -144,7 +144,7 @@ export interface FederatedSearchOptions {
   limit?: number;
   /** Which indexes to search. Defaults to all. */
   indexes?: ("kb" | "repo" | "conversation" | "fact")[];
-  /** P4-18: Per-source timeout in ms. Defaults to 10s. Prevents one slow backend from stalling the whole call. */
+  /** Per-source timeout in ms. Defaults to 10s. Prevents one slow backend from stalling the whole call. */
   perSourceTimeoutMs?: number;
 }
 
@@ -158,7 +158,7 @@ export async function federatedSearch(opts: FederatedSearchOptions): Promise<Fed
     query,
     kbId,
     conversationId,
-    // P23-07: Cap limit to prevent excessive DB reads and memory usage
+    // Cap limit to prevent excessive DB reads and memory usage
     limit: rawLimit = 10,
     indexes = ["kb", "repo", "conversation", "fact"],
     perSourceTimeoutMs = 10_000,
@@ -168,7 +168,7 @@ export async function federatedSearch(opts: FederatedSearchOptions): Promise<Fed
 
   const k = 60; // RRF constant
 
-  // P4-18: Helper to race a search against a per-source timeout.
+  // Helper to race a search against a per-source timeout.
   // Returns empty results on timeout instead of failing the whole federated search.
   function withTimeout<T>(
     source: string,
@@ -254,7 +254,7 @@ export async function federatedSearch(opts: FederatedSearchOptions): Promise<Fed
   const allSearchResults = await Promise.all(searches);
 
   // Merge with Reciprocal Rank Fusion
-  // P35-10: Cap scoreMap to prevent unbounded memory growth
+  // Cap scoreMap to prevent unbounded memory growth
   const MAX_SCORE_MAP = 10_000;
   const scoreMap = new Map<string, { result: FederatedResult; rrfScore: number }>();
 

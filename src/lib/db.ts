@@ -1,4 +1,4 @@
-// P2-21: This is the CANONICAL database pool (pg.Pool).
+// This is the CANONICAL database pool (pg.Pool).
 // lib/drizzle.ts wraps this pool with Drizzle ORM.
 // Use lib/drizzle.ts for all ORM queries; use this file for raw SQL via pool.query().
 import { env } from "../config/env.js";
@@ -12,13 +12,13 @@ try {
   throw new Error(`Invalid DATABASE_URL: cannot parse as URL. Check your .env configuration.`);
 }
 const connectionLimitStr = dbUrl.searchParams.get("connection_limit");
-// P9-44: Guard against NaN — parseInt("abc") returns NaN, which silently uses driver default
+// Guard against NaN — parseInt("abc") returns NaN, which silently uses driver default
 const parsedLimit = connectionLimitStr ? parseInt(connectionLimitStr, 10) : NaN;
 const maxConnections = Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : 20;
 
-// P9-41: Enforce SSL/TLS for non-localhost connections
+// Enforce SSL/TLS for non-localhost connections
 const isLocalhost = dbUrl.hostname === "localhost" || dbUrl.hostname === "127.0.0.1";
-// P57-01: Default to validating SSL certs for non-localhost. Set DB_SSL_REJECT_UNAUTHORIZED=false only for self-signed certs.
+// Default to validating SSL certs for non-localhost. Set DB_SSL_REJECT_UNAUTHORIZED=false only for self-signed certs.
 const sslConfig = isLocalhost
   ? undefined
   : { rejectUnauthorized: process.env.DB_SSL_REJECT_UNAUTHORIZED !== "false" };
@@ -29,7 +29,7 @@ export const pool = new pg.Pool({
   idleTimeoutMillis: 30_000,
   connectionTimeoutMillis: 5_000,
   statement_timeout: 30_000,
-  // P9-42: Set application_name for pg_stat_activity visibility
+  // Set application_name for pg_stat_activity visibility
   application_name: "aibyai-api",
   ssl: sslConfig,
 });
@@ -38,7 +38,7 @@ pool.on("error", (err) => {
   logger.error({ err, total: pool.totalCount, idle: pool.idleCount }, "Database pool error");
 });
 
-// P9-43: Downgrade acquire logging to trace level — was creating log noise at INFO level
+// Downgrade acquire logging to trace level — was creating log noise at INFO level
 pool.on("acquire", () => {
   logger.trace({ total: pool.totalCount, idle: pool.idleCount }, "DB connection acquired");
 });

@@ -1,5 +1,5 @@
 /**
- * P4-20: Vector DB adapter abstraction.
+ * Vector DB adapter abstraction.
  *
  * Provides a pluggable interface for vector databases (pgvector, Pinecone,
  * Weaviate, Qdrant, Milvus, etc.). The current implementation uses pgvector

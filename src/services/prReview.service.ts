@@ -105,7 +105,7 @@ Return ONLY the JSON array.`,
 
     const match = result.text.match(/\[[\s\S]*\]/);
     if (match) {
-      // P35-07: Safe JSON.parse with try-catch + array cap on LLM output
+      // Safe JSON.parse with try-catch + array cap on LLM output
       try {
         const findings = JSON.parse(match[0]) as ReviewFinding[];
         return Array.isArray(findings) ? findings.slice(0, 100) : [];

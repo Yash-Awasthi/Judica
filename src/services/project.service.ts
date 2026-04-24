@@ -29,7 +29,7 @@ export interface CreateProjectInput {
 }
 
 export async function createProject(input: CreateProjectInput): Promise<Project> {
-  // P30-03: Validate string field lengths to prevent storage exhaustion
+  // Validate string field lengths to prevent storage exhaustion
   if (input.name && input.name.length > 200) throw new Error("Project name too long (max 200 chars)");
   if (input.description && input.description.length > 5000) throw new Error("Description too long (max 5000 chars)");
   if (input.color && input.color.length > 30) throw new Error("Color value too long (max 30 chars)");
@@ -107,7 +107,7 @@ export async function updateProject(id: string, userId: number, input: Partial<C
     const [project] = await db
       .update(projects)
       .set({
-        // P44-07: Explicitly whitelist updateable fields instead of spreading untrusted input
+        // Explicitly whitelist updateable fields instead of spreading untrusted input
         name: input.name,
         description: input.description,
         color: input.color,

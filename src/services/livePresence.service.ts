@@ -31,7 +31,7 @@ export interface PresenceState {
 
 // ─── In-memory store ────────────────────────────────────────────────────────
 
-// P23-08: Cap presence map to prevent unbounded memory growth from many sessions
+// Cap presence map to prevent unbounded memory growth from many sessions
 const MAX_PRESENCE_ENTRIES = 10_000;
 // Key: `${sessionId}:${userId}`
 const presenceMap = new Map<string, PresenceState>();
@@ -50,7 +50,7 @@ export function updatePresence(
 ): PresenceState {
   const k = key(sessionId, userId);
   const existing = presenceMap.get(k);
-  // P35-06: Enforce presence map cap
+  // Enforce presence map cap
   if (!existing && presenceMap.size >= MAX_PRESENCE_ENTRIES) {
     throw new Error("Presence map full — too many active sessions");
   }
@@ -63,7 +63,7 @@ export function updatePresence(
     metadata: state.metadata ?? existing?.metadata ?? { color: "#000000", name: userId },
   };
   presenceMap.set(k, updated);
-  // P23-08: Evict oldest entries when map exceeds cap
+  // Evict oldest entries when map exceeds cap
   if (presenceMap.size > MAX_PRESENCE_ENTRIES) {
     const oldest = presenceMap.keys().next().value;
     if (oldest !== undefined) presenceMap.delete(oldest);

@@ -8,8 +8,8 @@ import { groundingModule } from "./grounding.js";
 import { computeConsensus } from "./metrics.js";
 import { getFallbackProvider } from "../config/fallbacks.js";
 
-// P10-43: Configurable phase timeouts (ms) via environment variables
-// P21-01: NaN guards — fall back to defaults if env vars are non-numeric
+// Configurable phase timeouts (ms) via environment variables
+// NaN guards — fall back to defaults if env vars are non-numeric
 const _parsedOpinionTimeout = parseInt(process.env.OPINION_TIMEOUT_MS || "60000", 10);
 const OPINION_TIMEOUT_MS = Number.isFinite(_parsedOpinionTimeout) && _parsedOpinionTimeout > 0 ? _parsedOpinionTimeout : 60000;
 const _parsedDebateTimeout = parseInt(process.env.DEBATE_TIMEOUT_MS || "60000", 10);
@@ -48,14 +48,14 @@ export async function gatherOpinions(
   const { members, currentMessages, abortSignal, maxTokens, onMemberChunk } = options;
 
   let totalTokens = 0;
-  let totalCost = 0; // P10-26: Track cost from provider responses
+  let totalCost = 0; // Track cost from provider responses
   
   const errors: string[] = [];
   const opinionsRaw = await Promise.all(members.map(async (m): Promise<OpinionResult | null> => {
     const start = Date.now();
     logger.debug({ member: m.name, start }, "Agent call started");
     
-    const agentTimeout = AbortSignal.timeout(OPINION_TIMEOUT_MS); // P10-43: Configurable timeout
+    const agentTimeout = AbortSignal.timeout(OPINION_TIMEOUT_MS); // Configurable timeout
     const combinedSignal = abortSignal
       ? AbortSignal.any([abortSignal, agentTimeout])
       : agentTimeout;
@@ -75,7 +75,7 @@ export async function gatherOpinions(
       logger.debug({ member: m.name, duration }, "Agent call finished");
 
       if (response.usage) totalTokens += response.usage.totalTokens;
-      if (response.cost) totalCost += response.cost; // P10-26: Accumulate provider cost
+      if (response.cost) totalCost += response.cost; // Accumulate provider cost
 
       const parsed = parseAgentOutput(response.text);
       if (parsed) {
@@ -91,7 +91,7 @@ export async function gatherOpinions(
       const rp = parseAgentOutput(retryRes.text);
       if (rp) return { name: m.name, opinion: retryRes.text, structured: rp };
 
-      // P10-35: Don't inject fake structured response on parse failure — mark as null
+      // Don't inject fake structured response on parse failure — mark as null
       // so downstream scoring treats it as unstructured rather than a real response
       logger.warn({ member: m.name }, "Agent returned unparseable JSON after retry — using raw text with null structured");
       return {
@@ -152,9 +152,9 @@ export async function conductPeerReview(
   const { members, opinions, currentMessages, validatorProvider, skipAdversarial, skipGrounding, abortSignal, maxTokens } = options;
 
   let totalTokens = 0;
-  let totalCost = 0; // P10-26: Track real cost
+  let totalCost = 0; // Track real cost
 
-  // P10-39: Support more than 26 agents — use A, B, ..., Z, AA, AB, ... labels
+  // Support more than 26 agents — use A, B, ..., Z, AA, AB, ... labels
   const getLabel = (index: number): string => {
     let label = '';
     let i = index;
@@ -227,9 +227,9 @@ Do not include any text outside the JSON object.`;
       logger.debug({ reviewer: m.name, duration }, "Peer review finished");
       
       if (res.usage) totalTokens += res.usage.totalTokens;
-      if (res.cost) totalCost += res.cost; // P10-26: Accumulate peer review cost
+      if (res.cost) totalCost += res.cost; // Accumulate peer review cost
 
-      // P10-36: Actually validate through schema (was called but result discarded)
+      // Actually validate through schema (was called but result discarded)
       let reviewData: { ranking: string[]; critique: string; identified_flaws: PeerReviewFlaw[] } | null = null;
       try {
         const jsonMatch = res.text.match(/\{[\s\S]*\}/);
@@ -253,7 +253,7 @@ Do not include any text outside the JSON object.`;
           identified_flaws: reviewData.identified_flaws
         };
       }
-      // P10-38: When peer review fails to parse, return null instead of garbage data
+      // When peer review fails to parse, return null instead of garbage data
       // that would inflate quality scores with empty arrays and zero-penalty reviews
       logger.warn({ reviewer: m.name }, "Peer review returned unparseable JSON — excluding from scoring");
       return null;
@@ -303,7 +303,7 @@ Do not include any text outside the JSON object.`;
     anonymizedLabels
   );
 
-  return { reviews, scored, totalTokens, cost: totalCost }; // P10-26: Return real cost
+  return { reviews, scored, totalTokens, cost: totalCost }; // Return real cost
 }
 
 interface EvaluateConsensusOptions {
@@ -324,12 +324,12 @@ export async function evaluateConsensus(
   shouldHalt: boolean;
   haltReason?: string;
   totalTokens: number;
-  cost: number; // P10-26: Real cost
+  cost: number; // Real cost
 }> {
   const { master, opinions, currentMessages, round, abortSignal } = options;
 
   let totalTokens = 0;
-  let totalCost = 0; // P10-26: Track cost
+  let totalCost = 0; // Track cost
 
   const criticPrompt = `As a qualitative critic, evaluate the Round ${round} opinions for:
 1. Logical contradictions and inconsistencies
@@ -383,7 +383,7 @@ interface SynthesizeVerdictOptions {
   abortSignal?: AbortSignal;
   maxTokens?: number;
   onVerdictChunk?: (chunk: string) => void;
-  validatorProvider?: Provider; // P10-40: Use separate provider for validation
+  validatorProvider?: Provider; // Use separate provider for validation
 }
 
 export async function synthesizeVerdict(
@@ -396,7 +396,7 @@ export async function synthesizeVerdict(
 }> {
   const { master, currentMessages, abortSignal, maxTokens, onVerdictChunk, validatorProvider } = options;
 
-  // P10-40: Use separate validator provider if provided, otherwise fall back to master
+  // Use separate validator provider if provided, otherwise fall back to master
   const coldValidator = validatorProvider || master;
 
   let verdict = "";
@@ -457,7 +457,7 @@ Return STRICT JSON:
   "summary": string
 }`;
 
-    // P10-40/P10-41: Use independent validator provider with fresh context
+    // Use independent validator provider with fresh context
     const validatorRes = await askProvider(
       { ...coldValidator, name: "Cold Validator", ...(maxTokens ? { maxTokens } : {}) },
       [{ role: "user", content: validatorPrompt }],
@@ -490,7 +490,7 @@ Return STRICT JSON:
       }
     } catch (e) { logger.error({ err: (e as Error).message }, "Failed to parse cold validation result"); }
   } catch (err) {
-    // P10-45: Validator exception = validation failure (fail closed, not open)
+    // Validator exception = validation failure (fail closed, not open)
     logger.warn({ err: (err as Error).message }, "Cold validator threw — treating as validation failure");
     validatorResult = {
       valid: false,
@@ -568,7 +568,7 @@ ${othersSummary}
 ${DEBATE_INSTRUCTION}`;
 
     try {
-      const agentTimeout = AbortSignal.timeout(DEBATE_TIMEOUT_MS); // P10-43: Configurable timeout
+      const agentTimeout = AbortSignal.timeout(DEBATE_TIMEOUT_MS); // Configurable timeout
       const combinedSignal = abortSignal
         ? AbortSignal.any([abortSignal, agentTimeout])
         : agentTimeout;

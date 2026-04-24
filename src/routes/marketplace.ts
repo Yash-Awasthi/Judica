@@ -28,7 +28,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
       limit = "20",
     } = request.query as Record<string, string>;
 
-    // P31-06: NaN-safe parseInt with explicit radix
+    // NaN-safe parseInt with explicit radix
     const _pageRaw = parseInt(page, 10);
     const _limitRaw = parseInt(limit, 10);
     const pageNum = Number.isFinite(_pageRaw) && _pageRaw > 0 ? _pageRaw : 1;
@@ -42,7 +42,7 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     if (tags) {
-      // P37-01: Cap tags to prevent unbounded array in SQL query
+      // Cap tags to prevent unbounded array in SQL query
       const tagList = tags.split(",").map((t) => t.trim()).slice(0, 20);
       conditions.push(
         sql`${marketplaceItems.tags} && ARRAY[${sql.join(tagList.map(t => sql`${t}`), sql`,`)}]::text[]`

@@ -99,7 +99,7 @@ class MLWorker {
     }
 
     return new Promise((resolve, reject) => {
-      // P29-05: Cap callback queue to prevent unbounded growth
+      // Cap callback queue to prevent unbounded growth
       if (this.callbacks.length >= 100) {
         reject(new Error("ML worker callback queue full"));
         return;
@@ -115,7 +115,7 @@ class MLWorker {
         if (data.error) {
           reject(new Error(data.error));
         } else {
-          // P29-06: NaN guard on ML similarity score
+          // NaN guard on ML similarity score
           const score = Number.isFinite(data.score) ? data.score! : 0;
           resolve(Math.min(1, Math.max(0, score)));
         }

@@ -78,7 +78,7 @@ export const DOMAIN_PROFILES: Record<string, DomainProfile> = {
   },
 };
 
-// P59-02: Freeze domain profiles to prevent runtime mutation
+// Freeze domain profiles to prevent runtime mutation
 Object.freeze(DOMAIN_PROFILES);
 for (const p of Object.values(DOMAIN_PROFILES)) Object.freeze(p);
 
@@ -142,7 +142,7 @@ export async function getPersonaPerformance(
       const total = row.totalResponses || 1;
       const agreed = row.agreedWith || 0;
       const contradicted = row.contradicted || 0;
-      // P59-09: Use natural rate with explicit zero-case, avoiding Laplace smoothing bias
+      // Use natural rate with explicit zero-case, avoiding Laplace smoothing bias
       const agreementRate = (agreed + contradicted) > 0 ? agreed / (agreed + contradicted) : 0.5;
 
       // Determine trend based on avg confidence vs agreement rate
@@ -237,7 +237,7 @@ export interface DelegationSuggestion {
   reason: string;
 }
 
-// P59-03: Module-level constant — avoids recreating 10 regex patterns per call
+// Module-level constant — avoids recreating 10 regex patterns per call
 const DELEGATION_RULES: { pattern: RegExp; archetype: string; reason: string }[] = [
   { pattern: /\b(code|implement|build|debug|refactor)\b/, archetype: "architect", reason: "Implementation task — systems thinking" },
   { pattern: /\b(research|investigate|find|search|look up)\b/, archetype: "empiricist", reason: "Research task — data-driven analysis" },

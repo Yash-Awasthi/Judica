@@ -85,7 +85,7 @@ export async function getReliabilityScores(
   const result = new Map<string, { avgConfidence: number; totalResponses: number }>();
   if (models.length === 0) return result;
 
-  // P26-04: Cap models array to prevent excessively large SQL IN clause
+  // Cap models array to prevent excessively large SQL IN clause
   const MAX_MODELS_QUERY = 200;
   if (models.length > MAX_MODELS_QUERY) {
     models = models.slice(0, MAX_MODELS_QUERY);
