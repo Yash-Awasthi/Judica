@@ -80,6 +80,7 @@ import scimPlugin from "./routes/scim.js";
 import patPlugin from "./routes/pat.js";
 import rateLimitPlugin from "./routes/rateLimits.js";
 import discordPlugin from "./integrations/discord/routes.js";
+import imagePlugin from "./routes/images.js";
 import { ingestionQueue, researchQueue, repoQueue, compactionQueue } from "./queue/queues.js";
 
 export async function buildApp() {
@@ -314,6 +315,8 @@ export async function buildApp() {
   await fastify.register(rateLimitPlugin,       { prefix: "/api/rate-limits" });
   // Discord bot integration
   await fastify.register(discordPlugin,         { prefix: "/api/integrations/discord" });
+  // Image generation (multi-provider)
+  await fastify.register(imagePlugin,           { prefix: "/api/images" });
   // Per-route rate limit differentiation.
   // /ask is the most expensive route (triggers full deliberation); cap at 30/min.
   // Uploads are I/O-heavy; cap at 20/min.
