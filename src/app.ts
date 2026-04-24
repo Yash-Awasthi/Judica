@@ -69,6 +69,7 @@ import evaluationPlugin from "./routes/evaluation.js";
 import projectsPlugin from "./routes/projects.js";
 import providerHealthPlugin from "./routes/providerHealth.js";
 import deliberationsPlugin from "./routes/deliberations.js";
+import connectorsPlugin from "./routes/connectors.js";
 import { ingestionQueue, researchQueue, repoQueue, compactionQueue } from "./queue/queues.js";
 
 export async function buildApp() {
@@ -281,6 +282,8 @@ export async function buildApp() {
   await fastify.register(providerHealthPlugin,  { prefix: "/api/admin" });
   // Consensus explainability API
   await fastify.register(deliberationsPlugin,   { prefix: "/api/deliberations" });
+  // Data source connectors
+  await fastify.register(connectorsPlugin,      { prefix: "/api/connectors" });
   // Per-route rate limit differentiation.
   // /ask is the most expensive route (triggers full deliberation); cap at 30/min.
   // Uploads are I/O-heavy; cap at 20/min.
