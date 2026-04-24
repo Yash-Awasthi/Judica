@@ -9,6 +9,7 @@ import { eq } from "drizzle-orm";
 import redis from "../lib/redis.js";
 import logger from "../lib/logger.js";
 import { Permission, getEffectivePermissions, hasPermission } from "../auth/permissions.js";
+import { validatePat } from "../services/pat.service.js";
 
 // Sanitize URLs for logging — strip tokens, keys, PII from query strings
 function sanitizeUrlForLog(url: string): string {
@@ -87,6 +88,19 @@ export async function fastifyRequireAuth(request: FastifyRequest, reply: Fastify
 
   if (!token) {
     reply.code(401).send({ error: "Authentication required" });
+    return;
+  }
+
+  // PAT auth: tokens starting with "aib_" are Personal Access Tokens
+  if (token.startsWith("aib_")) {
+    const result = await validatePat(token);
+    if (!result.valid) {
+      reply.code(401).send({ error: "Invalid or expired API key" });
+      return;
+    }
+    request.userId = result.userId;
+    request.role = "member"; // PATs get member role; scope enforcement is separate
+    (request as Record<string, unknown>).patScopes = result.scopes;
     return;
   }
 
