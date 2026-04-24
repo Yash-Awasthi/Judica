@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "AIBYAI — AI Search & Deliberation",
+  "version": "1.0.0",
+  "description": "Quick access to AIBYAI search, summarization, and deliberation from any tab.",
+  "permissions": [
+    "sidePanel",
+    "activeTab",
+    "storage",
+    "contextMenus"
+  ],
+  "host_permissions": [],
+  "background": {
+    "service_worker": "service_worker.js"
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "commands": {
+    "toggle-side-panel": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+A",
+        "mac": "Command+Shift+A"
+      },
+      "description": "Toggle AIBYAI side panel"
+    }
+  },
+  "omnibox": {
+    "keyword": "ai"
+  },
+  "action": {
+    "default_title": "Open AIBYAI",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}
