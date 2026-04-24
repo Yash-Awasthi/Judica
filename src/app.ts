@@ -141,8 +141,8 @@ export async function buildApp() {
     ...(rateLimitRedis ? { redis: rateLimitRedis } : {}),
   });
 
-  // Only register Swagger UI in non-production environments
-  if (env.NODE_ENV !== "production") {
+  // Register Swagger/OpenAPI docs — always available (gated by optional ENABLE_API_DOCS env)
+  if (process.env.ENABLE_API_DOCS !== "false") {
     await registerSwagger(fastify);
   }
 
