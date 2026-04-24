@@ -28,6 +28,14 @@ export const memories = pgTable(
     sourceUrl: text("sourceUrl"),
     parentChunkId: text("parentChunkId"),
     embedding: vector("embedding", { dimensions: 1536 }).notNull(),
+    /** ACL list — tokens like "user:1", "group:team-a", "public", "ext_email:foo@bar.com" */
+    accessControlList: jsonb("accessControlList").$type<string[]>().default([]),
+    /** Document sets this chunk belongs to (for set-based access control). */
+    documentSets: jsonb("documentSets").$type<string[]>().default([]),
+    /** Boost factor for search ranking (feedback-driven). Default 0 = neutral. */
+    boostFactor: integer("boostFactor").default(0).notNull(),
+    /** Whether this document is hidden from search results. */
+    hidden: boolean("hidden").default(false).notNull(),
     createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
     lastAccessedAt: timestamp("lastAccessedAt", { mode: "date", withTimezone: true }),
     accessCount: integer("accessCount").default(0).notNull(),
