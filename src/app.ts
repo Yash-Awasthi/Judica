@@ -82,6 +82,7 @@ import rateLimitPlugin from "./routes/rateLimits.js";
 import discordPlugin from "./integrations/discord/routes.js";
 import imagePlugin from "./routes/images.js";
 import featureFlagPlugin from "./routes/featureFlags.js";
+import widgetPlugin from "./routes/widget.js";
 import { ingestionQueue, researchQueue, repoQueue, compactionQueue } from "./queue/queues.js";
 
 export async function buildApp() {
@@ -320,6 +321,8 @@ export async function buildApp() {
   await fastify.register(imagePlugin,           { prefix: "/api/images" });
   // Feature flags
   await fastify.register(featureFlagPlugin,     { prefix: "/api/feature-flags" });
+  // Embeddable chat widget (JS bundle + config)
+  await fastify.register(widgetPlugin,          { prefix: "/api/widget" });
   // Per-route rate limit differentiation.
   // /ask is the most expensive route (triggers full deliberation); cap at 30/min.
   // Uploads are I/O-heavy; cap at 20/min.

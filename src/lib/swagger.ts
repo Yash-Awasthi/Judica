@@ -105,6 +105,8 @@ export async function registerSwagger(fastify: FastifyInstance): Promise<void> {
         { name: "Usage", description: "API usage statistics" },
         { name: "Queue", description: "BullMQ job management" },
         { name: "Provider Health", description: "LLM provider health probes" },
+        // Widget
+        { name: "Widget", description: "Embeddable chat widget bundle & configuration" },
         // Projects
         { name: "Projects", description: "Project & workspace management" },
         { name: "Evaluation", description: "RAG evaluation & benchmarks" },
