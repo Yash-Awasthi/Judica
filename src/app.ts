@@ -75,6 +75,7 @@ import notificationsPlugin from "./routes/notifications.js";
 import documentSetsPlugin from "./routes/documentSets.js";
 import slackPlugin from "./integrations/slack/routes.js";
 import standardAnswersPlugin from "./routes/standardAnswers.js";
+import userGroupsPlugin from "./routes/userGroups.js";
 import { ingestionQueue, researchQueue, repoQueue, compactionQueue } from "./queue/queues.js";
 
 export async function buildApp() {
@@ -299,6 +300,8 @@ export async function buildApp() {
   await fastify.register(slackPlugin,           { prefix: "/api/integrations/slack" });
   // Standard answers (canned responses)
   await fastify.register(standardAnswersPlugin, { prefix: "/api/standard-answers" });
+  // User groups
+  await fastify.register(userGroupsPlugin,      { prefix: "/api/user-groups" });
   // Per-route rate limit differentiation.
   // /ask is the most expensive route (triggers full deliberation); cap at 30/min.
   // Uploads are I/O-heavy; cap at 20/min.
