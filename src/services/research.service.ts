@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { routeAndCollect } from "../router/smartRouter.js";
 import logger from "../lib/logger.js";
 import type { AdapterMessage } from "../adapters/types.js";
-import { env } from "../config/env.js";
+import { webSearch as multiProviderSearch } from "./webSearch.service.js";
 
 /** Sanitize user input before interpolation into LLM prompts */
 function sanitizeForPrompt(text: string): string {
@@ -25,61 +25,12 @@ export interface ResearchStep {
 type EventEmitter = (event: string, data: unknown) => void;
 
 export async function webSearch(query: string, maxResults: number = 5): Promise<{ title: string; url: string; content: string }[]> {
-  // Use Tavily if available, otherwise SerpAPI
-  if (env.TAVILY_API_KEY) {
-    try {
-      const res = await fetch("https://api.tavily.com/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          api_key: env.TAVILY_API_KEY,
-          query,
-          max_results: maxResults,
-          search_depth: "advanced",
-        }),
-        signal: AbortSignal.timeout(15000),
-      });
-      if (res.ok) {
-        const data = (await res.json()) as { results?: Array<{ title: string; url: string; content?: string }> };
-        return (data.results || []).map((r) => ({
-          title: r.title || "",
-          url: r.url || "",
-          content: (r.content || "").slice(0, 2000),
-        }));
-      }
-    } catch (err) {
-      logger.warn({ err }, "Tavily search failed");
-    }
-  }
-
-  if (env.SERP_API_KEY) {
-    try {
-      // Send API key via header instead of URL query string to avoid
-      // leaking credentials in server logs and referer headers (BE-16)
-      const serpUrl = new URL("https://serpapi.com/search.json");
-      serpUrl.searchParams.set("q", query);
-      serpUrl.searchParams.set("num", String(maxResults));
-      const res = await fetch(serpUrl.toString(), {
-        headers: {
-          "X-API-KEY": env.SERP_API_KEY,
-          "Authorization": `Bearer ${env.SERP_API_KEY}`,
-        },
-        signal: AbortSignal.timeout(15000),
-      });
-      if (res.ok) {
-        const data = (await res.json()) as { organic_results?: Array<{ title: string; link: string; snippet?: string }> };
-        return (data.organic_results || []).slice(0, maxResults).map((r) => ({
-          title: r.title || "",
-          url: r.link || "",
-          content: (r.snippet || "").slice(0, 2000),
-        }));
-      }
-    } catch (err) {
-      logger.warn({ err }, "SerpAPI search failed");
-    }
-  }
-
-  return [];
+  const results = await multiProviderSearch({ query, maxResults, depth: "advanced" });
+  return results.map(r => ({
+    title: r.title || "",
+    url: r.url || "",
+    content: (r.content || "").slice(0, 2000),
+  }));
 }
 
 async function callAI(systemPrompt: string, userPrompt: string, model?: string): Promise<string> {
