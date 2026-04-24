@@ -13,6 +13,7 @@ import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { authSchema, configSchema, userSettingsSchema, fastifyValidate } from "../middleware/validate.js";
 import { encrypt, decrypt } from "../lib/crypto.js";
 import { AppError } from "../middleware/errorHandler.js";
+import { requireCaptcha, rejectDisposableEmail } from "../middleware/captchaGuard.js";
 
 const ACCESS_TOKEN_EXPIRY = "15m";
 const REFRESH_TOKEN_TTL_DAYS = 7;
@@ -126,7 +127,7 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
   };
 
     // Fix CodeQL alert: Explicit rate limit config so static analyzers detect it
-    fastify.post("/register", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } }, preHandler: [authRateLimit, fastifyValidate(authSchema)] }, async (request, reply) => {
+    fastify.post("/register", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } }, preHandler: [authRateLimit, requireCaptcha, rejectDisposableEmail, fastifyValidate(authSchema)] }, async (request, reply) => {
     try {
       const { username, password } = request.body as { username: string; password: string };
       const hash = await argon2.hash(password, { type: argon2.argon2id, memoryCost: 65536, timeCost: 3 });
@@ -354,6 +355,17 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     });
 
     return { success: true };
+  });
+
+  // Public endpoint — frontend needs CAPTCHA provider and site key
+  fastify.get("/captcha-config", async () => {
+    const { getCaptchaProvider, getCaptchaSiteKey } = await import("../services/captcha.service.js");
+    const provider = getCaptchaProvider();
+    return {
+      provider,
+      siteKey: getCaptchaSiteKey(),
+      enabled: provider !== "none",
+    };
   });
 
     fastify.get("/config", { preHandler: [fastifyRequireAuth] }, async (request, _reply) => {
