@@ -3,6 +3,7 @@ import { executeCodeTool } from "./execute_code.js";
 import { env } from "../../config/env.js";
 import { registerUserSkillsAsTools } from "./skillExecutor.js";
 import { validateSafeUrl } from "../ssrf.js";
+import { webSearch } from "../../services/webSearch.service.js";
 
 /**
  * Remove all occurrences of a given block-level tag (e.g. script, style) and
@@ -175,7 +176,7 @@ registerUserSkillsAsTools();
 registerTool(
   {
     name: "web_search",
-    description: "Search the web for current information, facts, or news",
+    description: "Search the web for current information, facts, or news. Supports multiple providers (Tavily, Serper, Brave, Google PSE, SearXNG).",
     parameters: {
       type: "object",
       properties: {
@@ -186,40 +187,15 @@ registerTool(
   },
   async (args) => {
     const query = args.query as string;
-
-    // Try Tavily first
-    if (env.TAVILY_API_KEY) {
-      try {
-        const res = await fetch("https://api.tavily.com/search", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            api_key: env.TAVILY_API_KEY,
-            query,
-            max_results: 5,
-            search_depth: "basic"
-          }),
-          signal: AbortSignal.timeout(10000)
-        });
-        if (res.ok) {
-          const data = await res.json();
-          const results = (data.results || []).map((r: { title?: string; url?: string; content?: string }) => ({
-            title: r.title,
-            url: r.url,
-            content: (r.content || "").slice(0, 300)
-          }));
-          return JSON.stringify(results);
-        }
-      } catch { /* fall through */ }
+    const results = await webSearch({ query, maxResults: 5, depth: "basic" });
+    if (results.length === 0) {
+      return `Search results for "${query}": [No web search provider configured. Set TAVILY_API_KEY, SERPER_API_KEY, BRAVE_SEARCH_API_KEY, or SEARXNG_BASE_URL to enable.]`;
     }
-
-    // Fall back to SerpAPI
-    if (env.SERP_API_KEY) {
-      const { executeSearch } = await import("./search.js");
-      return executeSearch({ query });
-    }
-
-    return `Search results for "${query}": [Web search is not configured. Set TAVILY_API_KEY or SERP_API_KEY to enable.]`;
+    return JSON.stringify(results.map(r => ({
+      title: r.title,
+      url: r.url,
+      content: (r.content || "").slice(0, 300),
+    })));
   }
 );
 
