@@ -197,6 +197,54 @@ const researchPlugin: FastifyPluginAsync = async (fastify) => {
     await db.delete(researchJobs).where(eq(researchJobs.id, job.id));
     return { success: true };
   });
+
+  // POST /api/research/deep — start deep (agentic multi-cycle) research
+  fastify.post("/deep", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    const body = request.body as {
+      query?: string;
+      maxCycles?: number;
+      timeoutMs?: number;
+      enableClarification?: boolean;
+      enablePlanning?: boolean;
+    };
+
+    if (!body.query || typeof body.query !== "string" || body.query.trim().length === 0) {
+      throw new AppError(400, "Query is required", "RESEARCH_QUERY_REQUIRED");
+    }
+    if (body.query.length > 5000) {
+      throw new AppError(400, "Query too long (max 5000 chars)", "RESEARCH_QUERY_TOO_LONG");
+    }
+
+    const { runDeepResearch } = await import("../lib/deepResearch/index.js");
+
+    // SSE streaming of research progress
+    reply.raw.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      Connection: "keep-alive",
+    });
+
+    const session = await runDeepResearch(
+      body.query.trim(),
+      request.userId!,
+      {
+        maxCycles: Math.min(body.maxCycles ?? 8, 12),
+        timeoutMs: Math.min(body.timeoutMs ?? 30 * 60 * 1000, 45 * 60 * 1000),
+        enableClarification: body.enableClarification ?? true,
+        enablePlanning: body.enablePlanning ?? true,
+      },
+      (event) => {
+        try {
+          reply.raw.write(`data: ${JSON.stringify(event)}\n\n`);
+        } catch {
+          // Client disconnected
+        }
+      },
+    );
+
+    reply.raw.write(`data: ${JSON.stringify({ type: "done", sessionId: session.id })}\n\n`);
+    reply.raw.end();
+  });
 };
 
 export default researchPlugin;
