@@ -77,6 +77,7 @@ import slackPlugin from "./integrations/slack/routes.js";
 import standardAnswersPlugin from "./routes/standardAnswers.js";
 import userGroupsPlugin from "./routes/userGroups.js";
 import scimPlugin from "./routes/scim.js";
+import patPlugin from "./routes/pat.js";
 import { ingestionQueue, researchQueue, repoQueue, compactionQueue } from "./queue/queues.js";
 
 export async function buildApp() {
@@ -305,6 +306,8 @@ export async function buildApp() {
   await fastify.register(userGroupsPlugin,      { prefix: "/api/user-groups" });
   // SCIM 2.0 provisioning (RFC 7644) — separate prefix, no CSRF
   await fastify.register(scimPlugin,            { prefix: "/api/scim/v2" });
+  // Personal Access Tokens
+  await fastify.register(patPlugin,             { prefix: "/api/tokens" });
   // Per-route rate limit differentiation.
   // /ask is the most expensive route (triggers full deliberation); cap at 30/min.
   // Uploads are I/O-heavy; cap at 20/min.
