@@ -75,11 +75,14 @@ const envSchema = z.object({
   GITHUB_CLIENT_ID: z.string().optional().default(""),
   GITHUB_CLIENT_SECRET: z.string().optional().default(""),
   OAUTH_CALLBACK_BASE_URL: z.string().optional().default("http://localhost:3000"),
+  // SSO / SAML / OIDC
+  SSO_ENABLED: z.preprocess((v) => v === "true" || v === "1", z.boolean()).default(false),
+  SSO_CALLBACK_BASE_URL: z.string().optional(),
 });
 
 // Warn about unknown env vars that look like typos of known keys
 const KNOWN_KEYS = new Set(Object.keys(envSchema.shape));
-const ENV_PREFIXES = ["DATABASE_", "REDIS_", "JWT_", "MASTER_", "PORT", "NODE_", "RATE_LIMIT_", "ALLOWED_", "TAVILY_", "SYSTEM_", "TRUST_", "OPENAI_", "ANTHROPIC_", "GOOGLE_", "OPENROUTER_", "NVIDIA_", "XIAOMI_", "GROQ_", "MISTRAL_", "CEREBRAS_", "COHERE_", "OLLAMA_", "SERP_", "LANGFUSE_", "PROVIDER_", "FRONTEND_", "CURRENT_", "ENABLE_", "GITHUB_", "OAUTH_", "OTEL_", "SENTRY_", "SMTP_", "GRACEFUL_"];
+const ENV_PREFIXES = ["DATABASE_", "REDIS_", "JWT_", "MASTER_", "PORT", "NODE_", "RATE_LIMIT_", "ALLOWED_", "TAVILY_", "SYSTEM_", "TRUST_", "OPENAI_", "ANTHROPIC_", "GOOGLE_", "OPENROUTER_", "NVIDIA_", "XIAOMI_", "GROQ_", "MISTRAL_", "CEREBRAS_", "COHERE_", "OLLAMA_", "SERP_", "LANGFUSE_", "PROVIDER_", "FRONTEND_", "CURRENT_", "ENABLE_", "GITHUB_", "OAUTH_", "OTEL_", "SENTRY_", "SMTP_", "GRACEFUL_", "SSO_"];
 for (const key of Object.keys(process.env)) {
   if (!KNOWN_KEYS.has(key) && ENV_PREFIXES.some(p => key.startsWith(p))) {
     process.stderr.write(`WARNING: Unknown env var '${key}' looks like a typo of a known config key\n`);

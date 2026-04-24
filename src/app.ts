@@ -70,6 +70,7 @@ import projectsPlugin from "./routes/projects.js";
 import providerHealthPlugin from "./routes/providerHealth.js";
 import deliberationsPlugin from "./routes/deliberations.js";
 import connectorsPlugin from "./routes/connectors.js";
+import ssoPlugin from "./sso/routes.js";
 import { ingestionQueue, researchQueue, repoQueue, compactionQueue } from "./queue/queues.js";
 
 export async function buildApp() {
@@ -284,6 +285,8 @@ export async function buildApp() {
   await fastify.register(deliberationsPlugin,   { prefix: "/api/deliberations" });
   // Data source connectors
   await fastify.register(connectorsPlugin,      { prefix: "/api/connectors" });
+  // SSO / SAML / OIDC authentication
+  await fastify.register(ssoPlugin,             { prefix: "/api/sso" });
   // Per-route rate limit differentiation.
   // /ask is the most expensive route (triggers full deliberation); cap at 30/min.
   // Uploads are I/O-heavy; cap at 20/min.
