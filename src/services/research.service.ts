@@ -24,7 +24,7 @@ export interface ResearchStep {
 
 type EventEmitter = (event: string, data: unknown) => void;
 
-async function webSearch(query: string, maxResults: number = 5): Promise<{ title: string; url: string; content: string }[]> {
+export async function webSearch(query: string, maxResults: number = 5): Promise<{ title: string; url: string; content: string }[]> {
   // Use Tavily if available, otherwise SerpAPI
   if (env.TAVILY_API_KEY) {
     try {
