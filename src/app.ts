@@ -84,6 +84,7 @@ import imagePlugin from "./routes/images.js";
 import featureFlagPlugin from "./routes/featureFlags.js";
 import widgetPlugin from "./routes/widget.js";
 import webSearchPlugin from "./routes/webSearch.js";
+import webScrapingPlugin from "./routes/webScraping.js";
 import { ingestionQueue, researchQueue, repoQueue, compactionQueue } from "./queue/queues.js";
 
 export async function buildApp() {
@@ -326,6 +327,8 @@ export async function buildApp() {
   await fastify.register(widgetPlugin,          { prefix: "/api/widget" });
   // Web search (multi-provider)
   await fastify.register(webSearchPlugin,       { prefix: "/api/web-search" });
+  // Web scraping (Firecrawl + Exa)
+  await fastify.register(webScrapingPlugin,     { prefix: "/api/web-scraping" });
   // Per-route rate limit differentiation.
   // /ask is the most expensive route (triggers full deliberation); cap at 30/min.
   // Uploads are I/O-heavy; cap at 20/min.

@@ -109,6 +109,7 @@ export async function registerSwagger(fastify: FastifyInstance): Promise<void> {
         { name: "Widget", description: "Embeddable chat widget bundle & configuration" },
         // Search
         { name: "Web Search", description: "Multi-provider web search (Tavily, Serper, Brave, Google PSE, SearXNG)" },
+        { name: "Web Scraping", description: "Web content extraction (Firecrawl, Exa AI)" },
         // Projects
         { name: "Projects", description: "Project & workspace management" },
         { name: "Evaluation", description: "RAG evaluation & benchmarks" },
