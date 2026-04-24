@@ -121,11 +121,17 @@ const envSchema = z.object({
   // Web scraping / extraction
   FIRECRAWL_API_KEY: z.string().optional(),
   EXA_API_KEY: z.string().optional(),
+  // LiteLLM proxy gateway
+  LITELLM_API_KEY: z.string().optional(),
+  LITELLM_BASE_URL: z.string().url().optional(),
+  // vLLM self-hosted inference
+  VLLM_BASE_URL: z.string().url().optional(),
+  VLLM_API_KEY: z.string().optional(),
 });
 
 // Warn about unknown env vars that look like typos of known keys
 const KNOWN_KEYS = new Set(Object.keys(envSchema.shape));
-const ENV_PREFIXES = ["DATABASE_", "REDIS_", "JWT_", "MASTER_", "PORT", "NODE_", "RATE_LIMIT_", "ALLOWED_", "TAVILY_", "SYSTEM_", "TRUST_", "OPENAI_", "ANTHROPIC_", "GOOGLE_", "OPENROUTER_", "NVIDIA_", "XIAOMI_", "GROQ_", "MISTRAL_", "CEREBRAS_", "COHERE_", "OLLAMA_", "SERP_", "LANGFUSE_", "PROVIDER_", "FRONTEND_", "CURRENT_", "ENABLE_", "GITHUB_", "OAUTH_", "OTEL_", "SENTRY_", "SMTP_", "GRACEFUL_", "SSO_", "SLACK_", "DISCORD_", "CAPTCHA_", "RECAPTCHA_", "HCAPTCHA_", "TURNSTILE_", "AZURE_", "STABILITY_", "REPLICATE_", "ELEVENLABS_", "DEEPGRAM_", "WEB_SEARCH_", "SERPER_", "BRAVE_", "SEARXNG_", "FIRECRAWL_", "EXA_"];
+const ENV_PREFIXES = ["DATABASE_", "REDIS_", "JWT_", "MASTER_", "PORT", "NODE_", "RATE_LIMIT_", "ALLOWED_", "TAVILY_", "SYSTEM_", "TRUST_", "OPENAI_", "ANTHROPIC_", "GOOGLE_", "OPENROUTER_", "NVIDIA_", "XIAOMI_", "GROQ_", "MISTRAL_", "CEREBRAS_", "COHERE_", "OLLAMA_", "SERP_", "LANGFUSE_", "PROVIDER_", "FRONTEND_", "CURRENT_", "ENABLE_", "GITHUB_", "OAUTH_", "OTEL_", "SENTRY_", "SMTP_", "GRACEFUL_", "SSO_", "SLACK_", "DISCORD_", "CAPTCHA_", "RECAPTCHA_", "HCAPTCHA_", "TURNSTILE_", "AZURE_", "STABILITY_", "REPLICATE_", "ELEVENLABS_", "DEEPGRAM_", "WEB_SEARCH_", "SERPER_", "BRAVE_", "SEARXNG_", "FIRECRAWL_", "EXA_", "LITELLM_", "VLLM_"];
 for (const key of Object.keys(process.env)) {
   if (!KNOWN_KEYS.has(key) && ENV_PREFIXES.some(p => key.startsWith(p))) {
     process.stderr.write(`WARNING: Unknown env var '${key}' looks like a typo of a known config key\n`);

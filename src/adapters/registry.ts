@@ -8,6 +8,8 @@ import { GeminiAdapter } from "./gemini.adapter.js";
 import { GroqAdapter } from "./groq.adapter.js";
 import { OpenRouterAdapter } from "./openrouter.adapter.js";
 import { OllamaAdapter } from "./ollama.adapter.js";
+import { LiteLLMAdapter } from "./litellm.adapter.js";
+import { VLLMAdapter } from "./vllm.adapter.js";
 import { env } from "../config/env.js";
 import logger from "../lib/logger.js";
 
@@ -88,6 +90,10 @@ const MODEL_PROVIDER_RULES: Array<{ test: (m: string) => boolean; provider: stri
   { test: (m) => m.startsWith("mistral-") || m.startsWith("codestral") || m.startsWith("pixtral"), provider: "mistral" },
   // Ollama — only match generic model family names (user's local models)
   { test: (m) => m.startsWith("ollama/") || m.includes(":") /* ollama tag format e.g. llama3:8b */, provider: "ollama" },
+  // LiteLLM — model IDs prefixed with litellm/
+  { test: (m) => m.startsWith("litellm/"), provider: "litellm" },
+  // vLLM — model IDs prefixed with vllm/
+  { test: (m) => m.startsWith("vllm/"), provider: "vllm" },
   // OpenRouter — model IDs always contain a slash (org/model)
   { test: (m) => m.includes("/"), provider: "openrouter" },
 ];
@@ -140,6 +146,24 @@ function initBuiltinAdapters(): void {
   // Ollama — always try to register (it's local, free, no key needed)
   adapters.set("ollama", new OllamaAdapter(env.OLLAMA_BASE_URL));
   logger.debug("Ollama adapter loaded (local)");
+
+  // LiteLLM — OpenAI-compatible proxy gateway for 100+ providers
+  if (process.env.LITELLM_API_KEY || process.env.LITELLM_BASE_URL) {
+    adapters.set("litellm", new LiteLLMAdapter(
+      process.env.LITELLM_API_KEY || "dummy",
+      process.env.LITELLM_BASE_URL || "http://localhost:4000",
+    ));
+    logger.debug("LiteLLM adapter loaded");
+  }
+
+  // vLLM — self-hosted GPU inference server
+  if (process.env.VLLM_BASE_URL) {
+    adapters.set("vllm", new VLLMAdapter(
+      process.env.VLLM_BASE_URL,
+      process.env.VLLM_API_KEY || "dummy",
+    ));
+    logger.debug("vLLM adapter loaded");
+  }
 
   // OpenAI-compatible providers via OpenAI adapter with custom base URL
   if (env.MISTRAL_API_KEY) {
