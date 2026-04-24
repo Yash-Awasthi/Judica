@@ -45,13 +45,17 @@ export async function storeChunk(
   sourceName?: string,
   sourceUrl?: string,
   parentChunkId?: string,
+  accessControlList?: string[],
 ): Promise<string> {
   const embedding = await embed(content);
   const vectorStr = safeVectorLiteral(embedding);
+  const aclJson = accessControlList && accessControlList.length > 0
+    ? JSON.stringify(accessControlList)
+    : "[]";
 
   const result = await db.execute(sql`
-    INSERT INTO "Memory" ("id", "userId", "kbId", "content", "chunkIndex", "sourceName", "sourceUrl", "parentChunkId", "embedding", "createdAt")
-    VALUES (gen_random_uuid()::text, ${userId}, ${kbId}, ${content}, ${chunkIndex}, ${sourceName || null}, ${sourceUrl || null}, ${parentChunkId || null}, ${vectorStr}::vector, NOW())
+    INSERT INTO "Memory" ("id", "userId", "kbId", "content", "chunkIndex", "sourceName", "sourceUrl", "parentChunkId", "embedding", "accessControlList", "createdAt")
+    VALUES (gen_random_uuid()::text, ${userId}, ${kbId}, ${content}, ${chunkIndex}, ${sourceName || null}, ${sourceUrl || null}, ${parentChunkId || null}, ${vectorStr}::vector, ${aclJson}::jsonb, NOW())
     RETURNING "id"
   `);
 
@@ -63,19 +67,26 @@ export async function searchSimilar(
   userId: number,
   query: string,
   kbId?: string | null,
-  limit: number = 5
+  limit: number = 5,
+  aclTokens?: string[],
 ): Promise<MemoryChunk[]> {
   limit = clampLimit(limit);
   const queryEmbedding = await embed(query);
   const vectorStr = safeVectorLiteral(queryEmbedding);
 
   const kbCondition = kbId ? sql`AND "kbId" = ${kbId}` : sql``;
+  // ACL enforcement at query level: only return docs whose ACL overlaps with user tokens.
+  // If aclTokens is provided, filter by it; otherwise fall back to userId-only (backward compat).
+  const aclCondition = aclTokens && aclTokens.length > 0
+    ? sql`AND ("accessControlList" IS NULL OR "accessControlList" = '[]'::jsonb OR "accessControlList" ?| ${aclTokens}::text[])`
+    : sql``;
+  const hiddenFilter = sql`AND ("hidden" IS NULL OR "hidden" = false)`;
 
   const results = await db.execute(sql`
     SELECT "id", "content", "sourceName", "sourceUrl",
            1 - ("embedding" <=> ${vectorStr}::vector) AS score
     FROM "Memory"
-    WHERE "userId" = ${userId} ${kbCondition}
+    WHERE "userId" = ${userId} ${kbCondition} ${aclCondition} ${hiddenFilter}
     ORDER BY score DESC
     LIMIT ${limit}
   `);
@@ -98,16 +109,21 @@ export async function keywordSearch(
   userId: number,
   query: string,
   kbId?: string | null,
-  limit: number = 10
+  limit: number = 10,
+  aclTokens?: string[],
 ): Promise<MemoryChunk[]> {
   limit = clampLimit(limit);
   const kbCondition = kbId ? sql`AND "kbId" = ${kbId}` : sql``;
+  const aclCondition = aclTokens && aclTokens.length > 0
+    ? sql`AND ("accessControlList" IS NULL OR "accessControlList" = '[]'::jsonb OR "accessControlList" ?| ${aclTokens}::text[])`
+    : sql``;
+  const hiddenFilter = sql`AND ("hidden" IS NULL OR "hidden" = false)`;
 
   const results = await db.execute(sql`
     SELECT "id", "content", "sourceName", "sourceUrl",
            ts_rank("tsv", plainto_tsquery('english', ${query})) AS score
     FROM "Memory"
-    WHERE "userId" = ${userId} ${kbCondition}
+    WHERE "userId" = ${userId} ${kbCondition} ${aclCondition} ${hiddenFilter}
       AND "tsv" @@ plainto_tsquery('english', ${query})
     ORDER BY score DESC
     LIMIT ${limit}
@@ -121,14 +137,15 @@ export async function hybridSearch(
   userId: number,
   query: string,
   kbId?: string | null,
-  limit: number = 5
+  limit: number = 5,
+  aclTokens?: string[],
 ): Promise<MemoryChunk[]> {
   limit = clampLimit(limit);
   const k = 60; // RRF constant
 
   const [vectorResults, kwResults] = await Promise.all([
-    searchSimilar(userId, query, kbId, limit * 2),
-    keywordSearch(userId, query, kbId, limit * 2),
+    searchSimilar(userId, query, kbId, limit * 2, aclTokens),
+    keywordSearch(userId, query, kbId, limit * 2, aclTokens),
   ]);
 
   // Build RRF scores
@@ -175,6 +192,64 @@ export async function deleteKBChunks(kbId: string): Promise<number> {
 export async function deleteDocChunks(kbId: string, sourceName: string): Promise<number> {
   const result = await db.execute(sql`
     DELETE FROM "Memory" WHERE "kbId" = ${kbId} AND "sourceName" = ${sourceName}
+  `);
+  return result.rowCount ?? 0;
+}
+
+// ─── ACL Management ─────────────────────────────────────────────────────────
+
+/** Update ACL on all chunks matching a source document. */
+export async function updateDocumentAcl(
+  kbId: string,
+  sourceName: string,
+  accessControlList: string[],
+): Promise<number> {
+  const aclJson = JSON.stringify(accessControlList);
+  const result = await db.execute(sql`
+    UPDATE "Memory"
+    SET "accessControlList" = ${aclJson}::jsonb
+    WHERE "kbId" = ${kbId} AND "sourceName" = ${sourceName}
+  `);
+  return result.rowCount ?? 0;
+}
+
+/** Update ACL on a specific chunk by ID. */
+export async function updateChunkAcl(
+  chunkId: string,
+  accessControlList: string[],
+): Promise<void> {
+  const aclJson = JSON.stringify(accessControlList);
+  await db.execute(sql`
+    UPDATE "Memory"
+    SET "accessControlList" = ${aclJson}::jsonb
+    WHERE "id" = ${chunkId}
+  `);
+}
+
+/** Set hidden status for a document's chunks. */
+export async function setDocumentHidden(
+  kbId: string,
+  sourceName: string,
+  hidden: boolean,
+): Promise<number> {
+  const result = await db.execute(sql`
+    UPDATE "Memory"
+    SET "hidden" = ${hidden}
+    WHERE "kbId" = ${kbId} AND "sourceName" = ${sourceName}
+  `);
+  return result.rowCount ?? 0;
+}
+
+/** Update boost factor for a document's chunks. */
+export async function updateDocumentBoost(
+  kbId: string,
+  sourceName: string,
+  boostFactor: number,
+): Promise<number> {
+  const result = await db.execute(sql`
+    UPDATE "Memory"
+    SET "boostFactor" = ${boostFactor}
+    WHERE "kbId" = ${kbId} AND "sourceName" = ${sourceName}
   `);
   return result.rowCount ?? 0;
 }
@@ -274,6 +349,7 @@ export async function hydeSearch(
   query: string,
   kbId?: string | null,
   limit: number = 5,
+  aclTokens?: string[],
 ): Promise<MemoryChunk[]> {
   limit = clampLimit(limit);
   const hypotheticalDoc = await generateHypotheticalDocument(query);
@@ -281,12 +357,16 @@ export async function hydeSearch(
   const vectorStr = safeVectorLiteral(hydeEmbedding);
 
   const kbCondition = kbId ? sql`AND "kbId" = ${kbId}` : sql``;
+  const aclCondition = aclTokens && aclTokens.length > 0
+    ? sql`AND ("accessControlList" IS NULL OR "accessControlList" = '[]'::jsonb OR "accessControlList" ?| ${aclTokens}::text[])`
+    : sql``;
+  const hiddenFilter = sql`AND ("hidden" IS NULL OR "hidden" = false)`;
 
   const results = await db.execute(sql`
     SELECT "id", "content", "sourceName", "sourceUrl",
            1 - ("embedding" <=> ${vectorStr}::vector) AS score
     FROM "Memory"
-    WHERE "userId" = ${userId} ${kbCondition}
+    WHERE "userId" = ${userId} ${kbCondition} ${aclCondition} ${hiddenFilter}
     ORDER BY score DESC
     LIMIT ${limit}
   `);
@@ -306,17 +386,18 @@ export async function enhancedHybridSearch(
   kbId?: string | null,
   limit: number = 5,
   useHyde: boolean = false,
+  aclTokens?: string[],
 ): Promise<MemoryChunk[]> {
   limit = clampLimit(limit);
   const k = 60;
 
   const searches: Promise<MemoryChunk[]>[] = [
-    searchSimilar(userId, query, kbId, limit * 2),
-    keywordSearch(userId, query, kbId, limit * 2),
+    searchSimilar(userId, query, kbId, limit * 2, aclTokens),
+    keywordSearch(userId, query, kbId, limit * 2, aclTokens),
   ];
 
   if (useHyde) {
-    searches.push(hydeSearch(userId, query, kbId, limit * 2));
+    searches.push(hydeSearch(userId, query, kbId, limit * 2, aclTokens));
   }
 
   const allResults = await Promise.all(searches);
