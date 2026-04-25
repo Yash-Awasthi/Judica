@@ -282,17 +282,27 @@ export async function scrapeUrl(url: string): Promise<ScrapeResult> {
 
   const html = await resp.text();
   const titleMatch = html.match(/<title[^>]*>([^<]+)<\/title>/i);
-  // Strip HTML using character-level state machine to avoid regex-based tag filter issues
-  let src = html
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "");
+  // State machine approach — no regex on HTML structure (avoids incomplete sanitization)
   const buf: string[] = [];
-  let inTag = false;
-  for (let i = 0; i < src.length; i++) {
-    const ch = src[i];
-    if (ch === "<") { inTag = true; buf.push(" "); }
-    else if (ch === ">") { inTag = false; }
-    else if (!inTag) { buf.push(ch); }
+  let i = 0;
+  const hlen = html.length;
+  const lower = html.toLowerCase();
+  while (i < hlen) {
+    if (html[i] !== "<") { buf.push(html[i++]); continue; }
+    let blockClose: string | null = null;
+    if (lower.startsWith("<script", i) && (i + 7 >= hlen || " \t\r\n>/<".includes(lower[i + 7]))) {
+      blockClose = "</script>";
+    } else if (lower.startsWith("<style", i) && (i + 6 >= hlen || " \t\r\n>/<".includes(lower[i + 6]))) {
+      blockClose = "</style>";
+    }
+    if (blockClose) {
+      const closeIdx = lower.indexOf(blockClose, i);
+      i = closeIdx !== -1 ? closeIdx + blockClose.length : hlen;
+    } else {
+      buf.push(" ");
+      while (i < hlen && html[i] !== ">") i++;
+      if (i < hlen) i++;
+    }
   }
   const text = buf.join("").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim().slice(0, 10_000);
 

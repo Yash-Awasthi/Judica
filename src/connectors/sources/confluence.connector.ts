@@ -165,16 +165,28 @@ export class ConfluenceConnector implements LoadConnector, PollConnector {
   }
 
   private stripHtml(html: string): string {
-    let src = html
-      .replace(/<script[\s\S]*?<\/script>/gi, "")
-      .replace(/<style[\s\S]*?<\/style>/gi, "");
+    // State machine approach — no regex on HTML structure (avoids incomplete sanitization)
     const buf: string[] = [];
-    let inTag = false;
-    for (let i = 0; i < src.length; i++) {
-      const ch = src[i];
-      if (ch === "<") { inTag = true; buf.push(" "); }
-      else if (ch === ">") { inTag = false; }
-      else if (!inTag) { buf.push(ch); }
+    let i = 0;
+    const len = html.length;
+    const lower = html.toLowerCase();
+    while (i < len) {
+      if (html[i] !== "<") { buf.push(html[i++]); continue; }
+      // Skip entire content of script/style blocks
+      let blockClose: string | null = null;
+      if (lower.startsWith("<script", i) && (i + 7 >= len || " \t\r\n>/<".includes(lower[i + 7]))) {
+        blockClose = "</script>";
+      } else if (lower.startsWith("<style", i) && (i + 6 >= len || " \t\r\n>/<".includes(lower[i + 6]))) {
+        blockClose = "</style>";
+      }
+      if (blockClose) {
+        const closeIdx = lower.indexOf(blockClose, i);
+        i = closeIdx !== -1 ? closeIdx + blockClose.length : len;
+      } else {
+        buf.push(" ");
+        while (i < len && html[i] !== ">") i++;
+        if (i < len) i++;
+      }
     }
     return buf.join("").replace(/&nbsp;/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
   }

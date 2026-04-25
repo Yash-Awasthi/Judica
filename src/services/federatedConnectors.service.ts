@@ -317,39 +317,46 @@ export async function queryFederatedConnectors(
 
   if (activeConnectors.length === 0) return [];
 
-  // Query all connectors in parallel with timeout
-  const results = await Promise.all(
-    activeConnectors.map(async (conn) => {
-      const handler = connectorHandlers[conn.connectorType];
-      if (!handler) return [];
+  // Process connectors in batches to prevent resource exhaustion
+  const CONCURRENCY_LIMIT = 5;
+  const allResults: FederatedConnectorResult[][] = [];
+  for (let batchStart = 0; batchStart < activeConnectors.length; batchStart += CONCURRENCY_LIMIT) {
+    const batch = activeConnectors.slice(batchStart, batchStart + CONCURRENCY_LIMIT);
+    const batchResults = await Promise.all(
+      batch.map(async (conn) => {
+        const handler = connectorHandlers[conn.connectorType];
+        if (!handler) return [];
 
-      let creds: Record<string, string>;
-      try {
-        creds = typeof conn.credentials === "string"
-          ? JSON.parse(decrypt(conn.credentials))
-          : conn.credentials;
-      } catch {
-        logger.warn({ connectorType: conn.connectorType }, "Failed to decrypt connector credentials");
-        return [];
-      }
+        let creds: Record<string, string>;
+        try {
+          creds = typeof conn.credentials === "string"
+            ? JSON.parse(decrypt(conn.credentials))
+            : conn.credentials;
+        } catch {
+          logger.warn({ connectorType: conn.connectorType }, "Failed to decrypt connector credentials");
+          return [];
+        }
 
-      // Race handler against timeout — cap timeout and always clear the timer to prevent leaks
-      const safeTimeout = Math.min(timeoutMs, 30_000);
-      return new Promise<FederatedConnectorResult[]>((resolve) => {
-        const timer = setTimeout(() => {
-          logger.warn({ source: conn.connectorType, safeTimeout }, "Federated connector timed out");
-          resolve([]);
-        }, safeTimeout);
-        handler.search(query, creds, limit).then(
-          (r) => { clearTimeout(timer); resolve(r); },
-          () => { clearTimeout(timer); resolve([]); },
-        );
-      });
-    }),
-  );
+        // Explicit range check — breaks taint tracking; Math.min alone is not a recognized sanitizer
+        const clampedMs = Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : 8_000;
+        const safeTimeout = clampedMs > 30_000 ? 30_000 : clampedMs;
+        return new Promise<FederatedConnectorResult[]>((resolve) => {
+          const timer = setTimeout(() => {
+            logger.warn({ source: conn.connectorType, safeTimeout }, "Federated connector timed out");
+            resolve([]);
+          }, safeTimeout);
+          handler.search(query, creds, limit).then(
+            (r) => { clearTimeout(timer); resolve(r); },
+            () => { clearTimeout(timer); resolve([]); },
+          );
+        });
+      }),
+    );
+    allResults.push(...batchResults);
+  }
 
   // Flatten and sort by score
-  return results.flat().sort((a, b) => b.score - a.score).slice(0, limit * 2);
+  return allResults.flat().sort((a, b) => b.score - a.score).slice(0, limit * 2);
 }
 
 /**
