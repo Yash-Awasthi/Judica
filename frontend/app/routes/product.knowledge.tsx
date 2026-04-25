@@ -62,7 +62,7 @@ export default function ProductKnowledge() {
           icon: Database,
           title: "Vector Embeddings",
           description:
-            "1536-dimensional embeddings with HNSW indexes for fast approximate nearest neighbor search at scale.",
+            "1536-dimensional embeddings stored in PostgreSQL with native vector similarity search. Fast cosine distance lookups across millions of chunks.",
         },
       ]}
       howItWorks={[
@@ -76,7 +76,7 @@ export default function ProductKnowledge() {
           step: "2",
           title: "Index",
           description:
-            "Automatic chunking and embedding. Parent-child hierarchies are built and indexed with HNSW for fast retrieval.",
+            "Automatic chunking and embedding. Parent-child hierarchies are built and stored with vector similarity search for fast retrieval.",
         },
         {
           step: "3",

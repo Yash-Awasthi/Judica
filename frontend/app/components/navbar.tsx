@@ -50,7 +50,7 @@ const productItems = [
   {
     label: "More",
     items: [
-      { name: "Connectors", desc: "19 LLM providers & vector DBs", href: "/product/connectors", icon: Plug },
+      { name: "Connectors", desc: "19 LLM providers, 51 data sources", href: "/product/connectors", icon: Plug },
       { name: "Developer Platform", desc: "API, MCP & SDK access", href: "/product/developer-platform", icon: Code2 },
       { name: "Deliberation Modes", desc: "5 thinking styles for every task", href: "/product/deliberation-modes", icon: Lightbulb },
       { name: "Desktop App", desc: "Native app for all platforms", href: "/product/desktop-app", icon: Monitor },

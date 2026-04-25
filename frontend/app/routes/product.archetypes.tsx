@@ -6,6 +6,7 @@ import {
   FlaskConical,
   Combine,
   Scale,
+  Flame,
   Sparkles,
 } from "lucide-react";
 
@@ -48,15 +49,21 @@ export default function ProductArchetypes() {
         },
         {
           icon: Combine,
-          title: "The Synthesizer",
+          title: "The Futurist",
           description:
-            "Combines diverse viewpoints into cohesive insights. The Synthesizer finds common ground and bridges conflicting perspectives.",
+            "Explores long-term trends, emerging technologies, and second-order consequences. The Futurist ensures decisions account for where the world is heading.",
         },
         {
           icon: Scale,
           title: "The Ethicist",
           description:
             "Evaluates moral implications and societal impact. The Ethicist ensures decisions consider fairness, harm, and long-term consequences.",
+        },
+        {
+          icon: Flame,
+          title: "The Devil's Advocate",
+          description:
+            "Dedicated adversarial stress-testing. Finds the strongest possible objections to any proposal to expose hidden weaknesses before they matter.",
         },
         {
           icon: Sparkles,

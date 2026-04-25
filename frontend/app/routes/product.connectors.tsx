@@ -7,15 +7,16 @@ import {
   Server,
   Cpu,
   Database,
+  FolderOpen,
 } from "lucide-react";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "19 LLM Providers & Vector DBs | AIBYAI" },
+    { title: "19 LLM Providers, Vector DBs & 51 Data Connectors | AIBYAI" },
     {
       name: "description",
       content:
-        "Connect to any major AI provider. Circuit breaker protection and automatic failover keep your system running even when providers go down.",
+        "Connect to any major AI provider and 51 data sources — Notion, Slack, GitHub, Confluence, Google Drive, Salesforce, and more. Circuit breaker protection and automatic failover.",
     },
   ];
 }
@@ -25,8 +26,8 @@ export default function ProductConnectors() {
     <ProductPage
       badge="Integrations"
       title="19 LLM Providers &"
-      titleHighlight="Vector DBs"
-      subtitle="Connect to any major AI provider. Circuit breaker protection and automatic failover keep your system running even when providers go down."
+      titleHighlight="51 Data Connectors"
+      subtitle="Connect to any major AI provider and ingest from 51 data sources. Circuit breaker protection and automatic failover keep your system running even when providers go down."
       features={[
         {
           icon: Brain,
@@ -36,15 +37,9 @@ export default function ProductConnectors() {
         },
         {
           icon: Cloud,
-          title: "Anthropic Claude",
+          title: "Anthropic, Gemini & More",
           description:
-            "Claude 3.5 Sonnet, Opus, and Haiku. Deep integration with Anthropic's safety-first models for thoughtful, nuanced reasoning.",
-        },
-        {
-          icon: Gem,
-          title: "Google Gemini",
-          description:
-            "Gemini Pro and Ultra models. Leverage Google's multimodal capabilities within your deliberation councils.",
+            "Claude 3.5, Gemini Pro/Ultra, Groq, Mistral, vLLM, LiteLLM, and OpenRouter — 9 adapters covering 19+ provider families.",
         },
         {
           icon: Server,
@@ -53,16 +48,22 @@ export default function ProductConnectors() {
             "Run models locally with Ollama. Full privacy, zero API costs, and offline capability for sensitive workloads.",
         },
         {
-          icon: Cpu,
-          title: "Groq & Cerebras",
-          description:
-            "Ultra-fast inference with specialized hardware. Groq's LPU and Cerebras wafer-scale chips for low-latency deliberation.",
-        },
-        {
           icon: Database,
           title: "Vector DBs",
           description:
             "pgvector, Pinecone, Weaviate, and Vespa. Choose the vector database that fits your scale and performance requirements.",
+        },
+        {
+          icon: FolderOpen,
+          title: "51 Data Source Connectors",
+          description:
+            "Notion, Slack, GitHub, Confluence, Jira, Google Drive, Salesforce, Dropbox, S3, OneDrive, Discord, Telegram, HubSpot, Linear, Zendesk, and 36 more.",
+        },
+        {
+          icon: Gem,
+          title: "Circuit Breaker Protection",
+          description:
+            "Automatic failover and load balancing across providers. Your deliberations keep running even when individual providers go down.",
         },
       ]}
       howItWorks={[
@@ -70,19 +71,19 @@ export default function ProductConnectors() {
           step: "1",
           title: "Connect",
           description:
-            "Add provider API keys through the settings panel. Test connections instantly.",
+            "Add provider API keys and data source credentials through the settings panel. Test connections instantly.",
         },
         {
           step: "2",
           title: "Configure",
           description:
-            "Set failover priorities and routing rules. Define which models handle which tasks.",
+            "Set failover priorities and routing rules. Define which models handle which tasks and which sources feed your knowledge bases.",
         },
         {
           step: "3",
           title: "Scale",
           description:
-            "Automatic load balancing and circuit breakers keep your system running even when individual providers go down.",
+            "Automatic load balancing and circuit breakers keep your system running. 51 data connectors keep your knowledge bases fresh.",
         },
       ]}
     />

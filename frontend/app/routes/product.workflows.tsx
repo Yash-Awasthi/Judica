@@ -7,6 +7,7 @@ import {
   ShieldCheck,
   DollarSign,
   HeartPulse,
+  Telescope,
 } from "lucide-react";
 
 export function meta({}: Route.MetaArgs) {
@@ -50,7 +51,7 @@ export default function ProductWorkflows() {
           icon: ShieldCheck,
           title: "Human Gates",
           description:
-            "Approval workflow nodes with 5-minute timeout and Redis-persisted state. Keep humans in the loop for critical decisions.",
+            "Approval workflow nodes with configurable timeout (default 24 hours) and Redis-persisted state. Keep humans in the loop for critical decisions.",
         },
         {
           icon: DollarSign,
@@ -63,6 +64,12 @@ export default function ProductWorkflows() {
           title: "Self-Healing",
           description:
             "Automatic retry with exponential backoff and intelligent error recovery. Workflows recover from transient failures without intervention.",
+        },
+        {
+          icon: Telescope,
+          title: "Deep Research Mode",
+          description:
+            "Dispatch independent research agents in parallel, synthesize findings, and produce cited, multi-source reports — all within a single workflow.",
         },
       ]}
       howItWorks={[

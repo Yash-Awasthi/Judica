@@ -15,7 +15,7 @@ export function meta({}: Route.MetaArgs) {
     {
       name: "description",
       content:
-        "Full API access with 84 endpoints. Model Context Protocol server for AI agent interoperability. Build on AIBYAI or integrate it into your stack.",
+        "Full REST API access covering every platform capability. Model Context Protocol server for AI agent interoperability. Build on AIBYAI or integrate it into your stack.",
     },
   ];
 }
@@ -26,13 +26,13 @@ export default function ProductDeveloperPlatform() {
       badge="For Developers"
       title="API, MCP &"
       titleHighlight="SDK"
-      subtitle="Full API access with 84 endpoints. Model Context Protocol server for AI agent interoperability. Build on AIBYAI or integrate it into your stack."
+      subtitle="Full REST API access covering every platform capability. Model Context Protocol server for AI agent interoperability. Build on AIBYAI or integrate it into your stack."
       features={[
         {
           icon: Code,
           title: "REST API",
           description:
-            "84 Fastify route plugins covering every platform capability. Comprehensive OpenAPI documentation with typed request and response schemas.",
+            "Comprehensive Fastify route plugins covering every platform capability. OpenAPI documentation with typed request and response schemas.",
         },
         {
           icon: Radio,

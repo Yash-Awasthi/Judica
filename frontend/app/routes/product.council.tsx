@@ -15,7 +15,7 @@ export function meta({}: Route.MetaArgs) {
     {
       name: "description",
       content:
-        "Run 4-7 AI agents simultaneously. Each with a distinct thinking style. They debate, critique, and produce a scored consensus.",
+        "Run multiple AI agents simultaneously. Each with a distinct thinking style. They debate, critique, and produce a scored consensus.",
     },
   ];
 }
@@ -56,7 +56,7 @@ export default function ProductCouncil() {
           icon: Merge,
           title: "Consensus Synthesis",
           description:
-            "Final answers are reliability-weighted, combining the strongest reasoning from every agent. Supports outputs up to 60K characters.",
+            "Final answers are reliability-weighted, combining the strongest reasoning from every agent into a single coherent response.",
         },
         {
           icon: Gauge,

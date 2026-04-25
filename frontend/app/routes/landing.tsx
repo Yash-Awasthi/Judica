@@ -100,7 +100,7 @@ const platformFeatures = [
     icon: Brain,
     title: "Knowledge That Remembers",
     description:
-      "Topic graphs with HNSW indexing, 14-day temporal decay, and contradiction tracking. Your AI actually builds understanding over time.",
+      "Topic graphs with vector similarity search, 14-day temporal decay, and contradiction tracking. Your AI actually builds understanding over time.",
     animation: "glow" as const,
   },
   {
@@ -122,9 +122,9 @@ const featureGrid = [
   },
   {
     icon: Search,
-    title: "Advanced RAG",
+    title: "51 Data Connectors",
     description:
-      "HyDE, federated search, parent-child chunking, RRF reranking.",
+      "Notion, Slack, GitHub, Confluence, Jira, Google Drive, Salesforce, Dropbox, and 43 more sources.",
     animation: "float" as const,
   },
   {
@@ -136,16 +136,16 @@ const featureGrid = [
   },
   {
     icon: Code2,
-    title: "Code Sandbox",
+    title: "Advanced RAG",
     description:
-      "V8 isolate for JS (128MB, 5s) and bubblewrap/seccomp for Python.",
+      "HyDE query expansion, federated search, parent-child chunking, RRF reranking, and contradiction tracking.",
     animation: "spin" as const,
   },
   {
     icon: Brain,
-    title: "MCP Protocol",
+    title: "Evaluation Framework",
     description:
-      "Model Context Protocol server for AI agent interoperability.",
+      "Local runner, Braintrust integration, and RAGBench scoring to measure and improve output quality.",
     animation: "glow" as const,
   },
   {
@@ -159,9 +159,9 @@ const featureGrid = [
 
 const stats = [
   { value: 19, suffix: "+", label: "LLM Providers" },
+  { value: 51, suffix: "", label: "Data Connectors" },
   { value: 14, suffix: "", label: "Agent Archetypes" },
   { value: 5, suffix: "", label: "Deliberation Modes" },
-  { value: 4300, suffix: "+", label: "Tests" },
 ];
 
 /* ------------------------------------------------------------------ */
