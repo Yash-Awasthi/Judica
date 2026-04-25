@@ -1,0 +1,262 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "id": null,
+  "links": [],
+  "panels": [
+    {
+      "title": "Provider Availability (Success Rate %)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 10 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 80 },
+              { "color": "green", "value": 95 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "100 * (1 - (sum(rate(aibyai_provider_call_duration_seconds_count{status=\"error\"}[5m])) by (provider) / sum(rate(aibyai_provider_call_duration_seconds_count[5m])) by (provider)))",
+          "legendFormat": "{{provider}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Provider Latency Distribution (p50 / p95 / p99)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 5 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "histogram_quantile(0.50, sum(rate(aibyai_provider_call_duration_seconds_bucket[5m])) by (le, provider))",
+          "legendFormat": "{{provider}} p50",
+          "refId": "A"
+        },
+        {
+          "expr": "histogram_quantile(0.95, sum(rate(aibyai_provider_call_duration_seconds_bucket[5m])) by (le, provider))",
+          "legendFormat": "{{provider}} p95",
+          "refId": "B"
+        },
+        {
+          "expr": "histogram_quantile(0.99, sum(rate(aibyai_provider_call_duration_seconds_bucket[5m])) by (le, provider))",
+          "legendFormat": "{{provider}} p99",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "title": "Cost per 1K Tokens by Provider",
+      "type": "barchart",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "currencyUSD",
+          "custom": { "fillOpacity": 80 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(aibyai_tokens_total{type=\"prompt\"}[1h])) by (provider, model) * 1000",
+          "legendFormat": "{{provider}}/{{model}} (prompt)",
+          "refId": "A"
+        },
+        {
+          "expr": "sum(rate(aibyai_tokens_total{type=\"completion\"}[1h])) by (provider, model) * 1000",
+          "legendFormat": "{{provider}}/{{model}} (completion)",
+          "refId": "B"
+        }
+      ]
+    },
+    {
+      "title": "Token Throughput by Provider",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineInterpolation": "smooth", "fillOpacity": 20, "stacking": { "mode": "normal" } }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(aibyai_tokens_total[5m])) by (provider)",
+          "legendFormat": "{{provider}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Provider Call Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "custom": { "drawStyle": "bars", "fillOpacity": 60 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(aibyai_provider_call_duration_seconds_count[5m])) by (provider)",
+          "legendFormat": "{{provider}}",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Provider Error Rate",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 16 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "color": { "mode": "fixed", "fixedColor": "red" },
+          "custom": { "drawStyle": "bars", "fillOpacity": 50 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "sum(rate(aibyai_provider_call_duration_seconds_count{status=\"error\"}[5m])) by (provider)",
+          "legendFormat": "{{provider}} errors",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "Queue Depth (Dead Letter / Main)",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineInterpolation": "stepAfter", "fillOpacity": 20 },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "green", "value": null },
+              { "color": "yellow", "value": 50 },
+              { "color": "red", "value": 100 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "aibyai_queue_depth{queue=\"main\"}",
+          "legendFormat": "Main Queue",
+          "refId": "A"
+        },
+        {
+          "expr": "aibyai_queue_depth{queue=\"dead_letter\"}",
+          "legendFormat": "Dead Letter Queue",
+          "refId": "B"
+        },
+        {
+          "expr": "aibyai_queue_depth{queue=\"retry\"}",
+          "legendFormat": "Retry Queue",
+          "refId": "C"
+        }
+      ]
+    },
+    {
+      "title": "Cache Hit Rate",
+      "type": "gauge",
+      "gridPos": { "h": 8, "w": 6, "x": 12, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "min": 0,
+          "max": 100,
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              { "color": "red", "value": null },
+              { "color": "yellow", "value": 30 },
+              { "color": "green", "value": 60 }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "100 * rate(aibyai_cache_operations_total{operation=\"hit\"}[5m]) / (rate(aibyai_cache_operations_total{operation=\"hit\"}[5m]) + rate(aibyai_cache_operations_total{operation=\"miss\"}[5m]))",
+          "legendFormat": "Hit Rate",
+          "refId": "A"
+        }
+      ]
+    },
+    {
+      "title": "DB Connection Pool",
+      "type": "timeseries",
+      "gridPos": { "h": 8, "w": 6, "x": 18, "y": 24 },
+      "datasource": { "type": "prometheus", "uid": "${DS_PROMETHEUS}" },
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "custom": { "drawStyle": "line", "lineInterpolation": "stepAfter", "fillOpacity": 15 }
+        },
+        "overrides": []
+      },
+      "targets": [
+        {
+          "expr": "aibyai_db_pool_connections{state=\"total\"}",
+          "legendFormat": "Total",
+          "refId": "A"
+        },
+        {
+          "expr": "aibyai_db_pool_connections{state=\"idle\"}",
+          "legendFormat": "Idle",
+          "refId": "B"
+        },
+        {
+          "expr": "aibyai_db_pool_connections{state=\"active\"}",
+          "legendFormat": "Active",
+          "refId": "C"
+        }
+      ]
+    }
+  ],
+  "schemaVersion": 39,
+  "tags": ["aibyai", "providers"],
+  "templating": { "list": [{ "name": "DS_PROMETHEUS", "type": "datasource", "query": "prometheus", "current": { "text": "Prometheus", "value": "prometheus" }, "hide": 0 }] },
+  "time": { "from": "now-3h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Provider Health & Queue Monitoring",
+  "uid": "aibyai-provider-health",
+  "version": 1
+}

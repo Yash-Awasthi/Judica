@@ -1,0 +1,61 @@
+schema aibyai_doc {
+  document aibyai_doc {
+    field id type string {
+      indexing: summary | attribute
+    }
+    field content type string {
+      indexing: summary | index | attribute
+      index: enable-bm25
+    }
+    field title type string {
+      indexing: summary | index | attribute
+      index: enable-bm25
+    }
+    field source type string {
+      indexing: summary | attribute
+    }
+    field tenantId type string {
+      indexing: summary | attribute
+    }
+    field userId type int {
+      indexing: summary | attribute
+    }
+    field embedding type tensor<float>(d[1536]) {
+      indexing: summary | attribute
+      attribute {
+        distance-metric: angular
+      }
+    }
+    field createdAt type long {
+      indexing: summary | attribute
+    }
+  }
+
+  fieldset default {
+    fields: content, title
+  }
+
+  rank-profile default inherits default {
+    function bm25Score() {
+      expression: bm25(content) + bm25(title)
+    }
+    function embeddingScore() {
+      expression: closeness(field, embedding)
+    }
+    first-phase {
+      expression: bm25Score + 0.5 * embeddingScore
+    }
+  }
+
+  rank-profile bm25_only inherits default {
+    first-phase {
+      expression: bm25(content) + bm25(title)
+    }
+  }
+
+  rank-profile ann_only inherits default {
+    first-phase {
+      expression: closeness(field, embedding)
+    }
+  }
+}

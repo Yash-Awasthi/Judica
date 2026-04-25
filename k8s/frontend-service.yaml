@@ -1,0 +1,17 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: aibyai-frontend
+  namespace: aibyai
+  labels:
+    app: aibyai-frontend
+    app.kubernetes.io/component: frontend
+spec:
+  type: ClusterIP
+  ports:
+    - port: 4173
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app: aibyai-frontend

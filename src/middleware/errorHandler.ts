@@ -1,0 +1,88 @@
+import { env } from "../config/env.js";
+import type { FastifyError, FastifyRequest, FastifyReply } from "fastify";
+import { ZodError } from "zod";
+import logger from "../lib/logger.js";
+
+// Optional Sentry error tracking — only active when SENTRY_DSN is set.
+// Lazy-initialized to avoid import cost when not configured.
+let sentryReportError: ((err: Error, context?: Record<string, unknown>) => void) | null = null;
+
+if (env.SENTRY_DSN) {
+  // @ts-ignore - @sentry/node may not be installed
+  import("@sentry/node").then((Sentry) => {
+    Sentry.init({
+      dsn: env.SENTRY_DSN,
+      environment: env.NODE_ENV,
+      tracesSampleRate: env.NODE_ENV === "production" ? 0.1 : 1.0,
+    });
+    sentryReportError = (err, context) => {
+      Sentry.captureException(err, { extra: context });
+    };
+    logger.info("Sentry error tracking initialized");
+  }).catch((e) => {
+    logger.warn({ err: (e as Error).message }, "Sentry not available — install @sentry/node to enable error tracking");
+  });
+}
+
+// Removed dead isOperational flag — was checked but never meaningfully used.
+// AppError is always operational by definition; unexpected errors are always non-operational.
+export class AppError extends Error {
+  constructor(
+    public statusCode: number,
+    public message: string,
+    public code: string = 'INTERNAL_ERROR',
+  ) {
+    super(message);
+    Object.setPrototypeOf(this, AppError.prototype);
+  }
+}
+
+export function fastifyErrorHandler(error: FastifyError | Error, request: FastifyRequest, reply: FastifyReply) {
+  // Include request ID in error responses for log correlation (only when defined)
+  const requestId = request.id;
+
+  if (error instanceof AppError) {
+    logger.warn({
+      requestId,
+      statusCode: error.statusCode,
+      message: error.message,
+      url: request.url,
+    });
+    const body: Record<string, unknown> = { error: error.message, code: error.code };
+    if (requestId !== undefined) body.requestId = requestId;
+    reply.code(error.statusCode).send(body);
+    return;
+  }
+
+  // Safer ZodError detection — verify issues is an array before sending
+  const maybeZod = error as { name?: string; issues?: unknown[] };
+  if (error instanceof ZodError || (maybeZod.name === "ZodError" && Array.isArray(maybeZod.issues))) {
+    const body: Record<string, unknown> = { error: "Validation failed", details: maybeZod.issues };
+    if (requestId !== undefined) body.requestId = requestId;
+    reply.code(400).send(body);
+    return;
+  }
+
+  logger.error({ err: error, requestId, url: request.url, method: request.method }, "Unhandled error");
+
+  // Report unhandled errors to Sentry if configured
+  if (sentryReportError) {
+    // Cap error string to prevent unbounded memory in Sentry reports
+    sentryReportError(error instanceof Error ? error : new Error(String(error).slice(0, 2000)), {
+      requestId,
+      url: request.url,
+      method: request.method,
+      userId: (request as unknown as { userId?: number }).userId,
+    });
+  }
+
+  // Cap error message length even in development to prevent oversized responses
+  const rawMessage = error.message || "Internal server error";
+  const message = env.NODE_ENV === "production" ? "Internal server error" : rawMessage.slice(0, 2000);
+  const body: Record<string, unknown> = {
+    error: message,
+    code: "INTERNAL_ERROR",
+  };
+  if (requestId !== undefined) body.requestId = requestId;
+  reply.code(500).send(body);
+}

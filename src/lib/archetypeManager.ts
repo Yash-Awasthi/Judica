@@ -1,0 +1,369 @@
+import { db } from "./drizzle.js";
+import { userArchetypes } from "../db/schema/users.js";
+import { chats } from "../db/schema/conversations.js";
+import { eq, and, asc } from "drizzle-orm";
+import { ARCHETYPES } from "../config/archetypes.js";
+import type { Archetype } from "../config/archetypes.js";
+import { randomUUID } from "crypto";
+
+// Import size limits to prevent OOM and DB bloat
+const MAX_IMPORT_COUNT = 50;
+const MAX_IMPORT_PAYLOAD_BYTES = 512 * 1024; // 512KB
+
+// Externalized tool registry — add new tools here without modifying archetype defs.
+// Each archetype's `tools` array references IDs from this registry.
+export const TOOL_REGISTRY: Record<string, { id: string; name: string; description: string }> = {
+  web_search: { id: "web_search", name: "Web Search", description: "Search the internet for real-time information" },
+  execute_code: { id: "execute_code", name: "Code Execution", description: "Execute code snippets in a sandbox" },
+  read_webpage: { id: "read_webpage", name: "Read Webpage", description: "Fetch and read webpage content" },
+  file_upload: { id: "file_upload", name: "File Upload", description: "Process uploaded files" },
+  image_gen: { id: "image_gen", name: "Image Generation", description: "Generate images from text prompts" },
+};
+
+export function getValidTools(): string[] {
+  return Object.keys(TOOL_REGISTRY);
+}
+
+export interface UserArchetypeInput {
+  archetypeId?: string;
+  name: string;
+  thinkingStyle: string;
+  asks: string;
+  blindSpot: string;
+  systemPrompt: string;
+  tools?: string[];
+  icon?: string;
+  colorBg?: string;
+  isActive?: boolean;
+}
+
+export async function getUserArchetypes(userId: number): Promise<Record<string, Archetype>> {
+  const rows = await db.select().from(userArchetypes)
+    .where(and(eq(userArchetypes.userId, userId), eq(userArchetypes.isActive, true)))
+    .orderBy(asc(userArchetypes.createdAt));
+
+  const customArchetypes: Record<string, Archetype> = {};
+
+  for (const ua of rows) {
+    customArchetypes[ua.archetypeId || `custom_${ua.id}`] = {
+      id: ua.archetypeId || `custom_${ua.id}`,
+      name: ua.name,
+      thinkingStyle: ua.thinkingStyle,
+      asks: ua.asks,
+      blindSpot: ua.blindSpot,
+      systemPrompt: ua.systemPrompt,
+      tools: ua.tools,
+      icon: ua.icon || undefined,
+      colorBg: ua.colorBg || undefined
+    };
+  }
+
+  return { ...ARCHETYPES, ...customArchetypes };
+}
+
+export async function upsertUserArchetype(
+  userId: number,
+  archetype: UserArchetypeInput,
+  archetypeId?: string
+): Promise<Archetype> {
+  // Use UUID instead of Date.now() to prevent ID collision on concurrent imports
+  const aid = archetypeId || `custom_${randomUUID()}`;
+  const data = {
+    userId,
+    archetypeId: aid,
+    name: archetype.name,
+    thinkingStyle: archetype.thinkingStyle,
+    asks: archetype.asks,
+    blindSpot: archetype.blindSpot,
+    systemPrompt: archetype.systemPrompt,
+    tools: archetype.tools || [],
+    icon: archetype.icon,
+    colorBg: archetype.colorBg,
+    isActive: archetype.isActive !== false,
+    updatedAt: new Date()
+  };
+
+  const [result] = await db.insert(userArchetypes)
+    .values({ ...data, createdAt: new Date() })
+    .onConflictDoUpdate({
+      target: [userArchetypes.userId, userArchetypes.archetypeId],
+      set: data
+    })
+    .returning();
+
+  return {
+    id: result.archetypeId,
+    name: result.name,
+    thinkingStyle: result.thinkingStyle,
+    asks: result.asks,
+    blindSpot: result.blindSpot,
+    systemPrompt: result.systemPrompt,
+    tools: result.tools,
+    icon: result.icon || undefined,
+    colorBg: result.colorBg || undefined
+  };
+}
+
+export async function deleteUserArchetype(userId: number, archetypeId: string): Promise<void> {
+  await db.delete(userArchetypes)
+    .where(and(eq(userArchetypes.userId, userId), eq(userArchetypes.archetypeId, archetypeId)));
+}
+
+export async function toggleArchetypeStatus(userId: number, archetypeId: string): Promise<boolean> {
+  const [archetype] = await db.select().from(userArchetypes)
+    .where(and(eq(userArchetypes.userId, userId), eq(userArchetypes.archetypeId, archetypeId)))
+    .limit(1);
+
+  if (!archetype) return false;
+
+  const [updated] = await db.update(userArchetypes)
+    .set({ isActive: !archetype.isActive })
+    .where(and(eq(userArchetypes.userId, userId), eq(userArchetypes.archetypeId, archetypeId)))
+    .returning();
+
+  return updated.isActive;
+}
+
+export function validateArchetype(data: UserArchetypeInput): { valid: boolean; errors: string[] } {
+  const errors: string[] = [];
+
+  if (!data.name || data.name.trim().length < 2) {
+    errors.push("Name must be at least 2 characters long");
+  }
+
+  if (!data.thinkingStyle || data.thinkingStyle.trim().length < 5) {
+    errors.push("Thinking style must be at least 5 characters long");
+  }
+
+  if (!data.asks || data.asks.trim().length < 5) {
+    errors.push("Asks field must be at least 5 characters long");
+  }
+
+  if (!data.blindSpot || data.blindSpot.trim().length < 5) {
+    errors.push("Blind spot field must be at least 5 characters long");
+  }
+
+  if (!data.systemPrompt || data.systemPrompt.trim().length < 20) {
+    errors.push("System prompt must be at least 20 characters long");
+  }
+
+  if (data.name && data.name.length > 100) {
+    errors.push("Name must be less than 100 characters");
+  }
+  if (data.systemPrompt && data.systemPrompt.length > 5000) {
+    errors.push("System prompt must be less than 5000 characters");
+  }
+
+  if (data.tools && Array.isArray(data.tools)) {
+    // Validate against externalized tool registry instead of hardcoded list
+    const validTools = getValidTools();
+    const invalidTools = data.tools.filter(tool => !validTools.includes(tool));
+    if (invalidTools.length > 0) {
+      errors.push(`Invalid tools: ${invalidTools.join(", ")}. Valid: ${validTools.join(", ")}`);
+    }
+  }
+
+  return {
+    valid: errors.length === 0,
+    errors
+  };
+}
+
+export async function getArchetypeUsage(userId: number): Promise<Record<string, number>> {
+  // Add LIMIT to prevent full table scan for users with extensive chat history
+  const rows = await db.select({ opinions: chats.opinions, createdAt: chats.createdAt })
+    .from(chats)
+    .where(eq(chats.userId, userId))
+    .orderBy(asc(chats.createdAt))
+    .limit(500);
+
+  const usage: Record<string, number> = {};
+
+  const now = Date.now();
+  const halfLifeMs = 14 * 24 * 60 * 60 * 1000; // 14-day half-life
+
+  for (const chat of rows) {
+    const opinions = chat.opinions as { name: string }[] || [];
+    // Recency weight: recent chats count more than old ones
+    const ageMs = now - new Date(chat.createdAt).getTime();
+    const weight = Math.pow(0.5, ageMs / halfLifeMs);
+
+    for (const opinion of opinions) {
+      const name = opinion.name;
+      usage[name] = (usage[name] || 0) + weight;
+    }
+  }
+
+  // Round to 2 decimal places for readability
+  for (const key of Object.keys(usage)) {
+    usage[key] = Math.round(usage[key] * 100) / 100;
+  }
+
+  return usage;
+}
+
+/**
+ * Recommend archetypes for a user based on their engagement patterns.
+ * Returns archetype IDs sorted by weighted usage (most engaged first).
+ * Includes both built-in AND custom archetypes in ranking.
+ */
+export function rankArchetypesByEngagement(
+  usage: Record<string, number>,
+  customArchetypes?: Record<string, Archetype>,
+): { id: string; name: string; score: number }[] {
+  // Merge built-in and custom archetypes for ranking
+  const allArchetypes = { ...ARCHETYPES, ...(customArchetypes || {}) };
+
+  return Object.entries(allArchetypes)
+    .map(([id, arch]) => ({
+      id,
+      name: arch.name,
+      score: usage[arch.name] || 0,
+    }))
+    .sort((a, b) => b.score - a.score);
+}
+
+export function cloneDefaultArchetype(archetypeId: string): UserArchetypeInput {
+  const defaultArchetype = ARCHETYPES[archetypeId];
+  if (!defaultArchetype) {
+    throw new Error(`Default archetype '${archetypeId}' not found`);
+  }
+
+  return {
+    name: `Custom ${defaultArchetype.name}`,
+    thinkingStyle: defaultArchetype.thinkingStyle,
+    asks: defaultArchetype.asks,
+    blindSpot: defaultArchetype.blindSpot,
+    systemPrompt: defaultArchetype.systemPrompt,
+    tools: defaultArchetype.tools || [],
+    icon: defaultArchetype.icon,
+    colorBg: defaultArchetype.colorBg
+  };
+}
+
+// Sanitize export to public DTO — exclude internal fields (IDs, timestamps, userId)
+export async function exportUserArchetypes(userId: number): Promise<string> {
+  const archetypes = await db.select().from(userArchetypes)
+    .where(eq(userArchetypes.userId, userId))
+    .orderBy(asc(userArchetypes.createdAt));
+
+  // Return only public-facing fields
+  const sanitized = archetypes.map(a => ({
+    archetypeId: a.archetypeId,
+    name: a.name,
+    thinkingStyle: a.thinkingStyle,
+    asks: a.asks,
+    blindSpot: a.blindSpot,
+    systemPrompt: a.systemPrompt,
+    tools: a.tools,
+    icon: a.icon,
+    colorBg: a.colorBg,
+    isActive: a.isActive,
+  }));
+
+  return JSON.stringify(sanitized, null, 2);
+}
+
+// Validate that an archetypeId (if provided) is a string matching allowed characters and length
+const ARCHETYPE_ID_PATTERN = /^[a-zA-Z0-9_-]+$/;
+const MAX_ARCHETYPE_ID_LENGTH = 100;
+
+function validateArchetypeId(id: unknown): { valid: boolean; error?: string } {
+  if (id === undefined || id === null) {
+    return { valid: true }; // optional — a UUID will be generated
+  }
+  if (typeof id !== "string") {
+    return { valid: false, error: `archetypeId must be a string, got ${typeof id}` };
+  }
+  if (id.length === 0 || id.length > MAX_ARCHETYPE_ID_LENGTH) {
+    return { valid: false, error: `archetypeId must be between 1 and ${MAX_ARCHETYPE_ID_LENGTH} characters` };
+  }
+  if (!ARCHETYPE_ID_PATTERN.test(id)) {
+    return { valid: false, error: "archetypeId must contain only alphanumeric characters, hyphens, and underscores" };
+  }
+  return { valid: true };
+}
+
+export async function importArchetypes(userId: number, jsonData: string): Promise<{ imported: number; errors: string[] }> {
+  const errors: string[] = [];
+  let imported = 0;
+
+  // Reject oversized payloads before parsing
+  if (jsonData.length > MAX_IMPORT_PAYLOAD_BYTES) {
+    errors.push(`Payload too large: ${jsonData.length} bytes exceeds ${MAX_IMPORT_PAYLOAD_BYTES} byte limit`);
+    return { imported, errors };
+  }
+
+  // Parse JSON separately so we can report an accurate error message
+  let data: unknown;
+  try {
+    data = JSON.parse(jsonData);
+  } catch (err) {
+    errors.push(`Failed to parse JSON: ${(err as Error).message}`);
+    return { imported, errors };
+  }
+
+  if (!Array.isArray(data)) {
+    errors.push("Invalid format: expected array of archetypes");
+    return { imported, errors };
+  }
+
+  // Enforce maximum import count
+  if (data.length > MAX_IMPORT_COUNT) {
+    errors.push(`Too many archetypes: ${data.length} exceeds maximum of ${MAX_IMPORT_COUNT}`);
+    return { imported, errors };
+  }
+
+  // Wrap bulk import in a transaction — all-or-nothing semantics
+  try {
+    await db.transaction(async (tx) => {
+      for (const item of data) {
+        try {
+          // Validate archetypeId type and format before using it
+          const idCheck = validateArchetypeId(item.archetypeId);
+          if (!idCheck.valid) {
+            errors.push(`Archetype "${item.name || 'unknown'}": ${idCheck.error}`);
+            continue;
+          }
+
+          const validation = validateArchetype(item);
+          if (!validation.valid) {
+            errors.push(`Archetype "${item.name || 'unknown'}": ${validation.errors.join(", ")}`);
+            continue;
+          }
+
+          const aid = item.archetypeId || `custom_${randomUUID()}`;
+          const insertData = {
+            userId,
+            archetypeId: aid,
+            name: item.name,
+            thinkingStyle: item.thinkingStyle,
+            asks: item.asks,
+            blindSpot: item.blindSpot,
+            systemPrompt: item.systemPrompt,
+            tools: item.tools || [],
+            icon: item.icon,
+            colorBg: item.colorBg,
+            isActive: item.isActive !== false,
+            updatedAt: new Date(),
+            createdAt: new Date(),
+          };
+
+          await tx.insert(userArchetypes)
+            .values(insertData)
+            .onConflictDoUpdate({
+              target: [userArchetypes.userId, userArchetypes.archetypeId],
+              set: { ...insertData },
+            });
+          imported++;
+        } catch (err) {
+          errors.push(`Failed to import archetype "${item.name || 'unknown'}": ${(err as Error).message}`);
+        }
+      }
+    });
+  } catch (err) {
+    errors.push(`Failed to save archetypes to database: ${(err as Error).message}`);
+  }
+
+  return { imported, errors };
+}
