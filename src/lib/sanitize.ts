@@ -1,0 +1,133 @@
+/**
+ * Central Input Sanitization Layer
+ *
+ * Provides a unified defense against injection attacks across all surfaces:
+ * - Prompt injection (LLM nodes)
+ * - Template injection (template nodes)
+ * - Command injection (code nodes)
+ * - Header injection (HTTP nodes)
+ * - Prototype pollution (merge/split nodes)
+ *
+ * All node handlers should pass untrusted input through this layer before use.
+ */
+
+// Dangerous keys that enable prototype pollution
+const PROTOTYPE_POLLUTION_KEYS = new Set([
+  "__proto__",
+  "constructor",
+  "prototype",
+  "__defineGetter__",
+  "__defineSetter__",
+  "__lookupGetter__",
+  "__lookupSetter__",
+]);
+
+/**
+ * Strip prototype-polluting keys from any object recursively.
+ * Prevents pollution from propagating through workflow state.
+ */
+export function sanitizeObject(obj: unknown, depth = 0): unknown {
+  if (depth > 20) return {}; // H-3 fix: return empty object, not original — original may contain pollution keys
+  if (obj === null || obj === undefined) return obj;
+  if (typeof obj !== "object") return obj;
+
+  if (Array.isArray(obj)) {
+    return obj.map(item => sanitizeObject(item, depth + 1));
+  }
+
+  const clean: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
+    if (PROTOTYPE_POLLUTION_KEYS.has(key)) continue;
+    clean[key] = sanitizeObject(value, depth + 1);
+  }
+  return clean;
+}
+
+/**
+ * Sanitize string content that will be used in prompts.
+ * Strips common prompt injection patterns without breaking legitimate content.
+ */
+export function sanitizeForPrompt(text: string): string {
+  if (typeof text !== "string") return String(text ?? "");
+  return text
+    // Neutralize role-switching attempts
+    .replace(/^(system|assistant|user)\s*:/gim, "[$1]:")
+    // L-4: Escape markdown code block fences without breaking legitimate content.
+    // Replace ``` with a visually equivalent but non-functional sequence so
+    // the LLM won't interpret it as a code fence boundary.
+    .replace(/`{3,}/g, (m) => "`".repeat(m.length - 1) + "\u200B`")
+    // Strip ANSI escape sequences
+    // eslint-disable-next-line no-control-regex
+    .replace(/\x1b\[[0-9;]*m/g, "");
+}
+
+/**
+ * Sanitize content for use in templates.
+ * Escapes template delimiters to prevent template injection.
+ */
+export function sanitizeForTemplate(text: string): string {
+  if (typeof text !== "string") return String(text ?? "");
+  return text
+    .replace(/\{\{/g, "\\{\\{")
+    .replace(/\}\}/g, "\\}\\}");
+}
+
+/**
+ * Validate HTTP headers for injection safety.
+ */
+export function sanitizeHeaders(headers: Record<string, string>): Record<string, string> {
+  const clean: Record<string, string> = {};
+  // Cap header count and value size to prevent resource exhaustion
+  const MAX_HEADERS = 100;
+  const MAX_HEADER_VALUE_SIZE = 8192;
+  let count = 0;
+  for (const [key, value] of Object.entries(headers)) {
+    if (count >= MAX_HEADERS) break;
+    // Reject headers with newlines (HTTP header injection)
+    if (/[\r\n\0]/.test(key) || /[\r\n\0]/.test(value)) continue;
+    clean[key] = typeof value === "string" && value.length > MAX_HEADER_VALUE_SIZE ? value.slice(0, MAX_HEADER_VALUE_SIZE) : value;
+    count++;
+  }
+  return clean;
+}
+
+/**
+ * Sanitize code node output before passing to downstream LLM/template nodes.
+ * Prevents sandbox escape via crafted output that gets interpreted as code.
+ */
+export function sanitizeCodeOutput(output: string): string {
+  if (typeof output !== "string") return String(output ?? "");
+  // Cap length to prevent DoS
+  const capped = output.length > 1_000_000 ? output.slice(0, 1_000_000) : output;
+  return capped
+    // Neutralize Handlebars/Mustache template delimiters
+    .replace(/\{\{/g, "{ {")
+    .replace(/\}\}/g, "} }")
+    // L-4: Neutralize additional template syntaxes to prevent injection into template nodes
+    .replace(/\$\{/g, "$ {")      // JS template literals
+    .replace(/<%/g, "< %")        // EJS / ERB
+    .replace(/#\{/g, "# {");      // Ruby interpolation
+}
+
+/**
+ * Apply appropriate sanitization based on source and target node types.
+ */
+export function sanitizeInterNodeData(
+  data: Record<string, unknown>,
+  sourceType: string,
+  targetType: string
+): Record<string, unknown> {
+  // Always strip prototype pollution regardless of node types
+  const clean = sanitizeObject(data) as Record<string, unknown>;
+
+  // Extra sanitization for code → LLM/template chains
+  if (sourceType === "code" && (targetType === "llm" || targetType === "template")) {
+    for (const [key, value] of Object.entries(clean)) {
+      if (typeof value === "string") {
+        clean[key] = sanitizeCodeOutput(value);
+      }
+    }
+  }
+
+  return clean;
+}

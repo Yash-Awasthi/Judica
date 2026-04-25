@@ -1,0 +1,92 @@
+import type { NodeHandler } from "../types.js";
+import { executeTool } from "../../lib/tools/index.js";
+import logger from "../../lib/logger.js";
+
+// Ensure builtin tools are registered
+import "../../lib/tools/builtin.js";
+
+// Configurable tool execution timeout (default 60s)
+// NaN guards — fall back to defaults if env vars are non-numeric
+const _parsedToolTimeout = parseInt(process.env.TOOL_EXECUTION_TIMEOUT_MS || "60000", 10);
+const TOOL_TIMEOUT_MS = Number.isFinite(_parsedToolTimeout) && _parsedToolTimeout > 0 ? _parsedToolTimeout : 60000;
+
+// Max output size for tool results (default 5MB)
+const _parsedToolMaxOutput = parseInt(process.env.TOOL_MAX_OUTPUT_BYTES || "5242880", 10);
+const MAX_TOOL_OUTPUT_SIZE = Number.isFinite(_parsedToolMaxOutput) && _parsedToolMaxOutput > 0 ? _parsedToolMaxOutput : 5242880;
+
+// Allowed tool whitelist (if set, only these tools can execute in workflows)
+// Guard against empty whitelist — treat empty string as "no whitelist"
+const _rawWhitelist = (process.env.WORKFLOW_TOOL_WHITELIST || "").trim();
+const TOOL_WHITELIST = _rawWhitelist.length > 0
+  ? new Set(_rawWhitelist.split(",").map(s => s.trim()).filter(s => s.length > 0))
+  : null;
+
+export const toolHandler: NodeHandler = async (ctx) => {
+  const toolName = ctx.nodeData.tool_name as string;
+  const toolInputs = (ctx.nodeData.tool_inputs as Record<string, unknown>) ?? {};
+
+  // Enforce tool whitelist if configured
+  if (TOOL_WHITELIST && !TOOL_WHITELIST.has(toolName)) {
+    throw new Error(`Tool "${toolName}" is not in the workflow tool whitelist`);
+  }
+
+  // Merge workflow inputs into tool inputs (workflow inputs take precedence)
+  const mergedArgs: Record<string, unknown> = { ...toolInputs, ...ctx.inputs };
+
+  // Audit log of tool invocation
+  logger.info({
+    event: "workflow_tool_invoke",
+    runId: ctx.runId,
+    userId: ctx.userId,
+    toolName,
+    inputKeys: Object.keys(mergedArgs),
+  }, `Workflow tool invocation: ${toolName}`);
+
+  // Execute with timeout
+  let timeoutHandle: ReturnType<typeof setTimeout>;
+  const result = await Promise.race([
+    executeTool(
+      {
+        id: `wf_${ctx.runId}_${Date.now()}`,
+        name: toolName,
+        arguments: mergedArgs,
+      },
+      {
+        userId: String(ctx.userId),
+        requestId: ctx.runId,
+      }
+    ),
+    new Promise<never>((_, reject) => {
+      timeoutHandle = setTimeout(
+        () => reject(new Error(`Tool "${toolName}" timed out after ${TOOL_TIMEOUT_MS}ms`)),
+        TOOL_TIMEOUT_MS
+      );
+    }),
+  ]).finally(() => clearTimeout(timeoutHandle!));
+
+  // Throw on error instead of returning {error} as a "successful" result
+  if (result.error) {
+    throw new Error(`Tool "${toolName}" failed: ${result.error}`);
+  }
+
+  // Cap output size
+  let output = result.result;
+  if (typeof output === "string" && output.length > MAX_TOOL_OUTPUT_SIZE) {
+    output = output.slice(0, MAX_TOOL_OUTPUT_SIZE) + "\n[TOOL OUTPUT TRUNCATED]";
+  }
+
+  // Log result summary
+  logger.info({
+    event: "workflow_tool_complete",
+    runId: ctx.runId,
+    toolName,
+    outputSize: typeof output === "string" ? output.length : JSON.stringify(output).length,
+  }, `Workflow tool complete: ${toolName}`);
+
+  // Try to parse JSON result
+  try {
+    return { result: typeof output === "string" ? JSON.parse(output) : output };
+  } catch {
+    return { result: output };
+  }
+};

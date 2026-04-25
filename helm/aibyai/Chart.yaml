@@ -1,0 +1,23 @@
+apiVersion: v2
+name: aibyai
+description: AI Council — Enterprise Multi-Agent AI Platform
+type: application
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - ai
+  - multi-agent
+  - rag
+  - llm
+maintainers:
+  - name: Yash-Awasthi
+    email: yashawasthi12032006@gmail.com
+dependencies:
+  - name: postgresql
+    version: "14.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  - name: redis
+    version: "18.x.x"
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled

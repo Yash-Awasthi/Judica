@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: aibyai
+  labels:
+    app.kubernetes.io/name: aibyai
+    app.kubernetes.io/managed-by: kubectl

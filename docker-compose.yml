@@ -1,0 +1,181 @@
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-council}:${POSTGRES_PASSWORD:-councilpass}@db:5432/${POSTGRES_DB:-councildb}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:-councilpass}@redis:6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-councilpass}
+      - JWT_SECRET=${JWT_SECRET}
+      - MASTER_ENCRYPTION_KEY=${MASTER_ENCRYPTION_KEY}
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    command: ["node", "dist/index.js"]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+          cpus: "2.0"
+        reservations:
+          memory: 512m
+
+  migrate:
+    build: .
+    environment:
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-council}:${POSTGRES_PASSWORD:-councilpass}@db:5432/${POSTGRES_DB:-councildb}
+    depends_on:
+      db:
+        condition: service_healthy
+    command: ["npx", "drizzle-kit", "push"]
+    restart: "no"
+    profiles:
+      - migrate
+
+  db:
+    image: pgvector/pgvector:pg16@sha256:7d400e340efb42f4d8c9c12c6427adb253f726881a9985d2a471bf0eed824dff
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-council}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-councilpass}
+      - POSTGRES_DB=${POSTGRES_DB:-councildb}
+    ports:
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-council} -d ${POSTGRES_DB:-councildb}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2g
+          cpus: "2.0"
+        reservations:
+          memory: 256m
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "max_connections=100"
+      - "-c"
+      - "work_mem=4MB"
+
+  redis:
+    image: redis:7-alpine@sha256:efc27681bf81e6ed55cb581718b7818c6c04c39b1f9aa40854edd3ea2241b6ed
+    command:
+      - "redis-server"
+      - "--requirepass"
+      # M-6: The 'councilpass' default is only for local dev. Set REDIS_PASSWORD
+      # to a strong random value in production .env (e.g. openssl rand -hex 32).
+      - "${REDIS_PASSWORD:-councilpass}"
+      - "--appendonly"
+      - "yes"
+      - "--appendfsync"
+      - "everysec"
+      - "--maxmemory"
+      - "512mb"
+      - "--maxmemory-policy"
+      - "allkeys-lru"
+    ports:
+      - "127.0.0.1:6380:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-councilpass}", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+          cpus: "1.0"
+        reservations:
+          memory: 128m
+
+  db-backup:
+    image: postgres:16-alpine@sha256:93d55776e04376e19adb2733e3ccebb4392ee7dd86d8ff238503b30fe719c84f
+    environment:
+      - PGHOST=db
+      - PGUSER=${POSTGRES_USER:-council}
+      - PGPASSWORD=${POSTGRES_PASSWORD:-councilpass}
+      - PGDATABASE=${POSTGRES_DB:-councildb}
+    volumes:
+      - ./backups:/backups
+    depends_on:
+      db:
+        condition: service_healthy
+    # Runs daily at 2 AM — use: docker compose run db-backup
+    # Or schedule via host cron: 0 2 * * * cd /path/to/project && docker compose run --rm db-backup
+    # L-14: Backup files are gzip-compressed but NOT encrypted at rest.
+    # For sensitive deployments, pipe through gpg or use an encrypted volume:
+    #   pg_dump ... | gpg --symmetric --cipher-algo AES256 > /backups/aibyai_$TIMESTAMP.sql.gz.gpg
+    entrypoint: >
+      sh -c '
+        TIMESTAMP=$$(date +%Y%m%d_%H%M%S) &&
+        pg_dump --no-owner --no-acl --clean --if-exists | gzip > /backups/aibyai_$$TIMESTAMP.sql.gz &&
+        echo "[$$TIMESTAMP] Backup complete: $$(du -h /backups/aibyai_$$TIMESTAMP.sql.gz | cut -f1)" &&
+        ls -1t /backups/aibyai_*.sql.gz | tail -n +8 | xargs -r rm -f &&
+        echo "Retained last 7 backups"
+      '
+    restart: "no"
+    profiles:
+      - backup
+
+  prometheus:
+    image: prom/prometheus:v2.53.0@sha256:075b1ba2c4ebb04bc3a6ab86c06ec8d8099f8fda1c96ef6d104d9bb1def1d8bc
+    ports:
+      - "127.0.0.1:9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    depends_on:
+      - app
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.5"
+
+  grafana:
+    image: grafana/grafana:11.1.0@sha256:079600c9517b678c10cda6006b4487d3174512fd4c6cface37df7822756ed7a5
+    ports:
+      - "127.0.0.1:3001:3000"
+    environment:
+      # M-7: GRAFANA_PASSWORD must be set explicitly in .env — if unset Grafana falls
+      # back to its built-in default 'admin' password which must be changed on first login.
+      # Set GRAFANA_PASSWORD in your .env file before running in production.
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:?GRAFANA_PASSWORD must be set in .env (see .env.example)}
+      - GF_SECURITY_ADMIN_USER=${GRAFANA_USER:-admin}
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning/datasources:/etc/grafana/provisioning/datasources
+      - ./grafana/provisioning/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/provisioning/alerting:/etc/grafana/provisioning/alerting
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+          cpus: "0.5"
+
+volumes:
+  postgres_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
