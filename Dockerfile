@@ -45,6 +45,7 @@ COPY --from=builder /app/package.json ./
 
 # Copy built artifacts from the builder stage
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/migrations ./migrations
 
 # Remove source maps from production image
 RUN find dist -name '*.map' -delete

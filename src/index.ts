@@ -9,6 +9,22 @@ import { startWorkers, stopWorkers } from "./queue/workers.js";
 import { startMemoryCrons } from "./queue/memoryCrons.js";
 import { cleanupRateLimitRedis } from "./middleware/rateLimit.js";
 import { cleanupCostTrackerInterval } from "./lib/realtimeCost.js";
+import { drizzle } from "drizzle-orm/node-postgres";
+import { migrate } from "drizzle-orm/node-postgres/migrator";
+import path from "path";
+import { fileURLToPath } from "url";
+
+// Run DB migrations before starting the server
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+const migrationsFolder = path.join(__dirname, "..", "migrations");
+try {
+  const migrationDb = drizzle(pool);
+  await migrate(migrationDb, { migrationsFolder });
+  logger.info("Database migrations applied");
+} catch (err) {
+  logger.fatal({ err }, "Database migration failed — aborting startup");
+  process.exit(1);
+}
 
 // Wrap buildApp() in try/catch with error classification
 let app;
