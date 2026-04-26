@@ -31,3 +31,4 @@ export * from "./memoryFacts.js";
 export * from "./ideaNodes.js";
 export * from "./openapiTools.js";
 export * from "./spendingLimits.js";
+export * from "./workspaces.js";
