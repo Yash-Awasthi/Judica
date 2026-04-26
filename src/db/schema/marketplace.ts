@@ -76,6 +76,8 @@ export const marketplaceStars = pgTable(
 );
 
 // ─── UserSkill ───────────────────────────────────────────────────────────────
+// Phase 1.3 — Dify-style skill builder (Apache 2.0, langgenius/dify)
+// Dify stores: name, description, language, inputSchema (JSON Schema), code body, version.
 export const userSkills = pgTable(
   "UserSkill",
   {
@@ -87,10 +89,15 @@ export const userSkills = pgTable(
     description: text("description").notNull(),
     code: text("code").notNull(),
     parameters: jsonb("parameters").notNull(),
+    // Phase 1.3 additions (Dify tool builder pattern)
+    language: text("language").default("python").notNull(),      // "python" | "javascript"
+    version: text("version").default("1.0.0").notNull(),
+    inputSchema: jsonb("inputSchema"),                            // JSON Schema for tool inputs
+    publishedToMarketplace: boolean("publishedToMarketplace").default(false).notNull(),
+    updatedAt: timestamp("updatedAt", { mode: "date", withTimezone: true }).defaultNow(),
     createdAt: timestamp("createdAt", { mode: "date", withTimezone: true }).defaultNow().notNull(),
     active: boolean("active").default(true).notNull(),
   },
-  // Composite index for user skill lookups ordered by creation
   (table) => [
     index("UserSkill_userId_idx").on(table.userId),
     index("UserSkill_userId_createdAt_idx").on(table.userId, table.createdAt),

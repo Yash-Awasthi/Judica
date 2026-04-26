@@ -15,7 +15,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "~/components/ui/collapsible";
-import { Settings, Shield, MessageSquare, Brain, Gauge, ChevronDown } from "lucide-react";
+import { Settings, Shield, MessageSquare, Brain, Gauge, ChevronDown, Filter } from "lucide-react";
 
 function ToggleRow({
   label,
@@ -45,6 +45,9 @@ export default function SettingsPage() {
   const [coldValidator, setColdValidator] = useState(false);
   const [piiDetection, setPiiDetection] = useState(true);
   const [autoAnonymize, setAutoAnonymize] = useState(false);
+  // Phase 1.1 — content filter toggles (LLM Guard scanner pattern; off by default)
+  const [blockProfanity, setBlockProfanity] = useState(false);
+  const [blockAdultContent, setBlockAdultContent] = useState(false);
   const [deliberationMode, setDeliberationMode] = useState("standard");
   const [enableStreaming, setEnableStreaming] = useState(true);
   const [showCost, setShowCost] = useState(true);
@@ -124,7 +127,33 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Chat Preferences */}
+        {/* Phase 1.1 — Content Filters (LLM Guard scanner pattern) */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Filter className="size-4" />
+              Content Filters
+            </CardTitle>
+            <CardDescription>
+              Applied as a scanner layer before input reaches models and after output returns.
+              Both filters are <strong>off by default</strong> — toggling on stores your preference per account.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="divide-y divide-border">
+            <ToggleRow
+              label="Block Profanity"
+              description="Redact profanity from your input and AI responses using a pattern scanner."
+              checked={blockProfanity}
+              onCheckedChange={setBlockProfanity}
+            />
+            <ToggleRow
+              label="Block Adult / Explicit Content"
+              description="Block adult or sexually explicit content in input and output. Off by default."
+              checked={blockAdultContent}
+              onCheckedChange={setBlockAdultContent}
+            />
+          </CardContent>
+        </Card>
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">

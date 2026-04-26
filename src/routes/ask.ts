@@ -47,6 +47,19 @@ import { anonymousRequests } from "../lib/prometheusMetrics.js";
 import { calculateCost } from "../lib/cost.js";
 import { hooks } from "../lib/hooks/hookRegistry.js";
 import { checkOutput, BUILTIN_OUTPUT_RULES } from "../lib/guardrails/index.js";
+import { buildUserScanners, runScannerPipeline } from "../lib/scanners/contentScanner.js";
+import { runPromptFilter } from "../lib/promptFilter.js";
+import { compressPrompt } from "../lib/tokenConservation.js";
+import { applySpecialisationMode, autoDetectDomain, type SpecialisationDomain } from "../lib/specialisationMode.js";
+import { wrapEpistemicSystemPrompt } from "../lib/epistemicTags.js";
+import { computeWeather, extractWeatherMetrics } from "../lib/conversationWeather.js";
+import { socraticRewrite, isSocraticSynthesisEnabled } from "../lib/socraticSynthesis.js";
+import { checkSpendingLimit, recordSpend } from "../lib/spendingLimits.js";
+import { selectRelevantSkills, buildSkillContextBlock } from "../lib/skillSelection.js";
+import { runSOPWorkflow, SOP_TEMPLATES } from "../lib/sopWorkflow.js";
+import { moderateContent } from "../lib/moderation.js";
+import { applyVerbosity, adjustMaxTokensForVerbosity, type VerbosityLevel } from "../lib/verbosity.js";
+import { userSettings } from "../db/schema/users.js";
 import { generateSessionName } from "../lib/secondaryFlows/sessionNaming.js";
 import { updateConversationTitle } from "../services/conversation.service.js";
 import { emitToConversation } from "../lib/socket.js";
@@ -179,6 +192,12 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     if (upload_ids && upload_ids.length > 50) upload_ids.length = 50;
     const kb_id: string | undefined = (request.body as AskBody).kb_id;
     const deliberation_mode: ReasoningMode = (request.body as AskBody).deliberation_mode ?? "standard";
+    // Phase 1.17 — God Mode: raw parallel view, skip synthesis (smol-ai/GodMode)
+    const god_mode: boolean = !!(request.body as AskBody).god_mode;
+    // Phase 1.20 — SOP template selection (MetaGPT pattern)
+    const sop_template: string | undefined = (request.body as any).sop_template;
+    // Phase 1.24 — Response verbosity control (Open WebUI per-chat override)
+    const verbosity: VerbosityLevel | undefined = (request.body as any).verbosity;
 
     // Broadcast user message to room members immediately (before AI processes)
     if (conversationId) {
@@ -238,7 +257,89 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
 
     const userId = request.userId;
 
-    let effectiveConversationId = conversationId;
+    // Phase 1.16 — Spending limit check (Onyx EE pattern)
+    if (userId) {
+      const spendCheck = await checkSpendingLimit(userId);
+      if (!spendCheck.allowed) {
+        return reply.code(402).send({ error: "spending_limit_exceeded", detail: spendCheck.reason });
+      }
+    }
+
+    // Phase 1.1 — Content scanners (LLM Guard scanner pattern, off by default)
+    // Load user's content filter settings and run scanner pipeline on input
+    let contentScanners = [];
+    let adversarialRewrite = false;
+    let tokenConservationMode = false;
+    let uSettings: Record<string, unknown> = {};
+    if (userId) {
+      const [settingsRow] = await db.select().from(userSettings).where(eq(userSettings.userId, userId)).limit(1);
+      uSettings = (settingsRow?.settings as Record<string, unknown>) ?? {};
+      contentScanners = buildUserScanners({
+        blockProfanity: !!uSettings.blockProfanity,
+        blockAdultContent: !!uSettings.blockAdultContent,
+      });
+      adversarialRewrite = !!uSettings.adversarialRewrite;
+      tokenConservationMode = !!uSettings.tokenConservationMode;
+      // Phase 1.10 — epistemic tagging: apply to master prompt
+      if (uSettings.epistemicStatusTags && master) {
+        master = { ...master, systemPrompt: wrapEpistemicSystemPrompt(master.systemPrompt ?? "") };
+      }
+    }    if (contentScanners.length > 0) {
+      const scanResult = runScannerPipeline(question, contentScanners);
+      if (!scanResult.isValid && scanResult.maxRiskScore >= 1.0) {
+        const blocked = scanResult.results.find(r => !r.isValid);
+        reply.code(400).send({ error: "Content policy violation", detail: blocked?.detail });
+        return;
+      }
+      // Replace question with sanitized version (redacted profanity etc.)
+      if (scanResult.sanitized !== question) {
+        (request.body as AskBody).question = scanResult.sanitized;
+      }
+    }
+
+    // Phase 1.21 — Automated Moderation (LibreChat pattern)
+    {
+      const modResult = await moderateContent(question);
+      if (modResult.blocked) {
+        return reply.code(400).send({
+          error: "content_policy_violation",
+          detail: `Content flagged by moderation (${modResult.topCategory}: ${(modResult.topScore * 100).toFixed(0)}%)`,
+        });
+      }
+    }
+
+    // Phase 1.4 — Adversarial prompt filter (Rebuff two-stage pattern, off by default)
+    // Stage 1 runs on every request (zero cost); Stage 2 (LLM rewrite) only when opt-in
+    {
+      const filterResult = await runPromptFilter(question, {
+        blockThreshold: 0.9,
+        enableRewrite: adversarialRewrite,
+        rewriteProvider: adversarialRewrite ? master ?? councilMembers[0] : undefined,
+      });
+
+      if (!filterResult.passed) {
+        reply.code(400).send({
+          error: "Prompt injection detected",
+          riskScore: filterResult.riskScore,
+          patterns: filterResult.patterns,
+        });
+        return;
+      }
+      if (filterResult.processedInput !== question) {
+        (request.body as AskBody).question = filterResult.processedInput;
+      }
+    }
+
+    // Phase 1.5 — Token conservation mode (LLMLingua, MIT, Microsoft)
+    // Silently reduces token spend. Runs only when user enables tokenConservationMode.
+    if (tokenConservationMode) {
+      const currentQ = (request.body as AskBody).question;
+      const compression = await compressPrompt(currentQ, { targetRatio: 0.6 });
+      if (compression.method !== "none") {
+        (request.body as AskBody).question = compression.compressed;
+        logger.info({ method: compression.method, ratio: compression.compressionRatio }, "Token conservation applied");
+      }
+    }
     let messages: Message[] = [];
 
     if (effectiveConversationId) {
@@ -267,7 +368,37 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
 
     const councilMembers = await prepareCouncilWithArchetypes(resolvedMembers, effectiveSummon, userId);
 
-    let memoryContext = "";
+    // Phase 1.2 — per-member toggle (LibreChat pause/resume pattern)
+    // disabled_members lists provider names to skip this round.
+    // Spec: member finishes current response then stops; on re-enable it receives
+    // all missed user messages + round consensus for catch-up (handled client-side via history).
+    const { disabled_members } = request.body as AskBody;
+    const activeCouncilMembers = disabled_members?.length
+      ? councilMembers.filter(m => !disabled_members.includes(m.name))
+      : councilMembers;
+    // Guard: if all members are disabled, fall back to full council
+    let effectiveCouncilMembers = activeCouncilMembers.length > 0 ? activeCouncilMembers : councilMembers;
+
+    // Phase 1.6 — Specialisation mode (CrewAI role-based specialisation + AutoGen domain-adaptive pattern)
+    // Reads specialisationDomain from user settings ("auto" = keyword-detect from question)
+    {
+      const rawDomain = (userId
+        ? (await db.select({ settings: userSettings.settings }).from(userSettings).where(eq(userSettings.userId, userId)).limit(1)
+            .then(r => (r[0]?.settings as Record<string, unknown>)?.specialisationDomain as SpecialisationDomain))
+        : undefined) ?? "auto";
+      const domain: SpecialisationDomain = rawDomain === "auto"
+        ? autoDetectDomain((request.body as AskBody).question)
+        : rawDomain;
+      if (domain !== "auto") {
+        effectiveCouncilMembers = applySpecialisationMode(effectiveCouncilMembers, domain);
+      }
+    }
+
+    // Phase 1.24 — Apply verbosity control (Open WebUI per-chat override)
+    if (verbosity && master) {
+      master = { ...master, systemPrompt: applyVerbosity(master.systemPrompt ?? "", verbosity) };
+    }
+    const effectiveMaxTokens = verbosity ? adjustMaxTokensForVerbosity(maxTokens, verbosity) : maxTokens;
     if (effectiveConversationId) {
       const relevantChats = await retrieveRelevantContext(effectiveConversationId, question, 3);
       memoryContext = formatContextForInjection(relevantChats);
@@ -319,7 +450,19 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     const enrichedQuestion = codeContext
       ? `${codeContext}\n\n${questionWithContext}`
       : questionWithContext;
-    const currentMessages = [...messages, { role: "user" as const, content: enrichedQuestion }] as Message[];
+
+    // Phase 1.19 — Intelligent Skill Selection (AnythingLLM pattern)
+    // Auto-select relevant tools from user's skill library and inject as context
+    let skillContextBlock = "";
+    if (userId) {
+      const relevantSkills = await selectRelevantSkills(userId, question);
+      skillContextBlock = buildSkillContextBlock(relevantSkills);
+    }
+    const finalEnrichedQuestion = skillContextBlock
+      ? `${enrichedQuestion}${skillContextBlock}`
+      : enrichedQuestion;
+
+    const currentMessages = [...messages, { role: "user" as const, content: finalEnrichedQuestion }] as Message[];
 
     // Hook: pre:query — before retrieval/search
     await hooks.run('pre:query', { stage: 'pre:query', userId: userId ?? undefined, query: question });
@@ -337,7 +480,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     // Pass userId to scope cache per tenant
     // Quota is already decremented by fastifyCheckQuota preHandler —
     // cache hits DO count against quota (request was counted before reaching this code).
-    const cached = await getCachedResponse(question, councilMembers, master, messages, userId);
+    const cached = await getCachedResponse(question, effectiveCouncilMembers, master, messages, userId);
 
     let verdict;
     let finalOpinions: { name: string; opinion: string; [key: string]: unknown }[];
@@ -351,22 +494,28 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       logger.info({ question: question.slice(0, 50) }, "Serving from semantic cache");
       if (traceCtx) addStep(traceCtx, { name: "cache_hit", type: "retrieval", input: question.slice(0, 500), output: "served from cache", latencyMs: 0 });
     } else {
-      logger.info({ question: question.slice(0, 80), memberCount: councilMembers.length, summon: effectiveSummon, rounds: effectiveRounds, deliberation_mode }, "Council ask started");
+      logger.info({ question: question.slice(0, 80), memberCount: effectiveCouncilMembers.length, summon: effectiveSummon, rounds: effectiveRounds, deliberation_mode }, "Council ask started");
 
       const councilStart = Date.now();
 
-      if (deliberation_mode === "socratic") {
-        const { augmentedContext, qa } = await runSocraticPrelude(question, councilMembers);
+      // Phase 1.20 — SOP workflow (MetaGPT pattern) takes priority if sop_template provided
+      if (sop_template && SOP_TEMPLATES[sop_template]) {
+        const sopResult = await runSOPWorkflow(question, effectiveCouncilMembers, SOP_TEMPLATES[sop_template], effectiveMaxTokens);
+        verdict = sopResult.finalSynthesis;
+        tokensUsed = sopResult.totalTokens;
+        finalOpinions = sopResult.steps.map(s => ({ name: s.step, opinion: s.output }));
+      } else if (deliberation_mode === "socratic") {
+        const { augmentedContext, qa } = await runSocraticPrelude(question, effectiveCouncilMembers);
         const augmentedMessages = [
           ...messages,
           { role: "user" as const, content: augmentedContext + (typeof enrichedQuestion === "string" ? enrichedQuestion : question) },
         ];
-        const councilResponse = await askCouncil(councilMembers, master, augmentedMessages, maxTokens, effectiveRounds);
+        const councilResponse = await askCouncil(effectiveCouncilMembers, master, augmentedMessages, effectiveMaxTokens, effectiveRounds);
         verdict = councilResponse.verdict;
         finalOpinions = [{ name: "Socratic Q&A", opinion: qa.map(({ q, a }) => `Q: ${q}\nA: ${a}`).join("\n\n") }, ...councilResponse.opinions];
         tokensUsed = councilResponse.metrics?.totalTokens ?? 0;
       } else if (deliberation_mode === "red_blue") {
-        const result = await runRedBlueDebate(question, councilMembers);
+        const result = await runRedBlueDebate(question, effectiveCouncilMembers);
         verdict = result.judgeVerdict;
         // Track tokens for all deliberation paths
         tokensUsed = (result as { totalTokens?: number }).totalTokens ?? 0;
@@ -376,7 +525,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
           { name: "Judge", opinion: result.judgeVerdict },
         ];
       } else if (deliberation_mode === "hypothesis") {
-        const result = await runHypothesisRefinement(question, councilMembers);
+        const result = await runHypothesisRefinement(question, effectiveCouncilMembers);
         verdict = result.finalSynthesis;
         // Track tokens for all deliberation paths
         tokensUsed = (result as { totalTokens?: number }).totalTokens ?? 0;
@@ -384,7 +533,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
           r.hypotheses.map((h) => ({ name: `${h.agent} [${r.phase} R${r.round}]`, opinion: h.text }))
         );
       } else if (deliberation_mode === "confidence") {
-        const result = await runConfidenceCalibration(question, councilMembers);
+        const result = await runConfidenceCalibration(question, effectiveCouncilMembers);
         verdict = result.weightedSynthesis;
         // Track tokens for all deliberation paths
         tokensUsed = (result as { totalTokens?: number }).totalTokens ?? 0;
@@ -397,9 +546,15 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       } else {
         // Hook: pre:llm — before LLM call
         await hooks.run('pre:llm', { stage: 'pre:llm', query: question, documents: ragCitations.length > 0 ? ragCitations : undefined });
-        const councilResponse = await askCouncil(councilMembers, master, currentMessages, maxTokens, effectiveRounds);
-        verdict = councilResponse.verdict;
-        finalOpinions = councilResponse.opinions;
+        const councilResponse = await askCouncil(effectiveCouncilMembers, master, currentMessages, effectiveMaxTokens, effectiveRounds);
+        // Phase 1.17 — God Mode: skip synthesis, surface raw parallel opinions directly
+        if (god_mode) {
+          finalOpinions = councilResponse.opinions;
+          verdict = finalOpinions.map(o => `**${o.name}:**\n${o.opinion}`).join("\n\n---\n\n");
+        } else {
+          verdict = councilResponse.verdict;
+          finalOpinions = councilResponse.opinions;
+        }
         tokensUsed = councilResponse.metrics?.totalTokens ?? 0;
         // Hook: post:llm — after LLM response
         await hooks.run('post:llm', { stage: 'post:llm', response: verdict });
@@ -412,13 +567,18 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         addStep(traceCtx, { name: "synthesis", type: "synthesis", input: question.slice(0, 500), output: verdict.slice(0, 500), tokens: tokensUsed, latencyMs: Date.now() - councilStart });
       }
 
-      await setCachedResponse(question, councilMembers, master, messages, verdict, finalOpinions, userId);
+      await setCachedResponse(question, effectiveCouncilMembers, master, messages, verdict, finalOpinions, userId);
     }
 
     // End trace
     if (traceCtx) {
       traceCtx.conversationId = effectiveConversationId || undefined;
       try { endTrace(traceCtx); } catch (err) { logger.warn({ err }, "Failed to save trace"); }
+    }
+
+    // Phase 1.16 — Record spend after successful council call
+    if (userId && tokensUsed > 0) {
+      recordSpend(userId, tokensUsed).catch(() => {}); // fire-and-forget, non-blocking
     }
 
     // Output guardrails — check and possibly redact/block verdict
@@ -430,6 +590,11 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       } else if (guardrailResult.processedText !== verdict) {
         verdict = guardrailResult.processedText;
       }
+      // Phase 1.1 — run output through user's content scanners too
+      if (contentScanners.length > 0) {
+        const outScan = runScannerPipeline(verdict, contentScanners);
+        if (outScan.sanitized !== verdict) verdict = outScan.sanitized;
+      }
     }
 
     // Citation formatting — append sources to verdict if RAG citations exist
@@ -438,6 +603,12 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         .map((c, i) => `[${i + 1}] ${c.source}`)
         .join("\n");
       verdict = `${verdict}\n\n**Sources:**\n${sourcesBlock}`;
+    }
+
+    // Phase 1.14 — Socratic synthesis rewrite (Khanmigo pattern)
+    // Rewrites verdict as guided questions when user wants to discover the answer themselves
+    if (verdict && effectiveCouncilMembers.length > 0 && isSocraticSynthesisEnabled(deliberation_mode, uSettings)) {
+      verdict = await socraticRewrite(verdict, question, effectiveCouncilMembers[0]);
     }
 
     const isNewConversation = !conversationId && !!userId;
@@ -512,6 +683,13 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       }
     }
 
+    // Phase 1.11 — Conversation Weather (Argilla data quality indicator pattern)
+    const weatherMetrics = extractWeatherMetrics(
+      finalOpinions.map(o => ({ opinion: o.opinion ?? "", confidence: o.confidence })),
+      finalOpinions.length > 1 ? undefined : undefined,
+    );
+    const weather = computeWeather(weatherMetrics);
+
     return {
       success: true,
       conversationId: effectiveConversationId,
@@ -522,7 +700,9 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       router: routerDecision ? formatRouterMetadata(routerDecision) : undefined,
       citations: ragCitations.length > 0 ? ragCitations : undefined,
       artifact_id: artifactId,
-      metrics: (tokensUsed > 0 || isCacheHit) ? { totalTokens: tokensUsed, totalCost: 0, hallucinationCount: 0 } : undefined
+      metrics: (tokensUsed > 0 || isCacheHit) ? { totalTokens: tokensUsed, totalCost: 0, hallucinationCount: 0 } : undefined,
+      weather,
+      god_mode: god_mode || undefined,
     };
   });
 
@@ -698,7 +878,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       let finalOpinions: { name: string; opinion: string; [key: string]: unknown }[] = [];
       let tokensUsed = 0;
 
-      const cached = await getCachedResponse(question, councilMembers, master, messages, userId);
+      const cached = await getCachedResponse(question, effectiveCouncilMembers, master, messages, userId);
       if (cached) {
         isCacheHit = true;
         finalVerdict = cached.verdict;
@@ -724,7 +904,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         })}\n\n`);
         reply.raw.end();
       } else {
-        logger.info({ question: question.slice(0, 80), memberCount: councilMembers.length, summon: effectiveSummon, rounds: effectiveRounds, deliberation_mode }, "Council SSE stream started");
+        logger.info({ question: question.slice(0, 80), memberCount: effectiveCouncilMembers.length, summon: effectiveSummon, rounds: effectiveRounds, deliberation_mode }, "Council SSE stream started");
 
         const emitEvent = (type: string, data: Record<string, unknown>) => {
           if (!controller.signal.aborted) {
@@ -740,14 +920,14 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
           emitEvent("mode_start", { mode: deliberation_mode });
 
           if (deliberation_mode === "socratic") {
-            const { augmentedContext, qa } = await runSocraticPrelude(question, councilMembers);
+            const { augmentedContext, qa } = await runSocraticPrelude(question, effectiveCouncilMembers);
             emitEvent("mode_phase", { phase: "socratic_prelude", qa });
             const augmentedMessages = [
               ...messages,
               { role: "user" as const, content: augmentedContext + questionWithContext },
             ];
             finalVerdict = await streamCouncil(
-              councilMembers, master, augmentedMessages,
+              effectiveCouncilMembers, master, augmentedMessages,
               (event, data) => {
                 if (event === "opinion") finalOpinions.push(data as { name: string; opinion: string });
                 if (event === "done") tokensUsed = (data as { tokensUsed?: number }).tokensUsed || 0;
@@ -756,7 +936,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
               maxTokens, effectiveRounds, controller.signal
             );
           } else if (deliberation_mode === "red_blue") {
-            const result = await runRedBlueDebate(question, councilMembers);
+            const result = await runRedBlueDebate(question, effectiveCouncilMembers);
             emitEvent("mode_phase", { phase: "red_blue_complete", redArguments: result.redArguments, blueArguments: result.blueArguments });
             finalVerdict = result.judgeVerdict;
             finalOpinions = [
@@ -766,7 +946,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
             ];
             emitEvent("done", { verdict: finalVerdict, opinions: finalOpinions, router: routerDecision ? formatRouterMetadata(routerDecision) : undefined });
           } else if (deliberation_mode === "hypothesis") {
-            const result = await runHypothesisRefinement(question, councilMembers);
+            const result = await runHypothesisRefinement(question, effectiveCouncilMembers);
             for (const round of result.rounds) {
               emitEvent("mode_phase", { phase: "hypothesis_round", round });
             }
@@ -776,7 +956,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
             );
             emitEvent("done", { verdict: finalVerdict, opinions: finalOpinions, router: routerDecision ? formatRouterMetadata(routerDecision) : undefined });
           } else if (deliberation_mode === "confidence") {
-            const result = await runConfidenceCalibration(question, councilMembers);
+            const result = await runConfidenceCalibration(question, effectiveCouncilMembers);
             emitEvent("mode_phase", { phase: "calibrated_opinions", opinions: result.opinions });
             finalVerdict = result.weightedSynthesis;
             finalOpinions = result.opinions.map((o) => ({
@@ -788,7 +968,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
           reply.raw.end();
         } else {
           finalVerdict = await streamCouncil(
-            councilMembers,
+            effectiveCouncilMembers,
             master,
             currentMessages,
             (event, data) => {
@@ -804,7 +984,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
           reply.raw.end();
         }
 
-        await setCachedResponse(question, councilMembers, master, messages, finalVerdict, finalOpinions, userId);
+        await setCachedResponse(question, effectiveCouncilMembers, master, messages, finalVerdict, finalOpinions, userId);
 
         // Output guardrails on stream verdict
         if (finalVerdict) {

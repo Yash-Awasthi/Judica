@@ -80,6 +80,15 @@ export const askSchema = z
     repo_id: z.string().optional(),
     dateFrom: z.string().optional(), // ISO 8601 date string for temporal filtering
     dateTo: z.string().optional(),   // ISO 8601 date string for temporal filtering
+    // Phase 1.2 — per-member toggle (LibreChat pause/resume pattern)
+    // List of provider names to skip this round; member catches up on re-enable
+    disabled_members: z.array(z.string().max(50)).max(10).optional(),
+    // Phase 1.17 — God Mode: skip synthesis, return raw parallel opinions (smol-ai/GodMode)
+    god_mode: z.boolean().default(false),
+    // Phase 1.20 — SOP-driven mode (MetaGPT pattern): use named SOP template
+    sop_template: z.enum(["research_analyze", "debate_resolve", "product_design"]).optional(),
+    // Phase 1.24 — Response verbosity control (Open WebUI per-chat override)
+    verbosity: z.enum(["concise", "standard", "detailed", "exhaustive"]).optional(),
   });
 
 export const renameConversationSchema = z.object({
@@ -127,6 +136,19 @@ export const userSettingsSchema = z.object({
   streamResponses: z.boolean().optional(),
   sidebarCollapsed: z.boolean().optional(),
   deliberationMode: z.enum(["standard", "socratic", "red_blue", "hypothesis", "confidence"]).optional(),
+  // Phase 1.1 — content filter toggles (off by default, per cost/opt-in principle)
+  blockProfanity: z.boolean().optional(),
+  blockAdultContent: z.boolean().optional(),
+  // Phase 1.4 — adversarial prompt rewrite (Rebuff pattern; adds token cost; off by default)
+  adversarialRewrite: z.boolean().optional(),
+  // Phase 1.5 — token conservation mode (LLMLingua, MIT, Microsoft; silently reduces token spend)
+  tokenConservationMode: z.boolean().optional(),
+  // Phase 1.6 — specialisation domain (CrewAI/AutoGen pattern; "auto" = keyword-detect)
+  specialisationDomain: z.enum(["auto", "code", "legal", "medical", "creative", "research"]).optional(),
+  // Phase 1.10 — epistemic status tags (Elicit / Gwern annotation pattern; off by default)
+  epistemicStatusTags: z.boolean().optional(),
+  // Phase 1.14 — Socratic synthesis rewrite (Khanmigo pattern; off by default)
+  socraticSynthesis: z.boolean().optional(),
 }).strict();
 
 export const configSchema = z
