@@ -21,6 +21,7 @@ RUN cd frontend && rm -f package-lock.json && npm install --legacy-peer-deps
 COPY tsconfig.json ./
 COPY drizzle.config.ts ./
 COPY src/ ./src/
+COPY migrations/ ./migrations/
 COPY frontend/ ./frontend/
 
 # Build everything (frontend + TypeScript compile)
