@@ -37,3 +37,4 @@ export * from "./promptFavourites.js";
 export * from "./connectedAiAccounts.js";
 export * from "./memoryTriples.js";
 export * from "./goalDocuments.js";
+export * from "./agentMemories.js";

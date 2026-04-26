@@ -61,6 +61,7 @@ import { moderateContent } from "../lib/moderation.js";
 import { applyVerbosity, adjustMaxTokensForVerbosity, type VerbosityLevel } from "../lib/verbosity.js";
 import { retrieveCrossConversationMemory, formatCrossMemoryContext } from "../lib/crossConversationMemory.js";
 import { goalDocuments } from "../db/schema/goalDocuments.js";
+import { buildAgentMemoryPrefixes } from "../lib/agentMemory.js";
 import { userSettings } from "../db/schema/users.js";
 import { generateSessionName } from "../lib/secondaryFlows/sessionNaming.js";
 import { updateConversationTitle } from "../services/conversation.service.js";
@@ -418,6 +419,21 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     if (effectiveConversationId) {
       const relevantChats = await retrieveRelevantContext(effectiveConversationId, question, 3);
       memoryContext = formatContextForInjection(relevantChats);
+    }
+
+    // Phase 2.10 — Agent-Level Memory (mem0 agent scope)
+    // Inject per-archetype memories into each council member's system prompt
+    if (userId) {
+      const agentIds = effectiveCouncilMembers.map(m => m.name ?? m.id ?? "").filter(Boolean);
+      const agentPrefixes = await buildAgentMemoryPrefixes(userId, agentIds as string[]);
+      if (agentPrefixes.size > 0) {
+        effectiveCouncilMembers = effectiveCouncilMembers.map(m => {
+          const key = m.name ?? m.id ?? "";
+          const prefix = agentPrefixes.get(key as string);
+          if (!prefix) return m;
+          return { ...m, systemPrompt: prefix + (m.systemPrompt ?? "") };
+        });
+      }
     }
 
     // Reject anonymous users for file loading instead of falling back to user 0.
