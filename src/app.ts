@@ -110,6 +110,7 @@ import { securityPlugin } from "./routes/security.js";
 import { agentAuditPlugin } from "./routes/agent-audit.js";
 import { webPushPlugin } from "./routes/web-push.js";
 import { simulationPersonasPlugin } from "./routes/simulation-personas.js";
+import { simulationEnvironmentPlugin } from "./routes/simulation-environment.js";
 import tracesPlugin from "./routes/traces.js";
 import analyticsPlugin from "./routes/analytics.js";
 import reposPlugin from "./routes/repos.js";
@@ -405,6 +406,7 @@ export async function buildApp() {
   await fastify.register(agentAuditPlugin,         { prefix: "/api" });
   await fastify.register(webPushPlugin,            { prefix: "/api" });
   await fastify.register(simulationPersonasPlugin, { prefix: "/api" });
+  await fastify.register(simulationEnvironmentPlugin, { prefix: "/api" });
   await fastify.register(tracesPlugin,          { prefix: "/api/traces" });
   await fastify.register(analyticsPlugin,       { prefix: "/api/analytics" });
   await fastify.register(reposPlugin,           { prefix: "/api/repos" });
