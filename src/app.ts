@@ -82,6 +82,7 @@ import { hfHubPlugin } from "./routes/hf-hub.js";
 import { memoryPortabilityPlugin } from "./routes/memory-portability.js";
 import { videoTranscriptPlugin } from "./routes/video-transcript.js";
 import { customConnectorsPlugin } from "./routes/custom-connectors.js";
+import { googleWorkspacePlugin } from "./routes/google-workspace.js";
 import tracesPlugin from "./routes/traces.js";
 import analyticsPlugin from "./routes/analytics.js";
 import reposPlugin from "./routes/repos.js";
@@ -349,6 +350,7 @@ export async function buildApp() {
   await fastify.register(memoryPortabilityPlugin,  { prefix: "/api" });
   await fastify.register(videoTranscriptPlugin,    { prefix: "/api" });
   await fastify.register(customConnectorsPlugin,   { prefix: "/api" });
+  await fastify.register(googleWorkspacePlugin,    { prefix: "/api" });
   await fastify.register(tracesPlugin,          { prefix: "/api/traces" });
   await fastify.register(analyticsPlugin,       { prefix: "/api/analytics" });
   await fastify.register(reposPlugin,           { prefix: "/api/repos" });
