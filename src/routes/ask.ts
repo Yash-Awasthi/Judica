@@ -62,6 +62,7 @@ import { applyVerbosity, adjustMaxTokensForVerbosity, type VerbosityLevel } from
 import { retrieveCrossConversationMemory, formatCrossMemoryContext } from "../lib/crossConversationMemory.js";
 import { goalDocuments } from "../db/schema/goalDocuments.js";
 import { buildAgentMemoryPrefixes } from "../lib/agentMemory.js";
+import { applyPostSynthesisMemoryEdits } from "../lib/selfEditingMemory.js";
 import { userSettings } from "../db/schema/users.js";
 import { generateSessionName } from "../lib/secondaryFlows/sessionNaming.js";
 import { updateConversationTitle } from "../services/conversation.service.js";
@@ -650,6 +651,13 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     // Rewrites verdict as guided questions when user wants to discover the answer themselves
     if (verdict && effectiveCouncilMembers.length > 0 && isSocraticSynthesisEnabled(deliberation_mode, uSettings)) {
       verdict = await socraticRewrite(verdict, question, effectiveCouncilMembers[0]);
+    }
+
+    // Phase 2.13 — Self-Editing Memory (Letta/MemGPT pattern)
+    // After synthesis, parse any <memory-edit> blocks in verdict and apply them
+    if (userId && verdict) {
+      applyPostSynthesisMemoryEdits(userId, verdict, effectiveConversationId ?? undefined)
+        .catch(() => {}); // fire-and-forget, don't block response
     }
 
     const isNewConversation = !conversationId && !!userId;
