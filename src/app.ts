@@ -151,6 +151,7 @@ import discordPlugin from "./integrations/discord/routes.js";
 import imagePlugin from "./routes/images.js";
 import featureFlagPlugin from "./routes/featureFlags.js";
 import widgetPlugin from "./routes/widget.js";
+import { surfaceAccessPlugin } from "./routes/surface-access.js";
 import whitelabelPlugin from "./routes/whitelabel.js";
 import billingPlugin from "./routes/billing.js";
 import webSearchPlugin from "./routes/webSearch.js";
@@ -481,6 +482,8 @@ export async function buildApp() {
   await fastify.register(featureFlagPlugin,     { prefix: "/api/feature-flags" });
   // Embeddable chat widget (JS bundle + config)
   await fastify.register(widgetPlugin,          { prefix: "/api/widget" });
+  // Multi-surface access (Chrome extension, Slack, Discord, widget, desktop, mobile)
+  await fastify.register(surfaceAccessPlugin,  { prefix: "/api/surfaces" });
   // Whitelabeling (tenant branding)
   await fastify.register(whitelabelPlugin,      { prefix: "/api/whitelabel" });
   // Plans & billing (Stripe)

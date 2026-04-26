@@ -45,3 +45,4 @@ export * from "./workflowRunLogs.js";
 export * from "./agentActionLogs.js";
 export * from "./documentSets.js";
 export * from "./connectorSync.js";
+export * from "./surfaceAccess.js";
