@@ -105,6 +105,7 @@ import { browserAgentPlugin } from "./routes/browser-agent.js";
 import { a2aPlugin } from "./routes/a2a.js";
 import { reactiveAgentsPlugin } from "./routes/reactive-agents.js";
 import { codeAgentPlugin } from "./routes/code-agent.js";
+import { githubFixPlugin } from "./routes/github-fix.js";
 import tracesPlugin from "./routes/traces.js";
 import analyticsPlugin from "./routes/analytics.js";
 import reposPlugin from "./routes/repos.js";
@@ -395,6 +396,7 @@ export async function buildApp() {
   await fastify.register(a2aPlugin,                { prefix: "/api" });
   await fastify.register(reactiveAgentsPlugin,     { prefix: "/api" });
   await fastify.register(codeAgentPlugin,          { prefix: "/api" });
+  await fastify.register(githubFixPlugin,          { prefix: "/api" });
   await fastify.register(tracesPlugin,          { prefix: "/api/traces" });
   await fastify.register(analyticsPlugin,       { prefix: "/api/analytics" });
   await fastify.register(reposPlugin,           { prefix: "/api/repos" });
