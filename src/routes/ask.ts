@@ -50,6 +50,7 @@ import { checkOutput, BUILTIN_OUTPUT_RULES } from "../lib/guardrails/index.js";
 import { buildUserScanners, runScannerPipeline } from "../lib/scanners/contentScanner.js";
 import { runPromptFilter } from "../lib/promptFilter.js";
 import { compressPrompt } from "../lib/tokenConservation.js";
+import { applySpecialisationMode, autoDetectDomain, type SpecialisationDomain } from "../lib/specialisationMode.js";
 import { userSettings } from "../db/schema/users.js";
 import { generateSessionName } from "../lib/secondaryFlows/sessionNaming.js";
 import { updateConversationTitle } from "../services/conversation.service.js";
@@ -256,8 +257,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       });
       adversarialRewrite = !!uSettings.adversarialRewrite;
       tokenConservationMode = !!uSettings.tokenConservationMode;
-    }
-    if (contentScanners.length > 0) {
+    }    if (contentScanners.length > 0) {
       const scanResult = runScannerPipeline(question, contentScanners);
       if (!scanResult.isValid && scanResult.maxRiskScore >= 1.0) {
         const blocked = scanResult.results.find(r => !r.isValid);
@@ -338,7 +338,22 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       ? councilMembers.filter(m => !disabled_members.includes(m.name))
       : councilMembers;
     // Guard: if all members are disabled, fall back to full council
-    const effectiveCouncilMembers = activeCouncilMembers.length > 0 ? activeCouncilMembers : councilMembers;
+    let effectiveCouncilMembers = activeCouncilMembers.length > 0 ? activeCouncilMembers : councilMembers;
+
+    // Phase 1.6 — Specialisation mode (CrewAI role-based specialisation + AutoGen domain-adaptive pattern)
+    // Reads specialisationDomain from user settings ("auto" = keyword-detect from question)
+    {
+      const rawDomain = (userId
+        ? (await db.select({ settings: userSettings.settings }).from(userSettings).where(eq(userSettings.userId, userId)).limit(1)
+            .then(r => (r[0]?.settings as Record<string, unknown>)?.specialisationDomain as SpecialisationDomain))
+        : undefined) ?? "auto";
+      const domain: SpecialisationDomain = rawDomain === "auto"
+        ? autoDetectDomain((request.body as AskBody).question)
+        : rawDomain;
+      if (domain !== "auto") {
+        effectiveCouncilMembers = applySpecialisationMode(effectiveCouncilMembers, domain);
+      }
+    }
     if (effectiveConversationId) {
       const relevantChats = await retrieveRelevantContext(effectiveConversationId, question, 3);
       memoryContext = formatContextForInjection(relevantChats);

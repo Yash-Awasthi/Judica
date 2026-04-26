@@ -137,6 +137,8 @@ export const userSettingsSchema = z.object({
   adversarialRewrite: z.boolean().optional(),
   // Phase 1.5 — token conservation mode (LLMLingua, MIT, Microsoft; silently reduces token spend)
   tokenConservationMode: z.boolean().optional(),
+  // Phase 1.6 — specialisation domain (CrewAI/AutoGen pattern; "auto" = keyword-detect)
+  specialisationDomain: z.enum(["auto", "code", "legal", "medical", "creative", "research"]).optional(),
 }).strict();
 
 export const configSchema = z
