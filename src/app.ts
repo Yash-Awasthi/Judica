@@ -78,6 +78,7 @@ import { agentMemoriesPlugin } from "./routes/agent-memories.js";
 import { fineTunePlugin } from "./routes/fine-tune.js";
 import { promptOptimisationPlugin } from "./routes/prompt-optimisation.js";
 import { agentProfilesPlugin } from "./routes/agent-profiles.js";
+import { hfHubPlugin } from "./routes/hf-hub.js";
 import tracesPlugin from "./routes/traces.js";
 import analyticsPlugin from "./routes/analytics.js";
 import reposPlugin from "./routes/repos.js";
@@ -341,6 +342,7 @@ export async function buildApp() {
   await fastify.register(fineTunePlugin,         { prefix: "/api" });
   await fastify.register(promptOptimisationPlugin, { prefix: "/api" });
   await fastify.register(agentProfilesPlugin,      { prefix: "/api" });
+  await fastify.register(hfHubPlugin,              { prefix: "/api" });
   await fastify.register(tracesPlugin,          { prefix: "/api/traces" });
   await fastify.register(analyticsPlugin,       { prefix: "/api/analytics" });
   await fastify.register(reposPlugin,           { prefix: "/api/repos" });
