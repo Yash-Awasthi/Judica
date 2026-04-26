@@ -58,6 +58,7 @@ import { checkSpendingLimit, recordSpend } from "../lib/spendingLimits.js";
 import { selectRelevantSkills, buildSkillContextBlock } from "../lib/skillSelection.js";
 import { runSOPWorkflow, SOP_TEMPLATES } from "../lib/sopWorkflow.js";
 import { moderateContent } from "../lib/moderation.js";
+import { applyVerbosity, adjustMaxTokensForVerbosity, type VerbosityLevel } from "../lib/verbosity.js";
 import { userSettings } from "../db/schema/users.js";
 import { generateSessionName } from "../lib/secondaryFlows/sessionNaming.js";
 import { updateConversationTitle } from "../services/conversation.service.js";
@@ -195,6 +196,8 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     const god_mode: boolean = !!(request.body as AskBody).god_mode;
     // Phase 1.20 — SOP template selection (MetaGPT pattern)
     const sop_template: string | undefined = (request.body as any).sop_template;
+    // Phase 1.24 — Response verbosity control (Open WebUI per-chat override)
+    const verbosity: VerbosityLevel | undefined = (request.body as any).verbosity;
 
     // Broadcast user message to room members immediately (before AI processes)
     if (conversationId) {
@@ -390,6 +393,12 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         effectiveCouncilMembers = applySpecialisationMode(effectiveCouncilMembers, domain);
       }
     }
+
+    // Phase 1.24 — Apply verbosity control (Open WebUI per-chat override)
+    if (verbosity && master) {
+      master = { ...master, systemPrompt: applyVerbosity(master.systemPrompt ?? "", verbosity) };
+    }
+    const effectiveMaxTokens = verbosity ? adjustMaxTokensForVerbosity(maxTokens, verbosity) : maxTokens;
     if (effectiveConversationId) {
       const relevantChats = await retrieveRelevantContext(effectiveConversationId, question, 3);
       memoryContext = formatContextForInjection(relevantChats);
@@ -491,7 +500,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
 
       // Phase 1.20 — SOP workflow (MetaGPT pattern) takes priority if sop_template provided
       if (sop_template && SOP_TEMPLATES[sop_template]) {
-        const sopResult = await runSOPWorkflow(question, effectiveCouncilMembers, SOP_TEMPLATES[sop_template], maxTokens);
+        const sopResult = await runSOPWorkflow(question, effectiveCouncilMembers, SOP_TEMPLATES[sop_template], effectiveMaxTokens);
         verdict = sopResult.finalSynthesis;
         tokensUsed = sopResult.totalTokens;
         finalOpinions = sopResult.steps.map(s => ({ name: s.step, opinion: s.output }));
@@ -501,7 +510,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
           ...messages,
           { role: "user" as const, content: augmentedContext + (typeof enrichedQuestion === "string" ? enrichedQuestion : question) },
         ];
-        const councilResponse = await askCouncil(effectiveCouncilMembers, master, augmentedMessages, maxTokens, effectiveRounds);
+        const councilResponse = await askCouncil(effectiveCouncilMembers, master, augmentedMessages, effectiveMaxTokens, effectiveRounds);
         verdict = councilResponse.verdict;
         finalOpinions = [{ name: "Socratic Q&A", opinion: qa.map(({ q, a }) => `Q: ${q}\nA: ${a}`).join("\n\n") }, ...councilResponse.opinions];
         tokensUsed = councilResponse.metrics?.totalTokens ?? 0;
@@ -537,7 +546,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       } else {
         // Hook: pre:llm — before LLM call
         await hooks.run('pre:llm', { stage: 'pre:llm', query: question, documents: ragCitations.length > 0 ? ragCitations : undefined });
-        const councilResponse = await askCouncil(effectiveCouncilMembers, master, currentMessages, maxTokens, effectiveRounds);
+        const councilResponse = await askCouncil(effectiveCouncilMembers, master, currentMessages, effectiveMaxTokens, effectiveRounds);
         // Phase 1.17 — God Mode: skip synthesis, surface raw parallel opinions directly
         if (god_mode) {
           finalOpinions = councilResponse.opinions;

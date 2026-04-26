@@ -87,6 +87,8 @@ export const askSchema = z
     god_mode: z.boolean().default(false),
     // Phase 1.20 — SOP-driven mode (MetaGPT pattern): use named SOP template
     sop_template: z.enum(["research_analyze", "debate_resolve", "product_design"]).optional(),
+    // Phase 1.24 — Response verbosity control (Open WebUI per-chat override)
+    verbosity: z.enum(["concise", "standard", "detailed", "exhaustive"]).optional(),
   });
 
 export const renameConversationSchema = z.object({
