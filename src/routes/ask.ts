@@ -59,6 +59,10 @@ import { selectRelevantSkills, buildSkillContextBlock } from "../lib/skillSelect
 import { runSOPWorkflow, SOP_TEMPLATES } from "../lib/sopWorkflow.js";
 import { moderateContent } from "../lib/moderation.js";
 import { applyVerbosity, adjustMaxTokensForVerbosity, type VerbosityLevel } from "../lib/verbosity.js";
+import { retrieveCrossConversationMemory, formatCrossMemoryContext } from "../lib/crossConversationMemory.js";
+import { goalDocuments } from "../db/schema/goalDocuments.js";
+import { buildAgentMemoryPrefixes } from "../lib/agentMemory.js";
+import { applyPostSynthesisMemoryEdits } from "../lib/selfEditingMemory.js";
 import { userSettings } from "../db/schema/users.js";
 import { generateSessionName } from "../lib/secondaryFlows/sessionNaming.js";
 import { updateConversationTitle } from "../services/conversation.service.js";
@@ -399,9 +403,38 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       master = { ...master, systemPrompt: applyVerbosity(master.systemPrompt ?? "", verbosity) };
     }
     const effectiveMaxTokens = verbosity ? adjustMaxTokensForVerbosity(maxTokens, verbosity) : maxTokens;
+
+    // Phase 2.8 — Goal document context injection (Cursor .cursorrules / CLAUDE.md pattern)
+    // Active goal document is silently prepended to master system prompt
+    if (userId && master) {
+      const [goalDoc] = await db
+        .select({ content: goalDocuments.content, title: goalDocuments.title })
+        .from(goalDocuments)
+        .where(and(eq(goalDocuments.userId, userId), eq(goalDocuments.isActive, true)))
+        .limit(1);
+      if (goalDoc) {
+        const goalPrefix = `[USER GOAL CONTEXT — "${goalDoc.title}"]\n${goalDoc.content}\n[/USER GOAL CONTEXT]\n\n`;
+        master = { ...master, systemPrompt: goalPrefix + (master.systemPrompt ?? "") };
+      }
+    }
     if (effectiveConversationId) {
       const relevantChats = await retrieveRelevantContext(effectiveConversationId, question, 3);
       memoryContext = formatContextForInjection(relevantChats);
+    }
+
+    // Phase 2.10 — Agent-Level Memory (mem0 agent scope)
+    // Inject per-archetype memories into each council member's system prompt
+    if (userId) {
+      const agentIds = effectiveCouncilMembers.map(m => m.name ?? m.id ?? "").filter(Boolean);
+      const agentPrefixes = await buildAgentMemoryPrefixes(userId, agentIds as string[]);
+      if (agentPrefixes.size > 0) {
+        effectiveCouncilMembers = effectiveCouncilMembers.map(m => {
+          const key = m.name ?? m.id ?? "";
+          const prefix = agentPrefixes.get(key as string);
+          if (!prefix) return m;
+          return { ...m, systemPrompt: prefix + (m.systemPrompt ?? "") };
+        });
+      }
     }
 
     // Reject anonymous users for file loading instead of falling back to user 0.
@@ -458,9 +491,18 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       const relevantSkills = await selectRelevantSkills(userId, question);
       skillContextBlock = buildSkillContextBlock(relevantSkills);
     }
-    const finalEnrichedQuestion = skillContextBlock
-      ? `${enrichedQuestion}${skillContextBlock}`
-      : enrichedQuestion;
+
+    // Phase 2.7 — Cross-Conversation Memory Retrieval (mem0/Zep pattern)
+    // Retrieve relevant memories from previous conversations via keyword Jaccard
+    let crossMemoryBlock = "";
+    if (userId) {
+      const crossMemories = await retrieveCrossConversationMemory(userId, question);
+      crossMemoryBlock = formatCrossMemoryContext(crossMemories);
+    }
+
+    const finalEnrichedQuestion = [enrichedQuestion, skillContextBlock, crossMemoryBlock]
+      .filter(Boolean)
+      .join("\n");
 
     const currentMessages = [...messages, { role: "user" as const, content: finalEnrichedQuestion }] as Message[];
 
@@ -609,6 +651,13 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     // Rewrites verdict as guided questions when user wants to discover the answer themselves
     if (verdict && effectiveCouncilMembers.length > 0 && isSocraticSynthesisEnabled(deliberation_mode, uSettings)) {
       verdict = await socraticRewrite(verdict, question, effectiveCouncilMembers[0]);
+    }
+
+    // Phase 2.13 — Self-Editing Memory (Letta/MemGPT pattern)
+    // After synthesis, parse any <memory-edit> blocks in verdict and apply them
+    if (userId && verdict) {
+      applyPostSynthesisMemoryEdits(userId, verdict, effectiveConversationId ?? undefined)
+        .catch(() => {}); // fire-and-forget, don't block response
     }
 
     const isNewConversation = !conversationId && !!userId;
