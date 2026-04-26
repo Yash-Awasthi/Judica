@@ -50,3 +50,4 @@ export * from "./hookExtensions.js";
 export * from "./webSelectors.js";
 export * from "./structuredExtraction.js";
 export * from "./dataResidency.js";
+export * from "./tenantIsolation.js";
