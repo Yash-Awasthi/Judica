@@ -59,6 +59,7 @@ import { selectRelevantSkills, buildSkillContextBlock } from "../lib/skillSelect
 import { runSOPWorkflow, SOP_TEMPLATES } from "../lib/sopWorkflow.js";
 import { moderateContent } from "../lib/moderation.js";
 import { applyVerbosity, adjustMaxTokensForVerbosity, type VerbosityLevel } from "../lib/verbosity.js";
+import { retrieveCrossConversationMemory, formatCrossMemoryContext } from "../lib/crossConversationMemory.js";
 import { userSettings } from "../db/schema/users.js";
 import { generateSessionName } from "../lib/secondaryFlows/sessionNaming.js";
 import { updateConversationTitle } from "../services/conversation.service.js";
@@ -458,9 +459,18 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       const relevantSkills = await selectRelevantSkills(userId, question);
       skillContextBlock = buildSkillContextBlock(relevantSkills);
     }
-    const finalEnrichedQuestion = skillContextBlock
-      ? `${enrichedQuestion}${skillContextBlock}`
-      : enrichedQuestion;
+
+    // Phase 2.7 — Cross-Conversation Memory Retrieval (mem0/Zep pattern)
+    // Retrieve relevant memories from previous conversations via keyword Jaccard
+    let crossMemoryBlock = "";
+    if (userId) {
+      const crossMemories = await retrieveCrossConversationMemory(userId, question);
+      crossMemoryBlock = formatCrossMemoryContext(crossMemories);
+    }
+
+    const finalEnrichedQuestion = [enrichedQuestion, skillContextBlock, crossMemoryBlock]
+      .filter(Boolean)
+      .join("\n");
 
     const currentMessages = [...messages, { role: "user" as const, content: finalEnrichedQuestion }] as Message[];
 
