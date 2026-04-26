@@ -145,7 +145,7 @@ async function executeCode(
   let stdout = "", stderr = "", exitCode = 0;
 
   try {
-    await writeFile(filename, code, "utf-8");
+    await writeFile(filename, code, { encoding: "utf-8", mode: 0o600 });
 
     const interpreter = language === "python" ? "python3" : "node";
     const result = await execFileAsync(interpreter, [filename], {

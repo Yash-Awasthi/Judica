@@ -46,7 +46,7 @@ export const hypothesesPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", fastifyRequireAuth);
 
   // GET /hypotheses
-  fastify.get("/hypotheses", async (request: any) => {
+  fastify.get("/hypotheses", { config: { rateLimit: { max: 100, timeWindow: "1 minute" } } }, async (request: any) => {
     const userId = request.user.userId;
     const { status } = (request.query as any) ?? {};
 
@@ -89,7 +89,7 @@ export const hypothesesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // PATCH /hypotheses/:id
-  fastify.patch("/hypotheses/:id", async (request: any, reply: any) => {
+  fastify.patch("/hypotheses/:id", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const userId = request.user.userId;
     const { id } = request.params as { id: string };
     const body = updateSchema.safeParse(request.body);

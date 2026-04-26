@@ -59,7 +59,7 @@ export const openapiToolsPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", fastifyRequireAuth);
 
   // GET /openapi-tools
-  fastify.get("/openapi-tools", async (request: any) => {
+  fastify.get("/openapi-tools", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } }, async (request: any) => {
     const tools = await db
       .select()
       .from(openapiTools)
@@ -94,7 +94,7 @@ export const openapiToolsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // PUT /openapi-tools/:id
-  fastify.put("/openapi-tools/:id", async (request: any, reply: any) => {
+  fastify.put("/openapi-tools/:id", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const userId = request.user.userId;
     const { id } = request.params as { id: string };
     const body = toolDefinitionSchema.partial().safeParse(request.body);

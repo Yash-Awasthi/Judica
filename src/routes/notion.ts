@@ -44,8 +44,10 @@ async function notionGet(token: string, path: string): Promise<unknown> {
 }
 
 async function notionPost(token: string, path: string, body: unknown): Promise<unknown> {
-  const safePath = path.replace(/[^a-zA-Z0-9/_?=&%-]/g, "");
-  const res = await fetch(`${NOTION_API}${safePath}`, {
+  // Validate path via URL constructor to prevent SSRF — must resolve under NOTION_API origin
+  const resolvedUrl = new URL(path, NOTION_API + "/");
+  if (!resolvedUrl.href.startsWith(NOTION_API)) throw new Error("Invalid Notion API path");
+  const res = await fetch(resolvedUrl.href, {
     method:  "POST",
     headers: notionHeaders(token),
     body:    JSON.stringify(body),

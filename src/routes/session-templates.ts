@@ -45,7 +45,7 @@ export const sessionTemplatesPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", fastifyRequireAuth);
 
   // GET /session-templates
-  fastify.get("/session-templates", async (request: any) => {
+  fastify.get("/session-templates", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } }, async (request: any) => {
     const rows = await db
       .select()
       .from(sessionTemplates)
@@ -87,7 +87,7 @@ export const sessionTemplatesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // GET /session-templates/:id
-  fastify.get("/session-templates/:id", async (request: any, reply: any) => {
+  fastify.get("/session-templates/:id", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const [template] = await db
       .select()
       .from(sessionTemplates)
@@ -102,7 +102,7 @@ export const sessionTemplatesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // PUT /session-templates/:id
-  fastify.put("/session-templates/:id", async (request: any, reply: any) => {
+  fastify.put("/session-templates/:id", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const userId = request.user.userId;
     const { id } = request.params as { id: string };
     const body = templateSchema.partial().safeParse(request.body);
@@ -146,7 +146,7 @@ export const sessionTemplatesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // DELETE /session-templates/:id
-  fastify.delete("/session-templates/:id", async (request: any, reply: any) => {
+  fastify.delete("/session-templates/:id", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const [deleted] = await db
       .delete(sessionTemplates)
       .where(and(

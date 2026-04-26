@@ -61,7 +61,7 @@ export const memoryTriplesPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", fastifyRequireAuth);
 
   // GET /memory/triples
-  fastify.get("/memory/triples", async (request: any) => {
+  fastify.get("/memory/triples", { config: { rateLimit: { max: 100, timeWindow: "1 minute" } } }, async (request: any) => {
     const userId = request.user.userId;
     const { subject, predicate } = (request.query as any) ?? {};
 
@@ -103,7 +103,7 @@ export const memoryTriplesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // DELETE /memory/triples/:id
-  fastify.delete("/memory/triples/:id", async (request: any, reply: any) => {
+  fastify.delete("/memory/triples/:id", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const [deleted] = await db
       .delete(memoryTriples)
       .where(and(
@@ -117,7 +117,7 @@ export const memoryTriplesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // GET /memory/triples/search?q=keyword
-  fastify.get("/memory/triples/search", async (request: any, reply: any) => {
+  fastify.get("/memory/triples/search", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const userId = request.user.userId;
     const { q } = (request.query as any) ?? {};
     if (!q) return reply.code(400).send({ error: "Query parameter q is required" });

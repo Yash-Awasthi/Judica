@@ -41,7 +41,7 @@ function nextResetDate(period: string): Date {
 export const spendingLimitsPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", fastifyRequireAuth);
 
-  fastify.get("/spending-limits/me", async (request: any, reply: any) => {
+  fastify.get("/spending-limits/me", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const [limit] = await db
       .select()
       .from(spendingLimits)
@@ -89,7 +89,7 @@ export const spendingLimitsPlugin: FastifyPluginAsync = async (fastify) => {
     return reply.code(201).send({ limit: created });
   });
 
-  fastify.delete("/spending-limits/me", async (request: any, reply: any) => {
+  fastify.delete("/spending-limits/me", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const [deleted] = await db
       .delete(spendingLimits)
       .where(eq(spendingLimits.userId, request.user.userId))

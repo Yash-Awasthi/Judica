@@ -42,6 +42,7 @@ const tenantIsolationPlugin: FastifyPluginAsync = async (fastify) => {
   // ─── Rotate ───────────────────────────────────────────────────────────────
 
   fastify.post("/:tenantId/keys/rotate", {
+    config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
     schema: {
       summary: "Rotate the per-tenant encryption key",
       tags: ["Tenant Isolation"],
@@ -58,6 +59,7 @@ const tenantIsolationPlugin: FastifyPluginAsync = async (fastify) => {
   // ─── Get key version ──────────────────────────────────────────────────────
 
   fastify.get("/:tenantId/keys/version", {
+    config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
     schema: {
       summary: "Get the current key version for a tenant",
       tags: ["Tenant Isolation"],
@@ -77,6 +79,7 @@ const tenantIsolationPlugin: FastifyPluginAsync = async (fastify) => {
   // ─── Delete key ───────────────────────────────────────────────────────────
 
   fastify.delete("/:tenantId/keys", {
+    config: { rateLimit: { max: 5, timeWindow: "1 minute" } },
     schema: {
       summary: "Delete the per-tenant encryption key (reverts to platform master key)",
       tags: ["Tenant Isolation"],

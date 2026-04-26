@@ -42,7 +42,7 @@ export const hookExtensionsPlugin: FastifyPluginAsync = async (fastify) => {
   // ─── List built-in templates ───────────────────────────────────────────────
   // Registered BEFORE the :id routes to avoid route collision
 
-  fastify.get("/built-in", async () => {
+  fastify.get("/built-in", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } }, async () => {
     return { templates: getBuiltInHooks() };
   });
 
@@ -63,7 +63,7 @@ export const hookExtensionsPlugin: FastifyPluginAsync = async (fastify) => {
 
   // ─── Reorder hooks ────────────────────────────────────────────────────────
 
-  fastify.put("/reorder", async (request, reply) => {
+  fastify.put("/reorder", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request, reply) => {
     const body = request.body as { hookPoint?: string; orderedIds?: number[] };
     if (!body.hookPoint || !VALID_HOOK_POINTS.has(body.hookPoint)) {
       reply.code(400);
@@ -84,7 +84,7 @@ export const hookExtensionsPlugin: FastifyPluginAsync = async (fastify) => {
 
   // ─── Create hook ──────────────────────────────────────────────────────────
 
-  fastify.post("/", async (request, reply) => {
+  fastify.post("/", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request, reply) => {
     const body = request.body as Record<string, unknown>;
     if (!body.name || typeof body.name !== "string") {
       reply.code(400);
@@ -125,7 +125,7 @@ export const hookExtensionsPlugin: FastifyPluginAsync = async (fastify) => {
 
   // ─── List hooks ───────────────────────────────────────────────────────────
 
-  fastify.get("/", async (request) => {
+  fastify.get("/", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } }, async (request) => {
     const query = request.query as { hookPoint?: string };
     let hookPoint: HookPoint | undefined;
     if (query.hookPoint) {
@@ -141,7 +141,7 @@ export const hookExtensionsPlugin: FastifyPluginAsync = async (fastify) => {
 
   // ─── Update hook ──────────────────────────────────────────────────────────
 
-  fastify.put("/:id", async (request, reply) => {
+  fastify.put("/:id", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = request.body as Record<string, unknown>;
 
@@ -181,7 +181,7 @@ export const hookExtensionsPlugin: FastifyPluginAsync = async (fastify) => {
 
   // ─── Delete hook ──────────────────────────────────────────────────────────
 
-  fastify.delete("/:id", async (request, reply) => {
+  fastify.delete("/:id", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const deleted = await deleteHook(Number(id), request.userId!);
     if (!deleted) {
@@ -193,7 +193,7 @@ export const hookExtensionsPlugin: FastifyPluginAsync = async (fastify) => {
 
   // ─── Toggle hook ──────────────────────────────────────────────────────────
 
-  fastify.patch("/:id/toggle", async (request, reply) => {
+  fastify.patch("/:id/toggle", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = request.body as { isActive?: boolean };
     if (body.isActive === null || body.isActive === undefined) {
@@ -211,7 +211,7 @@ export const hookExtensionsPlugin: FastifyPluginAsync = async (fastify) => {
 
   // ─── Test hook ────────────────────────────────────────────────────────────
 
-  fastify.post("/:id/test", async (request, reply) => {
+  fastify.post("/:id/test", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = request.body as { content?: string; config?: Record<string, unknown> };
 
@@ -243,7 +243,7 @@ export const hookExtensionsPlugin: FastifyPluginAsync = async (fastify) => {
 
   // ─── Get execution logs ───────────────────────────────────────────────────
 
-  fastify.get("/:id/logs", async (request) => {
+  fastify.get("/:id/logs", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } }, async (request) => {
     const { id } = request.params as { id: string };
     const query = request.query as { limit?: string; offset?: string };
 

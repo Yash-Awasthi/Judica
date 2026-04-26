@@ -34,7 +34,7 @@ export const promptFavouritesPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", fastifyRequireAuth);
 
   // GET /prompt-favourites
-  fastify.get("/prompt-favourites", async (request: any) => {
+  fastify.get("/prompt-favourites", { config: { rateLimit: { max: 100, timeWindow: "1 minute" } } }, async (request: any) => {
     const userId = request.user.userId;
     const { folder } = (request.query as any) ?? {};
 
@@ -74,7 +74,7 @@ export const promptFavouritesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // PUT /prompt-favourites/:id
-  fastify.put("/prompt-favourites/:id", async (request: any, reply: any) => {
+  fastify.put("/prompt-favourites/:id", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const userId = request.user.userId;
     const { id } = request.params as { id: string };
     const body = updateSchema.safeParse(request.body);
@@ -101,7 +101,7 @@ export const promptFavouritesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // DELETE /prompt-favourites/:id
-  fastify.delete("/prompt-favourites/:id", async (request: any, reply: any) => {
+  fastify.delete("/prompt-favourites/:id", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const [deleted] = await db
       .delete(promptFavourites)
       .where(and(

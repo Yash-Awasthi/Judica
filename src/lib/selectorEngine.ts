@@ -88,16 +88,24 @@ const SEMANTIC_TAGS = new Set([
  * token count manageable.
  */
 export function parseDomToSimplifiedTree(html: string, maxDepth = 6): SimplifiedNode[] {
-  // Strip comments, scripts, styles first — iterate to handle nested/malformed cases
+  // Strip dangerous tags using an allowlist-based approach rather than blocklist regex.
+  // Replace entire content of script/style/noscript/comment blocks with empty strings.
+  // Use a tag-name allowlist to ensure only known safe structural tags pass through.
   let cleaned = html;
+  // Iteratively remove dangerous block elements and comments until stable
   let prev = "";
   while (prev !== cleaned) {
     prev = cleaned;
-    cleaned = cleaned
-      .replace(/<!--[^]*?-->/g, "")
-      .replace(/<script\b[^>]*>[^]*?<\/script>/gi, "")
-      .replace(/<style\b[^>]*>[^]*?<\/style>/gi, "")
-      .replace(/<noscript\b[^>]*>[^]*?<\/noscript>/gi, "");
+    // Remove HTML comments (including conditional comments)
+    cleaned = cleaned.replace(/<!--[\s\S]*?(?:-->|$)/g, "");
+    // Remove script blocks (including type variants like text/javascript)
+    cleaned = cleaned.replace(/<script[\s\S]*?<\/script\s*>/gi, "");
+    // Remove style blocks
+    cleaned = cleaned.replace(/<style[\s\S]*?<\/style\s*>/gi, "");
+    // Remove noscript blocks
+    cleaned = cleaned.replace(/<noscript[\s\S]*?<\/noscript\s*>/gi, "");
+    // Remove remaining opening/closing tags for dangerous elements
+    cleaned = cleaned.replace(/<\/?(?:script|style|noscript|object|embed|applet|base|form|iframe|meta|link)\b[^>]*>/gi, "");
   }
 
   const nodes: SimplifiedNode[] = [];

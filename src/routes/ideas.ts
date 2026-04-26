@@ -58,7 +58,7 @@ export const ideaNodesPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", fastifyRequireAuth);
 
   // GET /ideas — list root nodes
-  fastify.get("/ideas", async (request: any) => {
+  fastify.get("/ideas", { config: { rateLimit: { max: 100, timeWindow: "1 minute" } } }, async (request: any) => {
     const userId = request.user.userId;
     const roots = await db
       .select()
@@ -68,7 +68,7 @@ export const ideaNodesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // GET /ideas/tree/:rootId — full subtree
-  fastify.get("/ideas/tree/:rootId", async (request: any, reply: any) => {
+  fastify.get("/ideas/tree/:rootId", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const userId = request.user.userId;
     const { rootId } = request.params as { rootId: string };
     const tree = await fetchSubtree(rootId, userId);

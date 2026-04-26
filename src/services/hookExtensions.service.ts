@@ -414,8 +414,7 @@ export function validateHookCode(code: string, language: string): ValidationResu
 
   // Try to compile (syntax check only — code is NOT executed here)
   try {
-    // lgtm[js/code-injection] -- this is compile-only validation; code is never executed in this call
-    new vm.Script(code, { filename: "validation.js" });
+    new vm.Script(code, { filename: "validation.js" }); // lgtm[js/code-injection]
   } catch (err) {
     errors.push(`Syntax error: ${(err as Error).message}`);
   }

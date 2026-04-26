@@ -34,7 +34,7 @@ export const workspacesPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", fastifyRequireAuth);
 
   // GET /workspaces
-  fastify.get("/workspaces", async (request: any) => {
+  fastify.get("/workspaces", { config: { rateLimit: { max: 100, timeWindow: "1 minute" } } }, async (request: any) => {
     const rows = await db
       .select()
       .from(workspaces)
@@ -80,7 +80,7 @@ export const workspacesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // GET /workspaces/:slug
-  fastify.get("/workspaces/:slug", async (request: any, reply: any) => {
+  fastify.get("/workspaces/:slug", { config: { rateLimit: { max: 100, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const [ws] = await db
       .select()
       .from(workspaces)
@@ -95,7 +95,7 @@ export const workspacesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // PUT /workspaces/:slug
-  fastify.put("/workspaces/:slug", async (request: any, reply: any) => {
+  fastify.put("/workspaces/:slug", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const userId = request.user.userId;
     const { slug } = request.params as { slug: string };
     const body = workspaceSchema.partial().safeParse(request.body);

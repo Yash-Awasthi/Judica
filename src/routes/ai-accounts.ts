@@ -53,7 +53,7 @@ export const aiAccountsPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.addHook("preHandler", fastifyRequireAuth);
 
   // GET /ai-accounts
-  fastify.get("/ai-accounts", async (request: any) => {
+  fastify.get("/ai-accounts", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } }, async (request: any) => {
     const rows = await db
       .select()
       .from(connectedAiAccounts)
@@ -86,7 +86,7 @@ export const aiAccountsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // PUT /ai-accounts/:id
-  fastify.put("/ai-accounts/:id", async (request: any, reply: any) => {
+  fastify.put("/ai-accounts/:id", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const userId = request.user.userId;
     const { id } = request.params as { id: string };
     const body = updateSchema.safeParse(request.body);
@@ -112,7 +112,7 @@ export const aiAccountsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // DELETE /ai-accounts/:id
-  fastify.delete("/ai-accounts/:id", async (request: any, reply: any) => {
+  fastify.delete("/ai-accounts/:id", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const [deleted] = await db
       .delete(connectedAiAccounts)
       .where(and(
@@ -126,7 +126,7 @@ export const aiAccountsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // POST /ai-accounts/:id/test — verify key works
-  fastify.post("/ai-accounts/:id/test", async (request: any, reply: any) => {
+  fastify.post("/ai-accounts/:id/test", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const [account] = await db
       .select()
       .from(connectedAiAccounts)

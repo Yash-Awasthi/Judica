@@ -63,7 +63,7 @@ function buildAuthHeaders(
 
 export async function customConnectorsPlugin(app: FastifyInstance) {
   // GET /connectors/custom — list user's custom connectors
-  app.get("/connectors/custom", async (req, reply) => {
+  app.get("/connectors/custom", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } } as any, async (req, reply) => {
     const userId = (req as any).userId as number | undefined;
     if (!userId) return reply.status(401).send({ error: "Unauthorized" });
 
@@ -76,7 +76,7 @@ export async function customConnectorsPlugin(app: FastifyInstance) {
   });
 
   // POST /connectors/custom — create a new custom connector
-  app.post("/connectors/custom", async (req, reply) => {
+  app.post("/connectors/custom", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } } as any, async (req, reply) => {
     const userId = (req as any).userId as number | undefined;
     if (!userId) return reply.status(401).send({ error: "Unauthorized" });
 
@@ -94,7 +94,7 @@ export async function customConnectorsPlugin(app: FastifyInstance) {
   });
 
   // PATCH /connectors/custom/:id — update
-  app.patch("/connectors/custom/:id", async (req, reply) => {
+  app.patch("/connectors/custom/:id", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } } as any, async (req, reply) => {
     const userId = (req as any).userId as number | undefined;
     if (!userId) return reply.status(401).send({ error: "Unauthorized" });
 
@@ -122,7 +122,7 @@ export async function customConnectorsPlugin(app: FastifyInstance) {
   });
 
   // DELETE /connectors/custom/:id — soft delete
-  app.delete("/connectors/custom/:id", async (req, reply) => {
+  app.delete("/connectors/custom/:id", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } } as any, async (req, reply) => {
     const userId = (req as any).userId as number | undefined;
     if (!userId) return reply.status(401).send({ error: "Unauthorized" });
 

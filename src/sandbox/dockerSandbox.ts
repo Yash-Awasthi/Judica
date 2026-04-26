@@ -258,11 +258,12 @@ export async function execInDocker(opts: DockerExecOptions): Promise<DockerExecR
 
     // dockerode multiplexes stdout/stderr into a single stream with an 8-byte header
     await new Promise<void>((resolve, reject) => {
+      const safeTimeout = Math.min(timeoutMs, DOCKER_TIMEOUT_MAX_MS);
       const timeoutHandle = setTimeout(() => {
         // Kill the container on timeout
         (container as any)!.stop({ t: 0 }).catch(() => {});
-        reject(new AppError(408, `Sandbox execution timed out after ${timeoutMs}ms`, "SANDBOX_TIMEOUT"));
-      }, timeoutMs);
+        reject(new AppError(408, `Sandbox execution timed out after ${safeTimeout}ms`, "SANDBOX_TIMEOUT"));
+      }, safeTimeout);
 
       (docker.modem as any).demuxStream(
         stream,

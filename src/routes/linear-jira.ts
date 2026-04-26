@@ -129,12 +129,19 @@ export async function linearJiraPlugin(app: FastifyInstance) {
     if (!token) return reply.status(503).send({ error: "Linear not configured" });
 
     const { teamId, limit = "20" } = req.query as Record<string, string>;
-    // Validate inputs to prevent GraphQL injection
     const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
     const safeTeamId = teamId ? teamId.replace(/[^a-zA-Z0-9_-]/g, "") : "";
-    const filter = safeTeamId ? `filter: { team: { id: { eq: "${safeTeamId}" } } }` : "";
 
-    const data = await linearQuery(token, `{ issues(first: ${safeLimit} ${filter}) { nodes { id title state { name } priority url createdAt } } }`).catch(() => null);
+    // Use GraphQL variables exclusively to prevent injection (no string interpolation of user values)
+    let issueQuery: string;
+    const variables: Record<string, unknown> = { first: safeLimit };
+    if (safeTeamId) {
+      issueQuery = `query Issues($first: Int!, $teamId: String!) { issues(first: $first, filter: { team: { id: { eq: $teamId } } }) { nodes { id title state { name } priority url createdAt } } }`;
+      variables.teamId = safeTeamId;
+    } else {
+      issueQuery = `query Issues($first: Int!) { issues(first: $first) { nodes { id title state { name } priority url createdAt } } }`;
+    }
+    const data = await linearQuery(token, issueQuery, variables).catch(() => null);
     return { success: true, issues: data?.issues?.nodes ?? [] };
   });
 

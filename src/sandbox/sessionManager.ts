@@ -472,10 +472,11 @@ async function collectStream(
   let totalSize = 0;
 
   return new Promise((resolve, reject) => {
+    const cappedTimeout = Math.min(timeoutMs, COMMAND_TIMEOUT_MS);
     const timer = setTimeout(() => {
       (stream as any).destroy?.();
       reject(new AppError(408, "Command timed out", "SANDBOX_TIMEOUT"));
-    }, timeoutMs);
+    }, cappedTimeout);
 
     (docker.modem as any).demuxStream(
       stream,
