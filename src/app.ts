@@ -88,6 +88,8 @@ import { slackPlugin as slackConnectorPlugin } from "./routes/slack.js";
 import { linearJiraPlugin } from "./routes/linear-jira.js";
 import { artifactBrowserPlugin } from "./routes/artifact-browser.js";
 import { fileGeneratorPlugin } from "./routes/file-generator.js";
+import { rssFeedsPlugin } from "./routes/rss-feeds.js";
+import { emailConnectorPlugin } from "./routes/email-connector.js";
 import tracesPlugin from "./routes/traces.js";
 import analyticsPlugin from "./routes/analytics.js";
 import reposPlugin from "./routes/repos.js";
@@ -361,6 +363,8 @@ export async function buildApp() {
   await fastify.register(linearJiraPlugin,         { prefix: "/api" });
   await fastify.register(artifactBrowserPlugin,    { prefix: "/api" });
   await fastify.register(fileGeneratorPlugin,      { prefix: "/api" });
+  await fastify.register(rssFeedsPlugin,           { prefix: "/api" });
+  await fastify.register(emailConnectorPlugin,     { prefix: "/api" });
   await fastify.register(tracesPlugin,          { prefix: "/api/traces" });
   await fastify.register(analyticsPlugin,       { prefix: "/api/analytics" });
   await fastify.register(reposPlugin,           { prefix: "/api/repos" });
