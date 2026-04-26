@@ -15,6 +15,7 @@
 
 import logger from "../lib/logger.js";
 import { AppError } from "../middleware/errorHandler.js";
+import type { DockerConstructor, DockerClient } from "./dockerTypes.js";
 
 export interface DockerExecOptions {
   language: string;
@@ -64,16 +65,15 @@ function requiresGitNetwork(code: string): boolean {
 
 /**
  * Lazily load dockerode — the package is optional.
- * Returns the Docker constructor or null if unavailable.
+ * Returns the typed Docker constructor or null if unavailable.
  */
-async function loadDocker(): Promise<any> {
-  let Docker: any;
+async function loadDocker(): Promise<DockerConstructor | null> {
   try {
-    Docker = (await import("dockerode")).default;
+    const mod = (await import("dockerode")) as { default: DockerConstructor };
+    return mod.default;
   } catch {
-    Docker = null;
+    return null;
   }
-  return Docker;
 }
 
 /**
@@ -115,7 +115,7 @@ export async function cleanupUserSandbox(userId: string): Promise<void> {
 
   // Stop & remove any containers that still reference this volume
   try {
-    const containers: any[] = await docker.listContainers({ all: true });
+    const containers: import("./dockerTypes.js").DockerContainerInfo[] = await docker.listContainers({ all: true });
     for (const info of containers) {
       const labelMatch = (info.Labels ?? {})["aibyai.userId"] === userId;
       if (labelMatch) {
@@ -243,7 +243,7 @@ export async function execInDocker(opts: DockerExecOptions): Promise<DockerExecR
     "Docker sandbox execution starting",
   );
 
-  let container: any;
+  let container: import("./dockerTypes.js").DockerContainer | undefined;
   let stdoutChunks: Buffer[] = [];
   let stderrChunks: Buffer[] = [];
   let totalOutputSize = 0;

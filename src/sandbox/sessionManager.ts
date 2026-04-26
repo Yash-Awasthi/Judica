@@ -15,6 +15,7 @@
 import logger from "../lib/logger.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { randomBytes } from "crypto";
+import type { DockerConstructor, DockerClient, DockerContainer } from "./dockerTypes.js";
 
 const SANDBOX_IMAGE = process.env.SANDBOX_IMAGE ?? "aibyai-sandbox:latest";
 const SESSION_IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
@@ -69,9 +70,10 @@ const cleanupInterval = setInterval(() => {
 }, 60_000);
 cleanupInterval.unref();
 
-async function loadDocker(): Promise<any> {
+async function loadDocker(): Promise<DockerConstructor | null> {
   try {
-    return (await import("dockerode")).default;
+    const mod = (await import("dockerode")) as { default: DockerConstructor };
+    return mod.default;
   } catch {
     return null;
   }
@@ -432,7 +434,7 @@ function shellEscape(str: string): string {
   return "'" + str.replace(/'/g, "'\\''") + "'";
 }
 
-async function execInContainer(container: any, cmd: string[], timeoutMs: number): Promise<string> {
+async function execInContainer(container: DockerContainer, cmd: string[], timeoutMs: number): Promise<string> {
   const exec = await container.exec({
     Cmd: cmd,
     AttachStdout: true,
@@ -460,8 +462,8 @@ async function execInContainer(container: any, cmd: string[], timeoutMs: number)
 }
 
 async function collectStream(
-  docker: any,
-  stream: any,
+  docker: DockerClient,
+  stream: NodeJS.ReadableStream,
   timeoutMs: number,
   maxSize: number,
 ): Promise<{ stdout: string; stderr: string }> {
