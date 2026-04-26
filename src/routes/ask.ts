@@ -57,6 +57,7 @@ import { socraticRewrite, isSocraticSynthesisEnabled } from "../lib/socraticSynt
 import { checkSpendingLimit, recordSpend } from "../lib/spendingLimits.js";
 import { selectRelevantSkills, buildSkillContextBlock } from "../lib/skillSelection.js";
 import { runSOPWorkflow, SOP_TEMPLATES } from "../lib/sopWorkflow.js";
+import { moderateContent } from "../lib/moderation.js";
 import { userSettings } from "../db/schema/users.js";
 import { generateSessionName } from "../lib/secondaryFlows/sessionNaming.js";
 import { updateConversationTitle } from "../services/conversation.service.js";
@@ -293,6 +294,17 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       }
     }
 
+    // Phase 1.21 — Automated Moderation (LibreChat pattern)
+    {
+      const modResult = await moderateContent(question);
+      if (modResult.blocked) {
+        return reply.code(400).send({
+          error: "content_policy_violation",
+          detail: `Content flagged by moderation (${modResult.topCategory}: ${(modResult.topScore * 100).toFixed(0)}%)`,
+        });
+      }
+    }
+
     // Phase 1.4 — Adversarial prompt filter (Rebuff two-stage pattern, off by default)
     // Stage 1 runs on every request (zero cost); Stage 2 (LLM rewrite) only when opt-in
     {
@@ -301,6 +313,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         enableRewrite: adversarialRewrite,
         rewriteProvider: adversarialRewrite ? master ?? councilMembers[0] : undefined,
       });
+
       if (!filterResult.passed) {
         reply.code(400).send({
           error: "Prompt injection detected",
