@@ -118,6 +118,7 @@ import { simulationReportPlugin } from "./routes/simulation-report.js";
 import { simulationReplayPlugin } from "./routes/simulation-replay.js";
 import { simulationUseCasesPlugin } from "./routes/simulation-use-cases.js";
 import { voiceExtendedPlugin } from "./routes/voice-extended.js";
+import { voicePersonasPlugin } from "./routes/voice-personas.js";
 import tracesPlugin from "./routes/traces.js";
 import analyticsPlugin from "./routes/analytics.js";
 import reposPlugin from "./routes/repos.js";
@@ -421,6 +422,7 @@ export async function buildApp() {
   await fastify.register(simulationReplayPlugin,   { prefix: "/api" });
   await fastify.register(simulationUseCasesPlugin, { prefix: "/api" });
   await fastify.register(voiceExtendedPlugin,      { prefix: "/api" });
+  await fastify.register(voicePersonasPlugin,      { prefix: "/api" });
   await fastify.register(tracesPlugin,          { prefix: "/api/traces" });
   await fastify.register(analyticsPlugin,       { prefix: "/api/analytics" });
   await fastify.register(reposPlugin,           { prefix: "/api/repos" });
