@@ -46,3 +46,4 @@ export * from "./agentActionLogs.js";
 export * from "./documentSets.js";
 export * from "./connectorSync.js";
 export * from "./surfaceAccess.js";
+export * from "./hookExtensions.js";

@@ -126,6 +126,7 @@ import { antiSycophancyPlugin } from "./routes/anti-sycophancy.js";
 import { hallucinationScorerPlugin } from "./routes/hallucination-scorer.js";
 import { abComparisonPlugin } from "./routes/ab-comparison.js";
 import { predictionRegistryPlugin } from "./routes/prediction-registry.js";
+import { hookExtensionsPlugin } from "./routes/hook-extensions.js";
 import tracesPlugin from "./routes/traces.js";
 import analyticsPlugin from "./routes/analytics.js";
 import reposPlugin from "./routes/repos.js";
@@ -439,6 +440,8 @@ export async function buildApp() {
   await fastify.register(hallucinationScorerPlugin, { prefix: "/api" });
   await fastify.register(abComparisonPlugin,       { prefix: "/api" });
   await fastify.register(predictionRegistryPlugin, { prefix: "/api" });
+  // Hook extensions — code injection points for compliance (Phase 3.11)
+  await fastify.register(hookExtensionsPlugin,    { prefix: "/api/hook-extensions" });
   await fastify.register(tracesPlugin,          { prefix: "/api/traces" });
   await fastify.register(analyticsPlugin,       { prefix: "/api/analytics" });
   await fastify.register(reposPlugin,           { prefix: "/api/repos" });
