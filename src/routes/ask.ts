@@ -53,6 +53,7 @@ import { compressPrompt } from "../lib/tokenConservation.js";
 import { applySpecialisationMode, autoDetectDomain, type SpecialisationDomain } from "../lib/specialisationMode.js";
 import { wrapEpistemicSystemPrompt } from "../lib/epistemicTags.js";
 import { computeWeather, extractWeatherMetrics } from "../lib/conversationWeather.js";
+import { socraticRewrite, isSocraticSynthesisEnabled } from "../lib/socraticSynthesis.js";
 import { userSettings } from "../db/schema/users.js";
 import { generateSessionName } from "../lib/secondaryFlows/sessionNaming.js";
 import { updateConversationTitle } from "../services/conversation.service.js";
@@ -250,9 +251,10 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     let contentScanners = [];
     let adversarialRewrite = false;
     let tokenConservationMode = false;
+    let uSettings: Record<string, unknown> = {};
     if (userId) {
       const [settingsRow] = await db.select().from(userSettings).where(eq(userSettings.userId, userId)).limit(1);
-      const uSettings = (settingsRow?.settings as Record<string, unknown>) ?? {};
+      uSettings = (settingsRow?.settings as Record<string, unknown>) ?? {};
       contentScanners = buildUserScanners({
         blockProfanity: !!uSettings.blockProfanity,
         blockAdultContent: !!uSettings.blockAdultContent,
@@ -535,6 +537,12 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         .map((c, i) => `[${i + 1}] ${c.source}`)
         .join("\n");
       verdict = `${verdict}\n\n**Sources:**\n${sourcesBlock}`;
+    }
+
+    // Phase 1.14 — Socratic synthesis rewrite (Khanmigo pattern)
+    // Rewrites verdict as guided questions when user wants to discover the answer themselves
+    if (verdict && effectiveCouncilMembers.length > 0 && isSocraticSynthesisEnabled(deliberation_mode, uSettings)) {
+      verdict = await socraticRewrite(verdict, question, effectiveCouncilMembers[0]);
     }
 
     const isNewConversation = !conversationId && !!userId;

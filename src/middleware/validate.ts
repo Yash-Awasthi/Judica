@@ -141,6 +141,8 @@ export const userSettingsSchema = z.object({
   specialisationDomain: z.enum(["auto", "code", "legal", "medical", "creative", "research"]).optional(),
   // Phase 1.10 — epistemic status tags (Elicit / Gwern annotation pattern; off by default)
   epistemicStatusTags: z.boolean().optional(),
+  // Phase 1.14 — Socratic synthesis rewrite (Khanmigo pattern; off by default)
+  socraticSynthesis: z.boolean().optional(),
 }).strict();
 
 export const configSchema = z
