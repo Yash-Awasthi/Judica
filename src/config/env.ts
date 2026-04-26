@@ -107,6 +107,8 @@ const envSchema = z.object({
   GOOGLE_VERTEX_LOCATION: z.string().optional(),
   STABILITY_API_KEY: z.string().optional(),
   REPLICATE_API_TOKEN: z.string().optional(),
+  // Image generation (Phase 6.5)
+  FAL_API_KEY: z.string().optional(),
   // Voice providers
   ELEVENLABS_API_KEY: z.string().optional(),
   AZURE_SPEECH_KEY: z.string().optional(),
@@ -170,7 +172,7 @@ const envSchema = z.object({
 
 // Warn about unknown env vars that look like typos of known keys
 const KNOWN_KEYS = new Set(Object.keys(envSchema.shape));
-const ENV_PREFIXES = ["DATABASE_", "REDIS_", "JWT_", "MASTER_", "PORT", "NODE_", "RATE_LIMIT_", "ALLOWED_", "TAVILY_", "SYSTEM_", "TRUST_", "OPENAI_", "ANTHROPIC_", "GOOGLE_", "OPENROUTER_", "NVIDIA_", "XIAOMI_", "GROQ_", "MISTRAL_", "CEREBRAS_", "COHERE_", "OLLAMA_", "SERP_", "LANGFUSE_", "PROVIDER_", "FRONTEND_", "CURRENT_", "ENABLE_", "GITHUB_", "OAUTH_", "OTEL_", "SENTRY_", "SMTP_", "GRACEFUL_", "SSO_", "SLACK_", "DISCORD_", "CAPTCHA_", "RECAPTCHA_", "HCAPTCHA_", "TURNSTILE_", "AZURE_", "STABILITY_", "REPLICATE_", "ELEVENLABS_", "DEEPGRAM_", "WEB_SEARCH_", "SERPER_", "BRAVE_", "SEARXNG_", "FIRECRAWL_", "EXA_", "LITELLM_", "VLLM_", "STRIPE_", "VECTOR_DB_", "VESPA_", "WEAVIATE_", "PINECONE_", "QUERY_", "DEPLOYMENT_", "LITE_", "CONFLUENCE_", "NOTION_", "TELEGRAM_", "WHATSAPP_", "VAPID_"];
+const ENV_PREFIXES = ["DATABASE_", "REDIS_", "JWT_", "MASTER_", "PORT", "NODE_", "RATE_LIMIT_", "ALLOWED_", "TAVILY_", "SYSTEM_", "TRUST_", "OPENAI_", "ANTHROPIC_", "GOOGLE_", "OPENROUTER_", "NVIDIA_", "XIAOMI_", "GROQ_", "MISTRAL_", "CEREBRAS_", "COHERE_", "OLLAMA_", "SERP_", "LANGFUSE_", "PROVIDER_", "FRONTEND_", "CURRENT_", "ENABLE_", "GITHUB_", "OAUTH_", "OTEL_", "SENTRY_", "SMTP_", "GRACEFUL_", "SSO_", "SLACK_", "DISCORD_", "CAPTCHA_", "RECAPTCHA_", "HCAPTCHA_", "TURNSTILE_", "AZURE_", "STABILITY_", "REPLICATE_", "ELEVENLABS_", "DEEPGRAM_", "WEB_SEARCH_", "SERPER_", "BRAVE_", "SEARXNG_", "FIRECRAWL_", "EXA_", "LITELLM_", "VLLM_", "STRIPE_", "VECTOR_DB_", "VESPA_", "WEAVIATE_", "PINECONE_", "QUERY_", "DEPLOYMENT_", "LITE_", "CONFLUENCE_", "NOTION_", "TELEGRAM_", "WHATSAPP_", "VAPID_", "FAL_"];
 for (const key of Object.keys(process.env)) {
   if (!KNOWN_KEYS.has(key) && ENV_PREFIXES.some(p => key.startsWith(p))) {
     process.stderr.write(`WARNING: Unknown env var '${key}' looks like a typo of a known config key\n`);
