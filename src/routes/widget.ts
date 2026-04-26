@@ -14,7 +14,6 @@ function escAttr(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
 }
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
-import { AibyaiWidget } from "../widget/widget.js";
 import { DEFAULT_WIDGET_CONFIG, DEFAULT_THEME } from "../widget/models.js";
 import { generateWidgetStyles } from "../widget/styles.js";
 
