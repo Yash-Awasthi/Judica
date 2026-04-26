@@ -76,6 +76,7 @@ import { memoryTriplesPlugin } from "./routes/memory-triples.js";
 import { goalDocumentsPlugin } from "./routes/goal-documents.js";
 import { agentMemoriesPlugin } from "./routes/agent-memories.js";
 import { fineTunePlugin } from "./routes/fine-tune.js";
+import { promptOptimisationPlugin } from "./routes/prompt-optimisation.js";
 import tracesPlugin from "./routes/traces.js";
 import analyticsPlugin from "./routes/analytics.js";
 import reposPlugin from "./routes/repos.js";
@@ -337,6 +338,7 @@ export async function buildApp() {
   await fastify.register(goalDocumentsPlugin,    { prefix: "/api" });
   await fastify.register(agentMemoriesPlugin,    { prefix: "/api" });
   await fastify.register(fineTunePlugin,         { prefix: "/api" });
+  await fastify.register(promptOptimisationPlugin, { prefix: "/api" });
   await fastify.register(tracesPlugin,          { prefix: "/api/traces" });
   await fastify.register(analyticsPlugin,       { prefix: "/api/analytics" });
   await fastify.register(reposPlugin,           { prefix: "/api/repos" });
