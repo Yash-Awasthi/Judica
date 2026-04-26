@@ -85,6 +85,8 @@ export const askSchema = z
     disabled_members: z.array(z.string().max(50)).max(10).optional(),
     // Phase 1.17 — God Mode: skip synthesis, return raw parallel opinions (smol-ai/GodMode)
     god_mode: z.boolean().default(false),
+    // Phase 1.20 — SOP-driven mode (MetaGPT pattern): use named SOP template
+    sop_template: z.enum(["research_analyze", "debate_resolve", "product_design"]).optional(),
   });
 
 export const renameConversationSchema = z.object({

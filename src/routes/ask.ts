@@ -56,6 +56,7 @@ import { computeWeather, extractWeatherMetrics } from "../lib/conversationWeathe
 import { socraticRewrite, isSocraticSynthesisEnabled } from "../lib/socraticSynthesis.js";
 import { checkSpendingLimit, recordSpend } from "../lib/spendingLimits.js";
 import { selectRelevantSkills, buildSkillContextBlock } from "../lib/skillSelection.js";
+import { runSOPWorkflow, SOP_TEMPLATES } from "../lib/sopWorkflow.js";
 import { userSettings } from "../db/schema/users.js";
 import { generateSessionName } from "../lib/secondaryFlows/sessionNaming.js";
 import { updateConversationTitle } from "../services/conversation.service.js";
@@ -191,6 +192,8 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     const deliberation_mode: ReasoningMode = (request.body as AskBody).deliberation_mode ?? "standard";
     // Phase 1.17 — God Mode: raw parallel view, skip synthesis (smol-ai/GodMode)
     const god_mode: boolean = !!(request.body as AskBody).god_mode;
+    // Phase 1.20 — SOP template selection (MetaGPT pattern)
+    const sop_template: string | undefined = (request.body as any).sop_template;
 
     // Broadcast user message to room members immediately (before AI processes)
     if (conversationId) {
@@ -473,7 +476,13 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
 
       const councilStart = Date.now();
 
-      if (deliberation_mode === "socratic") {
+      // Phase 1.20 — SOP workflow (MetaGPT pattern) takes priority if sop_template provided
+      if (sop_template && SOP_TEMPLATES[sop_template]) {
+        const sopResult = await runSOPWorkflow(question, effectiveCouncilMembers, SOP_TEMPLATES[sop_template], maxTokens);
+        verdict = sopResult.finalSynthesis;
+        tokensUsed = sopResult.totalTokens;
+        finalOpinions = sopResult.steps.map(s => ({ name: s.step, opinion: s.output }));
+      } else if (deliberation_mode === "socratic") {
         const { augmentedContext, qa } = await runSocraticPrelude(question, effectiveCouncilMembers);
         const augmentedMessages = [
           ...messages,
