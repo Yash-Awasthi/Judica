@@ -83,6 +83,8 @@ export const askSchema = z
     // Phase 1.2 — per-member toggle (LibreChat pause/resume pattern)
     // List of provider names to skip this round; member catches up on re-enable
     disabled_members: z.array(z.string().max(50)).max(10).optional(),
+    // Phase 1.17 — God Mode: skip synthesis, return raw parallel opinions (smol-ai/GodMode)
+    god_mode: z.boolean().default(false),
   });
 
 export const renameConversationSchema = z.object({

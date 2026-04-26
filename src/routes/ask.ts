@@ -188,6 +188,8 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     if (upload_ids && upload_ids.length > 50) upload_ids.length = 50;
     const kb_id: string | undefined = (request.body as AskBody).kb_id;
     const deliberation_mode: ReasoningMode = (request.body as AskBody).deliberation_mode ?? "standard";
+    // Phase 1.17 — God Mode: raw parallel view, skip synthesis (smol-ai/GodMode)
+    const god_mode: boolean = !!(request.body as AskBody).god_mode;
 
     // Broadcast user message to room members immediately (before AI processes)
     if (conversationId) {
@@ -501,8 +503,14 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         // Hook: pre:llm — before LLM call
         await hooks.run('pre:llm', { stage: 'pre:llm', query: question, documents: ragCitations.length > 0 ? ragCitations : undefined });
         const councilResponse = await askCouncil(effectiveCouncilMembers, master, currentMessages, maxTokens, effectiveRounds);
-        verdict = councilResponse.verdict;
-        finalOpinions = councilResponse.opinions;
+        // Phase 1.17 — God Mode: skip synthesis, surface raw parallel opinions directly
+        if (god_mode) {
+          finalOpinions = councilResponse.opinions;
+          verdict = finalOpinions.map(o => `**${o.name}:**\n${o.opinion}`).join("\n\n---\n\n");
+        } else {
+          verdict = councilResponse.verdict;
+          finalOpinions = councilResponse.opinions;
+        }
         tokensUsed = councilResponse.metrics?.totalTokens ?? 0;
         // Hook: post:llm — after LLM response
         await hooks.run('post:llm', { stage: 'post:llm', response: verdict });
@@ -650,6 +658,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       artifact_id: artifactId,
       metrics: (tokensUsed > 0 || isCacheHit) ? { totalTokens: tokensUsed, totalCost: 0, hallucinationCount: 0 } : undefined,
       weather,
+      god_mode: god_mode || undefined,
     };
   });
 
