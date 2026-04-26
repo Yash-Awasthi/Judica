@@ -38,3 +38,5 @@ export * from "./connectedAiAccounts.js";
 export * from "./memoryTriples.js";
 export * from "./goalDocuments.js";
 export * from "./agentMemories.js";
+export * from "./customConnectors.js";
+export * from "./rssFeeds.js";
