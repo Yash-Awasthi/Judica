@@ -231,6 +231,126 @@ const exportPlugin: FastifyPluginAsync = async (fastify) => {
       }
     },
   );
+
+  // Phase 1.23 — Structured Deliberation Report (Pandoc/docx pattern)
+  // Produces a rich markdown report with per-member sections and metadata
+  fastify.get<{ Params: { id: string }; Querystring: { format?: string } }>(
+    "/conversation/:id/report",
+    { preHandler: fastifyRequireAuth },
+    async (request, reply) => {
+      const userId = request.userId!;
+      const { id } = request.params;
+      const format = (request.query as any).format ?? "markdown";
+
+      const [conversation] = await db
+        .select()
+        .from(conversations)
+        .where(and(eq(conversations.id, String(id)), eq(conversations.userId, userId)))
+        .limit(1);
+
+      if (!conversation) {
+        reply.code(404).send({ error: "Conversation not found" });
+        return;
+      }
+
+      const chatRows = await db
+        .select()
+        .from(chats)
+        .where(eq(chats.conversationId, String(id)))
+        .orderBy(asc(chats.createdAt));
+
+      const exportedAt = new Date().toISOString();
+
+      // Build structured report
+      let report = `# Deliberation Report: ${conversation.title}\n\n`;
+      report += `> **Exported:** ${exportedAt}  \n`;
+      report += `> **Conversation ID:** ${conversation.id}  \n`;
+      report += `> **Turns:** ${chatRows.length}  \n\n`;
+      report += `---\n\n`;
+
+      chatRows.forEach((chat, idx) => {
+        report += `## Turn ${idx + 1}\n\n`;
+        report += `### Question\n\n${chat.question}\n\n`;
+
+        // Council opinions section
+        const opinions = Array.isArray(chat.opinions)
+          ? chat.opinions as Array<{ name: string; opinion: string }>
+          : [];
+
+        if (opinions.length > 0) {
+          report += `### Council Deliberation\n\n`;
+          for (const op of opinions) {
+            report += `#### ${op.name || "Agent"}\n\n${op.opinion || ""}\n\n`;
+          }
+        }
+
+        report += `### Verdict\n\n${chat.verdict}\n\n`;
+
+        if (chat.durationMs) {
+          report += `*Response time: ${(chat.durationMs / 1000).toFixed(1)}s*\n\n`;
+        }
+        if (chat.tokensUsed) {
+          report += `*Tokens used: ${chat.tokensUsed}*\n\n`;
+        }
+        report += `---\n\n`;
+      });
+
+      const safeId = String(id).replace(/[^a-zA-Z0-9_-]/g, "_");
+
+      if (format === "html") {
+        // Simple markdown-to-HTML conversion (no external dep)
+        const html = markdownToSimpleHtml(report, conversation.title);
+        reply.type("text/html");
+        reply.header("Content-Disposition", `attachment; filename="report-${safeId}.html"`);
+        return html;
+      }
+
+      reply.type("text/markdown");
+      reply.header("Content-Disposition", `attachment; filename="report-${safeId}.md"`);
+      return report;
+    },
+  );
 };
 
 export default exportPlugin;
+
+/** Minimal markdown→HTML converter for report export (no external deps) */
+function markdownToSimpleHtml(markdown: string, title: string): string {
+  const body = markdown
+    .replace(/^#### (.+)$/gm, "<h4>$1</h4>")
+    .replace(/^### (.+)$/gm, "<h3>$1</h3>")
+    .replace(/^## (.+)$/gm, "<h2>$1</h2>")
+    .replace(/^# (.+)$/gm, "<h1>$1</h1>")
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/\*(.+?)\*/g, "<em>$1</em>")
+    .replace(/^> (.+)$/gm, "<blockquote>$1</blockquote>")
+    .replace(/^---$/gm, "<hr>")
+    .replace(/\n\n/g, "</p><p>")
+    .replace(/\n/g, "<br>");
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>${escapeHtml(title)}</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; line-height: 1.6; color: #1a1a1a; }
+    h1 { border-bottom: 2px solid #e5e7eb; padding-bottom: 0.5rem; }
+    h2 { margin-top: 2rem; color: #374151; }
+    h3 { color: #4b5563; }
+    h4 { color: #6b7280; font-style: italic; }
+    blockquote { border-left: 4px solid #e5e7eb; margin: 0; padding: 0.5rem 1rem; color: #6b7280; }
+    hr { border: none; border-top: 1px solid #e5e7eb; margin: 2rem 0; }
+    em { color: #6b7280; font-size: 0.9rem; }
+  </style>
+</head>
+<body>
+<p>${body}</p>
+</body>
+</html>`;
+}
+
+function escapeHtml(text: string): string {
+  return text.replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c] ?? c));
+}
