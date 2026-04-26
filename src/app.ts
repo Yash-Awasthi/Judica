@@ -138,6 +138,7 @@ import evaluationPlugin from "./routes/evaluation.js";
 import projectsPlugin from "./routes/projects.js";
 import providerHealthPlugin from "./routes/providerHealth.js";
 import deliberationsPlugin from "./routes/deliberations.js";
+import deliberateProxyPlugin from "./routes/deliberate-proxy.js";
 import connectorsPlugin from "./routes/connectors.js";
 import connectorSyncPlugin from "./routes/connector-sync.js";
 import ssoPlugin from "./sso/routes.js";
@@ -490,6 +491,8 @@ export async function buildApp() {
   await fastify.register(projectsPlugin,        { prefix: "/api/v1/projects" });
   // Consensus explainability API
   await fastify.register(deliberationsPlugin,   { prefix: "/api/deliberations" });
+  // Frontend SPA proxy routes — handled by Cloudflare AI in Workers mode, Gemini here
+  await fastify.register(deliberateProxyPlugin, { prefix: "/api" });
   // Data source connectors
   await fastify.register(connectorsPlugin,      { prefix: "/api/connectors" });
   // Connector sync modes (Load / Poll / Slim)

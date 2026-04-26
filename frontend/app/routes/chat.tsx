@@ -638,17 +638,6 @@ export function clientLoader() {
   return {};
 }
 
-export function HydrateFallback() {
-  return (
-    <div className="flex items-center justify-center h-screen bg-background">
-      <div className="flex flex-col items-center gap-3">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
-        <span className="text-sm text-muted-foreground">Loading Deliberation…</span>
-      </div>
-    </div>
-  );
-}
-
 export default function ChatPage() {
   const store = useStore();
   const [conversations, setConversations] = useState(mockConversations);
