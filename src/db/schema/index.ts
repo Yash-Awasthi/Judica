@@ -41,3 +41,4 @@ export * from "./agentMemories.js";
 export * from "./customConnectors.js";
 export * from "./rssFeeds.js";
 export * from "./buildTasks.js";
+export * from "./workflowRunLogs.js";
