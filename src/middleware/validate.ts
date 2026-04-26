@@ -139,6 +139,8 @@ export const userSettingsSchema = z.object({
   tokenConservationMode: z.boolean().optional(),
   // Phase 1.6 — specialisation domain (CrewAI/AutoGen pattern; "auto" = keyword-detect)
   specialisationDomain: z.enum(["auto", "code", "legal", "medical", "creative", "research"]).optional(),
+  // Phase 1.10 — epistemic status tags (Elicit / Gwern annotation pattern; off by default)
+  epistemicStatusTags: z.boolean().optional(),
 }).strict();
 
 export const configSchema = z

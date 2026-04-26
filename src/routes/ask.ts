@@ -51,6 +51,7 @@ import { buildUserScanners, runScannerPipeline } from "../lib/scanners/contentSc
 import { runPromptFilter } from "../lib/promptFilter.js";
 import { compressPrompt } from "../lib/tokenConservation.js";
 import { applySpecialisationMode, autoDetectDomain, type SpecialisationDomain } from "../lib/specialisationMode.js";
+import { wrapEpistemicSystemPrompt } from "../lib/epistemicTags.js";
 import { userSettings } from "../db/schema/users.js";
 import { generateSessionName } from "../lib/secondaryFlows/sessionNaming.js";
 import { updateConversationTitle } from "../services/conversation.service.js";
@@ -257,6 +258,10 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       });
       adversarialRewrite = !!uSettings.adversarialRewrite;
       tokenConservationMode = !!uSettings.tokenConservationMode;
+      // Phase 1.10 — epistemic tagging: apply to master prompt
+      if (uSettings.epistemicStatusTags && master) {
+        master = { ...master, systemPrompt: wrapEpistemicSystemPrompt(master.systemPrompt ?? "") };
+      }
     }    if (contentScanners.length > 0) {
       const scanResult = runScannerPipeline(question, contentScanners);
       if (!scanResult.isValid && scanResult.maxRiskScore >= 1.0) {
