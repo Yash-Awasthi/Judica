@@ -100,7 +100,7 @@ CREATE TABLE "Chat" (
 	"conversationId" text,
 	"durationMs" integer,
 	"tokensUsed" integer,
-	"embedding" vector
+	"embedding" vector(1536)
 );
 --> statement-breakpoint
 CREATE TABLE "ContextSummary" (
@@ -129,7 +129,7 @@ CREATE TABLE "SemanticCache" (
 	"opinions" jsonb NOT NULL,
 	"prompt" text NOT NULL,
 	"verdict" text NOT NULL,
-	"embedding" vector,
+	"embedding" vector(1536),
 	CONSTRAINT "SemanticCache_keyHash_unique" UNIQUE("keyHash")
 );
 --> statement-breakpoint
