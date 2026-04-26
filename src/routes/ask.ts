@@ -60,6 +60,7 @@ import { runSOPWorkflow, SOP_TEMPLATES } from "../lib/sopWorkflow.js";
 import { moderateContent } from "../lib/moderation.js";
 import { applyVerbosity, adjustMaxTokensForVerbosity, type VerbosityLevel } from "../lib/verbosity.js";
 import { retrieveCrossConversationMemory, formatCrossMemoryContext } from "../lib/crossConversationMemory.js";
+import { goalDocuments } from "../db/schema/goalDocuments.js";
 import { userSettings } from "../db/schema/users.js";
 import { generateSessionName } from "../lib/secondaryFlows/sessionNaming.js";
 import { updateConversationTitle } from "../services/conversation.service.js";
@@ -400,6 +401,20 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       master = { ...master, systemPrompt: applyVerbosity(master.systemPrompt ?? "", verbosity) };
     }
     const effectiveMaxTokens = verbosity ? adjustMaxTokensForVerbosity(maxTokens, verbosity) : maxTokens;
+
+    // Phase 2.8 — Goal document context injection (Cursor .cursorrules / CLAUDE.md pattern)
+    // Active goal document is silently prepended to master system prompt
+    if (userId && master) {
+      const [goalDoc] = await db
+        .select({ content: goalDocuments.content, title: goalDocuments.title })
+        .from(goalDocuments)
+        .where(and(eq(goalDocuments.userId, userId), eq(goalDocuments.isActive, true)))
+        .limit(1);
+      if (goalDoc) {
+        const goalPrefix = `[USER GOAL CONTEXT — "${goalDoc.title}"]\n${goalDoc.content}\n[/USER GOAL CONTEXT]\n\n`;
+        master = { ...master, systemPrompt: goalPrefix + (master.systemPrompt ?? "") };
+      }
+    }
     if (effectiveConversationId) {
       const relevantChats = await retrieveRelevantContext(effectiveConversationId, question, 3);
       memoryContext = formatContextForInjection(relevantChats);

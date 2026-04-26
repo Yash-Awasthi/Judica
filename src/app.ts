@@ -73,6 +73,7 @@ import { sessionTemplatesPlugin } from "./routes/session-templates.js";
 import { promptFavouritesPlugin } from "./routes/prompt-favourites.js";
 import { aiAccountsPlugin } from "./routes/ai-accounts.js";
 import { memoryTriplesPlugin } from "./routes/memory-triples.js";
+import { goalDocumentsPlugin } from "./routes/goal-documents.js";
 import tracesPlugin from "./routes/traces.js";
 import analyticsPlugin from "./routes/analytics.js";
 import reposPlugin from "./routes/repos.js";
@@ -331,6 +332,7 @@ export async function buildApp() {
   await fastify.register(promptFavouritesPlugin, { prefix: "/api" });
   await fastify.register(aiAccountsPlugin,       { prefix: "/api" });
   await fastify.register(memoryTriplesPlugin,    { prefix: "/api" });
+  await fastify.register(goalDocumentsPlugin,    { prefix: "/api" });
   await fastify.register(tracesPlugin,          { prefix: "/api/traces" });
   await fastify.register(analyticsPlugin,       { prefix: "/api/analytics" });
   await fastify.register(reposPlugin,           { prefix: "/api/repos" });
