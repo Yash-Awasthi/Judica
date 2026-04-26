@@ -50,6 +50,7 @@ vi.mock("drizzle-orm", () => ({
   asc: vi.fn((col: any) => ["asc", col]),
   desc: vi.fn((col: any) => ["desc", col]),
   inArray: vi.fn((...a: any[]) => ["inArray", ...a]),
+  relations: vi.fn(() => ({})),
 }));
 
 vi.mock("../../src/middleware/fastifyAuth.js", () => ({
@@ -422,10 +423,11 @@ describe("Export Routes", () => {
   describe("Route registration", () => {
     it("registers exactly three GET routes", () => {
       const keys = Object.keys(routes);
-      expect(keys).toHaveLength(3);
+      expect(keys).toHaveLength(4);
       expect(keys).toContain("GET /conversation/:id");
       expect(keys).toContain("GET /all");
       expect(keys).toContain("GET /conversation/:id/markdown");
+      expect(keys).toContain("GET /conversation/:id/report");
     });
   });
 });

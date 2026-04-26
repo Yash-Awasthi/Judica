@@ -17,7 +17,7 @@ import logger from "../lib/logger.js";
 
 /** Call faster-whisper local API */
 async function fasterWhisperTranscribe(audioBuffer: Buffer, mimetype: string, filename: string): Promise<string> {
-  const whisperUrl = (env as Record<string, string>).FASTER_WHISPER_URL;
+  const whisperUrl = (env as unknown as Record<string, string>).FASTER_WHISPER_URL;
   if (!whisperUrl) throw new Error("FASTER_WHISPER_URL not set");
   const formData = new FormData();
   formData.append("audio_file", new Blob([new Uint8Array(audioBuffer)], { type: mimetype }), filename);
@@ -46,7 +46,7 @@ const voicePlugin: FastifyPluginAsync = async (fastify) => {
       const text = await fasterWhisperTranscribe(audioBuffer, file.mimetype, file.filename || "audio.webm");
       return { text, provider: "faster-whisper" };
     } catch (e1) {
-      if ((env as Record<string, string>).FASTER_WHISPER_URL) {
+      if ((env as unknown as Record<string, string>).FASTER_WHISPER_URL) {
         logger.warn({ err: (e1 as Error).message }, "faster-whisper failed, trying OpenAI Whisper");
       }
     }

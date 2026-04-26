@@ -72,7 +72,7 @@ cleanupInterval.unref();
 
 async function loadDocker(): Promise<DockerConstructor | null> {
   try {
-    const mod = (await import("dockerode")) as { default: DockerConstructor };
+    const mod = (await import("dockerode")) as unknown as { default: DockerConstructor };
     return mod.default;
   } catch {
     return null;
@@ -157,7 +157,7 @@ export async function createSession(
       Binds: [`${volumeName}:/workspace`],
       SecurityOpt: ["no-new-privileges"],
       // Don't auto-remove — we manage lifecycle
-    },
+    } as any,
   });
 
   await container.start();
@@ -238,9 +238,9 @@ export async function execCommand(
     AttachStderr: true,
     Env: envArr.length > 0 ? envArr : undefined,
     WorkingDir: opts.cwd ?? "/workspace",
-  });
+  } as any);
 
-  const stream = await exec.start({ Detach: false, Tty: false });
+  const stream = await exec.start({ Detach: false, Tty: false } as any);
 
   const { stdout, stderr } = await collectStream(docker, stream, timeoutMs, MAX_OUTPUT_SIZE);
 
@@ -439,13 +439,13 @@ async function execInContainer(container: DockerContainer, cmd: string[], timeou
     Cmd: cmd,
     AttachStdout: true,
     AttachStderr: true,
-  });
-  const stream = await exec.start({ Detach: false, Tty: false });
+  } as any);
+  const stream = await exec.start({ Detach: false, Tty: false } as any);
 
   return new Promise<string>((resolve, reject) => {
     const chunks: Buffer[] = [];
     const timer = setTimeout(() => {
-      stream.destroy?.();
+      (stream as any).destroy?.();
       reject(new Error("exec timeout"));
     }, timeoutMs);
 
@@ -473,11 +473,11 @@ async function collectStream(
 
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
-      stream.destroy?.();
+      (stream as any).destroy?.();
       reject(new AppError(408, "Command timed out", "SANDBOX_TIMEOUT"));
     }, timeoutMs);
 
-    docker.modem.demuxStream(
+    (docker.modem as any).demuxStream(
       stream,
       {
         write(chunk: Buffer) {

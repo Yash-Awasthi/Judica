@@ -1,3 +1,4 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   runSpeculativeDraft,
   buildDraftSeedContext,
@@ -5,7 +6,7 @@ import {
   type QueryComplexity,
   type DraftResult,
   type SpeculativeRunResult,
-} from "../../services/speculativeDecoding.service.js";
+} from "../../src/services/speculativeDecoding.service.js";
 
 describe("speculativeDecoding.service", () => {
   describe("classifyQueryComplexity", () => {
@@ -30,13 +31,14 @@ describe("speculativeDecoding.service", () => {
     });
 
     it("classifies very long queries as complex regardless of content", () => {
-      const longQuery = "What is ".repeat(20) + "the answer?";
+      const longQuery = "What is ".repeat(42) + "the answer?"; // 85+ words, above threshold
       expect(classifyQueryComplexity(longQuery)).toBe("complex");
     });
 
     it("classifies medium queries by word count", () => {
-      const shortQ = "List the main planets";
-      const longQ = "List the main planets and describe their atmospheres and distances from the sun in detail";
+      const shortQ = "Tell me about planets";
+      // 31+ words, no complex markers, doesn't match simple patterns → word count decides
+      const longQ = "Tell me about the planets their atmospheres distances from the sun orbital periods temperatures and the geological composition history and formation of each planet rocky gas giant in our solar system";
       expect(classifyQueryComplexity(shortQ)).toBe("simple");
       expect(classifyQueryComplexity(longQ)).toBe("complex");
     });

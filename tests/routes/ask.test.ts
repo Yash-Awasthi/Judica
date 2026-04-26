@@ -14,6 +14,8 @@ function chainable(overrides: Record<string, any> = {}): any {
   for (const m of methods) {
     chain[m] = overrides[m] ?? vi.fn(() => chain);
   }
+  // Support promise-style .then() chaining (used in ask.ts for userSettings query)
+  chain.then = overrides.then ?? vi.fn((fn: (v: any[]) => any) => Promise.resolve(fn ? fn([]) : []));
   return chain;
 }
 
@@ -38,11 +40,17 @@ vi.mock("../../src/db/schema/users.js", () => ({
     requests: "dailyUsage.requests",
     tokens: "dailyUsage.tokens",
   },
+  userSettings: {
+    userId: "userSettings.userId",
+    settings: "userSettings.settings",
+  },
 }));
 
 vi.mock("drizzle-orm", () => ({
   eq: vi.fn((...args: any[]) => args),
   and: vi.fn((...args: any[]) => args),
+  gte: vi.fn((...args: any[]) => args),
+  desc: vi.fn((...args: any[]) => args),
   sql: vi.fn((strings: TemplateStringsArray) => strings.join("")),
 }));
 
@@ -183,6 +191,11 @@ vi.mock("../../src/observability/tracer.js", () => ({
 const mockSearchRepo = vi.fn();
 vi.mock("../../src/services/repoSearch.service.js", () => ({
   searchRepo: mockSearchRepo,
+}));
+
+vi.mock("../../src/lib/crossConversationMemory.js", () => ({
+  retrieveCrossConversationMemory: vi.fn().mockResolvedValue([]),
+  formatCrossMemoryContext: vi.fn().mockReturnValue(""),
 }));
 
 // ---- helpers to capture registered route handlers ----

@@ -61,7 +61,7 @@ export const connectorSyncSchedules = pgTable(
       .references(() => users.id, { onDelete: "cascade" }),
     /** Sync mode this schedule triggers. */
     syncMode: text("syncMode").notNull(),
-    /** Cron expression (e.g. "0 */6 * * *" for every 6 hours). */
+    /** Cron expression (e.g. "0 *\/6 * * *" for every 6 hours). */
     cronExpression: text("cronExpression").notNull(),
     enabled: boolean("enabled").default(true).notNull(),
     lastRunAt: timestamp("lastRunAt", { mode: "date", withTimezone: true }),

@@ -44,7 +44,7 @@ const toolDefinitionSchema = z.object({
   /** JSON Schema object describing parameters */
   parameters: z.object({
     type: z.literal("object"),
-    properties: z.record(parameterPropertySchema),
+    properties: z.record(z.string(), parameterPropertySchema),
     required: z.array(z.string()).optional(),
   }),
   /** Optional auth header name (e.g. "Authorization") */
@@ -69,7 +69,7 @@ export const openapiToolsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // POST /openapi-tools
-  fastify.post("/openapi-tools", async (request: any, reply: any) => {
+  fastify.post("/openapi-tools", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const body = toolDefinitionSchema.safeParse(request.body);
     if (!body.success) {
       return reply.code(400).send({ error: "Validation failed", details: body.error.issues });
@@ -151,7 +151,7 @@ export const openapiToolsPlugin: FastifyPluginAsync = async (fastify) => {
     if (!tool) return reply.code(404).send({ error: "Tool not found" });
 
     try {
-      const result = await invokeOpenapiTool(tool, testParams);
+      const result = await invokeOpenapiTool(tool as unknown as { method: string; url: string; parameters: Record<string, unknown>; meta: Record<string, unknown> | null }, testParams);
       return { success: true, result };
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);

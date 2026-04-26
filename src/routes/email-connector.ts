@@ -15,7 +15,7 @@
  * Security: credentials stored encrypted per user (production: use MASTER_ENCRYPTION_KEY).
  */
 
-import { FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 
 const imapConfigSchema = z.object({

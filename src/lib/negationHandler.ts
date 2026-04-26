@@ -61,7 +61,7 @@ async function loadRules(conversationId: string): Promise<NegationRule[]> {
 
 async function saveRules(conversationId: string, rules: NegationRule[]): Promise<void> {
   try {
-    await redis.set(redisKey(conversationId), JSON.stringify(rules), "EX", NEGATION_TTL_SECONDS);
+    await redis.set(redisKey(conversationId), JSON.stringify(rules), { EX: NEGATION_TTL_SECONDS });
   } catch {
     inMemoryStore.set(conversationId, rules);
   }

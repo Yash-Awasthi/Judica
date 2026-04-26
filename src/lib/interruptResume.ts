@@ -58,12 +58,17 @@ async function saveRun(run: DeliberationRun): Promise<void> {
     await redis.set(
       redisKey(run.userId, run.id),
       JSON.stringify(run),
-      "EX", RUN_TTL_SECONDS,
+      { EX: RUN_TTL_SECONDS },
     );
-    // Track run IDs per user (as a sorted set by creation time)
-    await redis.zadd(userRunsKey(run.userId), run.createdAt, run.id);
-    // Trim to max runs per user
-    await redis.zremrangebyrank(userRunsKey(run.userId), 0, -(MAX_RUNS_PER_USER + 1));
+    // Track run IDs per user using a simple JSON list
+    const runsKey = userRunsKey(run.userId);
+    const existing = await redis.get(runsKey);
+    const runIds: Array<{ id: string; createdAt: number }> = existing ? JSON.parse(existing) : [];
+    const idx = runIds.findIndex(r => r.id === run.id);
+    if (idx === -1) runIds.push({ id: run.id, createdAt: run.createdAt });
+    // Trim to max runs per user (keep most recent)
+    const trimmed = runIds.sort((a, b) => b.createdAt - a.createdAt).slice(0, MAX_RUNS_PER_USER);
+    await redis.set(runsKey, JSON.stringify(trimmed), { EX: RUN_TTL_SECONDS });
   } catch (err) {
     logger.warn({ err }, "IMR: failed to save run state");
   }
@@ -177,8 +182,11 @@ export async function getRun(userId: number, runId: string): Promise<Deliberatio
  */
 export async function listRuns(userId: number, limit = 20): Promise<DeliberationRun[]> {
   try {
-    const runIds = await redis.zrevrange(userRunsKey(userId), 0, limit - 1);
-    const runs = await Promise.all(runIds.map(id => loadRun(userId, Number(id))));
+    const runsKey = userRunsKey(userId);
+    const existing = await redis.get(runsKey);
+    const runIds: Array<{ id: string; createdAt: number }> = existing ? JSON.parse(existing) : [];
+    const recentIds = runIds.sort((a, b) => b.createdAt - a.createdAt).slice(0, limit).map(r => r.id);
+    const runs = await Promise.all(recentIds.map(id => loadRun(userId, id)));
     return runs.filter((r): r is DeliberationRun => r !== null);
   } catch {
     return [];

@@ -53,12 +53,14 @@ Rewrite this as Socratic guided questions (do NOT reveal the answer directly):`;
   try {
     const response = await askProvider(
       {
-        ...provider,
+        name: "openai" as const,
+        type: "api" as const,
+        apiKey: provider.apiKey ?? "",
+        model: provider.model,
+        baseUrl: provider.baseUrl,
         systemPrompt: KHANMIGO_SYSTEM_PROMPT,
       },
       [{ role: "user", content: prompt }],
-      undefined,
-      600,
     );
     return response.text.trim();
   } catch {

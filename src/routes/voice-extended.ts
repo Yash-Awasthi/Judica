@@ -23,6 +23,7 @@
 import type { FastifyInstance } from "fastify";
 import { randomUUID } from "crypto";
 import { askProvider } from "../lib/providers.js";
+import type { Message } from "../lib/providers.js";
 import { env } from "../config/env.js";
 import { z } from "zod";
 
@@ -66,7 +67,7 @@ const llmProvider = (systemPrompt?: string) => ({
 });
 
 async function llm(messages: Array<{ role: string; content: string }>, systemPrompt?: string): Promise<string> {
-  const resp = await askProvider(llmProvider(systemPrompt), messages);
+  const resp = await askProvider(llmProvider(systemPrompt), messages as Message[]);
   return typeof resp === "string" ? resp : ((resp as any)?.content ?? "");
 }
 

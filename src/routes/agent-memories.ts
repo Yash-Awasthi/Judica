@@ -5,7 +5,7 @@
  * Each scope is searchable and editable independently.
  */
 
-import { FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { db } from "../lib/drizzle.js";
 import { agentMemories } from "../db/schema/agentMemories.js";
 import { eq, and } from "drizzle-orm";

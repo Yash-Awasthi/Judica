@@ -71,7 +71,7 @@ async function recordRun(complexity: "simple" | "complex", latencyMs: number, sa
     else stats.complexRuns++;
     stats.avgLatencyMs   = Math.round((stats.avgLatencyMs * (stats.totalRuns - 1) + latencyMs) / stats.totalRuns);
     stats.savedLatencyMs = Math.round(stats.savedLatencyMs + savedMs);
-    await redis.set(STATS_KEY, JSON.stringify(stats), "EX", 86400 * 30);
+    await redis.set(STATS_KEY, JSON.stringify(stats), { EX: 86400 * 30 });
   } catch { /* non-critical */ }
 }
 
@@ -97,21 +97,19 @@ const speculativeDecodingPlugin: FastifyPluginAsync = async (fastify) => {
       const opts: SpeculativeRunOptions = {
         query,
         complexity,
-        drafterModel: drafter,
-        memberCount,
       };
       const result = await runSpeculativeDraft(opts);
       const latencyMs = Date.now() - t0;
 
-      await recordRun(complexity, latencyMs, result.savedMs ?? 0);
+      await recordRun(complexity, latencyMs, 0);
 
       return reply.send({
-        answer:        result.answer,
+        answer:        result.draft?.text,
         complexity,
-        usedDraft:     result.usedDraft,
-        drafterModel:  result.drafterModel,
+        usedDraft:     result.useDraftDirectly,
+        drafterModel:  result.draft?.draftModel,
         latencyMs,
-        savedMs:       result.savedMs ?? 0,
+        savedMs:       0,
         ...(includeDraft ? { draft: result.draft } : {}),
         note: complexity === "simple"
           ? "Simple query — answered by fast drafter, cold-validated."

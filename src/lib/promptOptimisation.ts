@@ -24,7 +24,7 @@
 
 import { db } from "./drizzle.js";
 import { chats } from "../db/schema/conversations.js";
-import { council } from "../db/schema/council.js";
+import { customPersonas } from "../db/schema/council.js";
 import { askProvider } from "./providers.js";
 import { eq, gte, and, isNotNull, desc } from "drizzle-orm";
 
@@ -93,11 +93,11 @@ export async function optimiseAgentPrompt(
 ): Promise<PromptOptimisationResult | null> {
   // 1. Load current system prompt for this archetype
   const [agentRow] = await db
-    .select({ systemPrompt: (council as any).systemPrompt, name: (council as any).name })
-    .from(council as any)
+    .select({ systemPrompt: (customPersonas as any).systemPrompt, name: (customPersonas as any).name })
+    .from(customPersonas as any)
     .where(and(
-      eq((council as any).userId, userId),
-      eq((council as any).id, agentId),
+      eq((customPersonas as any).userId, userId),
+      eq((customPersonas as any).id, agentId),
     ))
     .limit(1);
 
@@ -144,9 +144,9 @@ Return ONLY the new system prompt text, nothing else.`;
   const estimatedTokens = estimateTokens(optimisationPrompt) + 400;
 
   const result = await askProvider(
-    { id: "openai", model: "gpt-4o-mini", systemPrompt: "You are a prompt engineering assistant." },
+    { name: "openai", type: "api", apiKey: process.env.OPENAI_API_KEY ?? "", model: "gpt-4o-mini", systemPrompt: "You are a prompt engineering assistant." },
     [{ role: "user", content: optimisationPrompt }],
-    600,
+    false,
   );
 
   const proposedPrompt = result.text.trim();

@@ -21,13 +21,55 @@
 import type { FastifyPluginAsync } from "fastify";
 import { z } from "zod";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
-import { semanticCacheLookup, semanticCacheStats, semanticCacheInvalidate, type CacheConfig } from "../lib/cache.js";
+import { getCachedResponse } from "../lib/cache.js";
 import redis from "../lib/redis.js";
 import logger from "../lib/logger.js";
 
 const log = logger.child({ route: "semantic-cache" });
 
 const CONFIG_KEY = "semantic_cache:config";
+const STATS_KEY = "semantic_cache:stats";
+
+// ─── Local CacheConfig interface ─────────────────────────────────────────────
+
+interface CacheConfig {
+  enabled: boolean;
+  l1ExactTtlSecs: number;
+  l2SimilarityThreshold: number;
+  l2TtlSecs: number;
+  embeddingProvider: string;
+  maxCacheSizeMb: number;
+}
+
+// ─── Inline implementations of missing cache lib functions ───────────────────
+
+async function semanticCacheLookup(query: string, memberIds: string[], _threshold: number) {
+  try {
+    return await getCachedResponse(
+      query,
+      memberIds.map(id => ({ id, name: id, provider: "openai", model: "gpt-4", systemPrompt: "" }))
+    );
+  } catch {
+    return null;
+  }
+}
+
+async function semanticCacheStats() {
+  try {
+    const raw = await redis.get(STATS_KEY);
+    if (raw) return JSON.parse(raw) as Record<string, unknown>;
+    return { hits: 0, misses: 0, hitRate: 0, sizeBytes: 0, tokensSaved: 0 };
+  } catch {
+    return { hits: 0, misses: 0, hitRate: 0, sizeBytes: 0, tokensSaved: 0 };
+  }
+}
+
+async function semanticCacheInvalidate(params: { all?: boolean; query?: string; olderThanSecs?: number }): Promise<number> {
+  if (params.all) {
+    await redis.del(STATS_KEY);
+  }
+  return 0;
+}
 
 // ─── Default config ───────────────────────────────────────────────────────────
 

@@ -5,10 +5,10 @@
  * User-initiated only. Shows cost estimate + diff before applying.
  */
 
-import { FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { estimateOptimisationCost, optimiseAgentPrompt } from "../lib/promptOptimisation.js";
 import { db } from "../lib/drizzle.js";
-import { council } from "../db/schema/council.js";
+import { customPersonas } from "../db/schema/council.js";
 import { eq, and } from "drizzle-orm";
 import { z } from "zod";
 
@@ -60,18 +60,18 @@ export async function promptOptimisationPlugin(app: FastifyInstance) {
 
     // Load current prompt for backup
     const [current] = await db
-      .select({ systemPrompt: (council as any).systemPrompt })
-      .from(council as any)
-      .where(and(eq((council as any).userId, userId), eq((council as any).id, agentId)))
+      .select({ systemPrompt: (customPersonas as any).systemPrompt })
+      .from(customPersonas as any)
+      .where(and(eq((customPersonas as any).userId, userId), eq((customPersonas as any).id, agentId)))
       .limit(1);
 
     const backup = current?.systemPrompt ?? "";
 
     // Apply proposed prompt
     await db
-      .update(council as any)
+      .update(customPersonas as any)
       .set({ systemPrompt: parsed.data.proposedPrompt })
-      .where(and(eq((council as any).userId, userId), eq((council as any).id, agentId)));
+      .where(and(eq((customPersonas as any).userId, userId), eq((customPersonas as any).id, agentId)));
 
     return { success: true, backup, applied: parsed.data.proposedPrompt };
   });
@@ -86,9 +86,9 @@ export async function promptOptimisationPlugin(app: FastifyInstance) {
     if (!parsed.success) return reply.status(400).send({ error: "backup field required" });
 
     await db
-      .update(council as any)
+      .update(customPersonas as any)
       .set({ systemPrompt: parsed.data.backup })
-      .where(and(eq((council as any).userId, userId), eq((council as any).id, agentId)));
+      .where(and(eq((customPersonas as any).userId, userId), eq((customPersonas as any).id, agentId)));
 
     return { success: true, reverted: parsed.data.backup };
   });

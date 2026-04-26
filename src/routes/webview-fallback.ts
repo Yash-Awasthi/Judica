@@ -107,7 +107,7 @@ const configSchema = z.object({
 
 const DEFAULT_CONFIG = { enabled: true, preferredProvider: "chatgpt", autoFallback: true, injectDelay: 500 };
 
-async function getConfig(userId: string): Promise<typeof DEFAULT_CONFIG> {
+async function getConfig(userId: number): Promise<typeof DEFAULT_CONFIG> {
   try {
     const rows = await db.select({ settings: userSettings.settings }).from(userSettings).where(eq(userSettings.userId, userId)).limit(1);
     const raw = rows[0]?.settings as Record<string, unknown> | undefined;
@@ -117,7 +117,7 @@ async function getConfig(userId: string): Promise<typeof DEFAULT_CONFIG> {
   }
 }
 
-async function saveConfig(userId: string, config: typeof DEFAULT_CONFIG): Promise<void> {
+async function saveConfig(userId: number, config: typeof DEFAULT_CONFIG): Promise<void> {
   const rows = await db.select({ settings: userSettings.settings }).from(userSettings).where(eq(userSettings.userId, userId)).limit(1);
   const existing = (rows[0]?.settings as Record<string, unknown>) ?? {};
   await db.insert(userSettings).values({ userId, settings: { ...existing, webviewFallback: config } })
@@ -138,8 +138,8 @@ const webviewFallbackPlugin: FastifyPluginAsync = async (fastify) => {
 
     const hasApiKeys = Boolean(
       env.OPENAI_API_KEY || env.ANTHROPIC_API_KEY ||
-      (env as Record<string, string>).GEMINI_API_KEY ||
-      (env as Record<string, string>).GROQ_API_KEY
+      (env as unknown as Record<string, string>).GEMINI_API_KEY ||
+      (env as unknown as Record<string, string>).GROQ_API_KEY
     );
 
     return reply.send({

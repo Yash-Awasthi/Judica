@@ -45,19 +45,20 @@ export async function tokenConservationPlugin(app: FastifyInstance) {
           ratio: "heuristic",
           backend: "heuristic" as const,
         }
-      : await compressPrompt(text, ratio);
+      : await compressPrompt(text, { targetRatio: ratio });
+    const r = result as { compressed: string; originTokens?: number; compressedTokens?: number; backend?: string; compressionRatio?: number; method?: string; };
 
-    const savedPct = result.originTokens > 0
-      ? Math.round((1 - result.compressedTokens / result.originTokens) * 100)
+    const savedPct = (r.originTokens ?? 0) > 0
+      ? Math.round((1 - (r.compressedTokens ?? 0) / (r.originTokens ?? 1)) * 100)
       : 0;
 
     return {
       success:        true,
-      compressed:     result.compressed,
-      originTokens:   result.originTokens,
-      compressedTokens: result.compressedTokens,
+      compressed:     r.compressed,
+      originTokens:   r.originTokens,
+      compressedTokens: r.compressedTokens,
       savedPercent:   savedPct,
-      backend:        result.backend,
+      backend:        r.backend,
     };
   });
 

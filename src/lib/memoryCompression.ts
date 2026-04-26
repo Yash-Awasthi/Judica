@@ -76,7 +76,7 @@ export async function compressConversationHistory(
     try {
       const response = await askProvider(provider, [
         { role: "user", content: SUMMARIZE_PROMPT(level1Turns, 1) },
-      ], undefined, 400);
+      ]);
       level1Summary = response.text.trim();
     } catch (err) {
       logger.warn({ err }, "Level 1 memory compression failed");
@@ -95,7 +95,7 @@ export async function compressConversationHistory(
     try {
       const response = await askProvider(provider, [
         { role: "user", content: SUMMARIZE_PROMPT(level2Turns, 2) },
-      ], undefined, 200);
+      ]);
       level2Digest = response.text.trim();
     } catch (err) {
       logger.warn({ err }, "Level 2 memory compression failed");

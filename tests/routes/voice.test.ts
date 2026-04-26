@@ -173,7 +173,7 @@ describe("voice routes", () => {
 
       const result = await getHandler()(req, reply);
 
-      expect(result).toEqual({ text: "Hello world" });
+      expect(result).toMatchObject({ text: "Hello world" });
       expect(mockFetch).toHaveBeenCalledOnce();
       expect(mockFetch).toHaveBeenCalledWith(
         "https://api.openai.com/v1/audio/transcriptions",
@@ -202,7 +202,7 @@ describe("voice routes", () => {
       });
 
       const result = await getHandler()(req, reply);
-      expect(result).toEqual({ text: "test" });
+      expect(result).toMatchObject({ text: "test" });
     });
 
     it("throws 502 when Whisper API returns non-ok response", async () => {

@@ -13,7 +13,7 @@
  * 2. Per-user OAuth2 token via POST /api/slack/token
  */
 
-import { FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
 
 const SLACK_API = "https://slack.com/api";
 

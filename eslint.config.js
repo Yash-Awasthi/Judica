@@ -12,6 +12,16 @@ export default [
     ignores: ["dist/**", "node_modules/**"],
   },
   js.configs.recommended,
+  // Browser globals for Chrome extension JS files
+  {
+    files: ["src/extensions/**/*.js"],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        ...globals.serviceworker,
+      },
+    },
+  },
   {
     files: ["src/**/*.ts"],
     languageOptions: {

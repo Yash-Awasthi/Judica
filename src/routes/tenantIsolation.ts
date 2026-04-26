@@ -25,6 +25,7 @@ const tenantIsolationPlugin: FastifyPluginAsync = async (fastify) => {
   // ─── Provision ────────────────────────────────────────────────────────────
 
   fastify.post("/:tenantId/keys", {
+    config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
     schema: {
       summary: "Provision a per-tenant encryption key (idempotent)",
       tags: ["Tenant Isolation"],

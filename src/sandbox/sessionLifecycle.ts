@@ -10,9 +10,9 @@
  *   provisioning  → ready       (container created and health-checked)
  *   provisioning  → error       (creation failed)
  *   ready         → running     (first exec command received)
- *   running       → idle        (no command for IDLE_TIMEOUT_MS)
+ *   running       → idle        (no command for getIdleTimeoutMs())
  *   idle          → running     (new command received)
- *   idle          → sleeping    (idle for SLEEP_TIMEOUT_MS, snapshot taken)
+ *   idle          → sleeping    (idle for getSleepTimeoutMs(), snapshot taken)
  *   sleeping      → restored    (new command wakes session, snapshot restored)
  *   restored      → running     (wake complete)
  *   running/idle  → destroyed   (explicit destroy or max lifetime exceeded)
@@ -41,9 +41,9 @@ const log = logger.child({ service: "sandboxLifecycle" });
 
 // ─── Configuration ────────────────────────────────────────────────────────────
 
-const IDLE_TIMEOUT_MS   = parseInt(process.env.SANDBOX_IDLE_TIMEOUT_MS    ?? "300000",  10); // 5 min
-const SLEEP_TIMEOUT_MS  = parseInt(process.env.SANDBOX_SLEEP_TIMEOUT_MS   ?? "1800000", 10); // 30 min
-const MAX_LIFETIME_MS   = parseInt(process.env.SANDBOX_MAX_LIFETIME_MS    ?? "86400000",10); // 24 hr
+const getIdleTimeoutMs   = () => parseInt(process.env.SANDBOX_IDLE_TIMEOUT_MS    ?? "300000",  10); // 5 min
+const getSleepTimeoutMs  = () => parseInt(process.env.SANDBOX_SLEEP_TIMEOUT_MS   ?? "1800000", 10); // 30 min
+const getMaxLifetimeMs   = () => parseInt(process.env.SANDBOX_MAX_LIFETIME_MS    ?? "86400000",10); // 24 hr
 const POOL_SIZE         = parseInt(process.env.SANDBOX_POOL_SIZE          ?? "3",        10);
 const POOL_REPLENISH_MS = parseInt(process.env.SANDBOX_POOL_REPLENISH_MS  ?? "30000",   10); // 30s
 
@@ -87,7 +87,7 @@ export interface ManagedSession {
 // ─── Allowed Transitions ──────────────────────────────────────────────────────
 
 const ALLOWED_TRANSITIONS: Record<SessionState, SessionState[]> = {
-  provisioning: ["ready", "error"],
+  provisioning: ["ready", "error", "destroyed"],
   ready:        ["running", "destroyed"],
   running:      ["idle", "destroyed"],
   idle:         ["running", "sleeping", "destroyed"],
@@ -151,14 +151,14 @@ export class SandboxLifecycleManager extends EventEmitter {
     if (to === "running") {
       session.idleTimer = setTimeout(
         () => this._onIdle(sessionId),
-        IDLE_TIMEOUT_MS
+        getIdleTimeoutMs()
       );
     }
 
     if (to === "idle") {
       session.sleepTimer = setTimeout(
         () => this._onSleep(sessionId),
-        SLEEP_TIMEOUT_MS
+        getSleepTimeoutMs()
       );
     }
 
@@ -188,7 +188,7 @@ export class SandboxLifecycleManager extends EventEmitter {
 
     session.lifetimeTimer = setTimeout(
       () => this.transition(id, "destroyed", "max lifetime exceeded"),
-      MAX_LIFETIME_MS
+      getMaxLifetimeMs()
     );
     session.lifetimeTimer.unref();
 
@@ -251,7 +251,7 @@ export class SandboxLifecycleManager extends EventEmitter {
       clearTimeout(session.idleTimer);
       session.idleTimer = setTimeout(
         () => this._onIdle(sessionId),
-        IDLE_TIMEOUT_MS
+        getIdleTimeoutMs()
       );
     }
   }

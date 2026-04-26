@@ -102,7 +102,7 @@ export async function recomputeEvolution(
   };
 
   try {
-    await redis.set(redisKey(userId, model), JSON.stringify(profile), "EX", EVOLUTION_TTL);
+    await redis.set(redisKey(userId, model), JSON.stringify(profile), { EX: EVOLUTION_TTL });
   } catch (err) {
     logger.warn({ err }, "MemberEvolution: failed to cache profile");
   }

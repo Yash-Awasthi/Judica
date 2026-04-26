@@ -179,7 +179,7 @@ export const connectorSyncPlugin: FastifyPluginAsync = async (fastify) => {
     const result = await cancelSyncJob(jobId, request.userId!);
 
     if (!result) throw new AppError(404, "Sync job not found");
-    if ("error" in result) throw new AppError(400, result.error);
+    if ("error" in result) throw new AppError(400, result.error ?? "");
 
     return result;
   });

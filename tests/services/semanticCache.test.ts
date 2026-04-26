@@ -4,11 +4,11 @@ import {
   getMemberCache,
   setMemberCache,
   getCacheStats,
-} from "../../services/semanticCache.service.js";
+} from "../../src/services/semanticCache.service.js";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 
 // Mock Redis and DB for unit tests
-vi.mock("../../lib/redis.js", () => ({
+vi.mock("../../src/lib/redis.js", () => ({
   default: {
     get: vi.fn().mockResolvedValue(null),
     set: vi.fn().mockResolvedValue("OK"),
@@ -17,17 +17,17 @@ vi.mock("../../lib/redis.js", () => ({
   },
 }));
 
-vi.mock("../../lib/drizzle.js", () => ({
+vi.mock("../../src/lib/drizzle.js", () => ({
   db: {
     execute: vi.fn().mockResolvedValue({ rows: [] }),
   },
 }));
 
-vi.mock("../../services/embeddings.service.js", () => ({
+vi.mock("../../src/services/embeddings.service.js", () => ({
   embed: vi.fn().mockResolvedValue(new Array(1536).fill(0.1)),
 }));
 
-vi.mock("../../services/vectorStore.service.js", () => ({
+vi.mock("../../src/services/vectorStore.service.js", () => ({
   safeVectorLiteral: vi.fn().mockReturnValue("[0.1,0.1]"),
 }));
 
@@ -53,7 +53,7 @@ describe("semanticCache.service", () => {
 
   describe("cacheSet / cacheGet L1 flow", () => {
     it("stores and retrieves via L1 exact cache", async () => {
-      const { default: redis } = await import("../../lib/redis.js");
+      const { default: redis } = await import("../../src/lib/redis.js");
       (redis.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce("Cached response");
 
       const result = await cacheGet("What is 2+2?", 1, ["member-a"], "gpt-4o");
@@ -70,7 +70,7 @@ describe("semanticCache.service", () => {
     });
 
     it("stores and retrieves member cache entries", async () => {
-      const { default: redis } = await import("../../lib/redis.js");
+      const { default: redis } = await import("../../src/lib/redis.js");
       const mockEntry = {
         memberId: "member-a",
         model: "gpt-4o",
@@ -86,7 +86,7 @@ describe("semanticCache.service", () => {
 
     it("skips storing when cache is disabled", async () => {
       process.env.ENABLE_SEMANTIC_CACHE = "false";
-      const { default: redis } = await import("../../lib/redis.js");
+      const { default: redis } = await import("../../src/lib/redis.js");
       await setMemberCache("test", {
         memberId: "x", model: "y", response: "z",
         usage: { prompt_tokens: 1, completion_tokens: 1 },
@@ -104,7 +104,7 @@ describe("semanticCache.service", () => {
     });
 
     it("computes hit rate correctly", async () => {
-      const { default: redis } = await import("../../lib/redis.js");
+      const { default: redis } = await import("../../src/lib/redis.js");
       (redis.get as ReturnType<typeof vi.fn>)
         .mockResolvedValueOnce("80")  // l1
         .mockResolvedValueOnce("10")  // l2

@@ -34,7 +34,8 @@ export type MemoryEditAction =
 /** Parse memory edit actions embedded in agent response text. */
 export function parseMemoryEdits(responseText: string): MemoryEditAction[] {
   // Agents can embed actions in a special XML-like block: <memory-edit>JSON</memory-edit>
-  const matches = responseText.matchAll(/<memory-edit>([\s\S]*?)<\/memory-edit>/g);
+  // Use a length-bounded pattern to avoid ReDoS on large inputs
+  const matches = responseText.matchAll(/<memory-edit>([^]{1,65536}?)<\/memory-edit>/g);
   const actions: MemoryEditAction[] = [];
 
   for (const match of matches) {
@@ -92,20 +93,20 @@ export async function executeMemoryEdits(
         case "promote": {
           await db.update(memoryFacts)
             .set({ decayScore: 1.0, scope: "global" } as any)
-            .where(and(eq(memoryFacts.id, action.factId), eq(memoryFacts.userId, userId)));
+            .where(and(eq(memoryFacts.id, String(action.factId)), eq(memoryFacts.userId, userId)) as any);
           break;
         }
 
         case "demote": {
           await db.update(memoryFacts)
-            .set({ decayScore: 0.1 })
-            .where(and(eq(memoryFacts.id, action.factId), eq(memoryFacts.userId, userId)));
+            .set({ decayScore: 0.1 } as any)
+            .where(and(eq(memoryFacts.id, String(action.factId)), eq(memoryFacts.userId, userId)) as any);
           break;
         }
 
         case "delete": {
           await db.delete(memoryFacts)
-            .where(and(eq(memoryFacts.id, action.factId), eq(memoryFacts.userId, userId)));
+            .where(and(eq(memoryFacts.id, String(action.factId)), eq(memoryFacts.userId, userId)) as any);
           break;
         }
 
@@ -114,23 +115,23 @@ export async function executeMemoryEdits(
           const [source] = await db
             .select({ fact: memoryFacts.fact })
             .from(memoryFacts)
-            .where(and(eq(memoryFacts.id, action.factId), eq(memoryFacts.userId, userId)))
+            .where(and(eq(memoryFacts.id, String(action.factId)), eq(memoryFacts.userId, userId)) as any)
             .limit(1);
 
           if (source) {
             const [target] = await db
               .select({ fact: memoryFacts.fact })
               .from(memoryFacts)
-              .where(and(eq(memoryFacts.id, action.intoFactId), eq(memoryFacts.userId, userId)))
+              .where(and(eq(memoryFacts.id, String(action.intoFactId)), eq(memoryFacts.userId, userId)) as any)
               .limit(1);
 
             if (target) {
               const merged = `${target.fact} | ${source.fact}`;
               await db.update(memoryFacts)
-                .set({ fact: merged, decayScore: 1.0 })
-                .where(eq(memoryFacts.id, action.intoFactId));
+                .set({ fact: merged, decayScore: 1.0 } as any)
+                .where(eq(memoryFacts.id, String(action.intoFactId)) as any);
               await db.delete(memoryFacts)
-                .where(eq(memoryFacts.id, action.factId));
+                .where(eq(memoryFacts.id, String(action.factId)) as any);
             }
           }
           break;

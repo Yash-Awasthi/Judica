@@ -61,7 +61,7 @@ async function img2imgSdWebui(opts: {
   strength: number;
   steps: number;
 }): Promise<string> {
-  const sdUrl = (env as Record<string, string>).SD_WEBUI_URL ?? "http://localhost:7860";
+  const sdUrl = (env as unknown as Record<string, string>).SD_WEBUI_URL ?? "http://localhost:7860";
   const res = await fetch(`${sdUrl}/sdapi/v1/img2img`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -88,7 +88,7 @@ async function img2videoCogVideo(opts: {
   durationSecs: number;
   fps: number;
 }): Promise<string> {
-  const cogUrl = (env as Record<string, string>).COGVIDEO_API_URL ?? "http://localhost:8080";
+  const cogUrl = (env as unknown as Record<string, string>).COGVIDEO_API_URL ?? "http://localhost:8080";
   const res = await fetch(`${cogUrl}/generate`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -139,7 +139,7 @@ async function img2videoRunway(opts: {
   prompt: string;
   durationSecs: number;
 }): Promise<string> {
-  const runwayKey = (env as Record<string, string>).RUNWAY_API_KEY;
+  const runwayKey = (env as unknown as Record<string, string>).RUNWAY_API_KEY;
   if (!runwayKey) throw new Error("RUNWAY_API_KEY required for Runway img2video");
   const res = await fetch("https://api.dev.runwayml.com/v1/image_to_video", {
     method: "POST",
@@ -173,23 +173,23 @@ const imageTransformationsPlugin: FastifyPluginAsync = async (fastify) => {
    * List available providers and which are configured (free vs paid).
    */
   fastify.get("/providers", { preHandler: fastifyRequireAuth }, async (_req, reply) => {
-    const sdUrl   = (env as Record<string, string>).SD_WEBUI_URL;
-    const cogUrl  = (env as Record<string, string>).COGVIDEO_API_URL;
-    const ltxUrl  = (env as Record<string, string>).LTX_VIDEO_API_URL;
-    const runwayKey = (env as Record<string, string>).RUNWAY_API_KEY;
+    const sdUrl   = (env as unknown as Record<string, string>).SD_WEBUI_URL;
+    const cogUrl  = (env as unknown as Record<string, string>).COGVIDEO_API_URL;
+    const ltxUrl  = (env as unknown as Record<string, string>).LTX_VIDEO_API_URL;
+    const runwayKey = (env as unknown as Record<string, string>).RUNWAY_API_KEY;
 
     return reply.send({
       img2img: [
         { id: "sd-webui",  label: "Stable Diffusion WebUI",  tier: "free",  configured: Boolean(sdUrl), defaultUrl: "http://localhost:7860" },
-        { id: "comfyui",   label: "ComfyUI",                 tier: "free",  configured: Boolean((env as Record<string, string>).COMFYUI_API_URL) },
+        { id: "comfyui",   label: "ComfyUI",                 tier: "free",  configured: Boolean((env as unknown as Record<string, string>).COMFYUI_API_URL) },
         { id: "dall-e",    label: "DALL-E 2 (OpenAI)",       tier: "paid",  configured: Boolean(env.OPENAI_API_KEY), warning: "Uses OpenAI credits (paid)" },
-        { id: "fal",       label: "fal.ai (FLUX)",           tier: "paid",  configured: Boolean((env as Record<string, string>).FAL_API_KEY), warning: "Uses fal.ai credits (paid)" },
+        { id: "fal",       label: "fal.ai (FLUX)",           tier: "paid",  configured: Boolean((env as unknown as Record<string, string>).FAL_API_KEY), warning: "Uses fal.ai credits (paid)" },
       ],
       img2video: [
         { id: "cogvideo",  label: "CogVideoX (local)",       tier: "free",  configured: Boolean(cogUrl), defaultUrl: "http://localhost:8080" },
         { id: "ltx-video", label: "LTX-Video (local)",       tier: "free",  configured: Boolean(ltxUrl), defaultUrl: "http://localhost:8081" },
         { id: "runway",    label: "Runway ML",               tier: "paid",  configured: Boolean(runwayKey), warning: "Uses Runway credits (paid)" },
-        { id: "kling",     label: "Kling",                   tier: "paid",  configured: Boolean((env as Record<string, string>).KLING_API_KEY), warning: "Uses Kling credits (paid)" },
+        { id: "kling",     label: "Kling",                   tier: "paid",  configured: Boolean((env as unknown as Record<string, string>).KLING_API_KEY), warning: "Uses Kling credits (paid)" },
       ],
       freeAlternativeMap: {
         note: "Free providers are the default. Set SD_WEBUI_URL or COGVIDEO_API_URL to point to your local instance.",
@@ -212,14 +212,14 @@ const imageTransformationsPlugin: FastifyPluginAsync = async (fastify) => {
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
     const { imageBase64, prompt, negativePrompt, strength, steps, provider, size } = parsed.data;
 
-    const sdUrl  = (env as Record<string, string>).SD_WEBUI_URL;
-    const falKey = (env as Record<string, string>).FAL_API_KEY;
+    const sdUrl  = (env as unknown as Record<string, string>).SD_WEBUI_URL;
+    const falKey = (env as unknown as Record<string, string>).FAL_API_KEY;
 
     // Resolve "auto": prefer free providers first
     let resolvedProvider = provider;
     if (resolvedProvider === "auto") {
       if (sdUrl)                   resolvedProvider = "sd-webui";
-      else if ((env as Record<string, string>).COMFYUI_API_URL) resolvedProvider = "comfyui";
+      else if ((env as unknown as Record<string, string>).COMFYUI_API_URL) resolvedProvider = "comfyui";
       else if (env.OPENAI_API_KEY) resolvedProvider = "dall-e";
       else if (falKey)             resolvedProvider = "fal";
       else {
@@ -257,10 +257,10 @@ const imageTransformationsPlugin: FastifyPluginAsync = async (fastify) => {
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
     const { imageBase64, prompt, durationSecs, fps, provider } = parsed.data;
 
-    const cogUrl    = (env as Record<string, string>).COGVIDEO_API_URL;
-    const ltxUrl    = (env as Record<string, string>).LTX_VIDEO_API_URL;
-    const runwayKey = (env as Record<string, string>).RUNWAY_API_KEY;
-    const klingKey  = (env as Record<string, string>).KLING_API_KEY;
+    const cogUrl    = (env as unknown as Record<string, string>).COGVIDEO_API_URL;
+    const ltxUrl    = (env as unknown as Record<string, string>).LTX_VIDEO_API_URL;
+    const runwayKey = (env as unknown as Record<string, string>).RUNWAY_API_KEY;
+    const klingKey  = (env as unknown as Record<string, string>).KLING_API_KEY;
 
     // Resolve "auto": prefer free providers first
     let resolvedProvider = provider;
@@ -306,8 +306,13 @@ const imageTransformationsPlugin: FastifyPluginAsync = async (fastify) => {
     { preHandler: fastifyRequireAuth },
     async (req, reply) => {
       const { taskId } = req.params;
-      const runwayKey = (env as Record<string, string>).RUNWAY_API_KEY;
+      const runwayKey = (env as unknown as Record<string, string>).RUNWAY_API_KEY;
       if (!runwayKey) return reply.status(400).send({ error: "No async video provider configured" });
+
+      // Validate taskId to prevent request-forgery via path manipulation
+      if (!/^[a-zA-Z0-9_-]{1,128}$/.test(taskId)) {
+        return reply.status(400).send({ error: "Invalid task ID" });
+      }
 
       const res = await fetch(`https://api.dev.runwayml.com/v1/tasks/${taskId}`, {
         headers: { Authorization: `Bearer ${runwayKey}`, "X-Runway-Version": "2024-11-06" },

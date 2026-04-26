@@ -136,7 +136,10 @@ async function executeCode(
   await mkdir(tmpDir, { recursive: true });
 
   const ext = language === "python" ? "py" : "js";
-  const filename = join(tmpDir, `run_${Date.now()}.${ext}`);
+  // Use crypto-random suffix to prevent temp file name prediction (insecure temp file)
+  const { randomBytes } = await import("crypto");
+  const safeSuffix = randomBytes(8).toString("hex");
+  const filename = join(tmpDir, `run_${safeSuffix}.${ext}`);
 
   const start = Date.now();
   let stdout = "", stderr = "", exitCode = 0;

@@ -5,7 +5,7 @@
  * Background polling via BullMQ (existing queue infrastructure).
  */
 
-import { FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { db } from "../lib/drizzle.js";
 import { rssFeeds, rssFeedItems } from "../db/schema/rssFeeds.js";
 import { fetchFeed } from "../lib/rssFeedParser.js";

@@ -3,12 +3,13 @@ import {
   releaseRefreshLock,
   withRefreshLock,
   RefreshTokenLockConflictError,
-} from "../../lib/refreshTokenMutex.js";
+} from "../../src/lib/refreshTokenMutex.js";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 
-vi.mock("../../lib/redis.js", () => ({
+vi.mock("../../src/lib/redis.js", () => ({
   default: {
-    set: vi.fn(),
+    get: vi.fn().mockResolvedValue(null), // null = no existing lock (default: available)
+    set: vi.fn().mockResolvedValue("OK"),
     eval: vi.fn().mockResolvedValue(1),
   },
 }));
@@ -18,7 +19,7 @@ describe("refreshTokenMutex", () => {
 
   describe("acquireRefreshLock", () => {
     it("returns true when lock is acquired successfully", async () => {
-      const { default: redis } = await import("../../lib/redis.js");
+      const { default: redis } = await import("../../src/lib/redis.js");
       (redis.set as ReturnType<typeof vi.fn>).mockResolvedValueOnce("OK");
 
       const result = await acquireRefreshLock("token-hash-abc", "request-id-1");
@@ -26,8 +27,9 @@ describe("refreshTokenMutex", () => {
     });
 
     it("throws RefreshTokenLockConflictError when lock is already held", async () => {
-      const { default: redis } = await import("../../lib/redis.js");
-      (redis.set as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null); // NX set returns null if key exists
+      const { default: redis } = await import("../../src/lib/redis.js");
+      // Simulate existing lock: get returns a non-null value
+      (redis.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce("existing-lock-value");
 
       await expect(
         acquireRefreshLock("token-hash-abc", "request-id-2")
@@ -35,8 +37,8 @@ describe("refreshTokenMutex", () => {
     });
 
     it("fails open when Redis is unavailable", async () => {
-      const { default: redis } = await import("../../lib/redis.js");
-      (redis.set as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("Redis connection refused"));
+      const { default: redis } = await import("../../src/lib/redis.js");
+      (redis.get as ReturnType<typeof vi.fn>).mockRejectedValueOnce(new Error("Redis connection refused"));
 
       // Should NOT throw — fails open
       const result = await acquireRefreshLock("token-hash-abc", "request-id-3");
@@ -46,7 +48,7 @@ describe("refreshTokenMutex", () => {
 
   describe("releaseRefreshLock", () => {
     it("executes Lua script to release lock atomically", async () => {
-      const { default: redis } = await import("../../lib/redis.js");
+      const { default: redis } = await import("../../src/lib/redis.js");
 
       await releaseRefreshLock("token-hash-abc", "request-id-1");
 
@@ -54,7 +56,7 @@ describe("refreshTokenMutex", () => {
     });
 
     it("does not throw when release fails (non-critical)", async () => {
-      const { default: redis } = await import("../../lib/redis.js");
+      const { default: redis } = await import("../../src/lib/redis.js");
       (redis as unknown as { eval: ReturnType<typeof vi.fn> }).eval.mockRejectedValueOnce(new Error("Network error"));
 
       await expect(
@@ -65,7 +67,7 @@ describe("refreshTokenMutex", () => {
 
   describe("withRefreshLock", () => {
     it("executes callback while holding lock and releases after", async () => {
-      const { default: redis } = await import("../../lib/redis.js");
+      const { default: redis } = await import("../../src/lib/redis.js");
       (redis.set as ReturnType<typeof vi.fn>).mockResolvedValueOnce("OK");
 
       let callbackRan = false;
@@ -80,7 +82,7 @@ describe("refreshTokenMutex", () => {
     });
 
     it("releases lock even when callback throws", async () => {
-      const { default: redis } = await import("../../lib/redis.js");
+      const { default: redis } = await import("../../src/lib/redis.js");
       (redis.set as ReturnType<typeof vi.fn>).mockResolvedValueOnce("OK");
 
       await expect(
@@ -94,8 +96,9 @@ describe("refreshTokenMutex", () => {
     });
 
     it("propagates RefreshTokenLockConflictError when lock is contended", async () => {
-      const { default: redis } = await import("../../lib/redis.js");
-      (redis.set as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null); // lock held
+      const { default: redis } = await import("../../src/lib/redis.js");
+      // Simulate lock already held: get returns non-null
+      (redis.get as ReturnType<typeof vi.fn>).mockResolvedValueOnce("held-by-another");
 
       await expect(
         withRefreshLock("token-hash-abc", "req-2", async () => "never reached")

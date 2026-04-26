@@ -7,7 +7,7 @@
  * Inspired by CrewAI task delegation and Taskade agent task graphs.
  */
 
-import { FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { db } from "../lib/drizzle.js";
 import { buildTasks } from "../db/schema/buildTasks.js";
 import { eq, and, isNull, desc } from "drizzle-orm";
@@ -18,7 +18,7 @@ const createTaskSchema = z.object({
   description:    z.string().optional(),
   parentId:       z.number().optional(),
   conversationId: z.string().optional(),
-  meta:           z.record(z.unknown()).optional(),
+  meta:           z.record(z.string(), z.unknown()).optional(),
 });
 
 const claimSchema = z.object({

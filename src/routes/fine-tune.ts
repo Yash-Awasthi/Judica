@@ -7,7 +7,7 @@
  * Inspired by DSPy self-improving pipeline concept.
  */
 
-import { FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { buildFineTuneDataset, serializeAsJSONL, initiateFineTuneJob } from "../lib/fineTunePipeline.js";
 import { z } from "zod";
 

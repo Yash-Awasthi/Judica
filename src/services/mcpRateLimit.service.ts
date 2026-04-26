@@ -66,35 +66,20 @@ export interface ToolRateConfig {
   callsPerMinute: number;
 }
 
-// ─── Redis Sliding Window ─────────────────────────────────────────────────────
+// ─── Redis Fixed Window Rate Limiter ─────────────────────────────────────────
 
 /**
- * Increment a sliding window counter in Redis.
- * Uses a sorted set keyed by timestamp to implement a true sliding window.
+ * Increment a fixed window counter in Redis.
+ * Uses incr + expire for a simple 1-minute fixed window.
  * Returns the current count within the window.
  */
 async function slidingWindowIncrement(key: string): Promise<number> {
-  const now = Date.now();
-  const windowStart = now - WINDOW_MS;
-  const member = `${now}-${Math.random().toString(36).slice(2, 7)}`;
-
   try {
-    const pipeline = (redis as { pipeline?: () => { zadd: Function; zremrangebyscore: Function; zcard: Function; expire: Function; exec: Function } }).pipeline?.();
-    if (pipeline) {
-      pipeline.zadd(key, now, member);
-      pipeline.zremrangebyscore(key, 0, windowStart);
-      pipeline.zcard(key);
-      pipeline.expire(key, Math.ceil(WINDOW_MS / 1000) + 5);
-      const results = await pipeline.exec();
-      // zcard result is at index 2
-      return (results?.[2]?.[1] as number) ?? 0;
+    const count = await redis.incr(key);
+    if (count === 1) {
+      // First call in this window — set expiry
+      await redis.expire(key, Math.ceil(WINDOW_MS / 1000) + 5);
     }
-
-    // Fallback: sequential commands (no pipeline support)
-    await redis.zadd(key, { score: now, value: member });
-    await redis.zremrangebyscore(key, 0, windowStart);
-    const count = await redis.zcard(key);
-    await redis.expire(key, Math.ceil(WINDOW_MS / 1000) + 5);
     return count;
   } catch (err) {
     log.warn({ err, key }, "MCP rate limit Redis error — failing open");
@@ -103,9 +88,9 @@ async function slidingWindowIncrement(key: string): Promise<number> {
 }
 
 async function slidingWindowCount(key: string): Promise<number> {
-  const windowStart = Date.now() - WINDOW_MS;
   try {
-    return await redis.zcount(key, windowStart, "+inf");
+    const val = await redis.get(key);
+    return val ? parseInt(val, 10) : 0;
   } catch {
     return 0;
   }

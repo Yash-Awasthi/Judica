@@ -84,7 +84,9 @@ function matchesPattern(event: string, pattern: string): boolean {
   if (pattern === "*") return true;
   if (pattern === event) return true;
   // Convert glob to regex: * matches any segment
-  const regex = new RegExp("^" + pattern.replace(/\./g, "\\.").replace(/\*/g, "[^.]+") + "$");
+  // Escape all regex metacharacters first, then restore the glob wildcard
+  const escaped = pattern.replace(/[.+^${}()|[\]\\]/g, "\\$&").replace(/\*/g, "[^.]+");
+  const regex = new RegExp("^" + escaped + "$");
   return regex.test(event);
 }
 

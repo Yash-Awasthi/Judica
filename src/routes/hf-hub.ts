@@ -5,7 +5,7 @@
  * Integrates with the existing openapiTools infrastructure.
  */
 
-import { FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { fetchHFSpaceInfo, fetchHFModelInfo, invokeHFInference, searchHFModels } from "../lib/hfHub.js";
 import { db } from "../lib/drizzle.js";
 import { openapiTools } from "../db/schema/openapiTools.js";
@@ -14,7 +14,7 @@ import { z } from "zod";
 const invokeSchema = z.object({
   modelId:    z.string().min(1),
   inputs:     z.unknown(),
-  parameters: z.record(z.unknown()).optional(),
+  parameters: z.record(z.string(), z.unknown()).optional(),
 });
 
 const registerSchema = z.object({

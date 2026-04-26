@@ -43,7 +43,7 @@ const log = logger.child({ service: "semanticCache" });
 const L1_TTL_SECONDS = 3_600;           // 1 hour exact-match cache
 const L3_TTL_SECONDS = 1_800;           // 30 min council config cache
 const SEMANTIC_THRESHOLD = parseFloat(process.env.SEMANTIC_CACHE_THRESHOLD ?? "0.92");
-const CACHE_ENABLED = process.env.ENABLE_SEMANTIC_CACHE !== "false";
+const isCacheEnabled = () => process.env.ENABLE_SEMANTIC_CACHE !== "false";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -227,7 +227,7 @@ export async function cacheGet(
   councilMemberIds: string[],
   model: string
 ): Promise<CacheResult> {
-  if (!CACHE_ENABLED) return { hit: false, level: null };
+  if (!isCacheEnabled()) return { hit: false, level: null };
 
   const cfgHash = configFingerprint(councilMemberIds, model);
   const qHash = queryHash(query, cfgHash);
@@ -264,7 +264,7 @@ export async function cacheSet(
   councilMemberIds: string[],
   model: string
 ): Promise<void> {
-  if (!CACHE_ENABLED) return;
+  if (!isCacheEnabled()) return;
 
   const cfgHash = configFingerprint(councilMemberIds, model);
   const qHash = queryHash(query, cfgHash);
@@ -283,7 +283,7 @@ export async function getMemberCache(
   memberId: string,
   model: string
 ): Promise<MemberCacheEntry | null> {
-  if (!CACHE_ENABLED) return null;
+  if (!isCacheEnabled()) return null;
   const qHash = createHash("sha256").update(normaliseQuery(query)).digest("hex");
   return l3GetMember(qHash, memberId, model);
 }
@@ -295,7 +295,7 @@ export async function setMemberCache(
   query: string,
   entry: MemberCacheEntry
 ): Promise<void> {
-  if (!CACHE_ENABLED) return;
+  if (!isCacheEnabled()) return;
   const qHash = createHash("sha256").update(normaliseQuery(query)).digest("hex");
   await l3SetMember(qHash, entry);
 }

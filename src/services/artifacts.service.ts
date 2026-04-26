@@ -53,20 +53,26 @@ export function detectArtifact(response: string): DetectedArtifact | null {
     }
   }
 
-  // 2. Check for complete HTML document
+  // 2. Check for complete HTML document (use indexOf to avoid ReDoS)
   if (
     response.includes("<!DOCTYPE") ||
     response.includes("<html") ||
     (response.includes("<head") && response.includes("<body"))
   ) {
-    const htmlMatch = response.match(/(<!DOCTYPE[\s\S]*<\/html>)/i) ||
-      response.match(/(<html[\s\S]*<\/html>)/i);
-    if (htmlMatch) {
-      return {
-        name: "HTML Document",
-        type: "html",
-        content: htmlMatch[1],
-      };
+    const closeTag = "</html>";
+    const closeIdx = response.toLowerCase().lastIndexOf(closeTag);
+    if (closeIdx !== -1) {
+      const afterClose = closeIdx + closeTag.length;
+      const docStart = response.toLowerCase().indexOf("<!doctype");
+      const htmlStart = response.toLowerCase().indexOf("<html");
+      const startIdx = docStart !== -1 ? docStart : (htmlStart !== -1 ? htmlStart : -1);
+      if (startIdx !== -1) {
+        return {
+          name: "HTML Document",
+          type: "html",
+          content: response.slice(startIdx, afterClose),
+        };
+      }
     }
   }
 

@@ -23,13 +23,13 @@ const createSchema = z.object({
   content: z.string().max(5000).optional(),
   parentId: z.string().uuid().optional(),
   conversationId: z.string().uuid().optional(),
-  meta: z.record(z.unknown()).optional(),
+  meta: z.record(z.string(), z.unknown()).optional(),
 });
 
 const updateSchema = z.object({
   label: z.string().min(1).max(200).optional(),
   content: z.string().max(5000).optional(),
-  meta: z.record(z.unknown()).optional(),
+  meta: z.record(z.string(), z.unknown()).optional(),
 });
 
 /** Recursively fetch children for a node (BFS using DB queries) */
@@ -77,7 +77,7 @@ export const ideaNodesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // POST /ideas
-  fastify.post("/ideas", async (request: any, reply: any) => {
+  fastify.post("/ideas", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const userId = request.user.userId;
     const body = createSchema.safeParse(request.body);
     if (!body.success) {

@@ -13,7 +13,7 @@
  * 2. OAuth2 — per-user token via Notion OAuth (requires NOTION_CLIENT_ID, NOTION_CLIENT_SECRET)
  */
 
-import { FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
 
 const NOTION_API = "https://api.notion.com/v1";
 const NOTION_VERSION = "2022-06-28";
@@ -34,7 +34,9 @@ function getToken(userId: number): string | null {
 }
 
 async function notionGet(token: string, path: string): Promise<unknown> {
-  const res = await fetch(`${NOTION_API}${path}`, {
+  // path is always internally constructed — validate it starts with / and contains only safe chars
+  const safePath = path.replace(/[^a-zA-Z0-9/_?=&%-]/g, "");
+  const res = await fetch(`${NOTION_API}${safePath}`, {
     headers: notionHeaders(token),
   });
   if (!res.ok) throw new Error(`Notion API error ${res.status}: ${await res.text()}`);
@@ -42,7 +44,8 @@ async function notionGet(token: string, path: string): Promise<unknown> {
 }
 
 async function notionPost(token: string, path: string, body: unknown): Promise<unknown> {
-  const res = await fetch(`${NOTION_API}${path}`, {
+  const safePath = path.replace(/[^a-zA-Z0-9/_?=&%-]/g, "");
+  const res = await fetch(`${NOTION_API}${safePath}`, {
     method:  "POST",
     headers: notionHeaders(token),
     body:    JSON.stringify(body),
@@ -104,6 +107,7 @@ export async function notionPlugin(app: FastifyInstance) {
     if (!token) return reply.status(503).send({ error: "Notion not connected" });
 
     const pageId = (req.params as any).id;
+    if (!/^[a-zA-Z0-9_-]{1,100}$/.test(pageId)) return reply.status(400).send({ error: "Invalid page ID" });
     const page = await notionGet(token, `/pages/${pageId}`).catch(() => null);
     if (!page) return reply.status(404).send({ error: "Page not found" });
     return { success: true, page };
@@ -118,6 +122,7 @@ export async function notionPlugin(app: FastifyInstance) {
     if (!token) return reply.status(503).send({ error: "Notion not connected" });
 
     const pageId = (req.params as any).id;
+    if (!/^[a-zA-Z0-9_-]{1,100}$/.test(pageId)) return reply.status(400).send({ error: "Invalid page ID" });
     const blocks = await notionGet(token, `/blocks/${pageId}/children?page_size=100`).catch(() => null);
     return { success: true, blocks: (blocks as any)?.results ?? [] };
   });
@@ -131,6 +136,7 @@ export async function notionPlugin(app: FastifyInstance) {
     if (!token) return reply.status(503).send({ error: "Notion not connected" });
 
     const dbId = (req.params as any).id;
+    if (!/^[a-zA-Z0-9_-]{1,100}$/.test(dbId)) return reply.status(400).send({ error: "Invalid database ID" });
     const filter = req.body ?? {};
 
     const rows = await notionPost(token, `/databases/${dbId}/query`, filter).catch(e => {

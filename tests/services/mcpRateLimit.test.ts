@@ -4,15 +4,20 @@ import {
   clearToolConfig,
   getToolLimit,
   MCPRateLimitError,
-} from "../../services/mcpRateLimit.service.js";
+} from "../../src/services/mcpRateLimit.service.js";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 
-vi.mock("../../lib/redis.js", () => ({
+vi.mock("../../src/lib/logger.js", () => ({
   default: {
-    zadd: vi.fn().mockResolvedValue(1),
-    zremrangebyscore: vi.fn().mockResolvedValue(0),
-    zcard: vi.fn().mockResolvedValue(1),
-    zcount: vi.fn().mockResolvedValue(0),
+    info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn(),
+    child: vi.fn(() => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() })),
+  },
+}));
+
+vi.mock("../../src/lib/redis.js", () => ({
+  default: {
+    get: vi.fn().mockResolvedValue(null),   // null = 0 count
+    incr: vi.fn().mockResolvedValue(1),
     expire: vi.fn().mockResolvedValue(1),
   },
 }));
@@ -26,8 +31,9 @@ describe("mcpRateLimit.service", () => {
 
   describe("checkAndConsumeToolLimit", () => {
     it("allows calls below the limit", async () => {
-      const { default: redis } = await import("../../lib/redis.js");
-      (redis.zcount as ReturnType<typeof vi.fn>).mockResolvedValue(0);
+      const { default: redis } = await import("../../src/lib/redis.js");
+      // All counts are 0 (below limits)
+      (redis.get as ReturnType<typeof vi.fn>).mockResolvedValue(null);
 
       await expect(
         checkAndConsumeToolLimit("github", "search_code", 1)
@@ -35,9 +41,12 @@ describe("mcpRateLimit.service", () => {
     });
 
     it("throws MCPRateLimitError when global limit exceeded", async () => {
-      const { default: redis } = await import("../../lib/redis.js");
-      // First zcount (global) returns 200 (at limit)
-      (redis.zcount as ReturnType<typeof vi.fn>).mockResolvedValueOnce(200);
+      const { default: redis } = await import("../../src/lib/redis.js");
+      // global count = 200 (at limit), server/tool = 0
+      (redis.get as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce("200")  // global
+        .mockResolvedValueOnce(null)   // server
+        .mockResolvedValueOnce(null);  // tool
 
       await expect(
         checkAndConsumeToolLimit("github", "search_code", 1)
@@ -45,12 +54,12 @@ describe("mcpRateLimit.service", () => {
     });
 
     it("throws MCPRateLimitError for tool-level limit", async () => {
-      const { default: redis } = await import("../../lib/redis.js");
-      // global ok, server ok, tool at limit
-      (redis.zcount as ReturnType<typeof vi.fn>)
-        .mockResolvedValueOnce(5)   // global
-        .mockResolvedValueOnce(5)   // server
-        .mockResolvedValueOnce(20); // tool at default limit
+      const { default: redis } = await import("../../src/lib/redis.js");
+      // global and server ok, tool at default limit (20)
+      (redis.get as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce("5")    // global
+        .mockResolvedValueOnce("5")    // server
+        .mockResolvedValueOnce("20");  // tool at default limit
 
       await expect(
         checkAndConsumeToolLimit("github", "search_code")
@@ -58,11 +67,11 @@ describe("mcpRateLimit.service", () => {
     });
 
     it("MCPRateLimitError has correct properties", async () => {
-      const { default: redis } = await import("../../lib/redis.js");
-      (redis.zcount as ReturnType<typeof vi.fn>)
-        .mockResolvedValueOnce(5)
-        .mockResolvedValueOnce(5)
-        .mockResolvedValueOnce(20);
+      const { default: redis } = await import("../../src/lib/redis.js");
+      (redis.get as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce("5")
+        .mockResolvedValueOnce("5")
+        .mockResolvedValueOnce("20");
 
       try {
         await checkAndConsumeToolLimit("github", "search_code");
@@ -94,12 +103,12 @@ describe("mcpRateLimit.service", () => {
 
     it("setting limit to 0 blocks the tool", async () => {
       configureTool("github", "delete_repo", { callsPerMinute: 0 });
-      const { default: redis } = await import("../../lib/redis.js");
-      // All counts below global/server limits
-      (redis.zcount as ReturnType<typeof vi.fn>)
-        .mockResolvedValueOnce(0)  // global
-        .mockResolvedValueOnce(0)  // server
-        .mockResolvedValueOnce(0); // tool (0 >= 0 → blocked)
+      const { default: redis } = await import("../../src/lib/redis.js");
+      // All counts below global/server limits, but tool limit is 0
+      (redis.get as ReturnType<typeof vi.fn>)
+        .mockResolvedValueOnce(null)   // global
+        .mockResolvedValueOnce(null)   // server
+        .mockResolvedValueOnce(null);  // tool count=0, limit=0 → 0 >= 0 → blocked
 
       await expect(
         checkAndConsumeToolLimit("github", "delete_repo")

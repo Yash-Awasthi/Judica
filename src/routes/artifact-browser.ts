@@ -13,7 +13,7 @@
  * - E2B (Apache 2.0, e2b-dev/e2b) — sandboxed code execution with artifact handling
  */
 
-import { FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { db } from "../lib/drizzle.js";
 import { artifacts } from "../db/schema/research.js";
 import { eq, and, desc, sql } from "drizzle-orm";

@@ -19,16 +19,17 @@
  */
 
 import type { FastifyPluginAsync } from "fastify";
-import { createHash, createHmac } from "crypto";
+import { createHash } from "crypto";
 import { z } from "zod";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
-import { db } from "../lib/drizzle.js";
-import { deliberations, deliberationSteps } from "../db/schema/council.js";
-import { eq, and, asc } from "drizzle-orm";
+import { loadCheckpoint } from "../lib/agentCheckpoint.js";
 import { AppError } from "../middleware/errorHandler.js";
+import redis from "../lib/redis.js";
 import logger from "../lib/logger.js";
 
 const log = logger.child({ route: "verifiable-pipelines" });
+
+const CP_INDEX_KEY = (runId: string) => `council:cp:index:${runId}`;
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -67,36 +68,38 @@ function rootHash(runId: string, userId: string, startedAt: string): string {
 }
 
 async function buildVerifiableLog(runId: string, userId: string): Promise<VerifiableLog> {
-  // Load the deliberation
-  const delibs = await db
-    .select()
-    .from(deliberations)
-    .where(and(eq(deliberations.id, runId), eq(deliberations.userId, userId)))
-    .limit(1);
-  if (delibs.length === 0) throw new AppError(404, "Run not found", "RUN_NOT_FOUND");
-  const deli = delibs[0];
+  // Load checkpoint index from Redis
+  const raw = await redis.get(CP_INDEX_KEY(runId));
+  if (!raw) throw new AppError(404, "Run not found", "RUN_NOT_FOUND");
+  const cpKeys: string[] = JSON.parse(raw) as string[];
 
-  // Load steps ordered by index
-  const steps = await db
-    .select()
-    .from(deliberationSteps)
-    .where(eq(deliberationSteps.deliberationId, runId))
-    .orderBy(asc(deliberationSteps.stepIndex));
-
-  const genesis = rootHash(runId, userId, deli.createdAt.toISOString());
+  // Load all checkpoints and build step records
+  const startedAt = new Date().toISOString();
+  const genesis = rootHash(runId, userId, startedAt);
   let prevHash = genesis;
   const builtSteps: StepRecord[] = [];
 
-  for (const step of steps) {
-    const inHash  = sha256(JSON.stringify(step.input  ?? ""));
-    const outHash = sha256(JSON.stringify(step.output ?? ""));
-    const chain   = buildChainHash(prevHash, step.stepIndex, inHash, outHash);
+  const sortedKeys = [...cpKeys].sort((a, b) => {
+    const aStep = parseInt(a.split("step")[1] ?? "0", 10);
+    const bStep = parseInt(b.split("step")[1] ?? "0", 10);
+    return aStep - bStep;
+  });
+
+  for (const cpKey of sortedKeys) {
+    const cp = await loadCheckpoint(cpKey);
+    if (!cp) continue;
+
+    const stepIndex = cp.step;
+    const data = cp.data;
+    const inHash  = sha256(JSON.stringify(data.input ?? ""));
+    const outHash = sha256(JSON.stringify(data.output ?? ""));
+    const chain   = buildChainHash(prevHash, stepIndex, inHash, outHash);
     builtSteps.push({
-      stepIndex:  step.stepIndex,
-      agentId:    step.agentId ?? "unknown",
+      stepIndex,
+      agentId:    (data.agentId as string | undefined) ?? "unknown",
       inputHash:  inHash,
       outputHash: outHash,
-      timestamp:  step.createdAt.toISOString(),
+      timestamp:  (data.savedAt as string | undefined) ?? cp.savedAt,
       chainHash:  chain,
     });
     prevHash = chain;
@@ -105,7 +108,7 @@ async function buildVerifiableLog(runId: string, userId: string): Promise<Verifi
   return {
     runId,
     userId,
-    startedAt:  deli.createdAt.toISOString(),
+    startedAt,
     rootHash:   genesis,
     steps:      builtSteps,
     finalHash:  prevHash,
@@ -150,7 +153,7 @@ const verifiablePipelinesPlugin: FastifyPluginAsync = async (fastify) => {
     { preHandler: fastifyRequireAuth },
     async (req, reply) => {
       try {
-        const vlog = await buildVerifiableLog(req.params.runId, req.userId!);
+        const vlog = await buildVerifiableLog(req.params.runId, req.userId!.toString());
         return reply.send(vlog);
       } catch (err) {
         if (err instanceof AppError) return reply.status(err.statusCode).send({ error: err.message });
@@ -227,7 +230,7 @@ const verifiablePipelinesPlugin: FastifyPluginAsync = async (fastify) => {
     { preHandler: fastifyRequireAuth },
     async (req, reply) => {
       try {
-        const vlog = await buildVerifiableLog(req.params.runId, req.userId!);
+        const vlog = await buildVerifiableLog(req.params.runId, req.userId!.toString());
         const filename = `aibyai-run-${req.params.runId.slice(0, 8)}-verifiable.json`;
         reply.header("Content-Disposition", `attachment; filename="${filename}"`);
         reply.header("Content-Type", "application/json");

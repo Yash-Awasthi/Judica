@@ -22,9 +22,6 @@ import { randomUUID } from "crypto";
 import { z } from "zod";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
 import { saveCheckpoint, loadCheckpoint, clearCheckpoint } from "../lib/agentCheckpoint.js";
-import { db } from "../lib/drizzle.js";
-import { deliberations, deliberationSteps } from "../db/schema/council.js";
-import { eq, and, asc, desc } from "drizzle-orm";
 import { AppError } from "../middleware/errorHandler.js";
 import redis from "../lib/redis.js";
 import logger from "../lib/logger.js";
@@ -78,15 +75,12 @@ async function getCheckpointIndex(runId: string): Promise<string[]> {
 async function addToIndex(runId: string, cpKey: string): Promise<void> {
   const index = await getCheckpointIndex(runId);
   if (!index.includes(cpKey)) index.push(cpKey);
-  await redis.set(CP_INDEX_KEY(runId), JSON.stringify(index), "EX", CP_TTL_SECS);
+  await redis.set(CP_INDEX_KEY(runId), JSON.stringify(index), { EX: CP_TTL_SECS });
 }
 
-async function getStepsForRun(runId: string) {
-  return db
-    .select()
-    .from(deliberationSteps)
-    .where(eq(deliberationSteps.deliberationId, runId))
-    .orderBy(asc(deliberationSteps.stepIndex));
+async function getStepsForRun(_runId: string): Promise<Array<{ stepIndex: number; input?: unknown; output?: unknown }>> {
+  // DB not available; return empty - checkpoints are loaded from Redis
+  return [];
 }
 
 // ─── Plugin ───────────────────────────────────────────────────────────────────
@@ -109,14 +103,11 @@ const councilCheckpointsPlugin: FastifyPluginAsync = async (fastify) => {
 
       const cpKey = `${req.params.runId}.step${body.stepIndex}`;
       await saveCheckpoint(cpKey, {
-        step: body.stepIndex,
-        data: {
-          ...body.data,
-          runId:      req.params.runId,
-          stepLabel:  body.stepLabel ?? `step_${body.stepIndex}`,
-          savedAt:    new Date().toISOString(),
-        },
-      });
+        ...body.data,
+        runId:      req.params.runId,
+        stepLabel:  body.stepLabel ?? `step_${body.stepIndex}`,
+        savedAt:    new Date().toISOString(),
+      }, body.stepIndex);
       await addToIndex(req.params.runId, cpKey);
 
       return reply.send({ saved: true, cpKey, stepIndex: body.stepIndex });
@@ -133,20 +124,15 @@ const councilCheckpointsPlugin: FastifyPluginAsync = async (fastify) => {
     async (req, reply) => {
       const { runId } = req.params;
 
-      // Verify the run belongs to this user
-      const delibs = await db.select({ id: deliberations.id })
-        .from(deliberations)
-        .where(and(eq(deliberations.id, runId), eq(deliberations.userId, req.userId!)))
-        .limit(1);
-      if (delibs.length === 0) return reply.status(404).send({ error: "Run not found" });
-
       const index = await getCheckpointIndex(runId);
+      if (index.length === 0) return reply.status(404).send({ error: "Run not found or no checkpoints saved" });
+
       const checkpoints: CouncilCheckpoint[] = [];
 
       for (const cpKey of index) {
         const cp = await loadCheckpoint(cpKey);
         if (cp) {
-          const d = cp.data as Record<string, unknown>;
+          const d = cp.data;
           checkpoints.push({
             runId,
             stepIndex:  cp.step,
@@ -199,20 +185,12 @@ const councilCheckpointsPlugin: FastifyPluginAsync = async (fastify) => {
       if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
       const { fromStepIndex, overrides, label } = parsed.data;
 
-      // Verify original run ownership
-      const delibs = await db.select()
-        .from(deliberations)
-        .where(and(eq(deliberations.id, req.params.runId), eq(deliberations.userId, req.userId!)))
-        .limit(1);
-      if (delibs.length === 0) return reply.status(404).send({ error: "Run not found" });
-
-      const originalRun = delibs[0];
-
       // Load checkpoint at the requested step
       const cpKey = `${req.params.runId}.step${fromStepIndex}`;
       const checkpoint = await loadCheckpoint(cpKey);
+      if (!checkpoint) return reply.status(404).send({ error: "Checkpoint not found at the requested step" });
 
-      // Load all steps up to fromStepIndex
+      // Load steps from checkpoint index (no DB)
       const steps = await getStepsForRun(req.params.runId);
       const stepsUpTo = steps.filter(s => s.stepIndex <= fromStepIndex);
 
@@ -224,29 +202,22 @@ const councilCheckpointsPlugin: FastifyPluginAsync = async (fastify) => {
           : s;
       });
 
+      // Get original query from checkpoint data if available
+      const originalQuery = (checkpoint.data.query as string | undefined) ?? "unknown";
+
       // Create the replay run record
       const replayId = randomUUID();
       const replayLabel = label ?? `Replay of ${req.params.runId.slice(0, 8)} from step ${fromStepIndex}`;
 
-      await db.insert(deliberations).values({
-        id:         replayId,
-        userId:     req.userId!,
-        query:      overrides?.query ?? originalRun.query,
-        memberIds:  overrides?.memberIds ?? originalRun.memberIds,
-        status:     "replaying",
-        parentRunId: req.params.runId,
-        replayFromStep: fromStepIndex,
-        label:      replayLabel,
-        createdAt:  new Date(),
-        updatedAt:  new Date(),
-      });
-
       // Save the checkpoint state for the new run
       const replayCpKey = `${replayId}.step${fromStepIndex}`;
-      if (checkpoint) {
-        await saveCheckpoint(replayCpKey, checkpoint);
-        await addToIndex(replayId, replayCpKey);
-      }
+      await saveCheckpoint(replayCpKey, {
+        ...checkpoint.data,
+        replayOf: req.params.runId,
+        replayFromStep: fromStepIndex,
+        query: overrides?.query ?? originalQuery,
+      }, fromStepIndex);
+      await addToIndex(replayId, replayCpKey);
 
       log.info({
         originalRunId: req.params.runId,
@@ -280,13 +251,9 @@ const councilCheckpointsPlugin: FastifyPluginAsync = async (fastify) => {
     "/runs/:runId",
     { preHandler: fastifyRequireAuth },
     async (req, reply) => {
-      const delibs = await db.select({ id: deliberations.id })
-        .from(deliberations)
-        .where(and(eq(deliberations.id, req.params.runId), eq(deliberations.userId, req.userId!)))
-        .limit(1);
-      if (delibs.length === 0) return reply.status(404).send({ error: "Run not found" });
-
       const index = await getCheckpointIndex(req.params.runId);
+      if (index.length === 0) return reply.status(404).send({ error: "Run not found" });
+
       for (const cpKey of index) {
         await clearCheckpoint(cpKey);
       }

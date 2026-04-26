@@ -37,7 +37,7 @@ export const SyncMode = {
   SLIM: "slim",
 } as const;
 
-export type SyncMode = (typeof SyncMode)[keyof typeof SyncMode];
+export type SyncMode = (typeof SyncMode)[keyof typeof SyncMode]; // eslint-disable-line no-redeclare
 
 export const SyncJobStatus = {
   PENDING: "pending",
@@ -46,7 +46,7 @@ export const SyncJobStatus = {
   FAILED: "failed",
 } as const;
 
-export type SyncJobStatus = (typeof SyncJobStatus)[keyof typeof SyncJobStatus];
+export type SyncJobStatus = (typeof SyncJobStatus)[keyof typeof SyncJobStatus]; // eslint-disable-line no-redeclare
 
 // ─── Sync Job CRUD ───────────────────────────────────────────────────────────
 

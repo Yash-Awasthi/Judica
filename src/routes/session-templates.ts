@@ -55,7 +55,7 @@ export const sessionTemplatesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // POST /session-templates
-  fastify.post("/session-templates", async (request: any, reply: any) => {
+  fastify.post("/session-templates", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const body = templateSchema.safeParse(request.body);
     if (!body.success) {
       return reply.code(400).send({ error: "Validation failed", details: body.error.issues });

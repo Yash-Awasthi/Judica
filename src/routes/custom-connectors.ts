@@ -7,18 +7,19 @@
  * Inspired by Nango (unified API builder) and Airbyte (low-code connector SDK).
  */
 
-import { FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { db } from "../lib/drizzle.js";
 import { customConnectors } from "../db/schema/customConnectors.js";
 import { eq, and } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { z } from "zod";
 
 const endpointSchema = z.object({
   name:            z.string(),
   path:            z.string(),
   method:          z.enum(["GET", "POST", "PUT", "PATCH", "DELETE"]).default("GET"),
-  parameters:      z.record(z.unknown()).optional(),
-  responseMapping: z.record(z.string()).optional(), // { localField: "jsonPath.to.value" }
+  parameters:      z.record(z.string(), z.unknown()).optional(),
+  responseMapping: z.record(z.string(), z.string()).optional(), // { localField: "jsonPath.to.value" }
 });
 
 const connectorSchema = z.object({
@@ -26,15 +27,15 @@ const connectorSchema = z.object({
   description: z.string().optional(),
   baseUrl:     z.string().url(),
   authType:    z.enum(["none", "api_key", "bearer", "basic", "oauth2"]).default("none"),
-  authConfig:  z.record(z.unknown()).optional(),
+  authConfig:  z.record(z.string(), z.unknown()).optional(),
   endpoints:   z.array(endpointSchema).optional().default([]),
   isActive:    z.boolean().optional(),
 });
 
 const invokeSchema = z.object({
   endpointName: z.string(),
-  params:       z.record(z.unknown()).optional(),
-  credentials:  z.record(z.string()).optional(), // runtime credentials (not stored)
+  params:       z.record(z.string(), z.unknown()).optional(),
+  credentials:  z.record(z.string(), z.string()).optional(), // runtime credentials (not stored)
 });
 
 /** Build Authorization header based on connector auth config. */
@@ -113,7 +114,7 @@ export async function customConnectorsPlugin(app: FastifyInstance) {
 
     const [updated] = await db
       .update(customConnectors)
-      .set({ ...parsed.data, updatedAt: new Date(), version: db.sql`version + 1` as any })
+      .set({ ...parsed.data, updatedAt: new Date(), version: sql`version + 1` as any })
       .where(eq(customConnectors.id, id))
       .returning();
 
@@ -137,7 +138,9 @@ export async function customConnectorsPlugin(app: FastifyInstance) {
   });
 
   // POST /connectors/custom/:id/invoke — proxy a request through the connector
-  app.post("/connectors/custom/:id/invoke", async (req, reply) => {
+  app.post("/connectors/custom/:id/invoke", {
+    config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
+  } as any, async (req, reply) => {
     const userId = (req as any).userId as number | undefined;
     if (!userId) return reply.status(401).send({ error: "Unauthorized" });
 
@@ -175,7 +178,7 @@ export async function customConnectorsPlugin(app: FastifyInstance) {
     };
 
     if (method === "GET" && Object.keys(params).length > 0) {
-      url += "?" + new URLSearchParams(params as Record<string, string>).toString();
+      url += "?" + new URLSearchParams(params as unknown as Record<string, string>).toString();
     } else if (method !== "GET") {
       fetchOptions.body = JSON.stringify(params);
     }

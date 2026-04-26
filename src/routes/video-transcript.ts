@@ -5,7 +5,7 @@
  * Works with YouTube, podcasts, any yt-dlp-supported URL.
  */
 
-import { FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { extractTranscript } from "../lib/videoTranscript.js";
 import { z } from "zod";
 
@@ -17,7 +17,9 @@ const ingestSchema = z.object({
 
 export async function videoTranscriptPlugin(app: FastifyInstance) {
   // POST /video/transcript — extract transcript from URL
-  app.post("/video/transcript", async (req, reply) => {
+  app.post("/video/transcript", {
+    config: { rateLimit: { max: 10, timeWindow: "1 minute" } },
+  } as any, async (req, reply) => {
     const userId = (req as any).userId as number | undefined;
     if (!userId) return reply.status(401).send({ error: "Unauthorized" });
 

@@ -13,6 +13,16 @@ import { routeAndCollect } from "../router/smartRouter.js";
 import type { AdapterMessage } from "../adapters/types.js";
 import logger from "./logger.js";
 
+/** Strip HTML tags iteratively to prevent incomplete multi-character sanitization. */
+function stripTags(html: string): string {
+  let result = html;
+  let prev = "";
+  while (prev !== result) {
+    prev = result;
+    result = result.replace(/<[^>]*>/g, "");
+  }
+  return result;
+}
 /* ── Types ─────────────────────────────────────────────────────────── */
 
 export interface SimplifiedNode {
@@ -78,12 +88,17 @@ const SEMANTIC_TAGS = new Set([
  * token count manageable.
  */
 export function parseDomToSimplifiedTree(html: string, maxDepth = 6): SimplifiedNode[] {
-  // Strip comments, scripts, styles first
-  let cleaned = html
-    .replace(/<!--[\s\S]*?-->/g, "")
-    .replace(/<script[\s\S]*?<\/script>/gi, "")
-    .replace(/<style[\s\S]*?<\/style>/gi, "")
-    .replace(/<noscript[\s\S]*?<\/noscript>/gi, "");
+  // Strip comments, scripts, styles first — iterate to handle nested/malformed cases
+  let cleaned = html;
+  let prev = "";
+  while (prev !== cleaned) {
+    prev = cleaned;
+    cleaned = cleaned
+      .replace(/<!--[^]*?-->/g, "")
+      .replace(/<script\b[^>]*>[^]*?<\/script>/gi, "")
+      .replace(/<style\b[^>]*>[^]*?<\/style>/gi, "")
+      .replace(/<noscript\b[^>]*>[^]*?<\/noscript>/gi, "");
+  }
 
   const nodes: SimplifiedNode[] = [];
   parseChildren(cleaned, nodes, 0, maxDepth);
@@ -132,7 +147,7 @@ function parseChildren(html: string, nodes: SimplifiedNode[], depth: number, max
 
     // Extract text content (first 200 chars, no nested tags)
     if (innerHtml) {
-      const textOnly = innerHtml.replace(/<[^>]+>/g, "").trim();
+      const textOnly = stripTags(innerHtml).trim();
       if (textOnly) node.text = textOnly.substring(0, 200);
     }
 
@@ -317,7 +332,7 @@ function extractWithCss(html: string, selector: string): ExtractionResult {
   let m: RegExpExecArray | null;
 
   while ((m = regex.exec(html)) !== null && matches.length < 50) {
-    const textContent = m[1]?.replace(/<[^>]+>/g, "").trim();
+    const textContent = m[1] ? stripTags(m[1]).trim() : undefined;
     if (textContent) matches.push(textContent);
   }
 
@@ -404,7 +419,7 @@ function extractWithXpath(html: string, xpath: string): ExtractionResult {
 
       while ((m = regex.exec(html)) !== null && matches.length < 50) {
         const fullMatch = m[0];
-        const textContent = fullMatch.replace(/<[^>]+>/g, "").trim();
+        const textContent = stripTags(fullMatch).trim();
         if (textContent) matches.push(textContent);
       }
 
@@ -445,7 +460,7 @@ function extractWithXpath(html: string, xpath: string): ExtractionResult {
   let m: RegExpExecArray | null;
 
   while ((m = regex.exec(html)) !== null && matches.length < 50) {
-    const textContent = m[1]?.replace(/<[^>]+>/g, "").trim();
+    const textContent = m[1] ? stripTags(m[1]).trim() : undefined;
     if (textContent) matches.push(textContent);
   }
 
@@ -478,7 +493,7 @@ function extractWithAria(html: string, selector: string): ExtractionResult {
   let m: RegExpExecArray | null;
 
   while ((m = regex.exec(html)) !== null && matches.length < 50) {
-    const textContent = m[1]?.replace(/<[^>]+>/g, "").trim();
+    const textContent = m[1] ? stripTags(m[1]).trim() : undefined;
     if (textContent) matches.push(textContent);
   }
 

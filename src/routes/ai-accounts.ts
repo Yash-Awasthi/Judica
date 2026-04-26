@@ -63,7 +63,7 @@ export const aiAccountsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // POST /ai-accounts
-  fastify.post("/ai-accounts", async (request: any, reply: any) => {
+  fastify.post("/ai-accounts", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const body = createSchema.safeParse(request.body);
     if (!body.success) {
       return reply.code(400).send({ error: "Validation failed", details: body.error.issues });

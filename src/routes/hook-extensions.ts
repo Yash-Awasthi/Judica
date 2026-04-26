@@ -48,7 +48,9 @@ export const hookExtensionsPlugin: FastifyPluginAsync = async (fastify) => {
 
   // ─── Validate hook code ────────────────────────────────────────────────────
 
-  fastify.post("/validate", async (request, reply) => {
+  fastify.post("/validate", {
+    config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
+  }, async (request, reply) => {
     const body = request.body as { code?: string; language?: string };
     if (!body.code || typeof body.code !== "string") {
       reply.code(400);
@@ -108,12 +110,12 @@ export const hookExtensionsPlugin: FastifyPluginAsync = async (fastify) => {
       name: body.name as string,
       description: (body.description as string) ?? undefined,
       hookPoint: body.hookPoint as HookPoint,
-      executionOrder: body.executionOrder != null ? Number(body.executionOrder) : undefined,
+      executionOrder: body.executionOrder !== null ? Number(body.executionOrder) : undefined,
       code: body.code as string,
       language: (body.language as "javascript" | "typescript") ?? "javascript",
       isActive: body.isActive !== false,
       config: (body.config as Record<string, unknown>) ?? undefined,
-      timeout: body.timeout != null ? Number(body.timeout) : undefined,
+      timeout: body.timeout !== null ? Number(body.timeout) : undefined,
     };
 
     const hook = await createHook(request.userId!, input);
@@ -159,15 +161,15 @@ export const hookExtensionsPlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     const input: UpdateHookInput = {};
-    if (body.name != null) input.name = body.name as string;
+    if (body.name !== null) input.name = body.name as string;
     if (body.description !== undefined) input.description = body.description as string;
-    if (body.hookPoint != null) input.hookPoint = body.hookPoint as HookPoint;
-    if (body.executionOrder != null) input.executionOrder = Number(body.executionOrder);
-    if (body.code != null) input.code = body.code as string;
-    if (body.language != null) input.language = body.language as "javascript" | "typescript";
-    if (body.isActive != null) input.isActive = Boolean(body.isActive);
+    if (body.hookPoint !== null) input.hookPoint = body.hookPoint as HookPoint;
+    if (body.executionOrder !== null) input.executionOrder = Number(body.executionOrder);
+    if (body.code !== null) input.code = body.code as string;
+    if (body.language !== null) input.language = body.language as "javascript" | "typescript";
+    if (body.isActive !== null) input.isActive = Boolean(body.isActive);
     if (body.config !== undefined) input.config = body.config as Record<string, unknown>;
-    if (body.timeout != null) input.timeout = Number(body.timeout);
+    if (body.timeout !== null) input.timeout = Number(body.timeout);
 
     const hook = await updateHook(Number(id), request.userId!, input);
     if (!hook) {
@@ -194,7 +196,7 @@ export const hookExtensionsPlugin: FastifyPluginAsync = async (fastify) => {
   fastify.patch("/:id/toggle", async (request, reply) => {
     const { id } = request.params as { id: string };
     const body = request.body as { isActive?: boolean };
-    if (body.isActive == null) {
+    if (body.isActive === null || body.isActive === undefined) {
       reply.code(400);
       return { error: "isActive is required" };
     }

@@ -104,7 +104,7 @@ export async function specialisationPlugin(app: FastifyInstance) {
       apiKey: env.OPENAI_API_KEY ?? "",
     }));
 
-    const adapted = applySpecialisationMode(fullProviders, effectiveDomain, question);
+    const adapted = applySpecialisationMode(fullProviders, effectiveDomain);
 
     return {
       success:         true,

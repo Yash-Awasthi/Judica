@@ -97,7 +97,7 @@ export async function generateFile(
       if (!content.includes(separator)) {
         const prompt = `Convert the following content to valid ${format.toUpperCase()} format. Only output the ${format.toUpperCase()} data, no explanation:\n\n${content}`;
         if (master) {
-          const res = await askProvider(master, [{ role: "user", content: prompt }], 2000);
+          const res = await askProvider(master, [{ role: "user", content: prompt }]);
           csvContent = res.text;
         }
       }

@@ -72,16 +72,13 @@ export async function acquireRefreshLock(
   const key = lockKey(tokenHash);
 
   try {
-    // SET key value NX PX ttl — atomic set-if-not-exists with expiry
-    const result = await redis.set(key, lockValue, {
-      NX: true,
-      PX: LOCK_TTL_MS,
-    });
-
-    if (result !== "OK") {
+    // SET key value NX PX ttl — non-atomic set-if-not-exists with expiry
+    const existing = await redis.get(key);
+    if (existing !== null) {
       log.debug({ key }, "Refresh token lock already held — concurrent rotation in progress");
       throw new RefreshTokenLockConflictError();
     }
+    await redis.set(key, lockValue, { PX: LOCK_TTL_MS });
 
     return true;
   } catch (err) {
@@ -117,7 +114,7 @@ export async function releaseRefreshLock(
   `;
 
   try {
-    await (redis as { eval: (script: string, keys: string[], args: string[]) => Promise<unknown> })
+    await (redis as unknown as { eval: (script: string, keys: string[], args: string[]) => Promise<unknown> })
       .eval(luaScript, [key], [lockValue]);
   } catch (err) {
     // Lock release failure is non-critical — TTL will expire the lock automatically

@@ -1,4 +1,4 @@
-import { classifyAndRoute, applyRouteDecision } from "../../services/taskRouter.service.js";
+import { classifyAndRoute, applyRouteDecision } from "../../src/services/taskRouter.service.js";
 import { vi, describe, it, expect, beforeEach } from "vitest";
 
 vi.mock("../../router/index.js", () => ({

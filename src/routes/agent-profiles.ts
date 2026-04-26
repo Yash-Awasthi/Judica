@@ -8,10 +8,10 @@
  * Inspired by SWE-agent YAML agent configs.
  */
 
-import { FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { profileToYAML, yamlToProfile, validateProfile, type CouncilProfile } from "../lib/agentProfiles.js";
 import { db } from "../lib/drizzle.js";
-import { council } from "../db/schema/council.js";
+import { customPersonas } from "../db/schema/council.js";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
 
@@ -27,8 +27,8 @@ export async function agentProfilesPlugin(app: FastifyInstance) {
 
     const members = await db
       .select()
-      .from(council as any)
-      .where(eq((council as any).userId, userId));
+      .from(customPersonas as any)
+      .where(eq((customPersonas as any).userId, userId));
 
     const master = members.find((m: any) => m.role === "master" || m.isMaster);
     const regular = members.filter((m: any) => !(m.role === "master" || m.isMaster));
@@ -66,8 +66,8 @@ export async function agentProfilesPlugin(app: FastifyInstance) {
 
     const members = await db
       .select()
-      .from(council as any)
-      .where(eq((council as any).userId, userId));
+      .from(customPersonas as any)
+      .where(eq((customPersonas as any).userId, userId));
 
     return { success: true, profile: members };
   });

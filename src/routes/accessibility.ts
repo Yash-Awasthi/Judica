@@ -67,7 +67,7 @@ const DEFAULTS: AccessibilitySettings = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-async function getSettings(userId: string): Promise<AccessibilitySettings> {
+async function getSettings(userId: number): Promise<AccessibilitySettings> {
   try {
     const rows = await db
       .select({ settings: userSettings.settings })
@@ -83,7 +83,7 @@ async function getSettings(userId: string): Promise<AccessibilitySettings> {
   }
 }
 
-async function saveSettings(userId: string, settings: AccessibilitySettings): Promise<void> {
+async function saveSettings(userId: number, settings: AccessibilitySettings): Promise<void> {
   // Merge into the user's settings JSON blob
   const current = await db
     .select({ settings: userSettings.settings })

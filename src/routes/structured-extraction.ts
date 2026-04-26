@@ -5,7 +5,7 @@
  * schema inference, and result export.
  */
 
-import { FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 import {
   createSchema,

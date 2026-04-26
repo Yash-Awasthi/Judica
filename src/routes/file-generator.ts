@@ -7,7 +7,7 @@
  * Inspired by jsPDF, ExcelJS, Archiver.
  */
 
-import { FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { generateFile, detectFileGenerationIntent, type GeneratableFormat } from "../lib/fileGenerator.js";
 import { db } from "../lib/drizzle.js";
 import { artifacts } from "../db/schema/research.js";
@@ -41,9 +41,8 @@ export async function fileGeneratorPlugin(app: FastifyInstance) {
     const systemPrompt = `You are a file content generator. Generate ${format.toUpperCase()} content based on the user's request. Output ONLY the file content — no explanation, no preamble, just the raw ${format} content that will be saved directly to a file.`;
 
     const contentRes = await askProvider(
-      { id: "openai", model: "gpt-4o-mini", systemPrompt },
+      { name: "openai" as const, type: "api" as const, apiKey: process.env.OPENAI_API_KEY ?? "", model: "gpt-4o-mini", systemPrompt },
       [{ role: "user", content: prompt }],
-      4000,
     );
 
     // 2. Format the content appropriately
@@ -55,13 +54,15 @@ export async function fileGeneratorPlugin(app: FastifyInstance) {
     const [artifact] = await db
       .insert(artifacts)
       .values({
+        id: `file-${Date.now()}-${Math.random().toString(36).slice(2)}`,
         userId,
         name:           file.filename,
         type:           format === "markdown" ? "markdown" : format === "html" ? "html" : "code",
         language:       format,
         content:        file.content,
         conversationId: conversationId ?? null,
-      })
+        updatedAt:      new Date(),
+      } as any)
       .returning();
 
     return reply.status(201).send({

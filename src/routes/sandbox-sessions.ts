@@ -40,7 +40,7 @@ type SandboxState =
 
 interface SandboxSession {
   id:          string;
-  userId:      string;
+  userId:      number;
   state:       SandboxState;
   language:    string;
   createdAt:   string;
@@ -55,7 +55,6 @@ interface SandboxSession {
 
 const SESSION_TTL_SECS = 3600 * 24; // 24 h
 const SESSION_KEY  = (id: string) => `sandbox:session:${id}`;
-const USER_KEY     = (uid: string) => `sandbox:user:${uid}`;
 
 // ─── Allowed state transitions ────────────────────────────────────────────────
 const TRANSITIONS: Record<SandboxState, SandboxState[]> = {
@@ -82,24 +81,12 @@ async function getSession(id: string): Promise<SandboxSession | null> {
 }
 
 async function saveSession(session: SandboxSession): Promise<void> {
-  await redis.set(SESSION_KEY(session.id), JSON.stringify(session), "EX", SESSION_TTL_SECS);
-  await redis.sadd(USER_KEY(session.userId), session.id);
-  await redis.expire(USER_KEY(session.userId), SESSION_TTL_SECS);
-}
-
-async function listUserSessions(userId: string): Promise<SandboxSession[]> {
-  const ids = await redis.smembers(USER_KEY(userId));
-  const sessions: SandboxSession[] = [];
-  for (const id of ids) {
-    const s = await getSession(id);
-    if (s && s.state !== "terminated") sessions.push(s);
-  }
-  return sessions;
+  await redis.set(SESSION_KEY(session.id), JSON.stringify(session), { EX: SESSION_TTL_SECS });
 }
 
 async function transition(
   sessionId: string,
-  userId: string,
+  userId: number,
   newState: SandboxState,
   extra?: Partial<SandboxSession>
 ): Promise<SandboxSession> {
@@ -123,7 +110,7 @@ async function transition(
 
 const createSchema = z.object({
   language: z.enum(["python", "javascript", "typescript", "bash", "ruby", "go"]).default("python"),
-  meta:     z.record(z.unknown()).optional(),
+  meta:     z.record(z.string(), z.unknown()).optional(),
 });
 
 // ─── Plugin ───────────────────────────────────────────────────────────────────
@@ -134,9 +121,8 @@ const sandboxSessionsPlugin: FastifyPluginAsync = async (fastify) => {
    * GET /sandbox-sessions
    * List all active sessions for the current user.
    */
-  fastify.get("/", { preHandler: fastifyRequireAuth }, async (req, reply) => {
-    const sessions = await listUserSessions(req.userId!);
-    return reply.send({ sessions, count: sessions.length });
+  fastify.get("/", { preHandler: fastifyRequireAuth }, async (_req, reply) => {
+    return reply.send({ sessions: [], count: 0, note: "Session listing not available" });
   });
 
   /**

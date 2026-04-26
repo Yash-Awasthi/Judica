@@ -7,7 +7,7 @@
  * Inspired by: Cursor .cursorrules, CLAUDE.md persistent context files.
  */
 
-import { FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { db } from "../lib/drizzle.js";
 import { goalDocuments } from "../db/schema/goalDocuments.js";
 import { eq, and } from "drizzle-orm";

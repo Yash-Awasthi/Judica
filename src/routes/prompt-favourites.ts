@@ -51,7 +51,7 @@ export const promptFavouritesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // POST /prompt-favourites
-  fastify.post("/prompt-favourites", async (request: any, reply: any) => {
+  fastify.post("/prompt-favourites", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const body = createSchema.safeParse(request.body);
     if (!body.success) {
       return reply.code(400).send({ error: "Validation failed", details: body.error.issues });

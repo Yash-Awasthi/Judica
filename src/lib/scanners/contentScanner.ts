@@ -26,22 +26,22 @@ export interface Scanner {
 // Mirrors LLM Guard's BanSubstrings scanner pattern.
 // Word list sourced from community-maintained lists (same approach as LLM Guard).
 const PROFANITY_PATTERNS: RegExp[] = [
-  /\bf+u+c+k+\b/gi,
-  /\bs+h+i+t+\b/gi,
-  /\ba+s+s+h+o+l+e+\b/gi,
-  /\bb+i+t+c+h+\b/gi,
-  /\bc+u+n+t+\b/gi,
-  /\bd+i+c+k+\b/gi,
-  /\bp+r+i+c+k+\b/gi,
-  /\bw+h+o+r+e+\b/gi,
-  /\bb+a+s+t+a+r+d+\b/gi,
-  /\bd+a+m+n+\b/gi,
-  /\bc+r+a+p+\b/gi,
-  /\bb+u+l+l+s+h+i+t+\b/gi,
-  /\bm+o+t+h+e+r+f+u+c+k+e+r+\b/gi,
-  /\bn+i+g+g+e+r+\b/gi,
-  /\bf+a+g+g+o+t+\b/gi,
-  /\br+e+t+a+r+d+\b/gi,
+  /\bf{1,8}u{1,8}c{1,8}k{1,8}\b/gi,
+  /\bs{1,8}h{1,8}i{1,8}t{1,8}\b/gi,
+  /\ba{1,8}s{1,8}s{1,8}h{1,8}o{1,8}l{1,8}e{1,8}\b/gi,
+  /\bb{1,8}i{1,8}t{1,8}c{1,8}h{1,8}\b/gi,
+  /\bc{1,8}u{1,8}n{1,8}t{1,8}\b/gi,
+  /\bd{1,8}i{1,8}c{1,8}k{1,8}\b/gi,
+  /\bp{1,8}r{1,8}i{1,8}c{1,8}k{1,8}\b/gi,
+  /\bw{1,8}h{1,8}o{1,8}r{1,8}e{1,8}\b/gi,
+  /\bb{1,8}a{1,8}s{1,8}t{1,8}a{1,8}r{1,8}d{1,8}\b/gi,
+  /\bd{1,8}a{1,8}m{1,8}n{1,8}\b/gi,
+  /\bc{1,8}r{1,8}a{1,8}p{1,8}\b/gi,
+  /\bb{1,8}u{1,8}l{1,8}l{1,8}s{1,8}h{1,8}i{1,8}t{1,8}\b/gi,
+  /\bm{1,8}o{1,8}t{1,8}h{1,8}e{1,8}r{1,8}f{1,8}u{1,8}c{1,8}k{1,8}e{1,8}r{1,8}\b/gi,
+  /\bn{1,8}i{1,8}g{1,8}g{1,8}e{1,8}r{1,8}\b/gi,
+  /\bf{1,8}a{1,8}g{1,8}g{1,8}o{1,8}t{1,8}\b/gi,
+  /\br{1,8}e{1,8}t{1,8}a{1,8}r{1,8}d{1,8}\b/gi,
 ];
 
 export class ProfanityScanner implements Scanner {

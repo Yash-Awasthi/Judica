@@ -147,7 +147,7 @@ export function parseExtractionResult(llmOutput: string, schema: ExtractionSchem
   try {
     parsed = JSON.parse(jsonStr);
   } catch (e) {
-    logger.warn("Extraction engine: failed to parse JSON from LLM output", { error: String(e) });
+    logger.warn({ error: String(e) }, "Extraction engine: failed to parse JSON from LLM output");
     return { rows: [], totalRows: 0, confidence: 0, warnings: [`JSON parse error: ${String(e)}`] };
   }
 
@@ -393,15 +393,17 @@ ${truncatedHtml}`,
     },
   ];
 
-  const chunks: string[] = [];
-  for await (const chunk of routeAndCollect(messages, {
-    systemMessage: "You are a schema inference engine. Analyze HTML pages and return structured field definitions.",
-    temperature: 0.2,
-  })) {
-    if (typeof chunk === "string") chunks.push(chunk);
-  }
+  const result = await routeAndCollect(
+    {
+      model: "auto",
+      messages,
+      system_prompt: "You are a schema inference engine. Analyze HTML pages and return structured field definitions.",
+      temperature: 0.2,
+    },
+    {}
+  );
 
-  const raw = chunks.join("");
+  const raw = result.text;
   let cleaned = raw.trim();
   if (cleaned.startsWith("```json")) cleaned = cleaned.slice(7);
   else if (cleaned.startsWith("```")) cleaned = cleaned.slice(3);
@@ -416,7 +418,7 @@ ${truncatedHtml}`,
       fields: Array.isArray(parsed.fields) ? parsed.fields : [],
     };
   } catch (e) {
-    logger.warn("Schema inference: failed to parse LLM output", { error: String(e) });
+    logger.warn({ error: String(e) }, "Schema inference: failed to parse LLM output");
     return { suggestedName: "Untitled Schema", confidence: 0, fields: [] };
   }
 }

@@ -7,7 +7,7 @@
  * which model was actually used and how many fallbacks occurred.
  *
  * Uses the existing circuit-breaker (src/lib/breaker.ts) under the hood.
- * The chain persists per-user in the database.
+ * The chain persists per-user in Redis.
  *
  * Free: Ollama models (local) can be placed at any position in the chain.
  *       The full chain runs entirely on user-configured providers — no extra cost.
@@ -21,15 +21,16 @@ import type { FastifyPluginAsync } from "fastify";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { fastifyRequireAuth } from "../middleware/fastifyAuth.js";
-import { db } from "../lib/drizzle.js";
-import { fallbackChains } from "../db/schema/council.js";
-import { eq, and, desc } from "drizzle-orm";
 import { askProvider } from "../lib/providers.js";
-import { env } from "../config/env.js";
 import { AppError } from "../middleware/errorHandler.js";
+import redis from "../lib/redis.js";
 import logger from "../lib/logger.js";
 
 const log = logger.child({ route: "fallback-chains" });
+
+// ─── Redis keys ───────────────────────────────────────────────────────────────
+
+const CHAINS_KEY = (userId: number | string) => `fallback_chains:${userId}`;
 
 // ─── Schema ───────────────────────────────────────────────────────────────────
 
@@ -58,6 +59,34 @@ const testChainSchema = z.object({
   prompt:  z.string().min(1).max(2000),
 });
 
+// ─── Stored chain interface ───────────────────────────────────────────────────
+
+interface FallbackChain {
+  id:        string;
+  userId:    number | string;
+  name:      string;
+  models:    z.infer<typeof modelEntrySchema>[];
+  trigger:   "error" | "error_or_timeout";
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ─── Redis helpers ────────────────────────────────────────────────────────────
+
+async function getChains(userId: number | string): Promise<FallbackChain[]> {
+  try {
+    const raw = await redis.get(CHAINS_KEY(userId));
+    return raw ? JSON.parse(raw) as FallbackChain[] : [];
+  } catch {
+    return [];
+  }
+}
+
+async function saveChains(userId: number | string, chains: FallbackChain[]): Promise<void> {
+  await redis.set(CHAINS_KEY(userId), JSON.stringify(chains));
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
 async function runChain(
@@ -74,10 +103,11 @@ async function runChain(
         const result = await askProvider(
           { name: entry.provider as "openai", type: "api", apiKey: "", model: entry.model },
           prompt,
-          { signal: controller.signal }
+          false,
+          controller.signal
         );
         clearTimeout(timer);
-        return { text: result, usedModel: entry.model, usedProvider: entry.provider, fallbacksTriggered };
+        return { text: result.text, usedModel: entry.model, usedProvider: entry.provider, fallbacksTriggered };
       } catch (err: unknown) {
         clearTimeout(timer);
         const isTimeout = (err as Error)?.name === "AbortError";
@@ -102,11 +132,7 @@ const fallbackChainsPlugin: FastifyPluginAsync = async (fastify) => {
    * List all fallback chains for the current user.
    */
   fastify.get("/", { preHandler: fastifyRequireAuth }, async (req, reply) => {
-    const chains = await db
-      .select()
-      .from(fallbackChains)
-      .where(eq(fallbackChains.userId, req.userId!))
-      .orderBy(desc(fallbackChains.createdAt));
+    const chains = await getChains(req.userId!);
     return reply.send({ chains });
   });
 
@@ -119,25 +145,27 @@ const fallbackChainsPlugin: FastifyPluginAsync = async (fastify) => {
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
     const { name, models, trigger, setAsDefault } = parsed.data;
 
+    const chains = await getChains(req.userId!);
     const id = randomUUID();
-    await db.insert(fallbackChains).values({
+    const now = new Date().toISOString();
+
+    // Unset previous default if needed
+    if (setAsDefault) {
+      for (const c of chains) c.isDefault = false;
+    }
+
+    const newChain: FallbackChain = {
       id,
       userId:    req.userId!,
       name,
-      models:    JSON.stringify(models),
+      models,
       trigger,
       isDefault: setAsDefault,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    });
-
-    if (setAsDefault) {
-      // Unset any previous default for this user
-      await db
-        .update(fallbackChains)
-        .set({ isDefault: false })
-        .where(and(eq(fallbackChains.userId, req.userId!), eq(fallbackChains.id, id)));
-    }
+      createdAt: now,
+      updatedAt: now,
+    };
+    chains.push(newChain);
+    await saveChains(req.userId!, chains);
 
     return reply.status(201).send({ id, name, models, trigger, isDefault: setAsDefault });
   });
@@ -150,13 +178,10 @@ const fallbackChainsPlugin: FastifyPluginAsync = async (fastify) => {
     "/:id",
     { preHandler: fastifyRequireAuth },
     async (req, reply) => {
-      const chains = await db
-        .select()
-        .from(fallbackChains)
-        .where(and(eq(fallbackChains.id, req.params.id), eq(fallbackChains.userId, req.userId!)))
-        .limit(1);
-      if (chains.length === 0) return reply.status(404).send({ error: "Chain not found" });
-      return reply.send(chains[0]);
+      const chains = await getChains(req.userId!);
+      const chain = chains.find(c => c.id === req.params.id);
+      if (!chain) return reply.status(404).send({ error: "Chain not found" });
+      return reply.send(chain);
     }
   );
 
@@ -171,23 +196,19 @@ const fallbackChainsPlugin: FastifyPluginAsync = async (fastify) => {
       const parsed = createChainSchema.safeParse(req.body);
       if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
-      const existing = await db
-        .select({ id: fallbackChains.id })
-        .from(fallbackChains)
-        .where(and(eq(fallbackChains.id, req.params.id), eq(fallbackChains.userId, req.userId!)))
-        .limit(1);
-      if (existing.length === 0) return reply.status(404).send({ error: "Chain not found" });
+      const chains = await getChains(req.userId!);
+      const idx = chains.findIndex(c => c.id === req.params.id);
+      if (idx === -1) return reply.status(404).send({ error: "Chain not found" });
 
-      await db
-        .update(fallbackChains)
-        .set({
-          name:      parsed.data.name,
-          models:    JSON.stringify(parsed.data.models),
-          trigger:   parsed.data.trigger,
-          isDefault: parsed.data.setAsDefault,
-          updatedAt: new Date(),
-        })
-        .where(eq(fallbackChains.id, req.params.id));
+      chains[idx] = {
+        ...chains[idx],
+        name:      parsed.data.name,
+        models:    parsed.data.models,
+        trigger:   parsed.data.trigger,
+        isDefault: parsed.data.setAsDefault,
+        updatedAt: new Date().toISOString(),
+      };
+      await saveChains(req.userId!, chains);
 
       return reply.send({ id: req.params.id, ...parsed.data });
     }
@@ -201,9 +222,9 @@ const fallbackChainsPlugin: FastifyPluginAsync = async (fastify) => {
     "/:id",
     { preHandler: fastifyRequireAuth },
     async (req, reply) => {
-      await db
-        .delete(fallbackChains)
-        .where(and(eq(fallbackChains.id, req.params.id), eq(fallbackChains.userId, req.userId!)));
+      const chains = await getChains(req.userId!);
+      const filtered = chains.filter(c => c.id !== req.params.id);
+      await saveChains(req.userId!, filtered);
       return reply.status(204).send();
     }
   );
@@ -217,19 +238,15 @@ const fallbackChainsPlugin: FastifyPluginAsync = async (fastify) => {
     const parsed = testChainSchema.safeParse(req.body);
     if (!parsed.success) return reply.status(400).send({ error: parsed.error.flatten() });
 
-    const chain = await db
-      .select()
-      .from(fallbackChains)
-      .where(and(eq(fallbackChains.id, parsed.data.chainId), eq(fallbackChains.userId, req.userId!)))
-      .limit(1);
-    if (chain.length === 0) return reply.status(404).send({ error: "Chain not found" });
+    const chains = await getChains(req.userId!);
+    const chain = chains.find(c => c.id === parsed.data.chainId);
+    if (!chain) return reply.status(404).send({ error: "Chain not found" });
 
-    const models = JSON.parse(chain[0].models as string) as z.infer<typeof modelEntrySchema>[];
-    const trigger = (chain[0].trigger ?? "error_or_timeout") as "error" | "error_or_timeout";
+    const trigger = (chain.trigger ?? "error_or_timeout") as "error" | "error_or_timeout";
 
     try {
-      const result = await runChain(models, parsed.data.prompt, trigger);
-      return reply.send({ ...result, chainId: parsed.data.chainId, chainName: chain[0].name });
+      const result = await runChain(chain.models, parsed.data.prompt, trigger);
+      return reply.send({ ...result, chainId: parsed.data.chainId, chainName: chain.name });
     } catch (err) {
       if (err instanceof AppError) return reply.status(err.statusCode).send({ error: err.message });
       return reply.status(502).send({ error: "Chain test failed" });

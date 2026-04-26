@@ -141,9 +141,9 @@ async function generateDraft(
         {
           messages: [{ role: "user", content: query }],
           model,
-          systemPrompt,
+          system_prompt: systemPrompt,
           temperature: 0.2,
-          maxTokens: 512,
+          max_tokens: 512,
         },
         { preferredProvider: provider, signal }
       );

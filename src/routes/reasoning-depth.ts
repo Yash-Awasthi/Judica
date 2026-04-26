@@ -80,16 +80,16 @@ export async function reasoningDepthPlugin(app: FastifyInstance) {
         result = { answer: "Use the standard /api/ask endpoint for standard mode." };
         break;
       case "socratic":
-        result = await runSocraticPrelude(question, provider);
+        result = await runSocraticPrelude(question, [provider]);
         break;
       case "red_blue":
-        result = await runRedBlueDebate(question, provider);
+        result = await runRedBlueDebate(question, [provider]);
         break;
       case "hypothesis":
-        result = await runHypothesisRefinement(question, provider);
+        result = await runHypothesisRefinement(question, [provider]);
         break;
       case "confidence":
-        result = await runConfidenceCalibration(question, provider);
+        result = await runConfidenceCalibration(question, [provider]);
         break;
     }
 

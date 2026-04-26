@@ -19,7 +19,7 @@
  * - GOOGLE_REDIRECT_URI (e.g. https://yourapp.com/api/google/auth/callback)
  */
 
-import { FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 
 const GOOGLE_AUTH_URL = "https://accounts.google.com/o/oauth2/v2/auth";
@@ -108,7 +108,9 @@ async function googleApiGet(userId: number, endpoint: string): Promise<unknown> 
   const token = await getAccessToken(userId);
   if (!token) throw new Error("Not authenticated with Google");
 
-  const res = await fetch(`https://www.googleapis.com${endpoint}`, {
+  // endpoint is always internally constructed; sanitize to prevent path manipulation
+  const safeEndpoint = endpoint.replace(/[^a-zA-Z0-9/_?=&%.@:-]/g, "");
+  const res = await fetch(`https://www.googleapis.com${safeEndpoint}`, {
     headers: { Authorization: `Bearer ${token}` },
   });
   if (!res.ok) throw new Error(`Google API error ${res.status}: ${await res.text()}`);
@@ -179,6 +181,7 @@ export async function googleWorkspacePlugin(app: FastifyInstance) {
     if (!userId) return reply.status(401).send({ error: "Unauthorized" });
 
     const msgId = (req.params as any).id;
+    if (!/^[a-zA-Z0-9_-]{1,200}$/.test(msgId)) return reply.status(400).send({ error: "Invalid message ID" });
     const message = await googleApiGet(userId, `/gmail/v1/users/me/messages/${msgId}?format=full`).catch(() => null);
     if (!message) return reply.status(404).send({ error: "Message not found" });
     return { success: true, message };

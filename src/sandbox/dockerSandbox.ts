@@ -69,7 +69,7 @@ function requiresGitNetwork(code: string): boolean {
  */
 async function loadDocker(): Promise<DockerConstructor | null> {
   try {
-    const mod = (await import("dockerode")) as { default: DockerConstructor };
+    const mod = (await import("dockerode")) as unknown as { default: DockerConstructor };
     return mod.default;
   } catch {
     return null;
@@ -251,20 +251,20 @@ export async function execInDocker(opts: DockerExecOptions): Promise<DockerExecR
   let exitCode = 1;
 
   try {
-    container = await docker.createContainer(createOptions);
+    container = await docker.createContainer(createOptions as any);
 
     // Attach to container streams before starting so we don't miss early output
-    const stream = await container.attach({ stream: true, stdout: true, stderr: true });
+    const stream = await (container as any).attach({ stream: true, stdout: true, stderr: true });
 
     // dockerode multiplexes stdout/stderr into a single stream with an 8-byte header
     await new Promise<void>((resolve, reject) => {
       const timeoutHandle = setTimeout(() => {
         // Kill the container on timeout
-        container.stop({ t: 0 }).catch(() => {});
+        (container as any)!.stop({ t: 0 }).catch(() => {});
         reject(new AppError(408, `Sandbox execution timed out after ${timeoutMs}ms`, "SANDBOX_TIMEOUT"));
       }, timeoutMs);
 
-      docker.modem.demuxStream(
+      (docker.modem as any).demuxStream(
         stream,
         {
           write(chunk: Buffer) {
@@ -300,10 +300,10 @@ export async function execInDocker(opts: DockerExecOptions): Promise<DockerExecR
     });
 
     // Start must come after attach (to avoid a race where output arrives before attach)
-    await container.start();
+    await (container as any).start();
 
     // Wait for container to finish (AutoRemove:true handles cleanup)
-    const waitResult = await container.wait();
+    const waitResult = await (container as any).wait();
     exitCode = waitResult.StatusCode ?? 1;
   } catch (err: unknown) {
     // Re-throw AppErrors (timeout, etc.) directly

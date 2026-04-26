@@ -97,13 +97,11 @@ export async function runSOPWorkflow(
 
     try {
       const response = await askProvider(
-        { ...member, systemPrompt: step.roleDescription },
+        { ...member, systemPrompt: step.roleDescription, maxTokens: step.maxTokens ?? maxTokens },
         [{ role: "user", content: inputContent }],
-        undefined,
-        step.maxTokens ?? maxTokens,
       );
       stepResults.push({ step: step.name, output: response.text.trim() });
-      totalTokens += (response.usage?.total_tokens ?? 0);
+      totalTokens += (response.usage?.totalTokens ?? 0);
     } catch (err) {
       logger.error({ err, step: step.name }, "SOP step failed");
       stepResults.push({ step: step.name, output: `[Step failed: ${err instanceof Error ? err.message : String(err)}]` });

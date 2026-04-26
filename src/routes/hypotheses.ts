@@ -63,7 +63,7 @@ export const hypothesesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // POST /hypotheses
-  fastify.post("/hypotheses", async (request: any, reply: any) => {
+  fastify.post("/hypotheses", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const userId = request.user.userId;
     const body = createSchema.safeParse(request.body);
     if (!body.success) {

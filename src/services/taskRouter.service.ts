@@ -37,7 +37,7 @@ import logger from "../lib/logger.js";
 
 const log = logger.child({ service: "taskRouter" });
 
-const ROUTING_ENABLED = process.env.INTELLIGENT_ROUTING_ENABLED !== "false";
+const isRoutingEnabled = () => process.env.INTELLIGENT_ROUTING_ENABLED !== "false";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -170,9 +170,9 @@ async function stage3Classify(
       {
         messages: [{ role: "user", content: query }],
         model: "llama-3.1-8b-instant",
-        systemPrompt: ROUTER_SYSTEM_PROMPT,
+        system_prompt: ROUTER_SYSTEM_PROMPT,
         temperature: 0.0,
-        maxTokens: 8,
+        max_tokens: 8,
       },
       { preferredProvider: "groq", signal }
     );
@@ -196,11 +196,11 @@ async function stage3Classify(
 
 // ─── Council Size Resolution ──────────────────────────────────────────────────
 
-const TIER_CONFIG: Record<RouteTier, { councilSize: number; fullDeliberation: boolean }> = {
-  trivial:  { councilSize: 1, fullDeliberation: false },
-  simple:   { councilSize: 1, fullDeliberation: false },
-  standard: { councilSize: 3, fullDeliberation: true  },
-  complex:  { councilSize: 5, fullDeliberation: true  },
+const TIER_CONFIG: Record<RouteTier, { councilSize: number; useFullDeliberation: boolean }> = {
+  trivial:  { councilSize: 1, useFullDeliberation: false },
+  simple:   { councilSize: 1, useFullDeliberation: false },
+  standard: { councilSize: 3, useFullDeliberation: true  },
+  complex:  { councilSize: 5, useFullDeliberation: true  },
 };
 
 // ─── Public API ───────────────────────────────────────────────────────────────
@@ -216,7 +216,7 @@ export async function classifyAndRoute(
   query: string,
   signal?: AbortSignal
 ): Promise<RouteDecision> {
-  if (!ROUTING_ENABLED) {
+  if (!isRoutingEnabled()) {
     return {
       tier: "complex",
       confidence: 1.0,
@@ -281,6 +281,6 @@ export function applyRouteDecision(
   availableMembers: unknown[],
   decision: RouteDecision
 ): unknown[] {
-  if (!ROUTING_ENABLED) return availableMembers;
+  if (!isRoutingEnabled()) return availableMembers;
   return availableMembers.slice(0, decision.councilSize);
 }

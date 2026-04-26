@@ -49,18 +49,17 @@ export async function moderationPlugin(app: FastifyInstance) {
     if (enforce && result.blocked) {
       return reply.status(403).send({
         error:      "Content blocked by moderation policy",
-        categories: result.categories,
-        score:      result.score,
+        categories: result.scores,
+        score:      result.topScore,
       });
     }
 
     return {
       success:    true,
       blocked:    result.blocked,
-      warned:     result.warned,
-      score:      result.score,
-      categories: result.categories,
-      backend:    result.backend,
+      warned:     result.topScore >= WARN_THRESHOLD && !result.blocked,
+      score:      result.topScore,
+      categories: result.scores,
     };
   });
 
@@ -85,7 +84,7 @@ export async function moderationPlugin(app: FastifyInstance) {
     );
 
     const blocked = results.filter(r => r.blocked).length;
-    const warned  = results.filter(r => r.warned).length;
+    const warned  = results.filter(r => !r.blocked && r.topScore >= WARN_THRESHOLD).length;
 
     if (enforce && blocked > 0) {
       return reply.status(403).send({

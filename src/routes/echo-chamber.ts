@@ -114,7 +114,7 @@ const llmProvider = () => ({
 
 // ─── Config helpers ───────────────────────────────────────────────────────────
 
-async function getUserConfig(userId: string): Promise<typeof DEFAULT_CONFIG> {
+async function getUserConfig(userId: number): Promise<typeof DEFAULT_CONFIG> {
   try {
     const rows = await db.select({ settings: userSettings.settings }).from(userSettings).where(eq(userSettings.userId, userId)).limit(1);
     const raw = rows[0]?.settings as Record<string, unknown> | undefined;
@@ -125,7 +125,7 @@ async function getUserConfig(userId: string): Promise<typeof DEFAULT_CONFIG> {
   }
 }
 
-async function saveUserConfig(userId: string, config: typeof DEFAULT_CONFIG): Promise<void> {
+async function saveUserConfig(userId: number, config: typeof DEFAULT_CONFIG): Promise<void> {
   const current = await db.select({ settings: userSettings.settings }).from(userSettings).where(eq(userSettings.userId, userId)).limit(1);
   const existing = (current[0]?.settings as Record<string, unknown>) ?? {};
   await db.insert(userSettings).values({ userId, settings: { ...existing, echoChamber: config } })

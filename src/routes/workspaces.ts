@@ -23,8 +23,8 @@ const workspaceSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
   icon: z.string().max(50).optional(),
-  councilConfig: z.array(z.record(z.unknown())).max(10).optional(),
-  masterConfig: z.record(z.unknown()).optional(),
+  councilConfig: z.array(z.record(z.string(), z.unknown())).max(10).optional(),
+  masterConfig: z.record(z.string(), z.unknown()).optional(),
   kbId: z.string().uuid().optional(),
   systemPrompt: z.string().max(5000).optional(),
   deliberationMode: z.enum(["standard", "socratic", "red_blue", "hypothesis", "confidence"]).optional(),
@@ -44,7 +44,7 @@ export const workspacesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // POST /workspaces
-  fastify.post("/workspaces", async (request: any, reply: any) => {
+  fastify.post("/workspaces", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const body = workspaceSchema.safeParse(request.body);
     if (!body.success) {
       return reply.code(400).send({ error: "Validation failed", details: body.error.issues });

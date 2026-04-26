@@ -12,7 +12,7 @@
  * Jira: REST v3 + API token (Basic auth with email:token)
  */
 
-import { FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { z } from "zod";
 
 // ─── Linear ──────────────────────────────────────────────────────────────────
@@ -129,9 +129,12 @@ export async function linearJiraPlugin(app: FastifyInstance) {
     if (!token) return reply.status(503).send({ error: "Linear not configured" });
 
     const { teamId, limit = "20" } = req.query as Record<string, string>;
-    const filter = teamId ? `filter: { team: { id: { eq: "${teamId}" } } }` : "";
+    // Validate inputs to prevent GraphQL injection
+    const safeLimit = Math.min(Math.max(parseInt(limit, 10) || 20, 1), 100);
+    const safeTeamId = teamId ? teamId.replace(/[^a-zA-Z0-9_-]/g, "") : "";
+    const filter = safeTeamId ? `filter: { team: { id: { eq: "${safeTeamId}" } } }` : "";
 
-    const data = await linearQuery(token, `{ issues(first: ${limit} ${filter}) { nodes { id title state { name } priority url createdAt } } }`).catch(() => null);
+    const data = await linearQuery(token, `{ issues(first: ${safeLimit} ${filter}) { nodes { id title state { name } priority url createdAt } } }`).catch(() => null);
     return { success: true, issues: data?.issues?.nodes ?? [] };
   });
 

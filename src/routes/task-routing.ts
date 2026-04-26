@@ -79,7 +79,7 @@ async function recordDecision(tier: string, confidence: number, usedLlm: boolean
     stats.tierCounts[tier as keyof typeof stats.tierCounts] = (stats.tierCounts[tier as keyof typeof stats.tierCounts] ?? 0) + 1;
     stats.avgConfidence = (stats.avgConfidence * (stats.totalClassified - 1) + confidence) / stats.totalClassified;
     if (usedLlm) stats.llmRouterCalls++;
-    await redis.set(STATS_KEY, JSON.stringify(stats), "EX", 86400 * 30);
+    await redis.set(STATS_KEY, JSON.stringify(stats), { EX: 86400 * 30 });
   } catch { /* non-critical */ }
 }
 
@@ -99,7 +99,7 @@ const taskRoutingPlugin: FastifyPluginAsync = async (fastify) => {
 
     try {
       const decision = await classifyAndRoute(query);
-      const councilConfig = applyRouteDecision(decision);
+      const councilConfig = applyRouteDecision([], decision);
 
       await recordDecision(decision.tier, decision.confidence, decision.stage === 3);
 
@@ -109,7 +109,7 @@ const taskRoutingPlugin: FastifyPluginAsync = async (fastify) => {
         classifiedBy:  `Stage ${decision.stage} (${["", "heuristic", "feature-based", "LLM meta-router"][decision.stage]})`,
         councilConfig,
         overridable:   true,
-        ...(explain ? { features: decision.features, reasoning: decision.reasoning } : {}),
+        ...(explain ? { reasoning: decision.reason } : {}),
         tierDescriptions: {
           trivial:  "Single fast model, no council. For factual lookups, simple math, yes/no.",
           simple:   "Single best model + cold validator. For straightforward questions.",

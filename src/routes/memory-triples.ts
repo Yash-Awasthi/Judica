@@ -80,7 +80,7 @@ export const memoryTriplesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // POST /memory/triples
-  fastify.post("/memory/triples", async (request: any, reply: any) => {
+  fastify.post("/memory/triples", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const body = createSchema.safeParse(request.body);
     if (!body.success) {
       return reply.code(400).send({ error: "Validation failed", details: body.error.issues });

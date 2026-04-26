@@ -29,7 +29,7 @@ const traceSchema = z.object({
   traceId:   z.string().min(1).max(200),
   name:      z.string().min(1).max(200),
   sessionId: z.string().max(200).optional(),
-  metadata:  z.record(z.unknown()).optional(),
+  metadata:  z.record(z.string(), z.unknown()).optional(),
 });
 
 export async function observabilityPlugin(app: FastifyInstance) {

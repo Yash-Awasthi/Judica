@@ -46,6 +46,7 @@ vi.mock("drizzle-orm", () => ({
   eq: vi.fn((...args: any[]) => args),
   and: vi.fn((...args: any[]) => args),
   desc: vi.fn((col: any) => col),
+  relations: vi.fn(() => ({})),
 }));
 
 vi.mock("../../src/middleware/fastifyAuth.js", () => ({
@@ -488,12 +489,12 @@ describe("PUT /:id", () => {
     });
 
     await handler(request, createReply());
-    expect(setCall).toHaveBeenCalledWith({
+    expect(setCall).toHaveBeenCalledWith(expect.objectContaining({
       name: "New",
       description: "New desc",
       code: "new code",
       active: false,
-    });
+    }));
   });
 
   it("updates parameters field", async () => {
@@ -517,7 +518,7 @@ describe("PUT /:id", () => {
     });
 
     await handler(request, createReply());
-    expect(setCall).toHaveBeenCalledWith({ parameters: newParams });
+    expect(setCall).toHaveBeenCalledWith(expect.objectContaining({ parameters: newParams }));
   });
 
   it("sends empty update when no fields provided", async () => {
@@ -540,7 +541,8 @@ describe("PUT /:id", () => {
     });
 
     await handler(request, createReply());
-    expect(setCall).toHaveBeenCalledWith({});
+    // updatedAt is always added by the route
+    expect(setCall).toHaveBeenCalledWith(expect.not.objectContaining({ name: expect.anything() }));
   });
 
   it("throws 404 when skill not found", async () => {

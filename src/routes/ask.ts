@@ -122,7 +122,7 @@ function handleCouncilError(err: unknown): never {
 async function validateAskBody(request: FastifyRequest, reply: FastifyReply) {
   const result = askSchema.safeParse(request.body);
   if (!result.success) {
-    reply.code(400).send({
+    (reply as any).code(400).send({
       error: "Validation failed",
       details: result.error.issues.map((e) => ({
         field: e.path.join("."),
@@ -185,7 +185,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       },
     },
     preHandler: [fastifyOptionalAuth, fastifyAnonGuard, fastifyCheckQuota, validateAskBody],
-  }, async (request, _reply) => {
+  }, async (request, reply) => {
     const startTime = Date.now();
 
     const { question, conversationId, summon, maxTokens, rounds = 1, context, mode, userConfig } = request.body as AskBody;
@@ -263,21 +263,29 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
 
     // Phase 1.16 — Spending limit check (Onyx EE pattern)
     if (userId) {
-      const spendCheck = await checkSpendingLimit(userId);
-      if (!spendCheck.allowed) {
-        return reply.code(402).send({ error: "spending_limit_exceeded", detail: spendCheck.reason });
+      try {
+        const spendCheck = await checkSpendingLimit(userId);
+        if (!spendCheck.allowed) {
+          return (reply as any).code(402).send({ error: "spending_limit_exceeded", detail: spendCheck.reason });
+        }
+      } catch (err) {
+        logger.warn({ err }, "Failed to check spending limit, allowing request");
       }
     }
 
     // Phase 1.1 — Content scanners (LLM Guard scanner pattern, off by default)
     // Load user's content filter settings and run scanner pipeline on input
-    let contentScanners = [];
+    let contentScanners: ReturnType<typeof buildUserScanners> = [];
     let adversarialRewrite = false;
     let tokenConservationMode = false;
     let uSettings: Record<string, unknown> = {};
     if (userId) {
-      const [settingsRow] = await db.select().from(userSettings).where(eq(userSettings.userId, userId)).limit(1);
-      uSettings = (settingsRow?.settings as Record<string, unknown>) ?? {};
+      try {
+        const [settingsRow] = await db.select().from(userSettings).where(eq(userSettings.userId, userId)).limit(1);
+        uSettings = (settingsRow?.settings as Record<string, unknown>) ?? {};
+      } catch (err) {
+        logger.warn({ err }, "Failed to load user settings");
+      }
       contentScanners = buildUserScanners({
         blockProfanity: !!uSettings.blockProfanity,
         blockAdultContent: !!uSettings.blockAdultContent,
@@ -292,7 +300,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       const scanResult = runScannerPipeline(question, contentScanners);
       if (!scanResult.isValid && scanResult.maxRiskScore >= 1.0) {
         const blocked = scanResult.results.find(r => !r.isValid);
-        reply.code(400).send({ error: "Content policy violation", detail: blocked?.detail });
+        (reply as any).code(400).send({ error: "Content policy violation", detail: blocked?.detail });
         return;
       }
       // Replace question with sanitized version (redacted profanity etc.)
@@ -305,7 +313,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     {
       const modResult = await moderateContent(question);
       if (modResult.blocked) {
-        return reply.code(400).send({
+        return (reply as any).code(400).send({
           error: "content_policy_violation",
           detail: `Content flagged by moderation (${modResult.topCategory}: ${(modResult.topScore * 100).toFixed(0)}%)`,
         });
@@ -318,11 +326,11 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       const filterResult = await runPromptFilter(question, {
         blockThreshold: 0.9,
         enableRewrite: adversarialRewrite,
-        rewriteProvider: adversarialRewrite ? master ?? councilMembers[0] : undefined,
+        rewriteProvider: adversarialRewrite ? master ?? resolvedMembers[0] : undefined,
       });
 
       if (!filterResult.passed) {
-        reply.code(400).send({
+        (reply as any).code(400).send({
           error: "Prompt injection detected",
           riskScore: filterResult.riskScore,
           patterns: filterResult.patterns,
@@ -345,6 +353,8 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       }
     }
     let messages: Message[] = [];
+    let effectiveConversationId = conversationId;
+    let memoryContext = "";
 
     if (effectiveConversationId) {
       // Verify requesting user owns the conversation OR is a room participant
@@ -386,15 +396,20 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     // Phase 1.6 — Specialisation mode (CrewAI role-based specialisation + AutoGen domain-adaptive pattern)
     // Reads specialisationDomain from user settings ("auto" = keyword-detect from question)
     {
-      const rawDomain = (userId
-        ? (await db.select({ settings: userSettings.settings }).from(userSettings).where(eq(userSettings.userId, userId)).limit(1)
-            .then(r => (r[0]?.settings as Record<string, unknown>)?.specialisationDomain as SpecialisationDomain))
-        : undefined) ?? "auto";
+      let settingsRows: Array<{ settings: unknown }> = [];
+      if (userId) {
+        try {
+          settingsRows = await db.select({ settings: userSettings.settings }).from(userSettings).where(eq(userSettings.userId, userId)).limit(1);
+        } catch (err) {
+          logger.warn({ err }, "Failed to load specialisation domain settings");
+        }
+      }
+      const rawDomain = ((settingsRows[0]?.settings as Record<string, unknown>)?.specialisationDomain as SpecialisationDomain) ?? "auto";
       const domain: SpecialisationDomain = rawDomain === "auto"
         ? autoDetectDomain((request.body as AskBody).question)
         : rawDomain;
       if (domain !== "auto") {
-        effectiveCouncilMembers = applySpecialisationMode(effectiveCouncilMembers, domain);
+        effectiveCouncilMembers = applySpecialisationMode(effectiveCouncilMembers, domain) as typeof effectiveCouncilMembers;
       }
     }
 
@@ -402,19 +417,23 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     if (verbosity && master) {
       master = { ...master, systemPrompt: applyVerbosity(master.systemPrompt ?? "", verbosity) };
     }
-    const effectiveMaxTokens = verbosity ? adjustMaxTokensForVerbosity(maxTokens, verbosity) : maxTokens;
+    const effectiveMaxTokens = verbosity ? adjustMaxTokensForVerbosity(maxTokens ?? 2000, verbosity) : maxTokens;
 
     // Phase 2.8 — Goal document context injection (Cursor .cursorrules / CLAUDE.md pattern)
     // Active goal document is silently prepended to master system prompt
     if (userId && master) {
-      const [goalDoc] = await db
-        .select({ content: goalDocuments.content, title: goalDocuments.title })
-        .from(goalDocuments)
-        .where(and(eq(goalDocuments.userId, userId), eq(goalDocuments.isActive, true)))
-        .limit(1);
-      if (goalDoc) {
-        const goalPrefix = `[USER GOAL CONTEXT — "${goalDoc.title}"]\n${goalDoc.content}\n[/USER GOAL CONTEXT]\n\n`;
-        master = { ...master, systemPrompt: goalPrefix + (master.systemPrompt ?? "") };
+      try {
+        const [goalDoc] = await db
+          .select({ content: goalDocuments.content, title: goalDocuments.title })
+          .from(goalDocuments)
+          .where(and(eq(goalDocuments.userId, userId), eq(goalDocuments.isActive, true)))
+          .limit(1);
+        if (goalDoc) {
+          const goalPrefix = `[USER GOAL CONTEXT — "${goalDoc.title}"]\n${goalDoc.content}\n[/USER GOAL CONTEXT]\n\n`;
+          master = { ...master, systemPrompt: goalPrefix + (master.systemPrompt ?? "") };
+        }
+      } catch (err) {
+        logger.warn({ err }, "Failed to load goal document context");
       }
     }
     if (effectiveConversationId) {
@@ -425,15 +444,19 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     // Phase 2.10 — Agent-Level Memory (mem0 agent scope)
     // Inject per-archetype memories into each council member's system prompt
     if (userId) {
-      const agentIds = effectiveCouncilMembers.map(m => m.name ?? m.id ?? "").filter(Boolean);
-      const agentPrefixes = await buildAgentMemoryPrefixes(userId, agentIds as string[]);
-      if (agentPrefixes.size > 0) {
-        effectiveCouncilMembers = effectiveCouncilMembers.map(m => {
-          const key = m.name ?? m.id ?? "";
-          const prefix = agentPrefixes.get(key as string);
-          if (!prefix) return m;
-          return { ...m, systemPrompt: prefix + (m.systemPrompt ?? "") };
-        });
+      try {
+        const agentIds = effectiveCouncilMembers.map(m => m.name ?? (m as any).id ?? "").filter(Boolean);
+        const agentPrefixes = await buildAgentMemoryPrefixes(userId, agentIds as string[]);
+        if (agentPrefixes.size > 0) {
+          effectiveCouncilMembers = effectiveCouncilMembers.map(m => {
+            const key = m.name ?? (m as any).id ?? "";
+            const prefix = agentPrefixes.get(key as string);
+            if (!prefix) return m;
+            return { ...m, systemPrompt: prefix + (m.systemPrompt ?? "") };
+          });
+        }
+      } catch (err) {
+        logger.warn({ err }, "Failed to load agent memory prefixes");
       }
     }
 
@@ -734,7 +757,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
 
     // Phase 1.11 — Conversation Weather (Argilla data quality indicator pattern)
     const weatherMetrics = extractWeatherMetrics(
-      finalOpinions.map(o => ({ opinion: o.opinion ?? "", confidence: o.confidence })),
+      finalOpinions.map(o => ({ opinion: o.opinion ?? "", confidence: o.confidence as number | undefined })),
       finalOpinions.length > 1 ? undefined : undefined,
     );
     const weather = computeWeather(weatherMetrics);
@@ -886,6 +909,11 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       }
 
       const councilMembers = await prepareCouncilWithArchetypes(resolvedMembers, effectiveSummon, userId);
+      const { disabled_members: stream_disabled } = request.body as AskBody;
+      const streamActiveMembers = stream_disabled?.length
+        ? councilMembers.filter(m => !stream_disabled.includes(m.name))
+        : councilMembers;
+      let effectiveCouncilMembers = streamActiveMembers.length > 0 ? streamActiveMembers : councilMembers;
 
       let memoryContext = "";
       if (effectiveConversationId) {

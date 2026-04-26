@@ -2,8 +2,8 @@ import {
   encryptBatch,
   decryptBatch,
   isEncryptedEnvelope,
-} from "../../lib/fieldEncryption.js";
-import { encrypt, decrypt } from "../../lib/crypto.js";
+} from "../../src/lib/fieldEncryption.js";
+import { encrypt, decrypt } from "../../src/lib/crypto.js";
 import { describe, it, expect, beforeAll } from "vitest";
 
 beforeAll(() => {

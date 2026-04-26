@@ -29,7 +29,21 @@
   const API_KEY = SCRIPT_TAG.getAttribute("data-api-key") ?? "";
   const THEME = SCRIPT_TAG.getAttribute("data-theme") ?? "auto";
   const POSITION = SCRIPT_TAG.getAttribute("data-position") ?? "bottom-right";
-  const API_URL = SCRIPT_TAG.getAttribute("data-api-url") ?? SCRIPT_TAG.src.replace(/\/api\/surfaces\/embed\.js.*$/, "");
+  const RAW_API_URL = SCRIPT_TAG.getAttribute("data-api-url") ?? SCRIPT_TAG.src.replace(/\/api\/surfaces\/embed\.js.*$/, "");
+
+  // Validate API_URL is a safe https:// or http:// URL to prevent XSS via javascript: URLs
+  let API_URL: string;
+  try {
+    const parsed = new URL(RAW_API_URL);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      console.error("[aibyai-widget] Invalid data-api-url protocol.");
+      return;
+    }
+    API_URL = parsed.origin;
+  } catch {
+    console.error("[aibyai-widget] Invalid data-api-url.");
+    return;
+  }
 
   if (!API_KEY) {
     console.error("[aibyai-widget] data-api-key is required.");

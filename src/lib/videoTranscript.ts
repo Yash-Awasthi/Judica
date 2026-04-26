@@ -128,7 +128,13 @@ async function fetchYtDlpSubtitles(url: string): Promise<TranscriptResult | null
       textLines.push(line.trim());
     }
 
-    const transcript = textLines.filter(Boolean).join(" ").replace(/<[^>]+>/g, "");
+    // Strip WebVTT inline tags iteratively to prevent incomplete multi-character sanitization
+    let transcript = textLines.filter(Boolean).join(" ");
+    let prev = "";
+    while (prev !== transcript) {
+      prev = transcript;
+      transcript = transcript.replace(/<[^>]*>/g, "");
+    }
 
     // Extract title from stdout
     const titleMatch = stdout.match(/\[download\] Destination: (.+?)(?:\.|$)/);

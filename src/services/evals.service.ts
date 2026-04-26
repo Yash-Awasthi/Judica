@@ -131,9 +131,9 @@ async function judgeWithLLM(
     {
       messages: [{ role: "user", content: userPrompt }],
       model: judgeModel,
-      systemPrompt: JUDGE_SYSTEM_PROMPT,
+      system_prompt: JUDGE_SYSTEM_PROMPT,
       temperature: 0.0,
-      maxTokens: 300,
+      max_tokens: 300,
     },
     { preferredProvider: judgeProvider }
   );

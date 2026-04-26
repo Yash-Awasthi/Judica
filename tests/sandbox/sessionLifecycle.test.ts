@@ -1,4 +1,4 @@
-import { SandboxLifecycleManager } from "../../sandbox/sessionLifecycle.js";
+import { SandboxLifecycleManager } from "../../src/sandbox/sessionLifecycle.js";
 import { describe, it, expect, beforeEach, vi, afterEach } from "vitest";
 
 describe("sessionLifecycle (Phase 8.10)", () => {

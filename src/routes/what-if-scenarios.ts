@@ -348,6 +348,9 @@ export async function whatIfScenariosPlugin(app: FastifyInstance) {
     const labelA = branchA ? (branchStore.get(branchA)?.name ?? branchA) : "Original";
     const labelB = branchB ? (branchStore.get(branchB)?.name ?? branchB) : "Original";
 
+    // Sanitize labels to prevent prototype pollution via computed property injection
+    const safeKey = (s: string) => s.replace(/[^a-zA-Z0-9 _-]/g, "").slice(0, 64) || "branch";
+
     // Align by tick number
     const allTicks = new Set([...sideA.map(t => t.tick), ...sideB.map(t => t.tick)]);
     const tickMap = (log: SimTick[]) => new Map(log.map(t => [t.tick, t]));
@@ -356,8 +359,8 @@ export async function whatIfScenariosPlugin(app: FastifyInstance) {
 
     const comparison = [...allTicks].sort((a, b) => a - b).map(tick => ({
       tick,
-      [labelA]: mapA.get(tick)?.actions ?? [],
-      [labelB]: mapB.get(tick)?.actions ?? [],
+      [safeKey(labelA)]: mapA.get(tick)?.actions ?? [],
+      [safeKey(labelB)]: mapB.get(tick)?.actions ?? [],
     }));
 
     return reply.send({

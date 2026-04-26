@@ -52,7 +52,7 @@ export const spendingLimitsPlugin: FastifyPluginAsync = async (fastify) => {
     return { limit };
   });
 
-  fastify.put("/spending-limits/me", async (request: any, reply: any) => {
+  fastify.put("/spending-limits/me", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const body = upsertSchema.safeParse(request.body);
     if (!body.success) {
       return reply.code(400).send({ error: "Validation failed", details: body.error.issues });

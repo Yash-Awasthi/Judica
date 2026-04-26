@@ -11,7 +11,7 @@
  * - mem0 (Apache 2.0, mem0ai/mem0) — memory export/import APIs
  */
 
-import { FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
 import { db } from "../lib/drizzle.js";
 import { memoryFacts } from "../db/schema/memoryFacts.js";
 import { memoryTriples } from "../db/schema/memoryTriples.js";

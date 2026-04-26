@@ -229,7 +229,7 @@ export async function runExtraction(
     const executionTimeMs = Date.now() - startTime;
     const errMsg = error instanceof Error ? error.message : String(error);
 
-    logger.error("Extraction job failed", { jobId: job.id, error: errMsg });
+    logger.error({ jobId: job.id, error: errMsg }, "Extraction job failed");
 
     const [updated] = await db
       .update(extractionJobs)
@@ -312,15 +312,16 @@ export async function extractFromHtml(
     { role: "user", content: prompt },
   ];
 
-  const chunks: string[] = [];
-  for await (const chunk of routeAndCollect(messages, {
-    systemMessage: "You are a structured data extraction engine. Extract data from HTML and return clean JSON arrays.",
-    temperature: 0.1,
-  })) {
-    if (typeof chunk === "string") chunks.push(chunk);
-  }
+  const result = await routeAndCollect(
+    {
+      model: "gpt-4o",
+      messages,
+      system_prompt: "You are a structured data extraction engine. Extract data from HTML and return clean JSON arrays.",
+      temperature: 0.1,
+    },
+  );
 
-  const llmOutput = chunks.join("");
+  const llmOutput = result.text;
   return parseExtractionResult(llmOutput, schema);
 }
 
@@ -356,7 +357,7 @@ export async function handlePagination(
         if (result.rows.length === 0) break; // No more data
         results.push(result);
       } catch (error) {
-        logger.warn("Pagination: page fetch failed", { page, error: String(error) });
+        logger.warn({ page, error: String(error) }, "Pagination: page fetch failed");
         break;
       }
     }
@@ -374,7 +375,7 @@ export async function handlePagination(
         if (result.rows.length === 0) break;
         results.push(result);
       } catch (error) {
-        logger.warn("Pagination: offset fetch failed", { offset: i * pageSize, error: String(error) });
+        logger.warn({ offset: i * pageSize, error: String(error) }, "Pagination: offset fetch failed");
         break;
       }
     }
@@ -395,7 +396,7 @@ export async function handlePagination(
         results.push(result);
         currentUrl = nextUrl;
       } catch (error) {
-        logger.warn("Pagination: next-link follow failed", { error: String(error) });
+        logger.warn({ error: String(error) }, "Pagination: next-link follow failed");
         break;
       }
     }
