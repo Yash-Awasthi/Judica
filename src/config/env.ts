@@ -109,6 +109,11 @@ const envSchema = z.object({
   REPLICATE_API_TOKEN: z.string().optional(),
   // Image generation (Phase 6.5)
   FAL_API_KEY: z.string().optional(),
+  // Video & audio generation (Phase 6.6)
+  RUNWAY_API_KEY: z.string().optional(),
+  KLING_API_KEY: z.string().optional(),
+  SUNO_API_KEY: z.string().optional(),
+  UDIO_API_KEY: z.string().optional(),
   // Voice providers
   ELEVENLABS_API_KEY: z.string().optional(),
   AZURE_SPEECH_KEY: z.string().optional(),
