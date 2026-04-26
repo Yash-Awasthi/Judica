@@ -16,10 +16,7 @@ import { AppError } from "../middleware/errorHandler.js";
 import { requireCaptcha, rejectDisposableEmail } from "../middleware/captchaGuard.js";
 import { isMFARequired } from "../services/mfa.service.js";
 import { withRefreshLock, RefreshTokenLockConflictError } from "../lib/refreshTokenMutex.js";
-
-const ACCESS_TOKEN_EXPIRY = "15m";
-const REFRESH_TOKEN_TTL_DAYS = 7;
-const REFRESH_TOKEN_TTL_SECS = REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60;
+import { issueTokenPair, generateAccessToken, createRefreshToken, REFRESH_TOKEN_TTL_SECS } from "../lib/tokenIssuer.js";
 
 // Constant dummy hash to prevent user enumeration via timing.
 // Generated with argon2id so verify() takes the same time regardless of user existence.
@@ -27,74 +24,13 @@ const REFRESH_TOKEN_TTL_SECS = REFRESH_TOKEN_TTL_DAYS * 24 * 60 * 60;
 // Re-generate with: node -e "require('argon2').hash('dummy-timing-password',{type:2,memoryCost:65536,timeCost:3}).then(console.log)"
 const DUMMY_HASH = "$argon2id$v=19$m=65536,t=3,p=4$c29tZXNhbHRoZXJlaGVyZQ$Tk5vc1ZmVEI5YVJtWHVXNjlmb2R5T3VRY2hJNjFoZTA";
 
-// Pin algorithm to HS256 in sign() to match verify() — prevents algorithm-confusion attacks
-function generateAccessToken(userId: number, username: string, role: string): string {
-  return jwt.sign({ userId, username, role }, env.JWT_SECRET, {
-    algorithm: "HS256",
-    expiresIn: ACCESS_TOKEN_EXPIRY,
-    issuer: "aibyai",
-    audience: env.NODE_ENV,
-  });
-}
-
-function generateRefreshToken(): string {
-  return crypto.randomBytes(48).toString("base64url");
-}
-
+// Local helpers for token revocation (logout/refresh rotation) — not part of token issuance
 function hashRefreshToken(token: string): string {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
-
 function fingerprintHash(value: string): string {
   return crypto.createHash("sha256").update(value).digest("hex");
 }
-
-async function createRefreshToken(userId: number, ip?: string, userAgent?: string): Promise<string> {
-  const rawToken = generateRefreshToken();
-  const tokenHash = hashRefreshToken(rawToken);
-  const expiresAt = new Date(Date.now() + REFRESH_TOKEN_TTL_SECS * 1000);
-
-  await db.insert(refreshTokens).values({
-    id: randomUUID(),
-    userId,
-    tokenHash,
-    ipHash: ip ? fingerprintHash(ip) : null,
-    userAgentHash: userAgent ? fingerprintHash(userAgent) : null,
-    expiresAt,
-  });
-
-  // Store token-family mapping for replay detection
-  await redis.set(`refresh_family:${tokenHash}`, String(userId), { EX: REFRESH_TOKEN_TTL_SECS });
-
-  return rawToken;
-}
-
-async function issueTokenPair(userId: number, username: string, role: string, reply: FastifyReply, request?: FastifyRequest): Promise<{ token: string; username: string; role: string }> {
-  const accessToken = generateAccessToken(userId, username, role);
-  const refreshToken = await createRefreshToken(userId, request?.ip, request?.headers["user-agent"]);
-
-  // Set access token as httpOnly cookie
-  reply.setCookie("access_token", accessToken, {
-    httpOnly: true,
-    secure: env.NODE_ENV === "production",
-    sameSite: "strict",
-    maxAge: 15 * 60, // 15 minutes
-    path: "/",
-  });
-
-  // Set refresh token as httpOnly cookie
-  reply.setCookie("refresh_token", refreshToken, {
-    httpOnly: true,
-    secure: env.NODE_ENV === "production",
-    sameSite: "strict",
-    maxAge: REFRESH_TOKEN_TTL_SECS,
-    path: "/api/auth",
-  });
-
-  // Still return token in body for backward compatibility during migration
-  return { token: accessToken, username, role };
-}
-
 
 import fastifyRateLimit from "@fastify/rate-limit";
 

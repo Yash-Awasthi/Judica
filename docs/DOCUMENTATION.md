@@ -24,6 +24,10 @@
 - [Queue System](#queue-system)
 - [Autonomous Operations](#autonomous-operations)
 - [MCP Integration](#mcp-integration)
+- [Collaborative Rooms](#collaborative-rooms)
+- [Connectors](#connectors)
+- [Conversation Branches](#conversation-branches)
+- [Workspaces](#workspaces)
 - [Provider Adapters](#provider-adapters)
 - [Code Sandbox](#code-sandbox)
 - [Security](#security)
@@ -128,7 +132,7 @@ At least one is required. The system logs a warning at startup if none are prese
 | `OLLAMA_BASE_URL` | `http://localhost:11434` | Ollama local inference URL |
 | `RATE_LIMIT_WINDOW_MS` | `60000` | Rate limit window (ms) |
 | `RATE_LIMIT_MAX` | `10` | Max requests per window |
-| `ENABLE_VECTOR_CACHE` | `false` | Enable semantic response caching |
+| `ENABLE_SEMANTIC_CACHE` | `false` | Enable semantic response caching (L1 Redis + L2 pgvector) |
 | `CURRENT_ENCRYPTION_VERSION` | `1` | Encryption key version for rotation |
 
 ### OAuth2
@@ -301,16 +305,28 @@ POST /api/prompts/test            Test prompt { content, model } (auth)
 ### Marketplace
 
 ```
-GET    /api/marketplace                       List (?type, ?tags, ?sort, ?search)
-GET    /api/marketplace/:id                   Item detail
+GET    /api/marketplace                       List (?type, ?tags, ?sort, ?search, ?filter=starred|installed|mine)
+GET    /api/marketplace/:id                   Item detail (includes starred flag for auth users)
 POST   /api/marketplace                       Publish item (auth)
 PUT    /api/marketplace/:id                   Update (author only, auth)
 DELETE /api/marketplace/:id                   Delete (author/admin, auth)
-POST   /api/marketplace/:id/install           Install to account (auth)
-POST   /api/marketplace/:id/star              Toggle star (auth)
+POST   /api/marketplace/:id/install           Install to account — imports content, increments downloads (auth)
+POST   /api/marketplace/:id/uninstall         Remove from account (auth)
+POST   /api/marketplace/:id/star              Toggle star — returns { starred: true|false } (auth)
 POST   /api/marketplace/:id/reviews           Add review { rating, comment } (auth)
 GET    /api/marketplace/:id/reviews           List reviews
 ```
+
+**Filter params on `GET /api/marketplace`:**
+
+| Param | Values | Description |
+|---|---|---|
+| `?filter` | `starred`, `installed`, `mine` | Show only starred/installed/authored items |
+| `?sort` | `downloads`, `stars`, `recent` | Sort order |
+| `?type` | `prompt`, `workflow`, `persona`, `tool` | Filter by item type |
+| `?search` | string | Full-text search on name + tags |
+
+Installed items expose a JSON download: the `content` field of `GET /api/marketplace/:id` contains the raw importable JSON for prompts, workflows, personas, and tools.
 
 ### Skills
 
@@ -493,7 +509,7 @@ aibyai/
 │   │   ├── queues.ts                  # Queue definitions
 │   │   └── workers.ts                 # Workers (ingestion, research, repo, compaction)
 │   │
-│   ├── routes/                        # Fastify route plugins (62 files)
+│   ├── routes/                        # Fastify route plugins (160 files)
 │   │   ├── ask.ts                     # Council deliberation endpoint (SSE)
 │   │   ├── auth.ts                    # Authentication + OAuth
 │   │   ├── council.ts                 # Council configuration
@@ -523,7 +539,7 @@ aibyai/
 │   │   ├── pythonSandbox.ts           # Python (bubblewrap + seccomp-bpf + ulimit)
 │   │   └── seccomp.ts                 # seccomp-bpf policy generation
 │   │
-│   ├── services/                      # Business logic (77 files)
+│   ├── services/                      # Business logic (92 files)
 │   │   ├── council.service.ts         # Council composition
 │   │   ├── conversation.service.ts    # Conversation management
 │   │   ├── vectorStore.service.ts     # pgvector operations
@@ -553,7 +569,7 @@ aibyai/
 │   └── workflow/                      # Workflow execution
 │       ├── executor.ts                # Topological execution engine (Kahn's algorithm)
 │       ├── types.ts                   # WorkflowDefinition, WorkflowNode types
-│       └── nodes/                     # Node handlers (12 types)
+│       └── nodes/                     # Node handlers (9 dedicated + 3 handled in executor)
 │           ├── llm.handler.ts
 │           ├── tool.handler.ts
 │           ├── condition.handler.ts
@@ -597,7 +613,7 @@ aibyai/
 │   ├── types/                         # TypeScript definitions
 │   └── router.tsx                     # React Router 7 config
 │
-├── tests/                             # 264 test files, 4300+ tests
+├── tests/                             # 282 test files, 4300+ tests
 │   ├── adapters/                      # Provider adapter unit tests
 │   ├── agents/                        # Agent orchestration tests
 │   ├── services/                      # Service-layer unit tests
@@ -616,13 +632,13 @@ aibyai/
 └── .env.example                       # Environment template
 ```
 
-**By the numbers:** ~479 backend TypeScript files · ~66 frontend React files · 96 Drizzle schema tables · 62 API route plugins · 77 services · 14 middleware · 8 document processors · 16 LLM provider adapters · 51 data source connectors · 4300+ tests.
+**By the numbers:** ~479 backend TypeScript files · ~66 frontend React files · 62 Drizzle schema files · 160 API route plugins · 92 services · 14 middleware · 8 document processors · 16 LLM provider adapters · 51 data source connectors · 4300+ tests.
 
 ---
 
 ## Database Schema
 
-39 Drizzle ORM tables across these domains:
+62 Drizzle ORM schema files across these domains:
 
 ```mermaid
 erDiagram
@@ -1010,6 +1026,96 @@ Connects to external MCP servers:
 
 ---
 
+## Collaborative Rooms
+
+Multi-user AI sessions where multiple people share the same conversation and interact with the council together in real-time.
+
+### How It Works
+
+1. A host creates a room (`POST /api/rooms`) — receives an `inviteCode`
+2. Guests join via `POST /api/rooms/join/:inviteCode` and become participants
+3. All participants send messages to the same `conversationId` via `POST /api/ask`
+4. The council responds once per message — all participants see the response in real-time via their individual SSE streams
+5. The host closes the room with `DELETE /api/rooms/:id`
+
+### API
+
+```
+POST   /api/rooms                   Create room { conversationId } → { id, inviteCode } (auth)
+POST   /api/rooms/join/:inviteCode  Join room as participant (auth)
+GET    /api/rooms/:id               Room info + participant list (auth)
+DELETE /api/rooms/:id               Close room (host only, auth)
+```
+
+---
+
+## Connectors
+
+Connectors pull external data into knowledge bases for RAG retrieval. Built-in connectors ship with the platform; custom connectors can be defined without code.
+
+### Built-in Connectors
+
+| Connector | Description |
+|---|---|
+| **GitHub** | Index repositories — clone, parse, embed code files for semantic search |
+| **Web scraping** | Scrape URLs via Playwright + content extraction (SSRF-validated) |
+| **Confluence** | Pull team wiki pages into the knowledge base |
+| **Apify** | Structured web data via Apify actors |
+
+### Custom Connectors
+
+Define any HTTP data source via the UI with no code required:
+
+```
+GET    /api/connectors/custom              List custom connectors (auth)
+POST   /api/connectors/custom              Create connector { name, baseUrl, auth, endpoints } (auth)
+POST   /api/connectors/custom/:id/invoke   Invoke connector → fetch + ingest data (auth)
+```
+
+### Connector Sync
+
+Schedule recurring data pulls so knowledge bases stay up to date automatically:
+
+```
+POST   /api/connectors/:connectorId/sync                  Trigger a sync now (auth)
+GET    /api/connectors/:connectorId/sync/jobs             List sync jobs (auth)
+GET    /api/connectors/:connectorId/sync/jobs/:jobId      Job status + result (auth)
+POST   /api/connectors/:connectorId/sync/schedules        Create schedule { cron } (auth)
+GET    /api/connectors/:connectorId/sync/schedules        List schedules (auth)
+```
+
+---
+
+## Conversation Branches
+
+Fork any conversation at any message to explore a different direction without losing the original thread. Each branch is a full, independent conversation with its own history.
+
+```
+POST   /api/branches                       Create branch { conversationId, fromMessageId } (auth)
+GET    /api/branches/:id                   Branch detail + message history (auth)
+GET    /api/conversations/:id/branches     List all branches of a conversation (auth)
+```
+
+Branches can be compared side by side in the UI and merged back via a summarise-and-inject workflow.
+
+---
+
+## Workspaces
+
+Isolated namespaces above conversations. Each workspace has its own document set, agent configuration, LLM settings, memory scope, and tool list — completely separate from other workspaces.
+
+```
+GET    /api/workspaces                     List user's workspaces (auth)
+POST   /api/workspaces                     Create workspace { name, description } (auth)
+GET    /api/workspaces/:id                 Workspace detail + config (auth)
+PUT    /api/workspaces/:id                 Update workspace settings (auth)
+DELETE /api/workspaces/:id                 Delete workspace (auth)
+```
+
+Conversations, knowledge bases, and memories all belong to a workspace. Switching workspaces gives a completely fresh context.
+
+---
+
 ## Provider Adapters
 
 All adapters implement the `IProviderAdapter` interface:
@@ -1033,10 +1139,18 @@ On startup, `src/adapters/registry.ts` checks which API keys are present and reg
 | Gemini | `GOOGLE_API_KEY` | Gemini 2.0/2.5; multimodal |
 | Groq | `GROQ_API_KEY` | OpenAI-compatible; fastest inference |
 | OpenRouter | `OPENROUTER_API_KEY` | OpenAI-compatible; 100+ models |
-| Ollama | None (always on) | Local inference at OLLAMA_BASE_URL |
+| Ollama | None (always on) | Local inference at `OLLAMA_BASE_URL` |
 | Mistral | `MISTRAL_API_KEY` | OpenAI-compatible |
 | Cerebras | `CEREBRAS_API_KEY` | OpenAI-compatible; fast |
 | NVIDIA NIM | `NVIDIA_API_KEY` | OpenAI-compatible |
+| Perplexity | `PERPLEXITY_API_KEY` | Search-augmented responses (Sonar) |
+| Fireworks | `FIREWORKS_API_KEY` | Fast open-source model inference |
+| Together | `TOGETHER_API_KEY` | Open-source model hosting |
+| DeepInfra | `DEEPINFRA_API_KEY` | Open-source model hosting |
+| Azure OpenAI | `AZURE_OPENAI_API_KEY` + `AZURE_OPENAI_ENDPOINT` | GPT-4o on Azure |
+| LiteLLM | `LITELLM_BASE_URL` | Proxy for 100+ providers via unified API |
+| vLLM | `VLLM_BASE_URL` | Self-hosted high-throughput inference |
+| Custom (EMOF) | UI-configured | Any OpenAI-compatible endpoint |
 
 ### Adding a Custom Provider
 

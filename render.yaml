@@ -1,0 +1,42 @@
+services:
+  - type: web
+    name: aibyai
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 3000
+      - key: DATABASE_URL
+        sync: false   # Set in Render dashboard — use Supabase (has pgvector)
+      - key: REDIS_URL
+        sync: false   # Set in Render dashboard — use Upstash free tier
+      - key: JWT_SECRET
+        generateValue: true
+      - key: MASTER_ENCRYPTION_KEY
+        sync: false   # Generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
+      - key: OAUTH_CALLBACK_BASE_URL
+        sync: false   # Your Render URL: https://aibyai.onrender.com
+      - key: FRONTEND_URL
+        sync: false   # Same as above (backend serves the frontend): https://aibyai.onrender.com
+      # ── At least one AI key required ──────────────────────────────────────
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: GOOGLE_API_KEY
+        sync: false
+      # ── Google Sign-in (optional) ──────────────────────────────────────────
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      # ── GitHub Sign-in (optional) ──────────────────────────────────────────
+      - key: GITHUB_CLIENT_ID
+        sync: false
+      - key: GITHUB_CLIENT_SECRET
+        sync: false

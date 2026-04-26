@@ -197,6 +197,8 @@ import taskRoutingPlugin from "./routes/task-routing.js";
 import sandboxSessionsPlugin from "./routes/sandbox-sessions.js";
 import councilCheckpointsPlugin from "./routes/council-checkpoints.js";
 import { ingestionQueue, researchQueue, repoQueue, compactionQueue } from "./queue/queues.js";
+import { googleOAuthPlugin } from "./auth/google.oauth.js";
+import { githubOAuthPlugin } from "./auth/github.strategy.js";
 
 export async function buildApp() {
   const fastify = Fastify({
@@ -376,6 +378,9 @@ export async function buildApp() {
   await fastify.register(exportPlugin,          { prefix: "/api/export" });
   await fastify.register(providersPlugin,       { prefix: "/api/providers" });
   await fastify.register(authPlugin,            { prefix: "/api/auth" });
+  // OAuth plugins register their own absolute paths (/api/auth/google, /api/auth/github)
+  await fastify.register(googleOAuthPlugin);
+  await fastify.register(githubOAuthPlugin);
   await fastify.register(councilPlugin,         { prefix: "/api/council" });
   await fastify.register(historyPlugin,         { prefix: "/api/history" });
   await fastify.register(ttsPlugin,             { prefix: "/api/tts" });

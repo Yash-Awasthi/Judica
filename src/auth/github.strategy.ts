@@ -11,13 +11,12 @@
 import type { FastifyInstance } from "fastify";
 import oauthPlugin from "@fastify/oauth2";
 import crypto from "crypto";
-// @ts-ignore - passport-github2 has no type declarations
-import { Strategy as GitHubStrategy } from "passport-github2";
 import { db } from "../lib/drizzle.js";
 import { users } from "../db/schema/users.js";
 import { eq } from "drizzle-orm";
 import { env } from "../config/env.js";
 import logger from "../lib/logger.js";
+import { issueTokenPair } from "../lib/tokenIssuer.js";
 
 // Map of generated OAuth state tokens to their creation timestamps (ms).
 // Used to validate the state parameter on callback and prevent CSRF attacks.
@@ -128,10 +127,12 @@ export async function githubOAuthPlugin(fastify: FastifyInstance): Promise<void>
       if (existing) {
         // Use explicit authMethod instead of checking passwordHash === ""
         if (existing.authMethod === "password") {
-          return reply.code(409).send({ error: "An account with this email already exists from a different sign-in method." });
+          const frontendUrl = env.FRONTEND_URL || "http://localhost:5173";
+          return reply.redirect(`${frontendUrl}/login?error=email_conflict`);
         }
-        // Return existing OAuth user — caller should issue tokens
-        return { user: existing };
+        await issueTokenPair(existing.id, existing.username, existing.role, reply, request);
+        const frontendUrl = env.FRONTEND_URL || "http://localhost:5173";
+        return reply.redirect(frontendUrl);
       }
 
       const [user] = await db
@@ -146,69 +147,13 @@ export async function githubOAuthPlugin(fastify: FastifyInstance): Promise<void>
         .returning();
 
       logger.info({ email, username: user.username }, "New user registered via GitHub OAuth");
-      return { user };
+      await issueTokenPair(user.id, user.username, user.role, reply, request);
+      const frontendUrl = env.FRONTEND_URL || "http://localhost:5173";
+      return reply.redirect(frontendUrl);
     } catch (err) {
       logger.error({ err }, "GitHub OAuth callback failed");
-      return reply.code(500).send({ error: "OAuth authentication failed" });
+      const frontendUrl = env.FRONTEND_URL || "http://localhost:5173";
+      return reply.redirect(`${frontendUrl}/login?error=oauth_failed`);
     }
   });
-}
-
-/**
- * Create a passport-github2 strategy instance for GitHub OAuth.
- * Returns null if GitHub credentials are not configured.
- */
-export function createGitHubStrategy(): GitHubStrategy | null {
-  if (!env.GITHUB_CLIENT_ID || !env.GITHUB_CLIENT_SECRET) {
-    return null;
-  }
-
-  const strategy = new GitHubStrategy(
-    {
-      clientID: env.GITHUB_CLIENT_ID,
-      clientSecret: env.GITHUB_CLIENT_SECRET,
-      callbackURL: `${env.OAUTH_CALLBACK_BASE_URL}/api/auth/github/callback`,
-      scope: ["user:email"],
-    },
-    async (accessToken: string, refreshToken: string, profile: any, done: Function) => {
-      try {
-        const emails: Array<{ value: string; verified?: boolean; primary?: boolean }> = profile.emails || [];
-        const emailObj = emails.find((e) => e.verified) || emails.find((e) => e.primary);
-        if (!emailObj) {
-          return done(new Error("No verified email found on GitHub account"));
-        }
-        const email = emailObj.value;
-
-        const [existing] = await db
-          .select()
-          .from(users)
-          .where(eq(users.email, email))
-          .limit(1);
-
-        if (existing) {
-          if (existing.authMethod === "password") {
-            return done(new Error("An account with this email already exists from a different sign-in method."));
-          }
-          return done(null, existing);
-        }
-
-        const [user] = await db
-          .insert(users)
-          .values({
-            email,
-            username: profile.username || profile.displayName || email.split("@")[0],
-            passwordHash: "",
-            authMethod: "github",
-            role: "member",
-          })
-          .returning();
-
-        return done(null, user);
-      } catch (err) {
-        return done(err instanceof Error ? err : new Error(String(err)));
-      }
-    }
-  );
-
-  return strategy;
 }

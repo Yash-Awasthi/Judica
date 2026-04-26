@@ -50,7 +50,7 @@ sequenceDiagram
     participant A1 as Empiricist
     participant A2 as Strategist
     participant A3 as Historian
-    participant A4 as Skeptic
+    participant A4 as Contrarian
     participant CD as Conflict Detector
     participant S as Synthesizer
     participant V as Cold Validator
@@ -64,7 +64,7 @@ sequenceDiagram
         R->>A1: Prompt + context → OpenAI
         R->>A2: Prompt + context → Anthropic
         R->>A3: Prompt + context → Gemini
-        R->>A4: Prompt + context → Groq
+        R->>A4: Prompt + context → Groq (Contrarian)
     end
 
     A1-->>CD: Response + 3–5 claims + confidence
@@ -108,7 +108,7 @@ flowchart TB
     end
 
     subgraph Gateway["API Gateway"]
-        GW["Fastify 5 — 62 route plugins\nJWT · RBAC · Rate-limit · CSRF · CSP · Helmet"]
+        GW["Fastify 5 — 160 route plugins\nJWT · RBAC · Rate-limit · CSRF · CSP · Helmet"]
     end
 
     subgraph Engine["Deliberation Engine"]
@@ -125,7 +125,7 @@ flowchart TB
         MEM["Agentic Memory\nTopic graph · HNSW · Temporal decay\nContradiction resolution"]
     end
 
-    subgraph Providers["LLM Providers — 13+"]
+    subgraph Providers["LLM Providers — 15"]
         P["OpenAI · Anthropic · Gemini · Groq\nOllama · Mistral · Cerebras · +7 more"]
     end
 
@@ -207,7 +207,7 @@ Publish and install prompts, workflows, personas, and custom tools. Star ratings
 | Layer | Technology |
 |---|---|
 | **Runtime** | Node.js 22+, TypeScript 6.0 (strict) |
-| **API** | Fastify 5 — 62 route plugins, Swagger UI at `/api/docs` |
+| **API** | Fastify 5 — 160 route plugins, Swagger UI at `/api/docs` |
 | **Frontend** | React 19, Vite 7, Tailwind CSS, React Flow |
 | **Database** | PostgreSQL 16 + pgvector HNSW indexes, Drizzle ORM |
 | **Cache / Queues** | Redis 7, BullMQ with dead-letter queue |
@@ -309,7 +309,7 @@ The endpoint streams SSE events in order:
 ```
 aibyai/
 ├── src/
-│   ├── adapters/           # 16 LLM provider adapters + registry
+│   ├── adapters/           # 16 LLM provider adapters + 6 storage/vector/embedding adapters + registry
 │   ├── agents/             # Orchestrator, conflict detector, shared memory, message bus
 │   ├── auth/               # OAuth strategies (Google, GitHub)
 │   ├── config/             # Zod-validated environment config
@@ -327,7 +327,7 @@ aibyai/
 │   ├── processors/         # File ingestion (PDF, DOCX, XLSX, CSV, images, audio)
 │   ├── queue/              # BullMQ workers + dead-letter queue
 │   ├── router/             # Smart routing, token estimation, quota tracking
-│   ├── routes/             # 62 Fastify route plugins
+│   ├── routes/             # 160 Fastify route plugins
 │   ├── sandbox/            # V8 isolate (JS) + bubblewrap/seccomp-bpf (Python)
 │   ├── services/           # 77 business logic services:
 │   │                       # council, RAG, memory, reliability, specialization,
@@ -342,7 +342,7 @@ aibyai/
 │   ├── hooks/              # Council stream, deliberation, member hooks
 │   ├── views/              # 25 page views (Chat, Debate, Workflows, Marketplace…)
 │   └── router.tsx          # React Router 7
-├── tests/                  # 264 test files, 4300+ tests (Vitest)
+├── tests/                  # 282 test files, 4300+ tests (Vitest)
 ├── cli/                    # CLI tool (@aibyai/cli) — terminal interface
 ├── desktop/                # Tauri 2 desktop app (macOS, Windows, Linux)
 ├── helm/                   # Helm chart for Kubernetes deployment
