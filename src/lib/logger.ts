@@ -50,27 +50,32 @@ const redactPaths = [
   "req.headers[\"x-api-key\"]",
 ];
 
-const logger = pino({
-  level: isDev ? "debug" : "info",
-  // Prevent sensitive data from leaking into log output
-  redact: {
-    paths: redactPaths,
-    censor: "[Redacted]",
+const logger = pino(
+  {
+    level: isDev ? "debug" : "info",
+    // Prevent sensitive data from leaking into log output
+    redact: {
+      paths: redactPaths,
+      censor: "[Redacted]",
+    },
+    // Inject traceId/spanId into every log record for OTEL correlation
+    mixin() {
+      const ctx = requestContext.getStore();
+      if (!ctx) return {};
+      const fields: Record<string, string> = { requestId: ctx.requestId };
+      if (ctx.traceId) fields.traceId = ctx.traceId;
+      if (ctx.spanId) fields.spanId = ctx.spanId;
+      return fields;
+    },
+    // pino-pretty is synchronous and must ONLY be used in development.
+    // The isDev guard ensures production never loads this blocking transport.
+    transport: isDev
+      ? { target: "pino-pretty", options: { colorize: true, ignore: "pid,hostname" } }
+      : undefined,
   },
-  // Inject traceId/spanId into every log record for OTEL correlation
-  mixin() {
-    const ctx = requestContext.getStore();
-    if (!ctx) return {};
-    const fields: Record<string, string> = { requestId: ctx.requestId };
-    if (ctx.traceId) fields.traceId = ctx.traceId;
-    if (ctx.spanId) fields.spanId = ctx.spanId;
-    return fields;
-  },
-  // pino-pretty is synchronous and must ONLY be used in development.
-  // The isDev guard ensures production never loads this blocking transport.
-  transport: isDev
-    ? { target: "pino-pretty", options: { colorize: true, ignore: "pid,hostname" } }
-    : undefined,
-});
+  // Use synchronous destination in production so logs are flushed immediately.
+  // This prevents log loss when process.exit() is called (e.g., on startup crash).
+  isDev ? undefined : pino.destination({ sync: true, dest: 1 }),
+);
 
 export default logger;
