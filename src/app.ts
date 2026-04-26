@@ -64,6 +64,7 @@ import marketplacePlugin from "./routes/marketplace.js";
 import skillsPlugin from "./routes/skills.js";
 import branchesPlugin from "./routes/branches.js";
 import memoryEditPlugin from "./routes/memory-edit.js";
+import { hypothesesPlugin } from "./routes/hypotheses.js";
 import tracesPlugin from "./routes/traces.js";
 import analyticsPlugin from "./routes/analytics.js";
 import reposPlugin from "./routes/repos.js";
@@ -313,6 +314,7 @@ export async function buildApp() {
   // Phase 1.7 — conversation branches (uses /api prefix for nested resource URLs)
   await fastify.register(branchesPlugin,        { prefix: "/api" });
   await fastify.register(memoryEditPlugin,      { prefix: "/api" });
+  await fastify.register(hypothesesPlugin,      { prefix: "/api" });
   await fastify.register(tracesPlugin,          { prefix: "/api/traces" });
   await fastify.register(analyticsPlugin,       { prefix: "/api/analytics" });
   await fastify.register(reposPlugin,           { prefix: "/api/repos" });

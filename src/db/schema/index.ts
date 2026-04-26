@@ -25,3 +25,6 @@ export * from "./mfa.js";
 export * from "./promptVersions.js";
 export * from "./feedback.js";
 export * from "./rooms.js";
+export * from "./hypotheses.js";
+export * from "./branches.js";
+export * from "./memoryFacts.js";
