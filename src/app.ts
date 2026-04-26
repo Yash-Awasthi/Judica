@@ -94,6 +94,7 @@ import { buildTasksPlugin } from "./routes/build-tasks.js";
 import { workStealingPlugin } from "./routes/work-stealing.js";
 import { taskReviewPlugin } from "./routes/task-review.js";
 import { backgroundTasksPlugin } from "./routes/background-tasks.js";
+import { autoDebugPlugin } from "./routes/auto-debug.js";
 import tracesPlugin from "./routes/traces.js";
 import analyticsPlugin from "./routes/analytics.js";
 import reposPlugin from "./routes/repos.js";
@@ -373,6 +374,7 @@ export async function buildApp() {
   await fastify.register(workStealingPlugin,       { prefix: "/api" });
   await fastify.register(taskReviewPlugin,         { prefix: "/api" });
   await fastify.register(backgroundTasksPlugin,    { prefix: "/api" });
+  await fastify.register(autoDebugPlugin,          { prefix: "/api" });
   await fastify.register(tracesPlugin,          { prefix: "/api/traces" });
   await fastify.register(analyticsPlugin,       { prefix: "/api/analytics" });
   await fastify.register(reposPlugin,           { prefix: "/api/repos" });
