@@ -52,6 +52,7 @@ import { runPromptFilter } from "../lib/promptFilter.js";
 import { compressPrompt } from "../lib/tokenConservation.js";
 import { applySpecialisationMode, autoDetectDomain, type SpecialisationDomain } from "../lib/specialisationMode.js";
 import { wrapEpistemicSystemPrompt } from "../lib/epistemicTags.js";
+import { computeWeather, extractWeatherMetrics } from "../lib/conversationWeather.js";
 import { userSettings } from "../db/schema/users.js";
 import { generateSessionName } from "../lib/secondaryFlows/sessionNaming.js";
 import { updateConversationTitle } from "../services/conversation.service.js";
@@ -608,6 +609,13 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       }
     }
 
+    // Phase 1.11 — Conversation Weather (Argilla data quality indicator pattern)
+    const weatherMetrics = extractWeatherMetrics(
+      finalOpinions.map(o => ({ opinion: o.opinion ?? "", confidence: o.confidence })),
+      finalOpinions.length > 1 ? undefined : undefined,
+    );
+    const weather = computeWeather(weatherMetrics);
+
     return {
       success: true,
       conversationId: effectiveConversationId,
@@ -618,7 +626,8 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       router: routerDecision ? formatRouterMetadata(routerDecision) : undefined,
       citations: ragCitations.length > 0 ? ragCitations : undefined,
       artifact_id: artifactId,
-      metrics: (tokensUsed > 0 || isCacheHit) ? { totalTokens: tokensUsed, totalCost: 0, hallucinationCount: 0 } : undefined
+      metrics: (tokensUsed > 0 || isCacheHit) ? { totalTokens: tokensUsed, totalCost: 0, hallucinationCount: 0 } : undefined,
+      weather,
     };
   });
 
