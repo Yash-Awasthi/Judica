@@ -49,6 +49,7 @@ import { hooks } from "../lib/hooks/hookRegistry.js";
 import { checkOutput, BUILTIN_OUTPUT_RULES } from "../lib/guardrails/index.js";
 import { buildUserScanners, runScannerPipeline } from "../lib/scanners/contentScanner.js";
 import { runPromptFilter } from "../lib/promptFilter.js";
+import { compressPrompt } from "../lib/tokenConservation.js";
 import { userSettings } from "../db/schema/users.js";
 import { generateSessionName } from "../lib/secondaryFlows/sessionNaming.js";
 import { updateConversationTitle } from "../services/conversation.service.js";
@@ -245,6 +246,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     // Load user's content filter settings and run scanner pipeline on input
     let contentScanners = [];
     let adversarialRewrite = false;
+    let tokenConservationMode = false;
     if (userId) {
       const [settingsRow] = await db.select().from(userSettings).where(eq(userSettings.userId, userId)).limit(1);
       const uSettings = (settingsRow?.settings as Record<string, unknown>) ?? {};
@@ -253,6 +255,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         blockAdultContent: !!uSettings.blockAdultContent,
       });
       adversarialRewrite = !!uSettings.adversarialRewrite;
+      tokenConservationMode = !!uSettings.tokenConservationMode;
     }
     if (contentScanners.length > 0) {
       const scanResult = runScannerPipeline(question, contentScanners);
@@ -285,6 +288,17 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       }
       if (filterResult.processedInput !== question) {
         (request.body as AskBody).question = filterResult.processedInput;
+      }
+    }
+
+    // Phase 1.5 — Token conservation mode (LLMLingua, MIT, Microsoft)
+    // Silently reduces token spend. Runs only when user enables tokenConservationMode.
+    if (tokenConservationMode) {
+      const currentQ = (request.body as AskBody).question;
+      const compression = await compressPrompt(currentQ, { targetRatio: 0.6 });
+      if (compression.method !== "none") {
+        (request.body as AskBody).question = compression.compressed;
+        logger.info({ method: compression.method, ratio: compression.compressionRatio }, "Token conservation applied");
       }
     }
     let messages: Message[] = [];

@@ -135,6 +135,8 @@ export const userSettingsSchema = z.object({
   blockAdultContent: z.boolean().optional(),
   // Phase 1.4 — adversarial prompt rewrite (Rebuff pattern; adds token cost; off by default)
   adversarialRewrite: z.boolean().optional(),
+  // Phase 1.5 — token conservation mode (LLMLingua, MIT, Microsoft; silently reduces token spend)
+  tokenConservationMode: z.boolean().optional(),
 }).strict();
 
 export const configSchema = z
