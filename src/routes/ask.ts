@@ -54,6 +54,7 @@ import { applySpecialisationMode, autoDetectDomain, type SpecialisationDomain } 
 import { wrapEpistemicSystemPrompt } from "../lib/epistemicTags.js";
 import { computeWeather, extractWeatherMetrics } from "../lib/conversationWeather.js";
 import { socraticRewrite, isSocraticSynthesisEnabled } from "../lib/socraticSynthesis.js";
+import { checkSpendingLimit, recordSpend } from "../lib/spendingLimits.js";
 import { userSettings } from "../db/schema/users.js";
 import { generateSessionName } from "../lib/secondaryFlows/sessionNaming.js";
 import { updateConversationTitle } from "../services/conversation.service.js";
@@ -245,6 +246,14 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     const userId = request.userId;
+
+    // Phase 1.16 — Spending limit check (Onyx EE pattern)
+    if (userId) {
+      const spendCheck = await checkSpendingLimit(userId);
+      if (!spendCheck.allowed) {
+        return reply.code(402).send({ error: "spending_limit_exceeded", detail: spendCheck.reason });
+      }
+    }
 
     // Phase 1.1 — Content scanners (LLM Guard scanner pattern, off by default)
     // Load user's content filter settings and run scanner pipeline on input
@@ -513,6 +522,11 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     if (traceCtx) {
       traceCtx.conversationId = effectiveConversationId || undefined;
       try { endTrace(traceCtx); } catch (err) { logger.warn({ err }, "Failed to save trace"); }
+    }
+
+    // Phase 1.16 — Record spend after successful council call
+    if (userId && tokensUsed > 0) {
+      recordSpend(userId, tokensUsed).catch(() => {}); // fire-and-forget, non-blocking
     }
 
     // Output guardrails — check and possibly redact/block verdict

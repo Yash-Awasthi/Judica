@@ -67,6 +67,7 @@ import memoryEditPlugin from "./routes/memory-edit.js";
 import { hypothesesPlugin } from "./routes/hypotheses.js";
 import { ideaNodesPlugin } from "./routes/ideas.js";
 import { openapiToolsPlugin } from "./routes/openapi-tools.js";
+import { spendingLimitsPlugin } from "./routes/spending-limits.js";
 import tracesPlugin from "./routes/traces.js";
 import analyticsPlugin from "./routes/analytics.js";
 import reposPlugin from "./routes/repos.js";
@@ -319,6 +320,7 @@ export async function buildApp() {
   await fastify.register(hypothesesPlugin,      { prefix: "/api" });
   await fastify.register(ideaNodesPlugin,       { prefix: "/api" });
   await fastify.register(openapiToolsPlugin,    { prefix: "/api" });
+  await fastify.register(spendingLimitsPlugin,  { prefix: "/api" });
   await fastify.register(tracesPlugin,          { prefix: "/api/traces" });
   await fastify.register(analyticsPlugin,       { prefix: "/api/analytics" });
   await fastify.register(reposPlugin,           { prefix: "/api/repos" });
