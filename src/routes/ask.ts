@@ -55,6 +55,7 @@ import { wrapEpistemicSystemPrompt } from "../lib/epistemicTags.js";
 import { computeWeather, extractWeatherMetrics } from "../lib/conversationWeather.js";
 import { socraticRewrite, isSocraticSynthesisEnabled } from "../lib/socraticSynthesis.js";
 import { checkSpendingLimit, recordSpend } from "../lib/spendingLimits.js";
+import { selectRelevantSkills, buildSkillContextBlock } from "../lib/skillSelection.js";
 import { userSettings } from "../db/schema/users.js";
 import { generateSessionName } from "../lib/secondaryFlows/sessionNaming.js";
 import { updateConversationTitle } from "../services/conversation.service.js";
@@ -424,7 +425,19 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     const enrichedQuestion = codeContext
       ? `${codeContext}\n\n${questionWithContext}`
       : questionWithContext;
-    const currentMessages = [...messages, { role: "user" as const, content: enrichedQuestion }] as Message[];
+
+    // Phase 1.19 — Intelligent Skill Selection (AnythingLLM pattern)
+    // Auto-select relevant tools from user's skill library and inject as context
+    let skillContextBlock = "";
+    if (userId) {
+      const relevantSkills = await selectRelevantSkills(userId, question);
+      skillContextBlock = buildSkillContextBlock(relevantSkills);
+    }
+    const finalEnrichedQuestion = skillContextBlock
+      ? `${enrichedQuestion}${skillContextBlock}`
+      : enrichedQuestion;
+
+    const currentMessages = [...messages, { role: "user" as const, content: finalEnrichedQuestion }] as Message[];
 
     // Hook: pre:query — before retrieval/search
     await hooks.run('pre:query', { stage: 'pre:query', userId: userId ?? undefined, query: question });
