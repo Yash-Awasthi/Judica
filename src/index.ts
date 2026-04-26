@@ -18,6 +18,8 @@ import { fileURLToPath } from "url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const migrationsFolder = path.join(__dirname, "..", "migrations");
 try {
+  // Enable pgvector extension before migrations — required for vector columns
+  await pool.query("CREATE EXTENSION IF NOT EXISTS vector");
   const migrationDb = drizzle(pool);
   await migrate(migrationDb, { migrationsFolder });
   logger.info("Database migrations applied");
