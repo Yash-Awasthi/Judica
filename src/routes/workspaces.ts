@@ -125,7 +125,7 @@ export const workspacesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // DELETE /workspaces/:slug — soft delete
-  fastify.delete("/workspaces/:slug", async (request: any, reply: any) => {
+  fastify.delete("/workspaces/:slug", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const [deleted] = await db
       .update(workspaces)
       .set({ deletedAt: new Date() })
@@ -141,7 +141,7 @@ export const workspacesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // POST /workspaces/:slug/default
-  fastify.post("/workspaces/:slug/default", async (request: any, reply: any) => {
+  fastify.post("/workspaces/:slug/default", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const userId = request.user.userId;
     const { slug } = request.params as { slug: string };
 

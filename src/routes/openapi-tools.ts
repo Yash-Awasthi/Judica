@@ -123,7 +123,7 @@ export const openapiToolsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // DELETE /openapi-tools/:id
-  fastify.delete("/openapi-tools/:id", async (request: any, reply: any) => {
+  fastify.delete("/openapi-tools/:id", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const userId = request.user.userId;
     const { id } = request.params as { id: string };
 
@@ -137,7 +137,7 @@ export const openapiToolsPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // POST /openapi-tools/:id/test — test-invoke with sample parameters
-  fastify.post("/openapi-tools/:id/test", async (request: any, reply: any) => {
+  fastify.post("/openapi-tools/:id/test", { config: { rateLimit: { max: 10, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const userId = request.user.userId;
     const { id } = request.params as { id: string };
     const { params: testParams = {} } = (request.body as any) ?? {};

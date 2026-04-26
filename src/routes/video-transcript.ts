@@ -41,9 +41,8 @@ export async function videoTranscriptPlugin(app: FastifyInstance) {
   });
 
   // GET /video/transcript/sources — available extraction backends
-  app.get("/video/transcript/sources", {
-    config: { rateLimit: { max: 30, timeWindow: "1 minute" } },
-  } as any, async (_req, reply) => {
+  // @ts-ignore — @fastify/rate-limit augments config type at runtime
+  app.get("/video/transcript/sources", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (_req, reply) => {
     const ytDlpAvailable = await import("child_process")
       .then(({ execSync }) => { execSync("which yt-dlp"); return true; })
       .catch(() => false);

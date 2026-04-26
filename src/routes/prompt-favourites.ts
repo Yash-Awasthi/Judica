@@ -115,7 +115,7 @@ export const promptFavouritesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // POST /prompt-favourites/:id/use — track usage
-  fastify.post("/prompt-favourites/:id/use", async (request: any, reply: any) => {
+  fastify.post("/prompt-favourites/:id/use", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const [updated] = await db
       .update(promptFavourites)
       .set({
@@ -134,7 +134,7 @@ export const promptFavouritesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // GET /prompt-history — recent unique questions from conversation history
-  fastify.get("/prompt-history", async (request: any) => {
+  fastify.get("/prompt-history", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } }, async (request: any) => {
     const userId = request.user.userId;
     const rows = await db
       .selectDistinctOn([chats.question], {

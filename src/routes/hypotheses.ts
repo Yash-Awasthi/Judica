@@ -115,7 +115,7 @@ export const hypothesesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // DELETE /hypotheses/:id
-  fastify.delete("/hypotheses/:id", async (request: any, reply: any) => {
+  fastify.delete("/hypotheses/:id", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const userId = request.user.userId;
     const { id } = request.params as { id: string };
 
@@ -129,7 +129,7 @@ export const hypothesesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // POST /hypotheses/:id/resolve
-  fastify.post("/hypotheses/:id/resolve", async (request: any, reply: any) => {
+  fastify.post("/hypotheses/:id/resolve", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const userId = request.user.userId;
     const { id } = request.params as { id: string };
     const body = resolveSchema.safeParse(request.body);

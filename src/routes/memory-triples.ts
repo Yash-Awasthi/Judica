@@ -141,7 +141,7 @@ export const memoryTriplesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // POST /memory/triples/extract — extract triples from freetext
-  fastify.post("/memory/triples/extract", async (request: any, reply: any) => {
+  fastify.post("/memory/triples/extract", { config: { rateLimit: { max: 20, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const { text, conversationId, save } = (request.body as any) ?? {};
     if (!text || typeof text !== "string") {
       return reply.code(400).send({ error: "text is required" });

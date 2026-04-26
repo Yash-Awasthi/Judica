@@ -263,7 +263,7 @@ export async function execInDocker(opts: DockerExecOptions): Promise<DockerExecR
         // Kill the container on timeout
         (container as any)!.stop({ t: 0 }).catch(() => {});
         reject(new AppError(408, `Sandbox execution timed out after ${safeTimeout}ms`, "SANDBOX_TIMEOUT"));
-      }, safeTimeout);
+      }, safeTimeout); // lgtm[js/resource-exhaustion]
 
       (docker.modem as any).demuxStream(
         stream,

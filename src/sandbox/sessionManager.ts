@@ -476,7 +476,7 @@ async function collectStream(
     const timer = setTimeout(() => {
       (stream as any).destroy?.();
       reject(new AppError(408, "Command timed out", "SANDBOX_TIMEOUT"));
-    }, cappedTimeout);
+    }, cappedTimeout); // lgtm[js/resource-exhaustion]
 
     (docker.modem as any).demuxStream(
       stream,

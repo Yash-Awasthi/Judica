@@ -160,7 +160,7 @@ export const sessionTemplatesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // POST /session-templates/:id/apply — return template as ask payload
-  fastify.post("/session-templates/:id/apply", async (request: any, reply: any) => {
+  fastify.post("/session-templates/:id/apply", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const [template] = await db
       .select()
       .from(sessionTemplates)

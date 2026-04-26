@@ -101,7 +101,7 @@ export const ideaNodesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // PATCH /ideas/:id
-  fastify.patch("/ideas/:id", async (request: any, reply: any) => {
+  fastify.patch("/ideas/:id", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const userId = request.user.userId;
     const { id } = request.params as { id: string };
     const body = updateSchema.safeParse(request.body);
@@ -125,7 +125,7 @@ export const ideaNodesPlugin: FastifyPluginAsync = async (fastify) => {
   });
 
   // DELETE /ideas/:id
-  fastify.delete("/ideas/:id", async (request: any, reply: any) => {
+  fastify.delete("/ideas/:id", { config: { rateLimit: { max: 30, timeWindow: "1 minute" } } }, async (request: any, reply: any) => {
     const userId = request.user.userId;
     const { id } = request.params as { id: string };
 
