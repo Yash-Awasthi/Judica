@@ -126,6 +126,9 @@ import { antiSycophancyPlugin } from "./routes/anti-sycophancy.js";
 import { hallucinationScorerPlugin } from "./routes/hallucination-scorer.js";
 import { abComparisonPlugin } from "./routes/ab-comparison.js";
 import { predictionRegistryPlugin } from "./routes/prediction-registry.js";
+import { hookExtensionsPlugin } from "./routes/hook-extensions.js";
+import { webSelectorsPlugin } from "./routes/web-selectors.js";
+import { structuredExtractionPlugin } from "./routes/structured-extraction.js";
 import tracesPlugin from "./routes/traces.js";
 import analyticsPlugin from "./routes/analytics.js";
 import reposPlugin from "./routes/repos.js";
@@ -136,6 +139,7 @@ import projectsPlugin from "./routes/projects.js";
 import providerHealthPlugin from "./routes/providerHealth.js";
 import deliberationsPlugin from "./routes/deliberations.js";
 import connectorsPlugin from "./routes/connectors.js";
+import connectorSyncPlugin from "./routes/connector-sync.js";
 import ssoPlugin from "./sso/routes.js";
 import notificationsPlugin from "./routes/notifications.js";
 import documentSetsPlugin from "./routes/documentSets.js";
@@ -150,6 +154,7 @@ import discordPlugin from "./integrations/discord/routes.js";
 import imagePlugin from "./routes/images.js";
 import featureFlagPlugin from "./routes/featureFlags.js";
 import widgetPlugin from "./routes/widget.js";
+import { surfaceAccessPlugin } from "./routes/surface-access.js";
 import whitelabelPlugin from "./routes/whitelabel.js";
 import billingPlugin from "./routes/billing.js";
 import webSearchPlugin from "./routes/webSearch.js";
@@ -157,6 +162,9 @@ import webScrapingPlugin from "./routes/webScraping.js";
 import federatedSearchPlugin from "./routes/federatedSearch.js";
 import storagePlugin from "./routes/storage.js";
 import auditDashboardPlugin from "./routes/auditDashboard.js";
+import dataResidencyPlugin from "./routes/dataResidency.js";
+import tenantIsolationPlugin from "./routes/tenantIsolation.js";
+import onboardingPlugin from "./routes/onboarding.js";
 import mfaPlugin from "./routes/mfa.js";
 import feedbackPlugin from "./routes/feedback.js";
 import systemPlugin from "./routes/system.js";
@@ -437,6 +445,11 @@ export async function buildApp() {
   await fastify.register(hallucinationScorerPlugin, { prefix: "/api" });
   await fastify.register(abComparisonPlugin,       { prefix: "/api" });
   await fastify.register(predictionRegistryPlugin, { prefix: "/api" });
+  // Hook extensions — code injection points for compliance (Phase 3.11)
+  await fastify.register(hookExtensionsPlugin,    { prefix: "/api/hook-extensions" });
+  // Natural language web selectors — Phase 3.12
+  await fastify.register(webSelectorsPlugin,       { prefix: "/api" });
+  await fastify.register(structuredExtractionPlugin, { prefix: "/api/extraction" });
   await fastify.register(tracesPlugin,          { prefix: "/api/traces" });
   await fastify.register(analyticsPlugin,       { prefix: "/api/analytics" });
   await fastify.register(reposPlugin,           { prefix: "/api/repos" });
@@ -448,6 +461,8 @@ export async function buildApp() {
   await fastify.register(deliberationsPlugin,   { prefix: "/api/deliberations" });
   // Data source connectors
   await fastify.register(connectorsPlugin,      { prefix: "/api/connectors" });
+  // Connector sync modes (Load / Poll / Slim)
+  await fastify.register(connectorSyncPlugin,  { prefix: "/api/connectors" });
   // Federated real-time search (live external API queries)
   await fastify.register(federatedSearchPlugin, { prefix: "/api/federated-search" });
   // SSO / SAML / OIDC authentication
@@ -478,6 +493,8 @@ export async function buildApp() {
   await fastify.register(featureFlagPlugin,     { prefix: "/api/feature-flags" });
   // Embeddable chat widget (JS bundle + config)
   await fastify.register(widgetPlugin,          { prefix: "/api/widget" });
+  // Multi-surface access (Chrome extension, Slack, Discord, widget, desktop, mobile)
+  await fastify.register(surfaceAccessPlugin,  { prefix: "/api/surfaces" });
   // Whitelabeling (tenant branding)
   await fastify.register(whitelabelPlugin,      { prefix: "/api/whitelabel" });
   // Plans & billing (Stripe)
@@ -490,6 +507,12 @@ export async function buildApp() {
   await fastify.register(storagePlugin,         { prefix: "/api/storage" });
   // Query audit dashboard
   await fastify.register(auditDashboardPlugin,  { prefix: "/api/audit" });
+  // Data residency controls (Phase 9.4)
+  await fastify.register(dataResidencyPlugin,   { prefix: "/api/data-residency" });
+  // Tenant isolation — per-tenant encryption keys + RLS management (Phase 9.5)
+  await fastify.register(tenantIsolationPlugin, { prefix: "/api/tenant-isolation" });
+  // Onboarding wizard (Phase 9.7)
+  await fastify.register(onboardingPlugin,      { prefix: "/api/onboarding" });
   // MFA / TOTP two-factor authentication
   await fastify.register(mfaPlugin,             { prefix: "/api/mfa" });
   // Response and search feedback

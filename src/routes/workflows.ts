@@ -8,6 +8,7 @@ import { AppError } from "../middleware/errorHandler.js";
 import logger from "../lib/logger.js";
 import type { ExecutionEvent, WorkflowDefinition } from "../workflow/types.js";
 import type { WorkflowExecutor } from "../workflow/executor.js";
+import { selfHealingConfig } from "../workflow/executor.js";
 
 /**
  * Validate that a workflow definition has well-formed node and edge structures.
@@ -458,6 +459,62 @@ const workflowsPlugin: FastifyPluginAsync = async (fastify) => {
 
     active.executor.resumeGate(nodeId, choice);
     return { success: true };
+  });
+
+  // ─── Self-healing config routes (4.21) ──────────────────────────────────────
+
+  /**
+   * GET /api/workflows/self-healing/config
+   * Returns current global self-healing defaults. Admins and regular users can read.
+   */
+  fastify.get("/self-healing/config", { preHandler: fastifyRequireAuth }, async (_request, reply) => {
+    return reply.send({
+      success: true,
+      config: {
+        enabled:     selfHealingConfig.enabled,
+        maxAttempts: selfHealingConfig.maxAttempts,
+        strategies:  selfHealingConfig.strategies,
+      },
+      note: "Per-node overrides can be set in the workflow node's 'selfHealing' field.",
+    });
+  });
+
+  /**
+   * PUT /api/workflows/self-healing/config
+   * Update global self-healing defaults at runtime (no restart required).
+   * Body: { enabled?: boolean, maxAttempts?: number, strategies?: string[] }
+   */
+  fastify.put("/self-healing/config", { preHandler: fastifyRequireAuth }, async (request, reply) => {
+    const body = request.body as Record<string, unknown>;
+
+    if (typeof body.enabled === "boolean") {
+      selfHealingConfig.enabled = body.enabled;
+    }
+
+    if (typeof body.maxAttempts === "number") {
+      const clamped = Math.min(Math.max(1, Math.floor(body.maxAttempts)), 5);
+      selfHealingConfig.maxAttempts = clamped;
+    }
+
+    const VALID_STRATEGIES = new Set(["retry_with_adjusted_params", "swap_provider", "rewrite_prompt"]);
+    if (Array.isArray(body.strategies)) {
+      const parsed = (body.strategies as unknown[]).filter(
+        (s): s is "retry_with_adjusted_params" | "swap_provider" | "rewrite_prompt" =>
+          typeof s === "string" && VALID_STRATEGIES.has(s)
+      );
+      if (parsed.length > 0) selfHealingConfig.strategies = parsed;
+    }
+
+    logger.info({ userId: request.userId, config: selfHealingConfig }, "Self-healing config updated");
+
+    return reply.send({
+      success: true,
+      config: {
+        enabled:     selfHealingConfig.enabled,
+        maxAttempts: selfHealingConfig.maxAttempts,
+        strategies:  selfHealingConfig.strategies,
+      },
+    });
   });
 };
 
