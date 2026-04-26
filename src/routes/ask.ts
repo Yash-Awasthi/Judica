@@ -47,6 +47,8 @@ import { anonymousRequests } from "../lib/prometheusMetrics.js";
 import { calculateCost } from "../lib/cost.js";
 import { hooks } from "../lib/hooks/hookRegistry.js";
 import { checkOutput, BUILTIN_OUTPUT_RULES } from "../lib/guardrails/index.js";
+import { buildUserScanners, runScannerPipeline } from "../lib/scanners/contentScanner.js";
+import { userSettings } from "../db/schema/users.js";
 import { generateSessionName } from "../lib/secondaryFlows/sessionNaming.js";
 import { updateConversationTitle } from "../services/conversation.service.js";
 import { emitToConversation } from "../lib/socket.js";
@@ -238,7 +240,29 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
 
     const userId = request.userId;
 
-    let effectiveConversationId = conversationId;
+    // Phase 1.1 — Content scanners (LLM Guard scanner pattern, off by default)
+    // Load user's content filter settings and run scanner pipeline on input
+    let contentScanners = [];
+    if (userId) {
+      const [settingsRow] = await db.select().from(userSettings).where(eq(userSettings.userId, userId)).limit(1);
+      const uSettings = (settingsRow?.settings as Record<string, unknown>) ?? {};
+      contentScanners = buildUserScanners({
+        blockProfanity: !!uSettings.blockProfanity,
+        blockAdultContent: !!uSettings.blockAdultContent,
+      });
+    }
+    if (contentScanners.length > 0) {
+      const scanResult = runScannerPipeline(question, contentScanners);
+      if (!scanResult.isValid && scanResult.maxRiskScore >= 1.0) {
+        const blocked = scanResult.results.find(r => !r.isValid);
+        reply.code(400).send({ error: "Content policy violation", detail: blocked?.detail });
+        return;
+      }
+      // Replace question with sanitized version (redacted profanity etc.)
+      if (scanResult.sanitized !== question) {
+        (request.body as AskBody).question = scanResult.sanitized;
+      }
+    }
     let messages: Message[] = [];
 
     if (effectiveConversationId) {
@@ -429,6 +453,11 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         verdict = `[Response blocked by content policy: ${guardrailResult.blockedReason}]`;
       } else if (guardrailResult.processedText !== verdict) {
         verdict = guardrailResult.processedText;
+      }
+      // Phase 1.1 — run output through user's content scanners too
+      if (contentScanners.length > 0) {
+        const outScan = runScannerPipeline(verdict, contentScanners);
+        if (outScan.sanitized !== verdict) verdict = outScan.sanitized;
       }
     }
 

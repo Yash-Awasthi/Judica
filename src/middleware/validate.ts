@@ -127,6 +127,9 @@ export const userSettingsSchema = z.object({
   streamResponses: z.boolean().optional(),
   sidebarCollapsed: z.boolean().optional(),
   deliberationMode: z.enum(["standard", "socratic", "red_blue", "hypothesis", "confidence"]).optional(),
+  // Phase 1.1 — content filter toggles (off by default, per cost/opt-in principle)
+  blockProfanity: z.boolean().optional(),
+  blockAdultContent: z.boolean().optional(),
 }).strict();
 
 export const configSchema = z
