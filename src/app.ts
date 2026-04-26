@@ -136,6 +136,7 @@ import projectsPlugin from "./routes/projects.js";
 import providerHealthPlugin from "./routes/providerHealth.js";
 import deliberationsPlugin from "./routes/deliberations.js";
 import connectorsPlugin from "./routes/connectors.js";
+import connectorSyncPlugin from "./routes/connector-sync.js";
 import ssoPlugin from "./sso/routes.js";
 import notificationsPlugin from "./routes/notifications.js";
 import documentSetsPlugin from "./routes/documentSets.js";
@@ -448,6 +449,8 @@ export async function buildApp() {
   await fastify.register(deliberationsPlugin,   { prefix: "/api/deliberations" });
   // Data source connectors
   await fastify.register(connectorsPlugin,      { prefix: "/api/connectors" });
+  // Connector sync modes (Load / Poll / Slim)
+  await fastify.register(connectorSyncPlugin,  { prefix: "/api/connectors" });
   // Federated real-time search (live external API queries)
   await fastify.register(federatedSearchPlugin, { prefix: "/api/federated-search" });
   // SSO / SAML / OIDC authentication
