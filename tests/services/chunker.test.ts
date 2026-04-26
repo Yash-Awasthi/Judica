@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { chunkText, chunkHierarchical } from "../../src/services/chunker.service";
+import { describe, it, expect, vi } from "vitest";
+import { chunkText, chunkHierarchical, mergeAdjacentChunks, enrichChunks } from "../../src/services/chunker.service";
 
 describe("chunkText", () => {
   // --- Empty / whitespace input ---
@@ -281,5 +281,227 @@ describe("chunkHierarchical", () => {
       expect(child.parentContent).toBeTruthy();
       expect(child.parentContent!).toContain(child.content.substring(0, 20));
     }
+  });
+});
+
+describe("mergeAdjacentChunks", () => {
+  it("returns empty array for empty input", () => {
+    expect(mergeAdjacentChunks([])).toEqual([]);
+  });
+
+  it("returns single merged chunk for single input", () => {
+    const result = mergeAdjacentChunks(["hello world"]);
+    expect(result).toHaveLength(1);
+    expect(result[0].content).toBe("hello world");
+    expect(result[0].sourceIndices).toEqual([0]);
+    expect(result[0].mergedFrom).toBe(1);
+  });
+
+  it("merges adjacent short chunks when combined size fits within maxMergedSize", () => {
+    const result = mergeAdjacentChunks(["first", "second", "third"], 10000);
+    expect(result).toHaveLength(1);
+    expect(result[0].content).toBe("first\n\nsecond\n\nthird");
+    expect(result[0].sourceIndices).toEqual([0, 1, 2]);
+    expect(result[0].mergedFrom).toBe(3);
+  });
+
+  it("separates merged content with double newline", () => {
+    const result = mergeAdjacentChunks(["alpha", "beta"], 10000);
+    expect(result[0].content).toBe("alpha\n\nbeta");
+  });
+
+  it("flushes current chunk when combined size would exceed maxMergedSize", () => {
+    const chunks = ["A".repeat(100), "B".repeat(100), "C".repeat(100)];
+    // 100 + 2 + 100 = 202 > 150 → each chunk stays separate
+    const result = mergeAdjacentChunks(chunks, 150);
+    expect(result).toHaveLength(3);
+    expect(result[0].content).toBe("A".repeat(100));
+    expect(result[1].content).toBe("B".repeat(100));
+    expect(result[2].content).toBe("C".repeat(100));
+  });
+
+  it("flushes current chunk when maxMergeCount is reached", () => {
+    const chunks = ["a", "b", "c", "d", "e"];
+    // maxMergeCount=2: merge at most 2 → [a+b], [c+d], [e]
+    const result = mergeAdjacentChunks(chunks, 10000, 2);
+    expect(result).toHaveLength(3);
+    expect(result[0].sourceIndices).toEqual([0, 1]);
+    expect(result[1].sourceIndices).toEqual([2, 3]);
+    expect(result[2].sourceIndices).toEqual([4]);
+  });
+
+  it("uses default maxMergeCount of 4", () => {
+    // 5 tiny chunks with no size limit → first 4 merge, 5th is separate
+    const chunks = ["a", "b", "c", "d", "e"];
+    const result = mergeAdjacentChunks(chunks, 10000);
+    expect(result).toHaveLength(2);
+    expect(result[0].sourceIndices).toEqual([0, 1, 2, 3]);
+    expect(result[1].sourceIndices).toEqual([4]);
+  });
+
+  it("flushes current chunk when next chunk starts with a ## section heading", () => {
+    const chunks = ["intro text", "## New Section\nsome content", "body text"];
+    const result = mergeAdjacentChunks(chunks, 10000);
+    expect(result.length).toBeGreaterThanOrEqual(2);
+    expect(result[0].content).toBe("intro text");
+    expect(result[1].content).toContain("## New Section");
+  });
+
+  it("detects === as a section break", () => {
+    const chunks = ["text before", "===\nnew section start", "more text"];
+    const result = mergeAdjacentChunks(chunks, 10000);
+    expect(result.length).toBeGreaterThanOrEqual(2);
+    expect(result[1].content).toContain("===");
+  });
+
+  it("detects --- as a section break", () => {
+    const chunks = ["text before", "---\nhrule section", "more text"];
+    const result = mergeAdjacentChunks(chunks, 10000);
+    expect(result.length).toBeGreaterThanOrEqual(2);
+    expect(result[1].content).toContain("---");
+  });
+
+  it("detects 'Chapter N' as a section break", () => {
+    const chunks = ["preamble", "Chapter 1\nIntroduction", "body"];
+    const result = mergeAdjacentChunks(chunks, 10000);
+    expect(result.length).toBeGreaterThanOrEqual(2);
+    expect(result[1].content).toContain("Chapter 1");
+  });
+
+  it("mergedFrom reflects actual number of source chunks merged", () => {
+    const chunks = ["a", "b", "c"];
+    const result = mergeAdjacentChunks(chunks, 10000);
+    expect(result[0].mergedFrom).toBe(3);
+    expect(result[0].mergedFrom).toBe(result[0].sourceIndices.length);
+  });
+
+  it("handles default maxMergedSize of 1024 — two 500-char chunks merge (1002 <= 1024)", () => {
+    const chunks = ["X".repeat(500), "Y".repeat(500)];
+    const result = mergeAdjacentChunks(chunks); // default maxMergedSize=1024
+    expect(result).toHaveLength(1);
+    expect(result[0].mergedFrom).toBe(2);
+  });
+
+  it("keeps two 520-char chunks separate under the default 1024 limit (1042 > 1024)", () => {
+    const chunks = ["X".repeat(520), "Y".repeat(520)];
+    const result = mergeAdjacentChunks(chunks);
+    expect(result).toHaveLength(2);
+  });
+
+  it("always flushes the last pending chunk", () => {
+    const chunks = ["only one"];
+    const result = mergeAdjacentChunks(chunks, 10000, 10);
+    expect(result).toHaveLength(1);
+    expect(result[0].content).toBe("only one");
+  });
+});
+
+describe("enrichChunks", () => {
+  it("returns empty array for empty input", () => {
+    expect(enrichChunks([])).toEqual([]);
+  });
+
+  it("returns chunk with originalIndex when called with no options", () => {
+    const result = enrichChunks(["hello world"]);
+    expect(result).toHaveLength(1);
+    expect(result[0].content).toBe("hello world");
+    expect(result[0].originalIndex).toBe(0);
+    expect(result[0].title).toBeNull();
+    expect(result[0].sectionHeading).toBeNull();
+  });
+
+  it("assigns sequential originalIndex values", () => {
+    const result = enrichChunks(["a", "b", "c"]);
+    expect(result[0].originalIndex).toBe(0);
+    expect(result[1].originalIndex).toBe(1);
+    expect(result[2].originalIndex).toBe(2);
+  });
+
+  it("prepends document title when provided", () => {
+    const result = enrichChunks(["some content"], { documentTitle: "My Doc" });
+    expect(result[0].content).toBe("Document: My Doc\nsome content");
+    expect(result[0].title).toBe("My Doc");
+  });
+
+  it("applies section heading from headings map to the correct chunk", () => {
+    const headings = new Map([[1, "Chapter Two"]]);
+    const result = enrichChunks(["first", "second", "third"], { headings });
+    expect(result[0].sectionHeading).toBeNull();
+    expect(result[1].sectionHeading).toBe("Chapter Two");
+    expect(result[1].content).toContain("Section: Chapter Two");
+    expect(result[2].sectionHeading).toBe("Chapter Two"); // heading propagates
+  });
+
+  it("carries heading forward across subsequent chunks", () => {
+    const headings = new Map([[0, "Intro"]]);
+    const result = enrichChunks(["c1", "c2", "c3"], { headings });
+    expect(result[0].sectionHeading).toBe("Intro");
+    expect(result[1].sectionHeading).toBe("Intro");
+    expect(result[2].sectionHeading).toBe("Intro");
+  });
+
+  it("detects inline heading in chunk content", () => {
+    const result = enrichChunks(["## Section Title\nbody text", "next chunk"]);
+    expect(result[0].sectionHeading).toBe("Section Title");
+    expect(result[1].sectionHeading).toBe("Section Title"); // propagates
+  });
+
+  it("headings map takes precedence over inline detection at the same index", () => {
+    const headings = new Map([[0, "Map Heading"]]);
+    const result = enrichChunks(["## Inline Heading\ntext"], { headings });
+    // Map heading should win
+    expect(result[0].sectionHeading).toBe("Map Heading");
+  });
+
+  it("builds enriched content as: title + heading + original content", () => {
+    const headings = new Map([[0, "Intro"]]);
+    const result = enrichChunks(["body"], { documentTitle: "My Doc", headings });
+    expect(result[0].content).toBe("Document: My Doc\nSection: Intro\nbody");
+  });
+
+  it("uses custom keywordExtractor when provided", () => {
+    const extractor = vi.fn(() => ["kw1", "kw2"]);
+    const result = enrichChunks(["content here"], { keywordExtractor: extractor });
+    expect(extractor).toHaveBeenCalledWith("content here");
+    expect(result[0].keywords).toEqual(["kw1", "kw2"]);
+  });
+
+  it("extracts quoted phrases as keywords via default extractor", () => {
+    const result = enrichChunks(['"machine learning" is the topic']);
+    expect(result[0].keywords).toContain("machine learning");
+  });
+
+  it("extracts capitalized multi-word terms as keywords", () => {
+    const result = enrichChunks(["Knowledge Graph is a powerful tool"]);
+    expect(result[0].keywords).toContain("Knowledge Graph");
+  });
+
+  it("extracts camelCase identifiers as keywords", () => {
+    const result = enrichChunks(["Call queryBuilder or updateConfig here"]);
+    expect(result[0].keywords).toContain("queryBuilder");
+    expect(result[0].keywords).toContain("updateConfig");
+  });
+
+  it("extracts ALL-CAPS acronyms (2-6 chars) as keywords", () => {
+    const result = enrichChunks(["The REST API uses HTTP"]);
+    expect(result[0].keywords).toContain("REST");
+    expect(result[0].keywords).toContain("API");
+    expect(result[0].keywords).toContain("HTTP");
+  });
+
+  it("limits keywords to 10", () => {
+    // Text rich with many different keyword types
+    const text = '"aa" "bb" "cc" "dd" "ee" Foo Bar Baz API REST HTTP JWT RPC GRPC queryFoo updateBar';
+    const result = enrichChunks([text]);
+    expect(result[0].keywords.length).toBeLessThanOrEqual(10);
+  });
+
+  it("keywords are extracted from original content, not enriched content", () => {
+    // If keywords were extracted from enriched content, "My Doc" would be captured
+    // as a capitalized term — verify that's not the case
+    const extractor = vi.fn(() => []);
+    enrichChunks(["body text"], { documentTitle: "My Doc", keywordExtractor: extractor });
+    // The extractor should have received just "body text", not the full enriched string
+    expect(extractor).toHaveBeenCalledWith("body text");
   });
 });
