@@ -99,6 +99,7 @@ import { workflowTriggersPlugin } from "./routes/workflow-triggers.js";
 import { knowledgeGraphPlugin } from "./routes/knowledge-graph.js";
 import { craftPlugin } from "./routes/craft.js";
 import { workflowRunLogsPlugin } from "./routes/workflow-run-logs.js";
+import { botPlugin } from "./routes/bot.js";
 import tracesPlugin from "./routes/traces.js";
 import analyticsPlugin from "./routes/analytics.js";
 import reposPlugin from "./routes/repos.js";
@@ -383,6 +384,7 @@ export async function buildApp() {
   await fastify.register(knowledgeGraphPlugin,     { prefix: "/api" });
   await fastify.register(craftPlugin,              { prefix: "/api" });
   await fastify.register(workflowRunLogsPlugin,    { prefix: "/api" });
+  await fastify.register(botPlugin,                { prefix: "/api" });
   await fastify.register(tracesPlugin,          { prefix: "/api/traces" });
   await fastify.register(analyticsPlugin,       { prefix: "/api/analytics" });
   await fastify.register(reposPlugin,           { prefix: "/api/repos" });
