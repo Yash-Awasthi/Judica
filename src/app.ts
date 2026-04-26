@@ -185,6 +185,17 @@ import { memberEvolutionPlugin } from "./routes/member-evolution.js";
 import { reasoningDepthPlugin } from "./routes/reasoning-depth.js";
 import { interruptResumePlugin } from "./routes/interrupt-resume.js";
 import { observabilityPlugin } from "./routes/observability.js";
+import imageTransformationsPlugin from "./routes/image-transformations.js";
+import accessibilityPlugin from "./routes/accessibility.js";
+import verifiablePipelinesPlugin from "./routes/verifiable-pipelines.js";
+import fallbackChainsPlugin from "./routes/fallback-chains.js";
+import echoChamberPlugin from "./routes/echo-chamber.js";
+import webviewFallbackPlugin from "./routes/webview-fallback.js";
+import speculativeDecodingPlugin from "./routes/speculative-decoding.js";
+import semanticCachePlugin from "./routes/semantic-cache.js";
+import taskRoutingPlugin from "./routes/task-routing.js";
+import sandboxSessionsPlugin from "./routes/sandbox-sessions.js";
+import councilCheckpointsPlugin from "./routes/council-checkpoints.js";
 import { ingestionQueue, researchQueue, repoQueue, compactionQueue } from "./queue/queues.js";
 
 export async function buildApp() {
@@ -553,6 +564,28 @@ export async function buildApp() {
   await fastify.register(reasoningDepthPlugin,  { prefix: "/api" });
   await fastify.register(interruptResumePlugin, { prefix: "/api" });
   await fastify.register(observabilityPlugin,   { prefix: "/api" });
+  // Phase 6.7 — image/video transformations (free: SD WebUI + CogVideoX; paid: DALL-E, Runway)
+  await fastify.register(imageTransformationsPlugin, { prefix: "/api/image-transformations" });
+  // Phase 6.8 — accessibility settings (WCAG 2.1 AA)
+  await fastify.register(accessibilityPlugin,   { prefix: "/api/accessibility" });
+  // Phase 7.2 — verifiable pipelines (SHA-256 Merkle chain, free)
+  await fastify.register(verifiablePipelinesPlugin, { prefix: "/api/verifiable" });
+  // Phase 7.3 — fallback chains (multi-model cascades)
+  await fastify.register(fallbackChainsPlugin,  { prefix: "/api/fallback-chains" });
+  // Phase 7.12 — echo-chamber detection + dissent injection (free, in-process cosine sim)
+  await fastify.register(echoChamberPlugin,     { prefix: "/api/echo-chamber" });
+  // Phase 7.17 — webview fallback config (ChatGPT/Claude/Gemini injection selectors)
+  await fastify.register(webviewFallbackPlugin, { prefix: "/api/webview-fallback" });
+  // Phase 8.1 — speculative decoding (fast drafter + council escalation)
+  await fastify.register(speculativeDecodingPlugin, { prefix: "/api/speculative" });
+  // Phase 8.2 — semantic cache management (L1 exact + L2 pgvector; free: nomic-embed via Ollama)
+  await fastify.register(semanticCachePlugin,   { prefix: "/api/semantic-cache" });
+  // Phase 8.3 — intelligent task routing (heuristic → feature → LLM meta-router)
+  await fastify.register(taskRoutingPlugin,     { prefix: "/api/task-routing" });
+  // Phase 8.10 — sandbox session lifecycle state machine
+  await fastify.register(sandboxSessionsPlugin, { prefix: "/api/sandbox-sessions" });
+  // Phase 8.13+8.14 — durable council checkpoints + time-travel debugging
+  await fastify.register(councilCheckpointsPlugin, { prefix: "/api/council-checkpoints" });
   // Per-route rate limit differentiation.
   // /ask is the most expensive route (triggers full deliberation); cap at 30/min.
   // Uploads are I/O-heavy; cap at 20/min.

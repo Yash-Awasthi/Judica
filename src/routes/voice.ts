@@ -5,6 +5,32 @@ import { env } from "../config/env.js";
 import { AppError } from "../middleware/errorHandler.js";
 import logger from "../lib/logger.js";
 
+/**
+ * Free/self-hosted STT providers (default — no API key needed):
+ *   1. faster-whisper — https://github.com/SYSTRAN/faster-whisper (MIT, runs offline)
+ *      Set FASTER_WHISPER_URL=http://localhost:9000 to enable
+ *      Compatible server: https://github.com/ahmetoner/whisper-asr-webservice
+ *
+ * Paid opt-in (only used when free options are unavailable):
+ *   2. OpenAI Whisper API (OPENAI_API_KEY)
+ */
+
+/** Call faster-whisper local API */
+async function fasterWhisperTranscribe(audioBuffer: Buffer, mimetype: string, filename: string): Promise<string> {
+  const whisperUrl = (env as Record<string, string>).FASTER_WHISPER_URL;
+  if (!whisperUrl) throw new Error("FASTER_WHISPER_URL not set");
+  const formData = new FormData();
+  formData.append("audio_file", new Blob([new Uint8Array(audioBuffer)], { type: mimetype }), filename);
+  const res = await fetch(`${whisperUrl}/asr?task=transcribe&language=en&output=json`, {
+    method: "POST",
+    body: formData,
+    signal: AbortSignal.timeout(60_000),
+  });
+  if (!res.ok) throw new Error(`faster-whisper failed: ${res.status}`);
+  const data = await res.json() as { text: string } | string;
+  return typeof data === "string" ? data : data.text;
+}
+
 const voicePlugin: FastifyPluginAsync = async (fastify) => {
   await fastify.register(multipart, { limits: { fileSize: 25 * 1024 * 1024 } });
 
@@ -13,10 +39,24 @@ const voicePlugin: FastifyPluginAsync = async (fastify) => {
     const file = await request.file();
     if (!file) throw new AppError(400, "Audio file required", "NO_AUDIO");
 
-    const apiKey = env.OPENAI_API_KEY;
-    if (!apiKey) throw new AppError(503, "Speech-to-text not configured (OPENAI_API_KEY missing)", "STT_UNAVAILABLE");
-
     const audioBuffer = await file.toBuffer();
+
+    // ── 1. faster-whisper (free, local) ─────────────────────────────────────
+    try {
+      const text = await fasterWhisperTranscribe(audioBuffer, file.mimetype, file.filename || "audio.webm");
+      return { text, provider: "faster-whisper" };
+    } catch (e1) {
+      if ((env as Record<string, string>).FASTER_WHISPER_URL) {
+        logger.warn({ err: (e1 as Error).message }, "faster-whisper failed, trying OpenAI Whisper");
+      }
+    }
+
+    // ── 2. OpenAI Whisper (paid, opt-in) ─────────────────────────────────────
+    const apiKey = env.OPENAI_API_KEY;
+    if (!apiKey) {
+      throw new AppError(503, "Speech-to-text not configured. Set FASTER_WHISPER_URL (free) or OPENAI_API_KEY.", "STT_UNAVAILABLE");
+    }
+
     const formData = new FormData();
     formData.append("file", new Blob([new Uint8Array(audioBuffer)], { type: file.mimetype }), file.filename || "audio.webm");
     formData.append("model", "whisper-1");
@@ -36,7 +76,7 @@ const voicePlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     const data = await response.json() as { text: string };
-    return { text: data.text };
+    return { text: data.text, provider: "openai-whisper" };
   });
 
     // POST /api/voice/synthesize — TTS
