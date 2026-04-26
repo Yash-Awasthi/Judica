@@ -15,6 +15,7 @@ import { encrypt, decrypt } from "../lib/crypto.js";
 import { AppError } from "../middleware/errorHandler.js";
 import { requireCaptcha, rejectDisposableEmail } from "../middleware/captchaGuard.js";
 import { isMFARequired } from "../services/mfa.service.js";
+import { withRefreshLock, RefreshTokenLockConflictError } from "../lib/refreshTokenMutex.js";
 
 const ACCESS_TOKEN_EXPIRY = "15m";
 const REFRESH_TOKEN_TTL_DAYS = 7;
@@ -259,57 +260,72 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     }
 
     const tokenHash = hashRefreshToken(refreshToken);
-    const [storedToken] = await db.select().from(refreshTokens).where(eq(refreshTokens.tokenHash, tokenHash)).limit(1);
 
-    if (!storedToken || storedToken.expiresAt < new Date()) {
-      // On replay, revoke ALL tokens for the affected user
-      if (!storedToken) {
-        // Token was already consumed — replay attack. Look up user from family mapping.
-        const familyUserId = await redis.get(`refresh_family:${tokenHash}`);
-        if (familyUserId) {
-          // NaN guard on familyUserId parse
-          const userId = parseInt(familyUserId, 10);
-          if (!Number.isFinite(userId) || userId <= 0) {
-            logger.warn({ familyUserId }, "Refresh token replay — invalid userId in family mapping");
-          } else {
-            logger.warn({ userId }, "Refresh token replay detected — revoking all sessions for user");
-            await db.delete(refreshTokens).where(eq(refreshTokens.userId, userId));
+    // Phase 8.7: Acquire distributed mutex before reading/rotating the token.
+    // Prevents parallel refresh race where two concurrent requests with the same
+    // token both pass validation and both issue new token pairs.
+    const lockValue = randomUUID();
+    try {
+      return await withRefreshLock(tokenHash, lockValue, async () => {
+        const [storedToken] = await db.select().from(refreshTokens).where(eq(refreshTokens.tokenHash, tokenHash)).limit(1);
+
+        if (!storedToken || storedToken.expiresAt < new Date()) {
+          // On replay, revoke ALL tokens for the affected user
+          if (!storedToken) {
+            // Token was already consumed — replay attack. Look up user from family mapping.
+            const familyUserId = await redis.get(`refresh_family:${tokenHash}`);
+            if (familyUserId) {
+              // NaN guard on familyUserId parse
+              const userId = parseInt(familyUserId, 10);
+              if (!Number.isFinite(userId) || userId <= 0) {
+                logger.warn({ familyUserId }, "Refresh token replay — invalid userId in family mapping");
+              } else {
+                logger.warn({ userId }, "Refresh token replay detected — revoking all sessions for user");
+                await db.delete(refreshTokens).where(eq(refreshTokens.userId, userId));
+              }
+            } else {
+              logger.warn("Refresh token replay detected — user unknown");
+            }
           }
-        } else {
-          logger.warn("Refresh token replay detected — user unknown");
+          reply.clearCookie("refresh_token", { path: "/api/auth" });
+          throw new AppError(401, "Invalid or expired refresh token");
         }
+
+        // Validate device/IP binding — prevent stolen refresh tokens from working on different devices
+        const currentIpHash = request.ip ? fingerprintHash(request.ip) : null;
+        const currentUaHash = request.headers["user-agent"] ? fingerprintHash(request.headers["user-agent"]) : null;
+
+        if (storedToken.ipHash && currentIpHash && storedToken.ipHash !== currentIpHash) {
+          logger.warn({ userId: storedToken.userId, storedIp: storedToken.ipHash, currentIp: currentIpHash }, "Refresh token used from different IP");
+          // Revoke all refresh tokens for this user (potential theft)
+          await db.delete(refreshTokens).where(eq(refreshTokens.userId, storedToken.userId));
+          reply.clearCookie("refresh_token", { path: "/api/auth" });
+          throw new AppError(401, "Session invalidated due to device mismatch. Please log in again.");
+        }
+
+        if (storedToken.userAgentHash && currentUaHash && storedToken.userAgentHash !== currentUaHash) {
+          logger.warn({ userId: storedToken.userId }, "Refresh token used from different user-agent");
+          await db.delete(refreshTokens).where(eq(refreshTokens.userId, storedToken.userId));
+          reply.clearCookie("refresh_token", { path: "/api/auth" });
+          throw new AppError(401, "Session invalidated due to device mismatch. Please log in again.");
+        }
+
+        // Look up the user separately
+        const [user] = await db.select({ id: users.id, username: users.username, role: users.role }).from(users).where(eq(users.id, storedToken.userId)).limit(1);
+
+        // Invalidate the old token to prevent reuse (token rotation)
+        await db.delete(refreshTokens).where(eq(refreshTokens.id, storedToken.id));
+
+        logger.info({ username: user.username }, "Token refreshed via rotation");
+        return issueTokenPair(user.id, user.username, user.role, reply, request);
+      });
+    } catch (err) {
+      if (err instanceof RefreshTokenLockConflictError) {
+        reply.header("Retry-After", "1");
+        throw new AppError(429, "Refresh already in progress — please retry in 1 second");
       }
-      reply.clearCookie("refresh_token", { path: "/api/auth" });
-      throw new AppError(401, "Invalid or expired refresh token");
+      throw err;
     }
-
-    // Validate device/IP binding — prevent stolen refresh tokens from working on different devices
-    const currentIpHash = request.ip ? fingerprintHash(request.ip) : null;
-    const currentUaHash = request.headers["user-agent"] ? fingerprintHash(request.headers["user-agent"]) : null;
-
-    if (storedToken.ipHash && currentIpHash && storedToken.ipHash !== currentIpHash) {
-      logger.warn({ userId: storedToken.userId, storedIp: storedToken.ipHash, currentIp: currentIpHash }, "Refresh token used from different IP");
-      // Revoke all refresh tokens for this user (potential theft)
-      await db.delete(refreshTokens).where(eq(refreshTokens.userId, storedToken.userId));
-      reply.clearCookie("refresh_token", { path: "/api/auth" });
-      throw new AppError(401, "Session invalidated due to device mismatch. Please log in again.");
-    }
-
-    if (storedToken.userAgentHash && currentUaHash && storedToken.userAgentHash !== currentUaHash) {
-      logger.warn({ userId: storedToken.userId }, "Refresh token used from different user-agent");
-      await db.delete(refreshTokens).where(eq(refreshTokens.userId, storedToken.userId));
-      reply.clearCookie("refresh_token", { path: "/api/auth" });
-      throw new AppError(401, "Session invalidated due to device mismatch. Please log in again.");
-    }
-
-    // Look up the user separately
-    const [user] = await db.select({ id: users.id, username: users.username, role: users.role }).from(users).where(eq(users.id, storedToken.userId)).limit(1);
-
-    // Invalidate the old token to prevent reuse (token rotation)
-    await db.delete(refreshTokens).where(eq(refreshTokens.id, storedToken.id));
-
-    logger.info({ username: user.username }, "Token refreshed via rotation");
-    return issueTokenPair(user.id, user.username, user.role, reply, request);
   });
 
     fastify.patch("/me", { preHandler: [fastifyRequireAuth] }, async (request, _reply) => {
