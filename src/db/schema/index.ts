@@ -33,3 +33,4 @@ export * from "./openapiTools.js";
 export * from "./spendingLimits.js";
 export * from "./workspaces.js";
 export * from "./sessionTemplates.js";
+export * from "./promptFavourites.js";
