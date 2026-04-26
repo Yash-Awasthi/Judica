@@ -25,6 +25,9 @@ COPY migrations/ ./migrations/
 COPY frontend/ ./frontend/
 
 # Build everything (frontend + TypeScript compile)
+# BUILD_TARGET=node skips @cloudflare/vite-plugin so React Router produces
+# a standard SPA build with index.html instead of a Cloudflare Workers bundle
+ENV BUILD_TARGET=node
 RUN npm run build
 
 # Install production-only dependencies in a clean directory

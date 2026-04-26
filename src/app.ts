@@ -688,12 +688,25 @@ export async function buildApp() {
   }
 
   // Don't reflect raw request.url in response — prevents info disclosure / log injection
-  fastify.setNotFoundHandler((request, reply) => {
+  // For non-API routes, serve index.html so React Router handles client-side navigation
+  fastify.setNotFoundHandler(async (request, reply) => {
     if (request.url.startsWith("/api/")) {
       const safeRoute = request.routeOptions?.url || request.url.split("?")[0].slice(0, 200);
       reply.code(404).send({ error: `Not Found: ${safeRoute}` });
     } else {
-      reply.code(404).sendFile("404.html");
+      try {
+        const currentContent = fs.readFileSync(indexPath, "utf8");
+        if (currentContent !== cachedIndexHtml) {
+          cachedIndexHtml = currentContent;
+        }
+        let html = cachedIndexHtml as string;
+        const nonce = (request as unknown as { cspNonce?: string }).cspNonce || "";
+        html = html.split("<script").join(`<script nonce="${nonce}"`);
+        html = html.split(`nonce="${nonce}" nonce="`).join(`nonce="`);
+        reply.code(200).type("text/html").send(html);
+      } catch {
+        reply.code(404).send({ error: "Not Found" });
+      }
     }
   });
 
