@@ -76,6 +76,26 @@ export interface GenericNodeData {
   [key: string]: unknown;
 }
 
+/**
+ * Per-node self-healing configuration (4.21).
+ * Controls automatic recovery attempts before falling through to a HUMAN_GATE.
+ */
+export interface NodeSelfHealingConfig {
+  /** Enable self-healing for this node (default: inherits global setting). */
+  enabled?: boolean;
+  /** Maximum automatic fix attempts before escalating to HUMAN_GATE (default: 2). */
+  maxAttempts?: number;
+  /**
+   * Recovery strategies tried in order.
+   * - "retry_with_adjusted_params" — re-run with LLM-corrected inputs
+   * - "swap_provider"              — retry LLM nodes with a fallback provider
+   * - "rewrite_prompt"             — ask recovery agent to rewrite the failing prompt
+   */
+  strategies?: Array<"retry_with_adjusted_params" | "swap_provider" | "rewrite_prompt">;
+  /** Human-gate fallback prompt shown when all strategies are exhausted (default: auto-generated). */
+  hitlPrompt?: string;
+}
+
 // Union of all node data shapes
 export type TypedNodeData =
   | LLMNodeData
@@ -92,6 +112,8 @@ export interface WorkflowNode {
   type: NodeType;
   position: { x: number; y: number };
   data: Record<string, unknown>; // Kept for backward compat; use TypedNodeData for new code
+  /** Per-node self-healing override (4.21). If absent, global defaults apply. */
+  selfHealing?: NodeSelfHealingConfig;
 }
 
 export interface WorkflowEdge {

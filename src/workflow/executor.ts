@@ -4,6 +4,7 @@ import type {
   WorkflowNode,
   ExecutionEvent,
   NodeContext,
+  NodeSelfHealingConfig,
 } from "./types.js";
 import { nodeHandlers } from "./nodes/index.js";
 import logger from "../lib/logger.js";
@@ -63,6 +64,25 @@ class InMemoryGateStore implements GateStore {
 }
 
 const gateStore: GateStore = new InMemoryGateStore();
+
+// ─── Global self-healing defaults (4.21) ─────────────────────────────────────
+// Exposed via GET/PUT /api/workflows/self-healing/config. Updated at runtime
+// without restart. Per-node `selfHealing` overrides these defaults.
+
+export interface SelfHealingGlobalConfig {
+  enabled: boolean;
+  maxAttempts: number;
+  strategies: Array<"retry_with_adjusted_params" | "swap_provider" | "rewrite_prompt">;
+}
+
+const _parsedMaxAttempts = parseInt(process.env.WORKFLOW_SELF_HEALING_MAX_ATTEMPTS || "2", 10);
+const DEFAULT_SELF_HEALING_MAX_ATTEMPTS = Number.isFinite(_parsedMaxAttempts) && _parsedMaxAttempts > 0 ? Math.min(_parsedMaxAttempts, 5) : 2;
+
+export const selfHealingConfig: SelfHealingGlobalConfig = {
+  enabled: process.env.WORKFLOW_SELF_HEALING === "true",
+  maxAttempts: DEFAULT_SELF_HEALING_MAX_ATTEMPTS,
+  strategies: ["retry_with_adjusted_params", "rewrite_prompt"],
+};
 
 // Idempotency key tracking to prevent duplicate executions
 const activeExecutions = new Set<string>();
@@ -244,40 +264,57 @@ export class WorkflowExecutor {
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
 
-      // Self-healing disabled by default — it allows LLM to generate arbitrary
-      // code/inputs which is an RCE/SSRF vector via prompt injection.
-      // Enable only with explicit opt-in and strict sandboxing.
-      const selfHealingEnabled = process.env.WORKFLOW_SELF_HEALING === "true";
+      // ── Self-healing (4.21) ───────────────────────────────────────────────
+      // Merge global defaults with per-node overrides.
+      // Security note: self-healing allows an LLM to rewrite node inputs —
+      // only safe on idempotent node types. Enable explicitly via config or node data.
+      const nodeShCfg = (node.selfHealing ?? {}) as Partial<NodeSelfHealingConfig>;
+      const shEnabled  = nodeShCfg.enabled  ?? selfHealingConfig.enabled;
+      const maxAttempts = Math.min(Math.max(1, nodeShCfg.maxAttempts ?? selfHealingConfig.maxAttempts), 5);
+      const strategies  = nodeShCfg.strategies ?? selfHealingConfig.strategies;
+      const hitlPrompt  = nodeShCfg.hitlPrompt
+        ?? `Node "${node.id}" (type: ${node.type}) failed after ${maxAttempts} auto-recovery attempts.\nError: ${error.slice(0, 400)}\n\nPlease review and choose how to proceed.`;
 
       // Only retry idempotent node types to prevent duplicate side effects
       const IDEMPOTENT_TYPES = new Set([NodeType.LLM, NodeType.CONDITION, NodeType.INPUT]);
       const isIdempotent = IDEMPOTENT_TYPES.has(node.type as NodeType);
 
-      if (attempt === 0 && selfHealingEnabled && isIdempotent) {
+      if (shEnabled && isIdempotent && attempt < maxAttempts) {
+        const strategyIndex = attempt; // each attempt tries the next strategy
+        const strategy = strategies[strategyIndex % strategies.length] ?? "retry_with_adjusted_params";
+
+        logger.info({ runId: this.runId, nodeId: node.id, attempt, strategy, maxAttempts }, "Self-healing: attempting recovery");
+
         const recoveryEvents: ExecutionEvent[] = [];
         recoveryEvents.push({
           type: "node_start",
-          nodeId: `${node.id}:recovery`,
+          nodeId: `${node.id}:recovery:${attempt}`,
           nodeType: NodeType.LLM,
         });
+
+        let healedInputs = nodeInputs;
 
         try {
           const recoveryHandler = nodeHandlers.get(NodeType.LLM);
           if (recoveryHandler) {
+            let recoveryPrompt: string;
+            if (strategy === "rewrite_prompt") {
+              recoveryPrompt = `A workflow node's prompt produced a failure. Rewrite the prompt to fix the problem.\n\nNode type: ${String(node.type).replace(/[^a-zA-Z0-9_.-]/g, "")}\nCurrent prompt/inputs: ${JSON.stringify(nodeInputs, null, 2).slice(0, 2000)}\nError: ${String(error).slice(0, 500)}\n\nReturn a JSON object where "prompt" key contains the rewritten prompt text.`;
+            } else {
+              recoveryPrompt = `A workflow node failed. Suggest corrected input values.\n\nNode type: ${String(node.type).replace(/[^a-zA-Z0-9_.-]/g, "")}\nOriginal inputs: ${JSON.stringify(nodeInputs, null, 2).slice(0, 2000)}\nError: ${String(error).slice(0, 500)}\n\nReturn a JSON object with corrected input fields only.`;
+            }
+
             const recoveryCtx: NodeContext = {
-              inputs: {
-                prompt: `A workflow node failed. Rewrite the inputs to fix the problem.\n\nNode type: ${String(node.type).replace(/[^a-zA-Z0-9_.-]/g, "")}\nOriginal inputs: ${JSON.stringify(nodeInputs, null, 2).slice(0, 2000)}\nError: ${String(error).slice(0, 500)}\n\nReturn a JSON object with corrected input values.`,
-              },
+              inputs: { prompt: recoveryPrompt },
               nodeData: {
                 model: node.data.model || "auto",
-                systemPrompt: "You are a workflow self-healing agent. Return only valid JSON.",
+                systemPrompt: "You are a workflow self-healing agent. Return only valid JSON with corrected values.",
                 responseFormat: "json",
               },
               runId: this.runId,
               userId: this.userId,
             };
 
-            // Clear recovery timer on resolution
             let recoveryTimer: ReturnType<typeof setTimeout>;
             const recoveryOutput = await Promise.race([
               recoveryHandler(recoveryCtx),
@@ -288,36 +325,54 @@ export class WorkflowExecutor {
 
             recoveryEvents.push({
               type: "node_complete",
-              nodeId: `${node.id}:recovery`,
+              nodeId: `${node.id}:recovery:${attempt}`,
               nodeType: NodeType.LLM,
               output: recoveryOutput,
             });
 
-            // Parse recovered inputs and retry
-            const healedInputs =
-              typeof recoveryOutput.result === "object" && recoveryOutput.result !== null
-                ? (recoveryOutput.result as Record<string, unknown>)
-                : nodeInputs;
-
-            const retryResult = await this.executeNode(node, healedInputs, contextMap, 1);
-            return {
-              ...retryResult,
-              events: [...events, ...recoveryEvents, ...retryResult.events],
-            };
+            if (typeof recoveryOutput.result === "object" && recoveryOutput.result !== null) {
+              const recovered = recoveryOutput.result as Record<string, unknown>;
+              healedInputs = strategy === "rewrite_prompt" && typeof recovered.prompt === "string"
+                ? { ...nodeInputs, prompt: recovered.prompt }
+                : { ...nodeInputs, ...recovered };
+            }
           }
-        } catch {
+        } catch (recoveryErr) {
           recoveryEvents.push({
             type: "node_error",
-            nodeId: `${node.id}:recovery`,
+            nodeId: `${node.id}:recovery:${attempt}`,
             nodeType: NodeType.LLM,
-            error: "Self-healing recovery failed",
+            error: `Recovery agent failed: ${recoveryErr instanceof Error ? recoveryErr.message : String(recoveryErr)}`,
           });
         }
 
-        events.push(...recoveryEvents);
+        const retryResult = await this.executeNode(node, healedInputs, contextMap, attempt + 1);
+        return {
+          ...retryResult,
+          events: [...events, ...recoveryEvents, ...retryResult.events],
+        };
       }
 
-      // Recovery exhausted — emit error events
+      // All auto-recovery attempts exhausted — escalate to HUMAN_GATE
+      if (shEnabled && isIdempotent && attempt >= maxAttempts) {
+        logger.warn({ runId: this.runId, nodeId: node.id, attempt, maxAttempts }, "Self-healing exhausted — escalating to HUMAN_GATE");
+        events.push({
+          type: "human_gate_pending",
+          nodeId: `${node.id}:hitl`,
+          prompt: hitlPrompt,
+          options: ["retry", "skip", "abort"],
+        });
+        // Persist the gate state so the caller can inspect it
+        await gateStore.set(this.runId, `${node.id}:hitl`, {
+          prompt: hitlPrompt,
+          options: ["retry", "skip", "abort"],
+          createdAt: Date.now(),
+        });
+        events.push({ type: "node_error", nodeId: node.id, nodeType: node.type as NodeType, error: `Self-healing exhausted after ${maxAttempts} attempts. Waiting for human intervention.` });
+        return { nodeId: node.id, output: {}, events, skipped: false };
+      }
+
+      // Self-healing disabled or non-idempotent — emit error directly
       events.push({ type: "node_error", nodeId: node.id, nodeType: node.type as NodeType, error });
       events.push({ type: "workflow_error", error: `Node ${node.id} failed: ${error}` });
       return { nodeId: node.id, output: {}, events, skipped: false };
