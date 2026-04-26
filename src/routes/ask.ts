@@ -48,6 +48,7 @@ import { calculateCost } from "../lib/cost.js";
 import { hooks } from "../lib/hooks/hookRegistry.js";
 import { checkOutput, BUILTIN_OUTPUT_RULES } from "../lib/guardrails/index.js";
 import { buildUserScanners, runScannerPipeline } from "../lib/scanners/contentScanner.js";
+import { runPromptFilter } from "../lib/promptFilter.js";
 import { userSettings } from "../db/schema/users.js";
 import { generateSessionName } from "../lib/secondaryFlows/sessionNaming.js";
 import { updateConversationTitle } from "../services/conversation.service.js";
@@ -243,6 +244,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
     // Phase 1.1 — Content scanners (LLM Guard scanner pattern, off by default)
     // Load user's content filter settings and run scanner pipeline on input
     let contentScanners = [];
+    let adversarialRewrite = false;
     if (userId) {
       const [settingsRow] = await db.select().from(userSettings).where(eq(userSettings.userId, userId)).limit(1);
       const uSettings = (settingsRow?.settings as Record<string, unknown>) ?? {};
@@ -250,6 +252,7 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
         blockProfanity: !!uSettings.blockProfanity,
         blockAdultContent: !!uSettings.blockAdultContent,
       });
+      adversarialRewrite = !!uSettings.adversarialRewrite;
     }
     if (contentScanners.length > 0) {
       const scanResult = runScannerPipeline(question, contentScanners);
@@ -261,6 +264,27 @@ const askPlugin: FastifyPluginAsync = async (fastify) => {
       // Replace question with sanitized version (redacted profanity etc.)
       if (scanResult.sanitized !== question) {
         (request.body as AskBody).question = scanResult.sanitized;
+      }
+    }
+
+    // Phase 1.4 — Adversarial prompt filter (Rebuff two-stage pattern, off by default)
+    // Stage 1 runs on every request (zero cost); Stage 2 (LLM rewrite) only when opt-in
+    {
+      const filterResult = await runPromptFilter(question, {
+        blockThreshold: 0.9,
+        enableRewrite: adversarialRewrite,
+        rewriteProvider: adversarialRewrite ? master ?? councilMembers[0] : undefined,
+      });
+      if (!filterResult.passed) {
+        reply.code(400).send({
+          error: "Prompt injection detected",
+          riskScore: filterResult.riskScore,
+          patterns: filterResult.patterns,
+        });
+        return;
+      }
+      if (filterResult.processedInput !== question) {
+        (request.body as AskBody).question = filterResult.processedInput;
       }
     }
     let messages: Message[] = [];

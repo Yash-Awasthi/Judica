@@ -133,6 +133,8 @@ export const userSettingsSchema = z.object({
   // Phase 1.1 — content filter toggles (off by default, per cost/opt-in principle)
   blockProfanity: z.boolean().optional(),
   blockAdultContent: z.boolean().optional(),
+  // Phase 1.4 — adversarial prompt rewrite (Rebuff pattern; adds token cost; off by default)
+  adversarialRewrite: z.boolean().optional(),
 }).strict();
 
 export const configSchema = z
