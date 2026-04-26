@@ -103,6 +103,7 @@ import { botPlugin } from "./routes/bot.js";
 import { subgraphPlugin } from "./routes/subgraphs.js";
 import { browserAgentPlugin } from "./routes/browser-agent.js";
 import { a2aPlugin } from "./routes/a2a.js";
+import { reactiveAgentsPlugin } from "./routes/reactive-agents.js";
 import tracesPlugin from "./routes/traces.js";
 import analyticsPlugin from "./routes/analytics.js";
 import reposPlugin from "./routes/repos.js";
@@ -391,6 +392,7 @@ export async function buildApp() {
   await fastify.register(subgraphPlugin,           { prefix: "/api" });
   await fastify.register(browserAgentPlugin,       { prefix: "/api" });
   await fastify.register(a2aPlugin,                { prefix: "/api" });
+  await fastify.register(reactiveAgentsPlugin,     { prefix: "/api" });
   await fastify.register(tracesPlugin,          { prefix: "/api/traces" });
   await fastify.register(analyticsPlugin,       { prefix: "/api/analytics" });
   await fastify.register(reposPlugin,           { prefix: "/api/repos" });
