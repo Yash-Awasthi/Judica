@@ -124,6 +124,7 @@ import { mediaGenerationPlugin } from "./routes/media-generation.js";
 import { citationPlugin } from "./routes/citations.js";
 import { antiSycophancyPlugin } from "./routes/anti-sycophancy.js";
 import { hallucinationScorerPlugin } from "./routes/hallucination-scorer.js";
+import { abComparisonPlugin } from "./routes/ab-comparison.js";
 import tracesPlugin from "./routes/traces.js";
 import analyticsPlugin from "./routes/analytics.js";
 import reposPlugin from "./routes/repos.js";
@@ -433,6 +434,7 @@ export async function buildApp() {
   await fastify.register(citationPlugin,           { prefix: "/api" });
   await fastify.register(antiSycophancyPlugin,     { prefix: "/api" });
   await fastify.register(hallucinationScorerPlugin, { prefix: "/api" });
+  await fastify.register(abComparisonPlugin,       { prefix: "/api" });
   await fastify.register(tracesPlugin,          { prefix: "/api/traces" });
   await fastify.register(analyticsPlugin,       { prefix: "/api/analytics" });
   await fastify.register(reposPlugin,           { prefix: "/api/repos" });
