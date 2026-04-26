@@ -86,6 +86,7 @@ import { googleWorkspacePlugin } from "./routes/google-workspace.js";
 import { notionPlugin } from "./routes/notion.js";
 import { slackPlugin as slackConnectorPlugin } from "./routes/slack.js";
 import { linearJiraPlugin } from "./routes/linear-jira.js";
+import { artifactBrowserPlugin } from "./routes/artifact-browser.js";
 import tracesPlugin from "./routes/traces.js";
 import analyticsPlugin from "./routes/analytics.js";
 import reposPlugin from "./routes/repos.js";
@@ -357,6 +358,7 @@ export async function buildApp() {
   await fastify.register(notionPlugin,             { prefix: "/api" });
   await fastify.register(slackConnectorPlugin,     { prefix: "/api" });
   await fastify.register(linearJiraPlugin,         { prefix: "/api" });
+  await fastify.register(artifactBrowserPlugin,    { prefix: "/api" });
   await fastify.register(tracesPlugin,          { prefix: "/api/traces" });
   await fastify.register(analyticsPlugin,       { prefix: "/api/analytics" });
   await fastify.register(reposPlugin,           { prefix: "/api/repos" });
