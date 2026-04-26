@@ -28,3 +28,4 @@ export * from "./rooms.js";
 export * from "./hypotheses.js";
 export * from "./branches.js";
 export * from "./memoryFacts.js";
+export * from "./ideaNodes.js";
