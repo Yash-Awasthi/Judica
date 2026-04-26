@@ -1,5 +1,6 @@
 import logger from "../lib/logger.js";
 import { validateSafeUrl } from "../lib/ssrf.js";
+import { checkAndConsumeToolLimit, MCPRateLimitError } from "./mcpRateLimit.service.js";
 
 /**
  * MCP Client Mode: allows agents to call external MCP servers
@@ -162,12 +163,14 @@ export async function discoverAllTools(
 
 /**
  * Call a tool on a remote MCP server.
+ * Phase 8.5: Per-tool rate limiting is enforced before every tool call.
  */
 export async function callTool(
   serverName: string,
   toolName: string,
   args: Record<string, unknown>,
   fetchFn: (url: string, init: RequestInit) => Promise<{ json: () => Promise<unknown> }> = fetch as unknown as (url: string, init: RequestInit) => Promise<{ json: () => Promise<unknown> }>,
+  userId?: number,
 ): Promise<MCPCallResult> {
   const startTime = Date.now();
   const conn = connections.get(serverName);
@@ -179,6 +182,22 @@ export async function callTool(
       error: `Unknown MCP server: ${serverName}`,
       durationMs: Date.now() - startTime,
     };
+  }
+
+  // Phase 8.5: Enforce per-tool rate limit before making the call
+  try {
+    await checkAndConsumeToolLimit(serverName, toolName, userId);
+  } catch (err) {
+    if (err instanceof MCPRateLimitError) {
+      logger.warn({ serverName, toolName, userId, retryAfterMs: err.retryAfterMs }, "MCP tool call blocked by rate limiter");
+      return {
+        success: false,
+        content: [],
+        error: err.message,
+        durationMs: Date.now() - startTime,
+      };
+    }
+    throw err;
   }
 
   try {
