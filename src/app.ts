@@ -164,6 +164,7 @@ import storagePlugin from "./routes/storage.js";
 import auditDashboardPlugin from "./routes/auditDashboard.js";
 import dataResidencyPlugin from "./routes/dataResidency.js";
 import tenantIsolationPlugin from "./routes/tenantIsolation.js";
+import onboardingPlugin from "./routes/onboarding.js";
 import mfaPlugin from "./routes/mfa.js";
 import feedbackPlugin from "./routes/feedback.js";
 import systemPlugin from "./routes/system.js";
@@ -510,6 +511,8 @@ export async function buildApp() {
   await fastify.register(dataResidencyPlugin,   { prefix: "/api/data-residency" });
   // Tenant isolation — per-tenant encryption keys + RLS management (Phase 9.5)
   await fastify.register(tenantIsolationPlugin, { prefix: "/api/tenant-isolation" });
+  // Onboarding wizard (Phase 9.7)
+  await fastify.register(onboardingPlugin,      { prefix: "/api/onboarding" });
   // MFA / TOTP two-factor authentication
   await fastify.register(mfaPlugin,             { prefix: "/api/mfa" });
   // Response and search feedback
