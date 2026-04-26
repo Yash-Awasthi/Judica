@@ -121,6 +121,7 @@ import { voiceExtendedPlugin } from "./routes/voice-extended.js";
 import { voicePersonasPlugin } from "./routes/voice-personas.js";
 import { imageGenerationPlugin } from "./routes/image-generation.js";
 import { mediaGenerationPlugin } from "./routes/media-generation.js";
+import { citationPlugin } from "./routes/citations.js";
 import tracesPlugin from "./routes/traces.js";
 import analyticsPlugin from "./routes/analytics.js";
 import reposPlugin from "./routes/repos.js";
@@ -427,6 +428,7 @@ export async function buildApp() {
   await fastify.register(voicePersonasPlugin,      { prefix: "/api" });
   await fastify.register(imageGenerationPlugin,    { prefix: "/api" });
   await fastify.register(mediaGenerationPlugin,    { prefix: "/api" });
+  await fastify.register(citationPlugin,           { prefix: "/api" });
   await fastify.register(tracesPlugin,          { prefix: "/api/traces" });
   await fastify.register(analyticsPlugin,       { prefix: "/api/analytics" });
   await fastify.register(reposPlugin,           { prefix: "/api/repos" });
