@@ -145,23 +145,6 @@ const connectorPlugin: FastifyPluginAsync = async (fastify) => {
     return { deleted: true };
   });
 
-  // POST /api/connectors/:id/sync — trigger a sync
-  fastify.post("/:id/sync", { preHandler: fastifyRequireAuth }, async (request) => {
-    const { id } = request.params as { id: string };
-    const connector = await getConnector(id);
-    if (!connector) throw new AppError(404, "Connector not found");
-
-    log.info({ connectorId: id }, "Manual sync triggered");
-
-    // Execute synchronously for now; will be moved to BullMQ in worker specialization PR
-    const { runId, result } = await executeConnectorRun(id);
-    return {
-      runId,
-      docsProcessed: result.documents.length,
-      docsFailed: result.failures.length,
-    };
-  });
-
   // GET /api/connectors/:id/runs — get run history
   fastify.get("/:id/runs", { preHandler: fastifyRequireAuth }, async (request) => {
     const { id } = request.params as { id: string };
