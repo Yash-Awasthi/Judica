@@ -15,7 +15,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "~/components/ui/collapsible";
-import { Settings, Shield, MessageSquare, Brain, Gauge, ChevronDown, Filter } from "lucide-react";
+import { Settings, Shield, MessageSquare, Brain, Gauge, ChevronDown, Filter, AlignLeft } from "lucide-react";
 
 function ToggleRow({
   label,
@@ -48,6 +48,8 @@ export default function SettingsPage() {
   // Phase 1.1 — content filter toggles (LLM Guard scanner pattern; off by default)
   const [blockProfanity, setBlockProfanity] = useState(false);
   const [blockAdultContent, setBlockAdultContent] = useState(false);
+  // Phase 1.24 — response verbosity control
+  const [verbosityLevel, setVerbosityLevel] = useState("standard");
   const [deliberationMode, setDeliberationMode] = useState("standard");
   const [enableStreaming, setEnableStreaming] = useState(true);
   const [showCost, setShowCost] = useState(true);
@@ -197,6 +199,29 @@ export default function SettingsPage() {
               checked={showCost}
               onCheckedChange={setShowCost}
             />
+            {/* Phase 1.24 — Response Verbosity Control */}
+            <div className="flex items-center justify-between py-4">
+              <div className="space-y-0.5">
+                <Label className="text-sm font-medium flex items-center gap-1.5">
+                  <AlignLeft className="size-3.5" />
+                  Response Verbosity
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Control the depth and length of AI responses
+                </p>
+              </div>
+              <Select value={verbosityLevel} onValueChange={setVerbosityLevel}>
+                <SelectTrigger className="w-44" aria-label="Response verbosity level">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="concise">Concise — 2–3 sentences</SelectItem>
+                  <SelectItem value="standard">Standard — balanced</SelectItem>
+                  <SelectItem value="detailed">Detailed — structured</SelectItem>
+                  <SelectItem value="exhaustive">Exhaustive — comprehensive</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </CardContent>
         </Card>
 

@@ -44,6 +44,7 @@ export default [
   route("evaluation", "routes/evaluation.tsx"),
   route("projects", "routes/projects.tsx"),
   route("build", "routes/build.tsx"),
+  route("god-mode", "routes/god-mode.tsx"),
   route("admin/users", "routes/admin-users.tsx"),
   route("admin/analytics", "routes/admin-analytics.tsx"),
   route("admin/system", "routes/admin-system.tsx"),

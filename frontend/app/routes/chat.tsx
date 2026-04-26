@@ -60,6 +60,8 @@ import {
   Trash2,
   Mic,
   Globe,
+  VolumeX,
+  Volume2,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -68,6 +70,8 @@ interface CouncilMember {
   id: string;
   name: string;
   model: string;
+  /** Phase 1.2 — per-member mute toggle */
+  muted?: boolean;
 }
 
 interface CouncilPreset {
@@ -974,17 +978,17 @@ export default function ChatPage() {
     setStreamingOpinions({});
     setCompletedMembers(new Set());
 
+    // Show "thinking" indicator for ACTIVE (non-muted) members only
+    const activeMembers = councilMembers.filter(m => !m.muted);
     const collectedOpinions: Record<string, string> = {};
-
-    // Show "thinking" indicator for ALL members immediately
     const thinkingState: Record<string, string> = {};
-    for (const member of councilMembers) {
+    for (const member of activeMembers) {
       thinkingState[member.name] = "…";
     }
     setStreamingOpinions(thinkingState);
 
-    // Fetch ALL member opinions in parallel
-    const fetchPromises = councilMembers.map(async (member) => {
+    // Fetch ALL active (non-muted) member opinions in parallel
+    const fetchPromises = activeMembers.map(async (member) => {
       try {
         const res = await fetch("/api/deliberate", {
           method: "POST",
@@ -1417,7 +1421,6 @@ export default function ChatPage() {
                 <div className="flex items-center gap-2">
                   <span className={`size-2 rounded-full ${c.dot} shrink-0`} />
                   <Select
-                    value={member.name}
                     onValueChange={(v) => {
                       if (v === "__new_archetype__") {
                         setInlineArchTarget(member.id);
@@ -1447,6 +1450,18 @@ export default function ChatPage() {
                       </SelectItem>
                     </SelectContent>
                   </Select>
+                  {/* Phase 1.2 — per-member mute toggle */}
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className={`size-6 shrink-0 ${member.muted ? "text-amber-500 hover:text-amber-400" : "text-muted-foreground hover:text-foreground"}`}
+                    onClick={() => setCouncilMembers(prev => prev.map(m => m.id === member.id ? { ...m, muted: !m.muted } : m))}
+                    title={member.muted ? "Unmute member" : "Mute member"}
+                    aria-label={member.muted ? `Unmute ${member.name}` : `Mute ${member.name}`}
+                    aria-pressed={member.muted}
+                  >
+                    {member.muted ? <VolumeX className="size-3" /> : <Volume2 className="size-3" />}
+                  </Button>
                   <Button
                     variant="ghost"
                     size="icon"

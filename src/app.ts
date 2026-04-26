@@ -170,6 +170,21 @@ import feedbackPlugin from "./routes/feedback.js";
 import systemPlugin from "./routes/system.js";
 import webhooksPlugin from "./routes/webhooks.js";
 import roomsPlugin from "./routes/rooms.js";
+import { promptFilterPlugin } from "./routes/prompt-filter.js";
+import { tokenConservationPlugin } from "./routes/token-conservation.js";
+import { specialisationPlugin } from "./routes/specialisation.js";
+import { skillSelectionPlugin } from "./routes/skill-selection.js";
+import { sopPlugin } from "./routes/sop.js";
+import { moderationPlugin } from "./routes/moderation.js";
+import { verbosityPlugin } from "./routes/verbosity.js";
+import { crossMemoryPlugin } from "./routes/cross-memory.js";
+import { negationPlugin } from "./routes/negation.js";
+import { symbolicReasoningPlugin } from "./routes/symbolic-reasoning.js";
+import { blindCouncilPlugin } from "./routes/blind-council.js";
+import { memberEvolutionPlugin } from "./routes/member-evolution.js";
+import { reasoningDepthPlugin } from "./routes/reasoning-depth.js";
+import { interruptResumePlugin } from "./routes/interrupt-resume.js";
+import { observabilityPlugin } from "./routes/observability.js";
 import { ingestionQueue, researchQueue, repoQueue, compactionQueue } from "./queue/queues.js";
 
 export async function buildApp() {
@@ -523,6 +538,21 @@ export async function buildApp() {
   await fastify.register(webhooksPlugin,        { prefix: "/api/webhooks" });
   // Collaborative AI rooms — multi-user sessions where all participants can post
   await fastify.register(roomsPlugin,           { prefix: "/api/rooms" });
+  await fastify.register(promptFilterPlugin,    { prefix: "/api" });
+  await fastify.register(tokenConservationPlugin, { prefix: "/api" });
+  await fastify.register(specialisationPlugin,  { prefix: "/api" });
+  await fastify.register(skillSelectionPlugin,  { prefix: "/api" });
+  await fastify.register(sopPlugin,             { prefix: "/api" });
+  await fastify.register(moderationPlugin,      { prefix: "/api" });
+  await fastify.register(verbosityPlugin,       { prefix: "/api" });
+  await fastify.register(crossMemoryPlugin,     { prefix: "/api" });
+  await fastify.register(negationPlugin,        { prefix: "/api" });
+  await fastify.register(symbolicReasoningPlugin, { prefix: "/api" });
+  await fastify.register(blindCouncilPlugin,    { prefix: "/api" });
+  await fastify.register(memberEvolutionPlugin, { prefix: "/api" });
+  await fastify.register(reasoningDepthPlugin,  { prefix: "/api" });
+  await fastify.register(interruptResumePlugin, { prefix: "/api" });
+  await fastify.register(observabilityPlugin,   { prefix: "/api" });
   // Per-route rate limit differentiation.
   // /ask is the most expensive route (triggers full deliberation); cap at 30/min.
   // Uploads are I/O-heavy; cap at 20/min.
