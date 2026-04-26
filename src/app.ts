@@ -162,6 +162,7 @@ import webScrapingPlugin from "./routes/webScraping.js";
 import federatedSearchPlugin from "./routes/federatedSearch.js";
 import storagePlugin from "./routes/storage.js";
 import auditDashboardPlugin from "./routes/auditDashboard.js";
+import dataResidencyPlugin from "./routes/dataResidency.js";
 import mfaPlugin from "./routes/mfa.js";
 import feedbackPlugin from "./routes/feedback.js";
 import systemPlugin from "./routes/system.js";
@@ -504,6 +505,8 @@ export async function buildApp() {
   await fastify.register(storagePlugin,         { prefix: "/api/storage" });
   // Query audit dashboard
   await fastify.register(auditDashboardPlugin,  { prefix: "/api/audit" });
+  // Data residency controls (Phase 9.4)
+  await fastify.register(dataResidencyPlugin,   { prefix: "/api/data-residency" });
   // MFA / TOTP two-factor authentication
   await fastify.register(mfaPlugin,             { prefix: "/api/mfa" });
   // Response and search feedback
