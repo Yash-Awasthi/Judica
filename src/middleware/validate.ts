@@ -80,6 +80,9 @@ export const askSchema = z
     repo_id: z.string().optional(),
     dateFrom: z.string().optional(), // ISO 8601 date string for temporal filtering
     dateTo: z.string().optional(),   // ISO 8601 date string for temporal filtering
+    // Phase 1.2 — per-member toggle (LibreChat pause/resume pattern)
+    // List of provider names to skip this round; member catches up on re-enable
+    disabled_members: z.array(z.string().max(50)).max(10).optional(),
   });
 
 export const renameConversationSchema = z.object({
