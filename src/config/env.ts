@@ -149,6 +149,17 @@ const envSchema = z.object({
   PINECONE_API_KEY: z.string().optional(),
   PINECONE_ENVIRONMENT: z.string().optional(),
   PINECONE_INDEX: z.string().optional(),
+  // Bot integrations (Phase 4.11)
+  TELEGRAM_BOT_TOKEN: z.string().optional(),
+  WHATSAPP_ACCESS_TOKEN: z.string().optional(),
+  WHATSAPP_PHONE_NUMBER_ID: z.string().optional(),
+  WHATSAPP_VERIFY_TOKEN: z.string().optional(),
+  // GitHub agent (Phase 4.17)
+  GITHUB_TOKEN: z.string().optional(),
+  // Web Push / VAPID (Phase 4.20)
+  VAPID_PUBLIC_KEY: z.string().optional(),
+  VAPID_PRIVATE_KEY: z.string().optional(),
+  VAPID_EMAIL: z.string().email().optional(),
   // Feature toggles
   ANTHROPIC_PROMPT_CACHE: z.preprocess((v) => v === "true" || v === "1", z.boolean()).default(false),
   QUERY_EXPANSION_ENABLED: z.preprocess((v) => v === "true" || v === "1", z.boolean()).default(false),
@@ -159,7 +170,7 @@ const envSchema = z.object({
 
 // Warn about unknown env vars that look like typos of known keys
 const KNOWN_KEYS = new Set(Object.keys(envSchema.shape));
-const ENV_PREFIXES = ["DATABASE_", "REDIS_", "JWT_", "MASTER_", "PORT", "NODE_", "RATE_LIMIT_", "ALLOWED_", "TAVILY_", "SYSTEM_", "TRUST_", "OPENAI_", "ANTHROPIC_", "GOOGLE_", "OPENROUTER_", "NVIDIA_", "XIAOMI_", "GROQ_", "MISTRAL_", "CEREBRAS_", "COHERE_", "OLLAMA_", "SERP_", "LANGFUSE_", "PROVIDER_", "FRONTEND_", "CURRENT_", "ENABLE_", "GITHUB_", "OAUTH_", "OTEL_", "SENTRY_", "SMTP_", "GRACEFUL_", "SSO_", "SLACK_", "DISCORD_", "CAPTCHA_", "RECAPTCHA_", "HCAPTCHA_", "TURNSTILE_", "AZURE_", "STABILITY_", "REPLICATE_", "ELEVENLABS_", "DEEPGRAM_", "WEB_SEARCH_", "SERPER_", "BRAVE_", "SEARXNG_", "FIRECRAWL_", "EXA_", "LITELLM_", "VLLM_", "STRIPE_", "VECTOR_DB_", "VESPA_", "WEAVIATE_", "PINECONE_", "QUERY_", "DEPLOYMENT_", "LITE_", "CONFLUENCE_", "NOTION_"];
+const ENV_PREFIXES = ["DATABASE_", "REDIS_", "JWT_", "MASTER_", "PORT", "NODE_", "RATE_LIMIT_", "ALLOWED_", "TAVILY_", "SYSTEM_", "TRUST_", "OPENAI_", "ANTHROPIC_", "GOOGLE_", "OPENROUTER_", "NVIDIA_", "XIAOMI_", "GROQ_", "MISTRAL_", "CEREBRAS_", "COHERE_", "OLLAMA_", "SERP_", "LANGFUSE_", "PROVIDER_", "FRONTEND_", "CURRENT_", "ENABLE_", "GITHUB_", "OAUTH_", "OTEL_", "SENTRY_", "SMTP_", "GRACEFUL_", "SSO_", "SLACK_", "DISCORD_", "CAPTCHA_", "RECAPTCHA_", "HCAPTCHA_", "TURNSTILE_", "AZURE_", "STABILITY_", "REPLICATE_", "ELEVENLABS_", "DEEPGRAM_", "WEB_SEARCH_", "SERPER_", "BRAVE_", "SEARXNG_", "FIRECRAWL_", "EXA_", "LITELLM_", "VLLM_", "STRIPE_", "VECTOR_DB_", "VESPA_", "WEAVIATE_", "PINECONE_", "QUERY_", "DEPLOYMENT_", "LITE_", "CONFLUENCE_", "NOTION_", "TELEGRAM_", "WHATSAPP_", "VAPID_"];
 for (const key of Object.keys(process.env)) {
   if (!KNOWN_KEYS.has(key) && ENV_PREFIXES.some(p => key.startsWith(p))) {
     process.stderr.write(`WARNING: Unknown env var '${key}' looks like a typo of a known config key\n`);
