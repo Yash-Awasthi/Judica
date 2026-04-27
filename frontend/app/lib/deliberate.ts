@@ -4,6 +4,7 @@
 
 export interface MoleculeOpinion {
   provider: string;
+  label: string;   // display name from council config
   text: string;
   summary: string;
   round: number;

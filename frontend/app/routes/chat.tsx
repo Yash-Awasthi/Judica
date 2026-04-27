@@ -8,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Separator } from "~/components/ui/separator";
 import { useStore } from "~/context/StoreContext";
 import { useAuth } from "~/context/AuthContext";
-import { deliberate } from "~/lib/deliberate";
+import { deliberate, listThreads, createThread, deleteThread, getMessages, onOpinion, onVerdict, onDone, toggleGlass } from "~/lib/deliberate";
+import { loadCouncilMembers } from "~/lib/council";
 import {
   Select,
   SelectContent,
@@ -639,28 +640,56 @@ export default function ChatPage() {
   const { user } = useAuth();
   const userKey = user?.id ? `judica-chats-${user.id}` : null;
 
-  const [conversations, setConversations] = useState<typeof mockConversations>(() => {
-    if (typeof window !== "undefined" && userKey) {
-      try {
-        const stored = localStorage.getItem(userKey);
-        return stored ? JSON.parse(stored) : [];
-      } catch { return []; }
-    }
-    return [];
-  });
-  const [selectedConvId, setSelectedConvId] = useState<string | null>(() => {
-    if (typeof window !== "undefined") {
-      return sessionStorage.getItem("judica-conv") || null;
-    }
-    return null;
-  });
+  const [conversations, setConversations] = useState<typeof mockConversations>([]);
+  const [selectedConvId, setSelectedConvId] = useState<string | null>(null);
 
-  // Persist conversations to per-user localStorage
+  // Load threads from SQLite on mount
   useEffect(() => {
-    if (userKey) {
-      localStorage.setItem(userKey, JSON.stringify(conversations));
-    }
-  }, [conversations, userKey]);
+    listThreads().then((threads: any[]) => {
+      if (threads.length > 0) {
+        setConversations(threads.map((t: any) => ({
+          id: t.id,
+          title: t.title ?? "Untitled",
+          date: new Date(t.updated_at).toLocaleDateString(),
+          mode: "Council",
+        })));
+      } else if (userKey) {
+        // fallback to localStorage for non-Electron
+        try {
+          const stored = localStorage.getItem(userKey);
+          if (stored) setConversations(JSON.parse(stored));
+        } catch { /* ignore */ }
+      }
+    });
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // When a thread is selected, load its messages from SQLite
+  useEffect(() => {
+    if (!selectedConvId) return;
+    setActiveThreadId(selectedConvId);
+    getMessages(selectedConvId).then((msgs: any[]) => {
+      if (!msgs || msgs.length === 0) { setMessageGroups([]); return; }
+      // Rebuild messageGroups from DB messages
+      const roundMap = new Map<number, MessageGroup>();
+      let maxRound = 1;
+      for (const msg of msgs) {
+        maxRound = Math.max(maxRound, msg.round ?? 1);
+        if (!roundMap.has(msg.round)) {
+          roundMap.set(msg.round, { id: `${selectedConvId}-${msg.round}`, userMessage: "", opinions: {}, verdict: null, isStreaming: false });
+        }
+        const group = roundMap.get(msg.round)!;
+        if (msg.role === "user") group.userMessage = msg.content;
+        if (msg.role === "opinion") group.opinions[msg.member ?? "Unknown"] = msg.content;
+        if (msg.role === "verdict") group.verdict = msg.content;
+      }
+      setRound(maxRound);
+      setMessageGroups(Array.from(roundMap.values()).sort((a, b) => {
+        const ra = parseInt(a.id.split("-").pop() ?? "1");
+        const rb = parseInt(b.id.split("-").pop() ?? "1");
+        return ra - rb;
+      }));
+    });
+  }, [selectedConvId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Persist selected conversation
   useEffect(() => {
@@ -679,7 +708,19 @@ export default function ChatPage() {
   useEffect(() => {
     sessionStorage.setItem("judica-draft", inputValue);
   }, [inputValue]);
-  const [councilMembers, setCouncilMembers] = useState<CouncilMember[]>(defaultMembers);
+  const [councilMembers, setCouncilMembers] = useState<CouncilMember[]>(() => {
+    // Load from settings (real providers)
+    const providers = loadCouncilMembers();
+    const mapped = providers
+      .filter((m) => m.enabled)
+      .map((m) => ({ id: m.id, name: m.label, model: m.model || m.provider }));
+    return mapped.length > 0 ? mapped : defaultMembers;
+  });
+
+  // Active thread tracking
+  const [activeThreadId, setActiveThreadId] = useState<string | null>(null);
+  const [round, setRound] = useState(1);
+  const [glassOn, setGlassOn] = useState(false);
   const [savedPresets, setSavedPresets] = useState<CouncilPreset[]>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -947,33 +988,29 @@ export default function ChatPage() {
     if (!text || isStreaming || councilMembers.length === 0) return;
 
     if (!retryText) setInputValue("");
-    if (textareaRef.current) {
-      textareaRef.current.style.height = "auto";
-    }
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
 
-    // Create conversation if needed
-    if (!selectedConvId) {
-      const newConv = {
-        id: Date.now().toString(),
-        title: text.length > 40 ? text.slice(0, 40) + "…" : text,
-        date: "Just now",
-        mode: "Council",
-      };
-      setConversations((prev) => [newConv, ...prev]);
-      setSelectedConvId(newConv.id);
-    }
-
-    const groupId = Date.now().toString();
     const startTime = performance.now();
 
-    // Add new message group — existing groups are untouched
-    const newGroup: MessageGroup = {
-      id: groupId,
-      userMessage: text,
-      opinions: {},
-      verdict: null,
-      isStreaming: true,
-    };
+    // Create thread if first message in session
+    let tid = activeThreadId;
+    let thisRound = round;
+
+    if (!tid) {
+      tid = await createThread();
+      setActiveThreadId(tid);
+      thisRound = 1;
+      setRound(1);
+      const newConv = { id: tid, title: text.slice(0, 50), date: "Just now", mode: "Council" };
+      setConversations((prev) => [newConv, ...prev]);
+      setSelectedConvId(tid);
+    } else {
+      thisRound = round + 1;
+      setRound((r) => r + 1);
+    }
+
+    const groupId = `${tid}-${thisRound}`;
+    const newGroup: MessageGroup = { id: groupId, userMessage: text, opinions: {}, verdict: null, isStreaming: true };
     setMessageGroups((prev) => [...prev, newGroup]);
     setCurrentGroupId(groupId);
     setIsStreaming(true);
@@ -981,88 +1018,70 @@ export default function ChatPage() {
     setStreamingOpinions({});
     setCompletedMembers(new Set());
 
-    // Show "thinking" indicator for ACTIVE (non-muted) members only
-    const activeMembers = councilMembers.filter(m => !m.muted);
-    const collectedOpinions: Record<string, string> = {};
+    // Show thinking indicator for all enabled members
+    const activeMembers = councilMembers.filter((m) => !m.muted);
     const thinkingState: Record<string, string> = {};
-    for (const member of activeMembers) {
-      thinkingState[member.name] = "…";
-    }
+    for (const member of activeMembers) thinkingState[member.name] = "…";
     setStreamingOpinions(thinkingState);
 
-    // Fetch ALL active (non-muted) member opinions in parallel
-    const fetchPromises = activeMembers.map(async (member) => {
-      try {
-        const text = await deliberate({
-          prompt,
-          members: [{ name: member.name }],
-          type: "opinion",
-        });
-        return { name: member.name, text: text || "No response generated." };
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : "I encountered an issue generating my response. Please try again.";
-        return { name: member.name, text: msg };
-      }
-    });
-
-    // As each response arrives, start streaming it immediately
-    const streamPromises: Promise<void>[] = [];
-    for (const promise of fetchPromises) {
-      const streamP = promise.then(async ({ name, text: fullText }) => {
-        if (stopRef.current) return;
-        collectedOpinions[name] = fullText;
-        await simulateStreaming(groupId, name, fullText);
-      });
-      streamPromises.push(streamP);
-    }
-
-    // Wait for all streams to complete
-    await Promise.all(streamPromises);
-
-    const elapsed = Math.round(performance.now() - startTime);
-
-    if (!stopRef.current) {
-      // Fetch the synthesized verdict
-      let verdict = "";
-      try {
-        verdict = await deliberate({
-          prompt: text,
-          members: Object.entries(collectedOpinions).map(([name, opinion]) => ({
-            name,
-            opinion,
-          })),
-          type: "verdict",
-        });
-        if (!verdict) verdict = "The council could not reach a verdict.";
-      } catch (err) {
-        verdict = err instanceof Error ? err.message : "Failed to generate verdict. Please try again.";
-      }
-
+    // Subscribe to IPC events
+    const unsubOpinion = onOpinion((data) => {
+      if (data.round !== thisRound) return;
+      const displayName = data.label || data.provider;
+      setStreamingOpinions((prev) => ({ ...prev, [displayName]: data.text }));
       setMessageGroups((prev) =>
         prev.map((g) =>
-          g.id === groupId
-            ? {
-                ...g,
-                opinions: collectedOpinions,
-                verdict,
-                isStreaming: false,
-                tokens: `${(Math.floor(Math.random() * 900) + 800).toLocaleString()} tokens`,
-                cost: `$${(Math.random() * 0.04 + 0.01).toFixed(2)}`,
-                latencyMs: elapsed,
-              }
-            : g
+          g.id === groupId ? { ...g, opinions: { ...g.opinions, [displayName]: data.text } } : g
         )
       );
-    } else {
+      setCompletedMembers((prev) => new Set(prev).add(displayName));
+    });
+
+    const unsubVerdict = onVerdict((data) => {
+      if (data.round !== thisRound) return;
+      setMessageGroups((prev) =>
+        prev.map((g) => (g.id === groupId ? { ...g, verdict: data.text } : g))
+      );
+    });
+
+    const unsubDone = onDone(() => {
+      const elapsed = Math.round(performance.now() - startTime);
       setMessageGroups((prev) =>
         prev.map((g) => (g.id === groupId ? { ...g, isStreaming: false, latencyMs: elapsed } : g))
       );
-    }
+      setIsStreaming(false);
+      setCurrentGroupId(null);
+      setStreamingOpinions({});
+      setCompletedMembers(new Set());
+      unsubOpinion();
+      unsubVerdict();
+      unsubDone();
+    });
 
-    setIsStreaming(false);
-    setCurrentGroupId(null);
-    setStreamingOpinions({});
-    setCompletedMembers(new Set());
+    try {
+      await deliberate({ threadId: tid, message: text, round: thisRound });
+    } catch (err) {
+      // If not in Electron, fall back to mock for development
+      unsubOpinion(); unsubVerdict(); unsubDone();
+      const elapsed = Math.round(performance.now() - startTime);
+      const mockOp: Record<string, string> = {};
+      for (const member of activeMembers) {
+        const pool = MOCK_OPINIONS[member.name] ?? MOCK_OPINIONS["The Pragmatist"];
+        mockOp[member.name] = pool[Math.floor(Math.random() * pool.length)] ?? "No response.";
+      }
+      const verdict = VERDICTS[Math.floor(Math.random() * VERDICTS.length)];
+      setMessageGroups((prev) =>
+        prev.map((g) =>
+          g.id === groupId
+            ? { ...g, opinions: mockOp, verdict, isStreaming: false, latencyMs: elapsed }
+            : g
+        )
+      );
+      setIsStreaming(false);
+      setCurrentGroupId(null);
+      setStreamingOpinions({});
+      setCompletedMembers(new Set());
+    }
   };
 
   const handleStop = () => {
@@ -1186,6 +1205,12 @@ export default function ChatPage() {
     }
   };
 
+  const handleGlassToggle = () => {
+    const next = !glassOn;
+    setGlassOn(next);
+    toggleGlass(next);
+  };
+
   const handleAttachment = (type: string) => {
     if (type === "file") {
       const input = document.createElement("input");
@@ -1247,6 +1272,8 @@ export default function ChatPage() {
           className="w-full gap-2"
           onClick={() => {
             setSelectedConvId(null);
+            setActiveThreadId(null);
+            setRound(1);
             setMessageGroups([]);
             setStreamingOpinions({});
             if (layoutStage === 0) setMobileHistoryOpen(false);
@@ -1267,29 +1294,48 @@ export default function ChatPage() {
       </div>
       <ScrollArea className="flex-1">
         {filteredConversations.map((conv) => (
-          <button
+          <div
             key={conv.id}
-            onClick={() => {
-              setSelectedConvId(conv.id);
-              setMessageGroups([]);
-              setStreamingOpinions({});
-              if (layoutStage === 0) setMobileHistoryOpen(false);
-            }}
-            className={`w-full text-left px-3 py-3 border-b border-border/50 hover:bg-muted/50 transition-colors ${
+            className={`group/conv flex items-center border-b border-border/50 hover:bg-muted/50 transition-colors ${
               selectedConvId === conv.id ? "bg-muted" : ""
             }`}
           >
-            <div className="flex items-center gap-2">
-              <MessageSquare className="size-3.5 text-muted-foreground shrink-0" />
-              <span className="text-sm font-medium truncate">{conv.title}</span>
-            </div>
-            <div className="flex items-center gap-2 mt-1 ml-5">
-              <Badge variant="outline" className="text-[10px]">
-                {conv.mode}
-              </Badge>
-              <span className="text-xs text-muted-foreground">{conv.date}</span>
-            </div>
-          </button>
+            <button
+              onClick={() => {
+                setSelectedConvId(conv.id);
+                setMessageGroups([]);
+                setStreamingOpinions({});
+                if (layoutStage === 0) setMobileHistoryOpen(false);
+              }}
+              className="flex-1 text-left px-3 py-3 min-w-0"
+            >
+              <div className="flex items-center gap-2">
+                <MessageSquare className="size-3.5 text-muted-foreground shrink-0" />
+                <span className="text-sm font-medium truncate">{conv.title}</span>
+              </div>
+              <div className="flex items-center gap-2 mt-1 ml-5">
+                <Badge variant="outline" className="text-[10px]">{conv.mode}</Badge>
+                <span className="text-xs text-muted-foreground">{conv.date}</span>
+              </div>
+            </button>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                deleteThread(conv.id);
+                setConversations((prev) => prev.filter((c) => c.id !== conv.id));
+                if (selectedConvId === conv.id) {
+                  setSelectedConvId(null);
+                  setActiveThreadId(null);
+                  setRound(1);
+                  setMessageGroups([]);
+                }
+              }}
+              className="px-2 opacity-0 group-hover/conv:opacity-100 transition-opacity text-muted-foreground hover:text-destructive"
+              title="Delete"
+            >
+              <Trash2 className="size-3.5" />
+            </button>
+          </div>
         ))}
       </ScrollArea>
     </>
@@ -1639,7 +1685,17 @@ export default function ChatPage() {
             <span className="hidden lg:inline text-xs">Share</span>
           </Button>
 
-          {/* Council — always visible */}
+          <Button
+            variant={glassOn ? "secondary" : "ghost"}
+            size="icon"
+            className="size-8 lg:w-auto lg:px-3 lg:gap-1.5 shrink-0"
+            onClick={handleGlassToggle}
+            title="Glass mode — overlay on any window"
+          >
+            <Globe className="size-3.5" />
+            <span className="hidden lg:inline text-xs">Glass</span>
+          </Button>
+
           <Button
             variant={configOpen ? "secondary" : "outline"}
             size="sm"
