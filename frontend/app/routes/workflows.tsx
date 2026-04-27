@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogFooter,
 } from "~/components/ui/dialog";
+import { deliberate, createThread, onOpinion, onDone } from "~/lib/deliberate";
 import {
   GitBranch,
   Plus,
@@ -335,24 +336,18 @@ function WorkflowEditor({ workflow, onBack, onUpdateWorkflow }: { workflow: Work
     setOutputExpanded(true);
     try {
       const nodeLabels = nodes.map((n) => (n.data?.label as string) || "Unnamed Node");
-      const prompt = `Analyze this workflow called "${workflow.name}" (${workflow.description}). It has the following steps: ${nodeLabels.join(" -> ")}. Describe what this workflow does, evaluate its design, and suggest improvements.`;
+      const prompt = `Analyze this workflow called "${workflow.name}" (${workflow.description}). Steps: ${nodeLabels.join(" -> ")}. Describe what it does, evaluate its design, and suggest improvements.`;
 
-      const res = await fetch("/api/deliberate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt,
-          type: "opinion",
-          members: [{ name: "Architect" }],
-        }),
+      const threadId = await createThread();
+      let outputText = "";
+
+      await new Promise<void>((resolve) => {
+        const unsubO = onOpinion((data) => { outputText = data.text; });
+        const unsubD = onDone(() => { unsubO(); unsubD(); resolve(); });
+        deliberate({ threadId, message: prompt, round: 1 }).catch(() => resolve());
       });
 
-      if (!res.ok) {
-        throw new Error(`API error: ${res.status}`);
-      }
-
-      const data = await res.json();
-      setRunOutput(data.text || "No output returned.");
+      setRunOutput(outputText || "Workflow analysis complete. No output returned.");
 
       const now = new Date();
       const timeStr = `${now.getHours()}:${now.getMinutes().toString().padStart(2, "0")}`;

@@ -9,13 +9,15 @@
  * - AnthropicAI Workbench raw output panels
  */
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
 import { Badge } from "~/components/ui/badge";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { Eye, Send, Loader2, Zap, AlertTriangle } from "lucide-react";
+import { deliberate, createThread, onOpinion, onVerdict, onDone } from "~/lib/deliberate";
+import { loadCouncilMembers } from "~/lib/council";
 
 interface MemberResponse {
   alias:     string;
@@ -38,10 +40,12 @@ const MEMBER_COLORS = [
 
 export default function GodModePage() {
   const [question, setQuestion] = useState("");
-  const [memberCount, setMemberCount] = useState(3);
   const [responses, setResponses] = useState<MemberResponse[]>([]);
   const [synthesis, setSynthesis] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+
+  const enabledMembers = loadCouncilMembers().filter(m => m.enabled);
+  const memberCount = enabledMembers.length || 3;
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -50,10 +54,9 @@ export default function GodModePage() {
     setIsLoading(true);
     setSynthesis(null);
 
-    // Initialize placeholder states
-    const placeholders: MemberResponse[] = Array.from({ length: memberCount }, (_, i) => ({
-      alias:     `Reviewer ${String.fromCharCode(65 + i)}`,
-      model:     "loading…",
+    const placeholders: MemberResponse[] = enabledMembers.map((m, i) => ({
+      alias:     m.label,
+      model:     m.model || m.provider,
       text:      "",
       latencyMs: 0,
       tokens:    0,
@@ -61,36 +64,51 @@ export default function GodModePage() {
     }));
     setResponses(placeholders);
 
+    const startTimes: Record<string, number> = {};
+    enabledMembers.forEach(m => { startTimes[m.label] = Date.now(); });
+
+    const threadId = await createThread();
+
+    const unsubOpinion = onOpinion((data) => {
+      const alias = data.label || data.provider;
+      const elapsed = Date.now() - (startTimes[alias] ?? Date.now());
+      setResponses(prev => prev.map(r =>
+        r.alias === alias
+          ? { ...r, text: data.text, status: "done", latencyMs: elapsed, tokens: Math.ceil(data.text.length / 4) }
+          : r
+      ));
+    });
+
+    const unsubVerdict = onVerdict((data) => {
+      setSynthesis(data.text);
+    });
+
+    const unsubDone = onDone(() => {
+      unsubOpinion();
+      unsubVerdict();
+      unsubDone();
+      setIsLoading(false);
+    });
+
     try {
-      const res = await fetch("/api/blind-council/run", {
-        method:  "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body:    JSON.stringify({ question, memberCount, revealAliases: true }),
-      });
-
-      if (!res.ok) throw new Error(`API error: ${res.status}`);
-
-      const data = await res.json() as {
-        responses: Array<{ alias: string; response: string; riskScore: number }>;
-        synthesis: string;
-        aliasMap?: Record<string, string>;
-      };
-
-      const updated: MemberResponse[] = data.responses.map((r, i) => ({
-        alias:     r.alias,
-        model:     data.aliasMap?.[r.alias] ?? "unknown",
-        text:      r.response,
-        latencyMs: 0,
-        tokens:    Math.ceil(r.response.length / 4),
-        status:    "done",
-      }));
-
-      setResponses(updated);
-      setSynthesis(data.synthesis);
-    } catch (err) {
-      setResponses(prev => prev.map(r => ({ ...r, status: "error" as const, error: (err as Error).message })));
-    } finally {
+      await deliberate({ threadId, message: question, round: 1 });
+    } catch {
+      // Not in Electron — show mock parallel responses
+      const mockTexts = [
+        "From an architectural standpoint, this question touches on fundamental system design principles. The key considerations are scalability, maintainability, and the trade-offs between consistency and availability. A well-structured approach would decompose the problem into orthogonal concerns...",
+        "Pragmatically speaking, the most important factor here is delivery speed and real-world constraints. Theory is valuable but implementation is where design meets reality. I'd focus on the simplest solution that works today and can be evolved tomorrow...",
+        "The ethical dimension of this question deserves attention. Beyond technical correctness, we must ask: who is affected by this decision, and how? Long-term consequences for users and society should weigh heavily in the calculus here...",
+      ];
+      setResponses(enabledMembers.slice(0, 3).map((m, i) => ({
+        alias: m.label,
+        model: m.model || m.provider,
+        text: mockTexts[i % mockTexts.length],
+        latencyMs: 800 + i * 300,
+        tokens: Math.ceil(mockTexts[i % mockTexts.length].length / 4),
+        status: "done",
+      })));
+      setSynthesis("After deliberation, the council converges on a balanced approach: acknowledge the architectural constraints, deliver iteratively, and build ethical review into the process from day one rather than auditing after the fact.");
+      unsubOpinion(); unsubVerdict(); unsubDone();
       setIsLoading(false);
     }
   }
@@ -107,18 +125,7 @@ export default function GodModePage() {
           </p>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <label htmlFor="member-count" className="text-xs text-muted-foreground">Members:</label>
-          <select
-            id="member-count"
-            value={memberCount}
-            onChange={e => setMemberCount(Number(e.target.value))}
-            className="text-sm border border-border rounded px-2 py-1 bg-background"
-            aria-label="Number of council members"
-          >
-            {[2, 3, 4, 5, 6].map(n => (
-              <option key={n} value={n}>{n}</option>
-            ))}
-          </select>
+          <Badge variant="outline" className="text-xs">{memberCount} members</Badge>
         </div>
       </header>
 

@@ -85,15 +85,23 @@ const STATUS_ICONS: Record<TaskStatus, React.ReactNode> = {
   blocked:     <AlertCircle className="w-3 h-3" />,
 };
 
-// ─── API helpers ─────────────────────────────────────────────────────────────
+// ─── localStorage helpers ─────────────────────────────────────────────────────
 
-async function apiFetch(path: string, opts?: RequestInit) {
-  const res = await fetch(`/api${path}`, {
-    headers: { "Content-Type": "application/json" },
-    ...opts,
-  });
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+const LS_KEY = "judica-build-tasks";
+let nextId = Date.now();
+
+function loadAllTasks(): BuildTask[] {
+  try {
+    return JSON.parse(localStorage.getItem(LS_KEY) ?? "[]");
+  } catch { return []; }
+}
+
+function saveAllTasks(tasks: BuildTask[]) {
+  localStorage.setItem(LS_KEY, JSON.stringify(tasks));
+}
+
+function mutate(fn: (tasks: BuildTask[]) => BuildTask[]) {
+  saveAllTasks(fn(loadAllTasks()));
 }
 
 // ─── TaskCard ─────────────────────────────────────────────────────────────────
@@ -116,41 +124,30 @@ function TaskCard({
   const handleClaim = async () => {
     setLoading(true);
     try {
-      await apiFetch(`/build/tasks/${task.id}/claim`, {
-        method: "POST",
-        body: JSON.stringify({ agentId: "user" }),
-      });
+      mutate(tasks => tasks.map(t =>
+        t.id === task.id ? { ...t, status: "claimed", claimedBy: "user", claimedAt: new Date().toISOString() } : t
+      ));
       onRefresh();
-    } catch (e) {
-      alert(String(e));
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handleRelease = async () => {
     setLoading(true);
     try {
-      await apiFetch(`/build/tasks/${task.id}/release`, { method: "POST" });
+      mutate(tasks => tasks.map(t =>
+        t.id === task.id ? { ...t, status: "planned", claimedBy: null, claimedAt: null } : t
+      ));
       onRefresh();
-    } catch (e) {
-      alert(String(e));
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handleDelete = async () => {
     if (!confirm(`Delete task "${task.title}"?`)) return;
     setLoading(true);
     try {
-      await apiFetch(`/build/tasks/${task.id}`, { method: "DELETE" });
+      mutate(tasks => tasks.filter(t => t.id !== task.id && t.parentId !== task.id));
       onRefresh();
-    } catch (e) {
-      alert(String(e));
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   return (
@@ -283,70 +280,55 @@ function TaskDetailPanel({
     if (!output.trim()) return;
     setLoading(true);
     try {
-      await apiFetch(`/build/tasks/${task.id}/submit`, {
-        method: "POST",
-        body: JSON.stringify({ output }),
-      });
+      mutate(tasks => tasks.map(t =>
+        t.id === task.id ? { ...t, status: "review", output, submittedAt: new Date().toISOString() } : t
+      ));
       onRefresh();
       onClose();
-    } catch (e) {
-      alert(String(e));
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handleAddSubtask = async () => {
     if (!subtaskTitle.trim()) return;
     setLoading(true);
     try {
-      await apiFetch(`/build/tasks/${task.id}/subtasks`, {
-        method: "POST",
-        body: JSON.stringify({ subtasks: [{ title: subtaskTitle }] }),
-      });
+      const now = new Date().toISOString();
+      const sub: BuildTask = {
+        id: ++nextId,
+        userId: 1, parentId: task.id,
+        title: subtaskTitle, description: null,
+        status: "planned", claimedBy: null, claimedAt: null,
+        output: null, submittedAt: null, isLocked: false,
+        meta: {}, createdAt: now, updatedAt: now,
+      };
+      mutate(tasks => [...tasks, sub]);
       setSubtaskTitle("");
       onRefresh();
-    } catch (e) {
-      alert(String(e));
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handleReview = async (verdict: "approved" | "rejected") => {
     setLoading(true);
     try {
-      await apiFetch(`/build/tasks/${task.id}/review`, {
-        method: "POST",
-        body: JSON.stringify({
-          reviewerId: "user",
-          verdict,
-          feedback: reviewFeedback || undefined,
-        }),
-      });
+      mutate(tasks => tasks.map(t =>
+        t.id === task.id
+          ? { ...t, status: verdict === "approved" ? "done" : "blocked" }
+          : t
+      ));
       onRefresh();
       onClose();
-    } catch (e) {
-      alert(String(e));
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   const handleMerge = async () => {
     setLoading(true);
     try {
-      await apiFetch(`/build/tasks/${task.id}/merge`, {
-        method: "POST",
-        body: JSON.stringify({ mergedBy: "user" }),
-      });
+      mutate(tasks => tasks.map(t =>
+        t.id === task.id ? { ...t, status: "done" } : t
+      ));
       onRefresh();
       onClose();
-    } catch (e) {
-      alert(String(e));
-    } finally {
-      setLoading(false);
-    }
+    } finally { setLoading(false); }
   };
 
   return (
@@ -458,16 +440,10 @@ export default function BuildPage() {
   const [stealAgentId, setStealAgentId] = useState("agent-1");
   const dragTask = useRef<BuildTask | null>(null);
 
-  const loadTasks = useCallback(async () => {
+  const loadTasks = useCallback(() => {
     setLoading(true);
-    try {
-      const data = await apiFetch("/build/tasks");
-      setTasks(data.tasks ?? []);
-    } catch {
-      /* ignore auth errors */
-    } finally {
-      setLoading(false);
-    }
+    setTasks(loadAllTasks());
+    setLoading(false);
   }, []);
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
@@ -479,18 +455,20 @@ export default function BuildPage() {
 
   const handleCreateTask = async () => {
     if (!newTitle.trim()) return;
-    try {
-      await apiFetch("/build/tasks", {
-        method: "POST",
-        body: JSON.stringify({ title: newTitle, description: newDesc || undefined }),
-      });
-      setNewTitle("");
-      setNewDesc("");
-      setShowCreateDialog(false);
-      loadTasks();
-    } catch (e) {
-      alert(String(e));
-    }
+    const now = new Date().toISOString();
+    const task: BuildTask = {
+      id: ++nextId,
+      userId: 1, parentId: null,
+      title: newTitle, description: newDesc || null,
+      status: "planned", claimedBy: null, claimedAt: null,
+      output: null, submittedAt: null, isLocked: false,
+      meta: {}, createdAt: now, updatedAt: now,
+    };
+    mutate(tasks => [...tasks, task]);
+    setNewTitle("");
+    setNewDesc("");
+    setShowCreateDialog(false);
+    loadTasks();
   };
 
   const handleDragStart = (e: React.DragEvent, task: BuildTask) => {
@@ -502,32 +480,24 @@ export default function BuildPage() {
     e.preventDefault();
     const t = dragTask.current;
     if (!t || t.status === status) return;
-    try {
-      await apiFetch(`/build/tasks/${t.id}/status`, {
-        method: "PATCH",
-        body: JSON.stringify({ status }),
-      });
-      loadTasks();
-    } catch (err) {
-      alert(String(err));
-    }
+    mutate(tasks => tasks.map(task =>
+      task.id === t.id ? { ...task, status } : task
+    ));
+    loadTasks();
     dragTask.current = null;
   };
 
-  const handleSteal = async () => {
-    try {
-      const data = await apiFetch("/build/steal", {
-        method: "POST",
-        body: JSON.stringify({ agentId: stealAgentId }),
-      });
-      if (data.task) {
-        alert(`Stolen: "${data.task.title}" → claimed by ${stealAgentId}`);
-        loadTasks();
-      } else {
-        alert("No available tasks to steal.");
-      }
-    } catch (e) {
-      alert(String(e));
+  const handleSteal = () => {
+    const allTasks = loadAllTasks();
+    const available = allTasks.find(t => t.status === "planned" && !t.claimedBy);
+    if (available) {
+      mutate(tasks => tasks.map(t =>
+        t.id === available.id ? { ...t, status: "claimed", claimedBy: stealAgentId, claimedAt: new Date().toISOString() } : t
+      ));
+      alert(`Stolen: "${available.title}" → claimed by ${stealAgentId}`);
+      loadTasks();
+    } else {
+      alert("No available tasks to steal.");
     }
   };
 
