@@ -1,79 +1,81 @@
 /**
- * Calls the AI deliberation command.
- * - In Tauri (desktop): uses the Rust `deliberate` command directly (secure, no server needed)
- * - Falls back to fetch for web builds
+ * Deliberation bridge — calls Electron IPC via window.molecule
  */
 
-interface Member {
-  name: string;
-  opinion?: string;
+export interface MoleculeOpinion {
+  provider: string;
+  text: string;
+  summary: string;
+  round: number;
 }
 
-interface DeliberateArgs {
-  prompt: string;
-  members: Member[];
-  type: "opinion" | "verdict";
+export interface MoleculeVerdict {
+  text: string;
+  summary: string;
+  round: number;
 }
 
-interface Settings {
-  provider: "anthropic" | "openai";
-  anthropicKey?: string;
-  openaiKey?: string;
-  anthropicModel?: string;
-  openaiModel?: string;
+function isMolecule(): boolean {
+  return typeof window !== "undefined" && "molecule" in window;
 }
 
-function loadSettings(): Settings {
-  try {
-    const raw = localStorage.getItem("aibyai_settings");
-    return raw ? JSON.parse(raw) : { provider: "anthropic" };
-  } catch {
-    return { provider: "anthropic" };
+export async function deliberate(args: {
+  threadId: string;
+  message: string;
+  round: number;
+}): Promise<void> {
+  if (!isMolecule()) {
+    throw new Error("Molecule desktop app required.");
   }
+  return (window as any).molecule.deliberate(args);
 }
 
-function isTauri(): boolean {
-  return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
+export async function listThreads() {
+  if (!isMolecule()) return [];
+  return (window as any).molecule.listThreads();
 }
 
-export async function deliberate(args: DeliberateArgs): Promise<string> {
-  if (isTauri()) {
-    const { invoke } = await import("@tauri-apps/api/core");
-    const settings = loadSettings();
-    const apiKey =
-      settings.provider === "anthropic"
-        ? settings.anthropicKey ?? ""
-        : settings.openaiKey ?? "";
+export async function createThread(): Promise<string> {
+  if (!isMolecule()) return crypto.randomUUID();
+  return (window as any).molecule.createThread();
+}
 
-    if (!apiKey) {
-      throw new Error(
-        `No API key set for ${settings.provider}. Open Settings to add your key.`
-      );
-    }
+export async function deleteThread(id: string) {
+  if (!isMolecule()) return;
+  return (window as any).molecule.deleteThread(id);
+}
 
-    const text = await invoke<string>("deliberate", {
-      req: {
-        prompt: args.prompt,
-        members: args.members,
-        type: args.type,
-        provider: settings.provider,
-        api_key: apiKey,
-        model:
-          settings.provider === "anthropic"
-            ? settings.anthropicModel ?? null
-            : settings.openaiModel ?? null,
-      },
-    });
-    return text;
-  }
+export async function getMessages(threadId: string) {
+  if (!isMolecule()) return [];
+  return (window as any).molecule.getMessages(threadId);
+}
 
-  // Web fallback (Cloudflare Workers build)
-  const res = await fetch("/api/deliberate", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(args),
-  });
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error ?? "AI request failed");
-  return data.text;
+export async function getMemory(): Promise<string> {
+  if (!isMolecule()) return localStorage.getItem("molecule_memory") ?? "";
+  return (window as any).molecule.getMemory();
+}
+
+export async function setMemory(value: string) {
+  if (!isMolecule()) { localStorage.setItem("molecule_memory", value); return; }
+  return (window as any).molecule.setMemory(value);
+}
+
+export async function toggleGlass(on: boolean) {
+  if (!isMolecule()) return;
+  return (window as any).molecule.toggleGlass(on);
+}
+
+export function onOpinion(cb: (data: MoleculeOpinion) => void): () => void {
+  if (!isMolecule()) return () => {};
+  return (window as any).molecule.on("deliberation:opinion", cb);
+}
+
+export function onVerdict(cb: (data: MoleculeVerdict) => void): () => void {
+  if (!isMolecule()) return () => {};
+  return (window as any).molecule.on("deliberation:verdict", cb);
+}
+
+export function onDone(cb: (data: { round: number }) => void): () => void {
+  if (!isMolecule()) return () => {};
+  return (window as any).molecule.on("deliberation:done", cb);
 }
