@@ -558,6 +558,44 @@ function registerIPC() {
     setMemory(value);
     return true;
   });
+
+  // Provider browser connection — opens a visible login window using the same
+  // persistent session as the hidden BrowserView, so cookies carry over.
+  ipcMain.handle("provider:connect", async (_e, provider: string) => {
+    const providerUrl = PROVIDER_URLS[provider as Provider] ?? `https://${provider}.com`;
+    const ses = session.fromPartition(`persist:${provider}`);
+
+    const loginWin = new BrowserWindow({
+      width: 900,
+      height: 700,
+      title: `Sign in to ${PROVIDER_LABELS[provider as Provider] ?? provider}`,
+      webPreferences: { session: ses },
+      parent: mainWindow ?? undefined,
+      modal: false,
+      autoHideMenuBar: true,
+    });
+
+    loginWin.loadURL(providerUrl);
+
+    return new Promise<void>((resolve) => {
+      loginWin.on("closed", () => resolve());
+    });
+  });
+
+  ipcMain.handle("provider:isConnected", async (_e, provider: string) => {
+    const providerUrl = PROVIDER_URLS[provider as Provider];
+    if (!providerUrl) return false;
+    const ses = session.fromPartition(`persist:${provider}`);
+    const cookies = await ses.cookies.get({ url: providerUrl });
+    // Presence of any session/auth cookie means the user is logged in
+    return cookies.some((c) =>
+      c.name.startsWith("__Secure") ||
+      c.name.includes("session") ||
+      c.name.includes("auth") ||
+      c.name.includes("token") ||
+      c.name.startsWith("_ga") === false && c.name.startsWith("_")
+    );
+  });
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

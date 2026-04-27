@@ -80,3 +80,25 @@ export function onDone(cb: (data: { round: number }) => void): () => void {
   if (!isMolecule()) return () => {};
   return (window as any).molecule.on("deliberation:done", cb);
 }
+
+const PROVIDER_WEB_URLS: Record<string, string> = {
+  chatgpt: "https://chat.openai.com",
+  gemini: "https://gemini.google.com/app",
+  claude: "https://claude.ai",
+};
+
+/** Open a login window for a browser-mode provider. Resolves when window closes. */
+export async function connectProvider(provider: string): Promise<void> {
+  if (!isMolecule()) {
+    // Web fallback — open in new tab so user can log in
+    window.open(PROVIDER_WEB_URLS[provider] ?? `https://${provider}.com`, "_blank");
+    return;
+  }
+  return (window as any).molecule.connectProvider(provider);
+}
+
+/** Returns true if the provider has a saved session (cookies present). */
+export async function isProviderConnected(provider: string): Promise<boolean> {
+  if (!isMolecule()) return false;
+  return (window as any).molecule.isProviderConnected(provider);
+}

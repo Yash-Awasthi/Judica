@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
 import { Switch } from "~/components/ui/switch";
 import { Label } from "~/components/ui/label";
@@ -16,7 +16,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "~/components/ui/collapsible";
-import { Settings, Shield, MessageSquare, Brain, Gauge, ChevronDown, Filter, AlignLeft, Users, Plus, Trash2, Globe, Key } from "lucide-react";
+import { Settings, Shield, MessageSquare, Brain, Gauge, ChevronDown, Filter, AlignLeft, Users, Plus, Trash2, Globe, Key, Loader2, CheckCircle2 } from "lucide-react";
 import {
   type CouncilMember,
   type MemberMode,
@@ -25,6 +25,7 @@ import {
   saveCouncilMembers,
   newMember,
 } from "~/lib/council";
+import { connectProvider, isProviderConnected } from "~/lib/deliberate";
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -65,6 +66,23 @@ function MemberRow({
 }) {
   const canBrowser = BROWSER_CAPABLE.has(member.id);
   const selectedProvider = API_PROVIDERS.find((p) => p.id === member.provider);
+  const [connected, setConnected] = useState<boolean | null>(null);
+  const [connecting, setConnecting] = useState(false);
+
+  // Check connection status when member is in browser mode
+  useEffect(() => {
+    if (!canBrowser || member.mode !== "browser") { setConnected(null); return; }
+    isProviderConnected(member.id).then(setConnected);
+  }, [member.id, member.mode, canBrowser]);
+
+  const handleConnect = async () => {
+    setConnecting(true);
+    await connectProvider(member.id);
+    // Re-check after window closes
+    const status = await isProviderConnected(member.id);
+    setConnected(status);
+    setConnecting(false);
+  };
 
   const handleModeChange = (mode: MemberMode) => {
     onChange({ ...member, mode });
@@ -131,6 +149,40 @@ function MemberRow({
           </button>
         )}
       </div>
+
+      {/* Browser mode — show connection status + Connect button */}
+      {canBrowser && member.mode === "browser" && (
+        <div className="flex items-center gap-3 pl-9">
+          <div className="flex items-center gap-1.5 text-xs">
+            {connected === null ? (
+              <span className="size-2 rounded-full bg-muted-foreground/40 inline-block" />
+            ) : connected ? (
+              <CheckCircle2 className="size-3.5 text-green-500" />
+            ) : (
+              <span className="size-2 rounded-full bg-amber-400 inline-block" />
+            )}
+            <span className="text-muted-foreground">
+              {connected === null ? "Checking…" : connected ? "Connected" : "Not signed in"}
+            </span>
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            className="h-7 text-xs gap-1.5"
+            onClick={handleConnect}
+            disabled={connecting}
+          >
+            {connecting ? (
+              <><Loader2 className="size-3 animate-spin" /> Opening…</>
+            ) : (
+              <><Globe className="size-3" /> {connected ? "Re-connect" : "Connect account"}</>
+            )}
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            Sign in with your existing {member.label} subscription
+          </span>
+        </div>
+      )}
 
       {/* API config — visible when mode is api */}
       {member.mode === "api" && (

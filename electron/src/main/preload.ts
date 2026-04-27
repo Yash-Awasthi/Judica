@@ -29,6 +29,10 @@ contextBridge.exposeInMainWorld("molecule", {
   getMemory: () => ipcRenderer.invoke("memory:get"),
   setMemory: (value: string) => ipcRenderer.invoke("memory:set", value),
 
+  // Browser provider connection
+  connectProvider: (provider: string) => ipcRenderer.invoke("provider:connect", provider),
+  isProviderConnected: (provider: string) => ipcRenderer.invoke("provider:isConnected", provider),
+
   // Events from main → renderer
   on: (
     channel:
