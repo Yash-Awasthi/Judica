@@ -614,7 +614,7 @@ export async function buildApp() {
     prefix: "/",
     serve: true,
     index: false,
-    wildcard: false,
+    wildcard: true,
     setHeaders: (res, filePath) => {
       if (/\/assets\//.test(filePath) && /\.[a-f0-9]{8,}\.(js|css|woff2?|png|svg|jpg)/.test(filePath)) {
         res.setHeader("Cache-Control", "public, max-age=31536000, immutable");

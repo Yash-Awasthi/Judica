@@ -2,7 +2,24 @@
 
 import type { Route } from "./+types/landing";
 import { Link } from "react-router";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, Component, type ReactNode } from "react";
+
+class SplineErrorBoundary extends Component<
+  { children: ReactNode; fallback: ReactNode },
+  { hasError: boolean }
+> {
+  constructor(props: { children: ReactNode; fallback: ReactNode }) {
+    super(props);
+    this.state = { hasError: false };
+  }
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+  render() {
+    if (this.state.hasError) return this.props.fallback;
+    return this.props.children;
+  }
+}
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import {
@@ -322,10 +339,12 @@ export default function Home() {
 
         {/* Spline as full-bleed section background */}
         <div ref={splineContainerRef} className="absolute inset-0">
-          <SplineScene
-            scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
-            className="w-full h-full"
-          />
+          <SplineErrorBoundary fallback={<OrbitingAgents />}>
+            <SplineScene
+              scene="https://prod.spline.design/kZDDjO5HuC9GJUM2/scene.splinecode"
+              className="w-full h-full"
+            />
+          </SplineErrorBoundary>
         </div>
 
         <Spotlight className="-top-40 left-0 md:left-60 md:-top-20" fill="white" />
