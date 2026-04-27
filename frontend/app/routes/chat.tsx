@@ -1068,7 +1068,14 @@ export default function ChatPage() {
     });
 
     try {
-      await deliberate({ threadId: tid, message: text, round: thisRound });
+      // Build per-member options map from current UI state (API mode only)
+      const memberOptions: Record<string, { deepThinking?: boolean; webSearch?: boolean }> = {};
+      for (const m of councilMembers) {
+        if (m.deepThinking || m.webSearch) {
+          memberOptions[m.id] = { deepThinking: m.deepThinking, webSearch: m.webSearch };
+        }
+      }
+      await deliberate({ threadId: tid, message: text, round: thisRound, memberOptions: Object.keys(memberOptions).length ? memberOptions : undefined });
     } catch (err) {
       // If not in Electron, fall back to mock for development
       unsubOpinion(); unsubVerdict(); unsubDone();
@@ -1557,6 +1564,7 @@ export default function ChatPage() {
                         <div>
                           <p className="text-xs font-medium">Deep Thinking</p>
                           <p className="text-[10px] text-muted-foreground">Extended reasoning / o1 mode</p>
+                          <p className="text-[9px] text-amber-500/80 mt-0.5">API mode only</p>
                         </div>
                         <Switch
                           checked={!!member.deepThinking}
@@ -1569,6 +1577,7 @@ export default function ChatPage() {
                         <div>
                           <p className="text-xs font-medium">Web Search</p>
                           <p className="text-[10px] text-muted-foreground">Ground answers in live web results</p>
+                          <p className="text-[9px] text-amber-500/80 mt-0.5">API mode only</p>
                         </div>
                         <Switch
                           checked={!!member.webSearch}

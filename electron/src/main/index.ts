@@ -58,7 +58,17 @@ interface CouncilMember {
   model: string;
   apiKey: string;
   baseUrl: string;
+  /** API-mode only: enable extended reasoning (Anthropic thinking / o1 models / Gemini flash-thinking) */
+  deepThinking?: boolean;
+  /** API-mode only: enable web search tool (Anthropic search / Gemini google_search / GPT-4o-search) */
+  webSearch?: boolean;
 }
+
+const PROVIDER_LABELS: Record<string, string> = {
+  chatgpt: "ChatGPT",
+  gemini: "Gemini",
+  claude: "Claude",
+};
 
 let councilMembers: CouncilMember[] = [
   { id: "chatgpt", label: "ChatGPT", enabled: true, mode: "browser", provider: "openai",    model: "gpt-4o",    apiKey: "", baseUrl: "https://api.openai.com/v1" },
@@ -240,51 +250,75 @@ async function sendToApi(
   message: string
 ): Promise<{ ok: boolean; text?: string; summary?: string; error?: string }> {
   try {
-    // Anthropic uses a different request/response format
+    // ── Anthropic ──────────────────────────────────────────────────────────────
     if (member.provider === "anthropic") {
-      const res = await fetch(`${member.baseUrl}/v1/messages`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          "x-api-key": member.apiKey,
-          "anthropic-version": "2023-06-01",
-        },
-        body: JSON.stringify({
-          model: member.model,
-          max_tokens: 2048,
-          messages: [{ role: "user", content: message }],
-        }),
-      });
+      const betaHeaders: string[] = [];
+      const body: any = {
+        model: member.model,
+        max_tokens: member.deepThinking ? 16000 : 2048,
+        messages: [{ role: "user", content: message }],
+      };
+
+      if (member.deepThinking) {
+        // Extended thinking — requires interleaved-thinking beta + max_tokens ≥ budget
+        body.thinking = { type: "enabled", budget_tokens: 10000 };
+        betaHeaders.push("interleaved-thinking-2025-05-14");
+      }
+
+      if (member.webSearch) {
+        body.tools = [{ type: "web_search_20250305" }];
+        betaHeaders.push("web-search-2025-03-05");
+      }
+
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+        "x-api-key": member.apiKey,
+        "anthropic-version": "2023-06-01",
+      };
+      if (betaHeaders.length) headers["anthropic-beta"] = betaHeaders.join(",");
+
+      const res = await fetch(`${member.baseUrl}/v1/messages`, { method: "POST", headers, body: JSON.stringify(body) });
       if (!res.ok) {
         const err = await res.text();
         return { ok: false, error: `Anthropic API error ${res.status}: ${err.slice(0, 200)}` };
       }
       const data: any = await res.json();
-      const text = data.content?.[0]?.text ?? "";
+      // Filter out thinking blocks — only return text blocks
+      const text = (data.content as any[] ?? [])
+        .filter((b: any) => b.type === "text")
+        .map((b: any) => b.text as string)
+        .join("") || data.content?.[0]?.text || "";
       return { ok: true, text, summary: text.slice(0, 200) };
     }
 
-    // All other providers: OpenAI-compatible /chat/completions
+    // ── OpenAI / Gemini (OpenAI-compatible) ───────────────────────────────────
+    let model = member.model;
+    const tools: any[] = [];
+
+    if (member.provider === "openai") {
+      if (member.deepThinking) model = "o3-mini"; // switch to reasoning model
+      else if (member.webSearch) model = "gpt-4o-search-preview"; // built-in search
+    } else if (member.provider === "gemini") {
+      if (member.deepThinking) model = "gemini-2.0-flash-thinking-exp";
+      if (member.webSearch) tools.push({ google_search: {} });
+    }
+
     const baseUrl = member.baseUrl.replace(/\/$/, "");
     const url = baseUrl.endsWith("/chat/completions")
       ? baseUrl
       : `${baseUrl}/chat/completions`;
 
-    const headers: Record<string, string> = {
-      "Content-Type": "application/json",
-    };
+    const headers: Record<string, string> = { "Content-Type": "application/json" };
     if (member.apiKey) headers["Authorization"] = `Bearer ${member.apiKey}`;
 
-    const res = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify({
-        model: member.model,
-        messages: [{ role: "user", content: message }],
-        stream: false,
-      }),
-    });
+    const reqBody: any = {
+      model,
+      messages: [{ role: "user", content: message }],
+      stream: false,
+    };
+    if (tools.length) reqBody.tools = tools;
 
+    const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(reqBody) });
     if (!res.ok) {
       const err = await res.text();
       return { ok: false, error: `API error ${res.status}: ${err.slice(0, 200)}` };
@@ -480,8 +514,23 @@ function registerIPC() {
         threadId,
         message,
         round,
-      }: { threadId: string; message: string; round: number }
+        memberOptions,
+      }: {
+        threadId: string;
+        message: string;
+        round: number;
+        /** Per-member capability overrides sent from the renderer's UI state */
+        memberOptions?: Record<string, { deepThinking?: boolean; webSearch?: boolean }>;
+      }
     ) => {
+      // Overlay member options from the UI onto the stored council config
+      if (memberOptions) {
+        councilMembers = councilMembers.map((m) =>
+          memberOptions[m.id]
+            ? { ...m, ...memberOptions[m.id] }
+            : m
+        );
+      }
       // Save user message
       insertMessage({
         id: randomUUID(),

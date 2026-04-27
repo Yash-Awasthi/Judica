@@ -24,6 +24,8 @@ export async function deliberate(args: {
   threadId: string;
   message: string;
   round: number;
+  /** Per-member capability flags (API mode only). Key = member id. */
+  memberOptions?: Record<string, { deepThinking?: boolean; webSearch?: boolean }>;
 }): Promise<void> {
   if (!isMolecule()) {
     throw new Error("Molecule desktop app required.");
