@@ -61,9 +61,16 @@
 	 */
 	"vars": {
 		"AI_VIRTUAL_MODEL": "auto",
-		"VALUE_FROM_CLOUDFLARE": "Starter template running on Cloudflare"
+		"VALUE_FROM_CLOUDFLARE": "Starter template running on Cloudflare",
 		// Optional local fallback for template DATA_PROXY shim:
 		// "DATA_PROXY_URL": "http://host.docker.internal:8081/proxy/<thread-id>/api"
+
+		// Auth configuration — use `wrangler secret put JWT_SECRET` for production
+		"JWT_SECRET": "change-me-use-wrangler-secret-put",
+		// Google OAuth — set GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET to enable "Continue with Google"
+		"GOOGLE_CLIENT_ID": "",
+		"GOOGLE_CLIENT_SECRET": "",
+		"OAUTH_CALLBACK_BASE_URL": "https://your-app.camelai.app"
 	},
 
 	/**

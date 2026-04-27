@@ -1,6 +1,8 @@
 import { type RouteConfig, index, layout, route } from "@react-router/dev/routes";
 
 export default [
+  // Setup (first launch)
+  route("setup", "routes/setup.tsx"),
   // Marketing pages — wrapped with Navbar + Footer
   layout("routes/marketing-layout.tsx", [
     index("routes/landing.tsx"),
@@ -21,15 +23,10 @@ export default [
     route("product/deliberation-modes", "routes/product.deliberation-modes.tsx"),
     route("product/desktop-app", "routes/product.desktop-app.tsx"),
   ]),
-  // Auth pages (no navbar)
-  route("login", "routes/login.tsx"),
-  route("register", "routes/register.tsx"),
   // App pages (sidebar layout handled by root.tsx)
   route("dashboard", "routes/home.tsx"),
   route("chat", "routes/chat.tsx"),
   route("chat/:id", "routes/chat-detail.tsx"),
-  route("api/deliberate", "routes/api.deliberate.tsx"),
-  route("api/evaluate", "routes/api.evaluate.tsx"),
   route("settings", "routes/settings.tsx"),
   route("profile", "routes/profile.tsx"),
   route("language-models", "routes/language-models.tsx"),

@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/com
 import { Switch } from "~/components/ui/switch";
 import { Label } from "~/components/ui/label";
 import { Button } from "~/components/ui/button";
+import { Input } from "~/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -15,7 +16,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "~/components/ui/collapsible";
-import { Settings, Shield, MessageSquare, Brain, Gauge, ChevronDown, Filter, AlignLeft } from "lucide-react";
+import { Settings, Shield, MessageSquare, Brain, Gauge, ChevronDown, Filter, AlignLeft, Key, CheckCircle2 } from "lucide-react";
 
 function ToggleRow({
   label,
@@ -39,7 +40,29 @@ function ToggleRow({
   );
 }
 
+const SETTINGS_KEY = "aibyai_settings";
+
+function loadAISettings() {
+  try {
+    const raw = localStorage.getItem(SETTINGS_KEY);
+    return raw
+      ? JSON.parse(raw)
+      : { provider: "anthropic", anthropicKey: "", openaiKey: "" };
+  } catch {
+    return { provider: "anthropic", anthropicKey: "", openaiKey: "" };
+  }
+}
+
 export default function SettingsPage() {
+  const [aiSettings, setAISettings] = useState(loadAISettings);
+  const [saved, setSaved] = useState(false);
+
+  const saveAISettings = () => {
+    localStorage.setItem(SETTINGS_KEY, JSON.stringify(aiSettings));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  };
+
   const [autoCouncil, setAutoCouncil] = useState(true);
   const [debateRound, setDebateRound] = useState(true);
   const [coldValidator, setColdValidator] = useState(false);
@@ -68,6 +91,63 @@ export default function SettingsPage() {
             </p>
           </div>
         </div>
+
+        {/* AI Provider Keys */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Key className="size-4" />
+              AI Provider Keys
+            </CardTitle>
+            <CardDescription>
+              Your keys are stored locally on this device and never sent anywhere else.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Default provider</Label>
+              <Select
+                value={aiSettings.provider}
+                onValueChange={(v) => setAISettings((s: typeof aiSettings) => ({ ...s, provider: v }))}
+              >
+                <SelectTrigger className="w-48">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="anthropic">Anthropic (Claude)</SelectItem>
+                  <SelectItem value="openai">OpenAI (GPT)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="anthropic-key">Anthropic API Key</Label>
+              <Input
+                id="anthropic-key"
+                type="password"
+                placeholder="sk-ant-..."
+                value={aiSettings.anthropicKey ?? ""}
+                onChange={(e) => setAISettings((s: typeof aiSettings) => ({ ...s, anthropicKey: e.target.value }))}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="openai-key">OpenAI API Key</Label>
+              <Input
+                id="openai-key"
+                type="password"
+                placeholder="sk-..."
+                value={aiSettings.openaiKey ?? ""}
+                onChange={(e) => setAISettings((s: typeof aiSettings) => ({ ...s, openaiKey: e.target.value }))}
+              />
+            </div>
+
+            <Button onClick={saveAISettings} className="gap-2">
+              {saved ? <CheckCircle2 className="size-4 text-emerald-400" /> : null}
+              {saved ? "Saved" : "Save Keys"}
+            </Button>
+          </CardContent>
+        </Card>
 
         {/* Council Preferences */}
         <Card>

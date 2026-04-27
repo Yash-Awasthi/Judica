@@ -7,6 +7,8 @@ import { Label } from "~/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "~/components/ui/card";
 import { Separator } from "~/components/ui/separator";
 import { useStore } from "~/context/StoreContext";
+import { useAuth } from "~/context/AuthContext";
+import { deliberate } from "~/lib/deliberate";
 import {
   Select,
   SelectContent,
@@ -177,13 +179,7 @@ const VERDICTS = [
   "Synthesizing across perspectives: begin with the simplest solution that satisfies current requirements, instrument it thoroughly from day one, and create explicit review points to reassess architectural decisions as complexity grows.",
 ];
 
-const mockConversations = [
-  { id: "1", title: "Authentication Architecture", date: "2 hours ago", mode: "Council" },
-  { id: "2", title: "Database Schema Review", date: "Yesterday", mode: "Council" },
-  { id: "3", title: "API Rate Limiting Strategy", date: "2 days ago", mode: "Council" },
-  { id: "4", title: "Frontend State Management", date: "3 days ago", mode: "Council" },
-  { id: "5", title: "Microservices vs Monolith", date: "1 week ago", mode: "Council" },
-];
+const mockConversations: { id: string; title: string; date: string; mode: string }[] = [];
 
 const defaultMembers: CouncilMember[] = [
   { id: "m1", name: "Architect", model: "claude-sonnet-4-6" },
@@ -640,13 +636,31 @@ export function clientLoader() {
 
 export default function ChatPage() {
   const store = useStore();
-  const [conversations, setConversations] = useState(mockConversations);
+  const { user } = useAuth();
+  const userKey = user?.id ? `aibyai-chats-${user.id}` : null;
+
+  const [conversations, setConversations] = useState<typeof mockConversations>(() => {
+    if (typeof window !== "undefined" && userKey) {
+      try {
+        const stored = localStorage.getItem(userKey);
+        return stored ? JSON.parse(stored) : [];
+      } catch { return []; }
+    }
+    return [];
+  });
   const [selectedConvId, setSelectedConvId] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
       return sessionStorage.getItem("aibyai-conv") || null;
     }
     return null;
   });
+
+  // Persist conversations to per-user localStorage
+  useEffect(() => {
+    if (userKey) {
+      localStorage.setItem(userKey, JSON.stringify(conversations));
+    }
+  }, [conversations, userKey]);
 
   // Persist selected conversation
   useEffect(() => {
@@ -979,19 +993,15 @@ export default function ChatPage() {
     // Fetch ALL active (non-muted) member opinions in parallel
     const fetchPromises = activeMembers.map(async (member) => {
       try {
-        const res = await fetch("/api/deliberate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt: text,
-            members: [{ name: member.name }],
-            type: "opinion",
-          }),
+        const text = await deliberate({
+          prompt,
+          members: [{ name: member.name }],
+          type: "opinion",
         });
-        const data = await res.json();
-        return { name: member.name, text: data.text || "No response generated." };
-      } catch {
-        return { name: member.name, text: "I encountered an issue generating my response. Please try again." };
+        return { name: member.name, text: text || "No response generated." };
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : "I encountered an issue generating my response. Please try again.";
+        return { name: member.name, text: msg };
       }
     });
 
@@ -1015,22 +1025,17 @@ export default function ChatPage() {
       // Fetch the synthesized verdict
       let verdict = "";
       try {
-        const verdictRes = await fetch("/api/deliberate", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt: text,
-            members: Object.entries(collectedOpinions).map(([name, opinion]) => ({
-              name,
-              opinion,
-            })),
-            type: "verdict",
-          }),
+        verdict = await deliberate({
+          prompt: text,
+          members: Object.entries(collectedOpinions).map(([name, opinion]) => ({
+            name,
+            opinion,
+          })),
+          type: "verdict",
         });
-        const verdictData = await verdictRes.json();
-        verdict = verdictData.text || "The council could not reach a verdict.";
-      } catch {
-        verdict = "Failed to generate verdict. Please try again.";
+        if (!verdict) verdict = "The council could not reach a verdict.";
+      } catch (err) {
+        verdict = err instanceof Error ? err.message : "Failed to generate verdict. Please try again.";
       }
 
       setMessageGroups((prev) =>

@@ -5,12 +5,13 @@ import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Separator } from "~/components/ui/separator";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useAuth } from "~/context/AuthContext";
 
 const OAUTH_ERRORS: Record<string, string> = {
   email_conflict: "An account with this email already exists. Please sign in with your password.",
   oauth_failed: "Google sign-in failed. Please try again.",
+  google_not_configured: "Google sign-in is not configured yet. Please use username/password login.",
 };
 
 export default function LoginPage() {
@@ -22,16 +23,21 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
 
   // Redirect if already authenticated
   useEffect(() => {
-    if (isAuthenticated) navigate("/dashboard", { replace: true });
+    if (isAuthenticated) navigate("/chat", { replace: true });
   }, [isAuthenticated, navigate]);
 
-  // Show OAuth callback errors passed via query param
+  // Show OAuth errors or post-registration success banner
   useEffect(() => {
     const errorCode = searchParams.get("error");
-    if (errorCode) setError(OAUTH_ERRORS[errorCode] ?? "An error occurred. Please try again.");
+    if (errorCode) {
+      setError(OAUTH_ERRORS[errorCode] ?? "An error occurred. Please try again.");
+    } else if (searchParams.get("registered") === "1") {
+      setSuccess("Account created! Sign in to get started.");
+    }
   }, [searchParams]);
 
   const handleSignIn = async (e: React.FormEvent) => {
@@ -40,7 +46,7 @@ export default function LoginPage() {
     setIsLoading(true);
     try {
       await login(username, password);
-      navigate("/dashboard");
+      navigate("/chat");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Sign in failed. Please try again.");
     } finally {
@@ -74,6 +80,12 @@ export default function LoginPage() {
             <p className="text-sm font-medium text-center">Sign in to your workspace</p>
           </CardHeader>
           <CardContent className="space-y-4">
+            {success && (
+              <div className="flex items-start gap-2 rounded-md bg-emerald-500/10 border border-emerald-500/20 p-3 text-sm text-emerald-600 dark:text-emerald-400">
+                <CheckCircle2 className="size-4 mt-0.5 shrink-0" />
+                <span>{success}</span>
+              </div>
+            )}
             {error && (
               <div className="flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
                 <AlertCircle className="size-4 mt-0.5 shrink-0" />

@@ -1,74 +1,49 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 
-interface AuthUser {
-  id: number;
+export interface AuthUser {
+  id: string;
   username: string;
-  email: string;
-  role: "admin" | "member" | "viewer";
 }
 
 interface AuthContextType {
   user: AuthUser | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (username: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
-  refreshUser: () => Promise<void>;
+  setUser: (user: AuthUser | null) => void;
+  logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
-async function fetchCurrentUser(): Promise<AuthUser | null> {
-  try {
-    const res = await fetch("/api/auth/me", { credentials: "include" });
-    if (!res.ok) return null;
-    return res.json();
-  } catch {
-    return null;
-  }
-}
+const STORAGE_KEY = "aibyai_user";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [user, setUser] = useState<AuthUser | null>(null);
+  const [user, setUserState] = useState<AuthUser | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const refreshUser = async () => {
-    const currentUser = await fetchCurrentUser();
-    setUser(currentUser);
-  };
-
   useEffect(() => {
-    refreshUser().finally(() => setIsLoading(false));
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) setUserState(JSON.parse(raw));
+    } catch {
+      // ignore
+    }
+    setIsLoading(false);
   }, []);
 
-  const login = async (username: string, password: string) => {
-    const res = await fetch("/api/auth/login", {
-      method: "POST",
-      credentials: "include",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ username, password }),
-    });
-
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({}));
-      throw new Error(body.error ?? `Login failed: ${res.status}`);
+  const setUser = (u: AuthUser | null) => {
+    setUserState(u);
+    if (u) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(u));
+    } else {
+      localStorage.removeItem(STORAGE_KEY);
     }
-
-    const currentUser = await fetchCurrentUser();
-    setUser(currentUser);
   };
 
-  const logout = async () => {
-    try {
-      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
-    } catch {
-      // ignore network errors on logout
-    }
-    setUser(null);
-  };
+  const logout = () => setUser(null);
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, refreshUser }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, setUser, logout }}>
       {children}
     </AuthContext.Provider>
   );

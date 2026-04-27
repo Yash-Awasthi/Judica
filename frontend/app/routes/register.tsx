@@ -5,11 +5,9 @@ import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Loader2, AlertCircle } from "lucide-react";
-import { useAuth } from "~/context/AuthContext";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
-  const { login } = useAuth();
 
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -40,9 +38,8 @@ export default function RegisterPage() {
         throw new Error(body.error ?? `Registration failed: ${res.status}`);
       }
 
-      // Registration sets auth cookies; load user then redirect
-      await login(username, password);
-      navigate("/dashboard");
+      // Account created — send to login to sign in explicitly
+      navigate("/login?registered=1");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Registration failed. Please try again.");
     } finally {

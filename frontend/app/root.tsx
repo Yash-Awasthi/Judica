@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import {
   isRouteErrorResponse,
   Links,
@@ -7,6 +8,7 @@ import {
   Scripts,
   ScrollRestoration,
   useLocation,
+  useNavigate,
 } from "react-router";
 import {
   MessageSquare,
@@ -54,6 +56,14 @@ import { AuthProvider, useAuth } from "~/context/AuthContext";
 
 import type { Route } from "./+types/root";
 import "./app.css";
+
+const PUBLIC_PATHS = new Set([
+  "/", "/login", "/setup",
+]);
+
+function isPublicPath(pathname: string) {
+  return PUBLIC_PATHS.has(pathname) || pathname.startsWith("/product/");
+}
 
 export const links: Route.LinksFunction = () => [
   { rel: "icon", type: "image/svg+xml", href: "/favicon.svg" },
@@ -275,14 +285,18 @@ function AppSidebar() {
 
 export default function App() {
   const location = useLocation();
-  const isPublicPage = location.pathname === "/" ||
-    location.pathname === "/login" ||
-    location.pathname === "/register" ||
-    location.pathname.startsWith("/product/") ||
-    ["/pricing", "/about", "/blog", "/careers", "/contact",
-     "/llm-leaderboard", "/infra-calculator", "/status"].includes(location.pathname);
+  const navigate = useNavigate();
 
-  if (isPublicPage) {
+  // Client-side auth guard — redirect to /setup if no user profile exists
+  useEffect(() => {
+    if (isPublicPath(location.pathname)) return;
+    const profile = localStorage.getItem("aibyai_user");
+    if (!profile) {
+      navigate("/setup", { replace: true });
+    }
+  }, [location.pathname]);
+
+  if (isPublicPath(location.pathname)) {
     return (
       <AuthProvider>
         <ThemeProvider>
