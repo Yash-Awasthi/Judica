@@ -33,6 +33,8 @@ import {
   LogOut,
   Sun,
   Moon,
+  Eye,
+  Hammer,
 } from "lucide-react";
 
 import { TooltipProvider } from "~/components/ui/tooltip";
@@ -110,6 +112,8 @@ const navGroups = [
       { to: "/projects", icon: FolderOpen, label: "Projects" },
       { to: "/evaluation", icon: ClipboardCheck, label: "Evaluation" },
       { to: "/marketplace", icon: Store, label: "Marketplace" },
+      { to: "/build", icon: Hammer, label: "Build" },
+      { to: "/god-mode", icon: Eye, label: "God Mode" },
     ],
   },
   {
