@@ -1,6 +1,6 @@
-# Contributing to AIBYAI
+# Contributing to Judica
 
-Thanks for your interest in contributing to AIBYAI — a multi-agent deliberative intelligence platform where a council of AI models argues, critiques each other's claims, and produces a scored consensus.
+Thanks for your interest in contributing to Judica — a multi-agent deliberative intelligence platform where a council of AI models argues, critiques each other's claims, and produces a scored consensus.
 
 ## Table of Contents
 
@@ -32,8 +32,8 @@ Thanks for your interest in contributing to AIBYAI — a multi-agent deliberativ
 
 ```bash
 # 1. Clone
-git clone https://github.com/Yash-Awasthi/aibyai.git
-cd aibyai
+git clone https://github.com/Yash-Awasthi/judica.git
+cd judica
 
 # 2. Copy env and fill in the required fields
 cp .env.example .env
@@ -69,7 +69,7 @@ docker compose up     # app + db + redis + prometheus + grafana
 ## Project Structure
 
 ```
-aibyai/
+judica/
 ├── src/                        # Backend (Fastify + TypeScript)
 │   ├── adapters/               # Per-provider LLM adapters (OpenAI, Anthropic, Gemini…)
 │   ├── agents/                 # Orchestrator, conflict detector, shared memory, message bus
@@ -354,4 +354,4 @@ If you're new to the codebase, these are well-contained starting points:
 
 ## Questions?
 
-Open a [GitHub Discussion](https://github.com/Yash-Awasthi/aibyai/discussions) or file an [issue](https://github.com/Yash-Awasthi/aibyai/issues).
+Open a [GitHub Discussion](https://github.com/Yash-Awasthi/judica/discussions) or file an [issue](https://github.com/Yash-Awasthi/judica/issues).

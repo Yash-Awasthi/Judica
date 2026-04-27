@@ -1,6 +1,6 @@
 <div align="center">
 
-# AIBYAI — Technical Documentation
+# Judica — Technical Documentation
 
 ### Complete Reference for Setup, APIs, Architecture, and Deployment
 
@@ -49,8 +49,8 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/Yash-Awasthi/aibyai.git
-cd aibyai
+git clone https://github.com/Yash-Awasthi/judica.git
+cd judica
 
 # Install backend dependencies
 npm install
@@ -421,7 +421,7 @@ GET /health    System health (public)
 ## Project Structure
 
 ```
-aibyai/
+judica/
 ├── src/
 │   ├── adapters/                      # LLM provider adapters
 │   │   ├── types.ts                   # IProviderAdapter interface
@@ -558,7 +558,7 @@ aibyai/
 │   │   ├── hitlGates.service.ts           # Human-in-the-loop gates
 │   │   ├── codeGeneration.service.ts      # Full-stack code scaffolding
 │   │   ├── mcpClient.service.ts           # MCP client (connect to external tools)
-│   │   ├── mcpServer.service.ts           # MCP server (expose AIBYAI as tool server)
+│   │   ├── mcpServer.service.ts           # MCP server (expose Judica as tool server)
 │   │   ├── pluginRegistry.service.ts      # Custom tool packages
 │   │   ├── audioVideo.service.ts          # Transcription + keyframe analysis
 │   │   ├── multiUserDeliberation.service.ts # Real-time multi-user sessions
@@ -696,7 +696,7 @@ All vector columns use pgvector HNSW indexes (`m=16`, `efConstruction=64`) for f
 
 ## Deliberation Engine
 
-The deliberation engine is the core of AIBYAI. It orchestrates multiple LLM agents through a structured debate pipeline and produces a scored consensus verdict.
+The deliberation engine is the core of Judica. It orchestrates multiple LLM agents through a structured debate pipeline and produces a scored consensus verdict.
 
 ### Pipeline Phases
 
@@ -816,7 +816,7 @@ score_rrf = 1 / (rank_vector + 60) + 1 / (rank_keyword + 60)
 
 ## Agentic Memory
 
-AIBYAI uses a three-layer memory system that persists knowledge across conversations.
+Judica uses a three-layer memory system that persists knowledge across conversations.
 
 ### Memory Architecture
 
@@ -999,11 +999,11 @@ Gates support multi-approver quorum requirements and auto-timeout (default 5 min
 
 ## MCP Integration
 
-AIBYAI implements the [Model Context Protocol](https://modelcontextprotocol.io/) in both directions.
+Judica implements the [Model Context Protocol](https://modelcontextprotocol.io/) in both directions.
 
 ### Server Mode (`src/services/mcpServer.service.ts`)
 
-Exposes AIBYAI as an MCP-compatible tool server:
+Exposes Judica as an MCP-compatible tool server:
 
 | Tool exposed | Description |
 |---|---|
@@ -1245,7 +1245,7 @@ docker compose up -d
 
 | Service | Image | Port | Purpose |
 |---|---|---|---|
-| `app` | Custom (Dockerfile) | 3000 | AIBYAI server |
+| `app` | Custom (Dockerfile) | 3000 | Judica server |
 | `db` | `pgvector/pgvector:pg16` | 5433 | PostgreSQL + pgvector |
 | `redis` | `redis:7-alpine` | 6379 | Cache, queues, rate limits |
 | `prometheus` | `prom/prometheus` | 9090 | Metrics collection |
@@ -1296,20 +1296,20 @@ For horizontal scaling, use an upstream block with multiple app instances and st
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: aibyai
+  name: judica
 spec:
   replicas: 3
   selector:
     matchLabels:
-      app: aibyai
+      app: judica
   template:
     metadata:
       labels:
-        app: aibyai
+        app: judica
     spec:
       containers:
-      - name: aibyai
-        image: aibyai:latest
+      - name: judica
+        image: judica:latest
         ports:
         - containerPort: 3000
         env:
@@ -1326,12 +1326,12 @@ spec:
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: aibyai-hpa
+  name: judica-hpa
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: aibyai
+    name: judica
   minReplicas: 2
   maxReplicas: 10
   metrics:

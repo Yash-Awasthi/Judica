@@ -1,4 +1,4 @@
-# Threat Model — AIBYAI
+# Threat Model — Judica
 
 Security architecture analysis covering trust boundaries, attack surfaces, mitigations, and residual risks.
 
