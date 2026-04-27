@@ -1,46 +1,55 @@
-import { useState } from "react";
-import { useNavigate, Link } from "react-router";
+import { useState, useEffect } from "react";
+import { useNavigate, useSearchParams, Link } from "react-router";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import { Separator } from "~/components/ui/separator";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
+import { useAuth } from "~/context/AuthContext";
 
-const DEMO_USER = { id: "demo-001", username: "admin", email: "admin@aibyai.dev", role: "admin" };
-const DEMO_TOKEN = "demo-token-preview-only";
+const OAUTH_ERRORS: Record<string, string> = {
+  email_conflict: "An account with this email already exists. Please sign in with your password.",
+  oauth_failed: "Google sign-in failed. Please try again.",
+};
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const { login, isAuthenticated } = useAuth();
+
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const [isDemoLoading, setIsDemoLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) navigate("/dashboard", { replace: true });
+  }, [isAuthenticated, navigate]);
+
+  // Show OAuth callback errors passed via query param
+  useEffect(() => {
+    const errorCode = searchParams.get("error");
+    if (errorCode) setError(OAUTH_ERRORS[errorCode] ?? "An error occurred. Please try again.");
+  }, [searchParams]);
 
   const handleSignIn = async (e: React.FormEvent) => {
     e.preventDefault();
+    setError("");
     setIsLoading(true);
-    // Demo mode: accept any credentials
-    if (typeof window !== "undefined") {
-      localStorage.setItem("aibyai_token", DEMO_TOKEN);
-      localStorage.setItem("aibyai_user", JSON.stringify(DEMO_USER));
-    }
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      await login(username, password);
       navigate("/dashboard");
-    }, 500);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Sign in failed. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleDemo = () => {
-    setIsDemoLoading(true);
-    if (typeof window !== "undefined") {
-      localStorage.setItem("aibyai_token", DEMO_TOKEN);
-      localStorage.setItem("aibyai_user", JSON.stringify(DEMO_USER));
-    }
-    setTimeout(() => {
-      setIsDemoLoading(false);
-      navigate("/dashboard");
-    }, 500);
+  const handleGoogleSignIn = () => {
+    window.location.href = "/api/auth/google";
   };
 
   return (
@@ -65,6 +74,13 @@ export default function LoginPage() {
             <p className="text-sm font-medium text-center">Sign in to your workspace</p>
           </CardHeader>
           <CardContent className="space-y-4">
+            {error && (
+              <div className="flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+                <AlertCircle className="size-4 mt-0.5 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
             <form onSubmit={handleSignIn} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="username">Username</Label>
@@ -74,6 +90,7 @@ export default function LoginPage() {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   autoComplete="username"
+                  required
                 />
               </div>
               <div className="space-y-2">
@@ -85,6 +102,7 @@ export default function LoginPage() {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="current-password"
+                  required
                 />
               </div>
               <Button type="submit" className="w-full" disabled={isLoading}>
@@ -109,7 +127,7 @@ export default function LoginPage() {
             <Button
               variant="outline"
               className="w-full gap-2"
-              onClick={() => {}}
+              onClick={handleGoogleSignIn}
               type="button"
             >
               <svg className="size-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
@@ -119,23 +137,6 @@ export default function LoginPage() {
                 <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
               </svg>
               Continue with Google
-            </Button>
-
-            <Button
-              variant="secondary"
-              className="w-full"
-              onClick={handleDemo}
-              disabled={isDemoLoading}
-              type="button"
-            >
-              {isDemoLoading ? (
-                <>
-                  <Loader2 className="size-4 mr-2 animate-spin" />
-                  Loading demo...
-                </>
-              ) : (
-                "Try Demo"
-              )}
             </Button>
 
             <p className="text-center text-xs text-muted-foreground">

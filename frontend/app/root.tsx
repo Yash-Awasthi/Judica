@@ -48,9 +48,9 @@ import {
   SidebarHeader,
   SidebarTrigger,
 } from "~/components/ui/sidebar";
-import { mockUser } from "~/lib/mock-data";
 import { ThemeProvider, useTheme } from "~/context/ThemeContext";
 import { StoreProvider } from "~/context/StoreContext";
+import { AuthProvider, useAuth } from "~/context/AuthContext";
 
 import type { Route } from "./+types/root";
 import "./app.css";
@@ -206,6 +206,10 @@ function ThemeToggleButton() {
 }
 
 function AppSidebar() {
+  const { user, logout } = useAuth();
+  const displayName = user?.username ?? "Guest";
+  const initials = displayName.slice(0, 2).toUpperCase();
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="px-3 py-4">
@@ -235,20 +239,17 @@ function AppSidebar() {
       <SidebarFooter>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton asChild tooltip={mockUser.name}>
+            <SidebarMenuButton asChild tooltip={displayName}>
               <NavLink to="/profile" className="flex items-center gap-2">
                 <div className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground text-[10px] font-medium">
-                  {mockUser.name
-                    .split(" ")
-                    .map((n) => n[0])
-                    .join("")}
+                  {initials}
                 </div>
                 <div className="flex flex-col group-data-[collapsible=icon]:hidden">
                   <span className="text-xs font-medium leading-none">
-                    {mockUser.name}
+                    {displayName}
                   </span>
                   <span className="text-[10px] text-muted-foreground leading-tight mt-0.5">
-                    {mockUser.role}
+                    {user?.role ?? ""}
                   </span>
                 </div>
               </NavLink>
@@ -257,10 +258,13 @@ function AppSidebar() {
           <ThemeToggleButton />
           <SidebarMenuItem>
             <SidebarMenuButton asChild tooltip="Logout">
-              <NavLink to="/login" className="flex items-center gap-2 text-muted-foreground hover:text-foreground">
+              <button
+                onClick={() => logout()}
+                className="flex w-full items-center gap-2 text-muted-foreground hover:text-foreground"
+              >
                 <LogOut className="size-4" />
                 <span className="group-data-[collapsible=icon]:hidden text-xs">Logout</span>
-              </NavLink>
+              </button>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -280,29 +284,33 @@ export default function App() {
 
   if (isPublicPage) {
     return (
-      <ThemeProvider>
-        <Outlet />
-      </ThemeProvider>
+      <AuthProvider>
+        <ThemeProvider>
+          <Outlet />
+        </ThemeProvider>
+      </AuthProvider>
     );
   }
 
   return (
-    <ThemeProvider>
-      <StoreProvider>
-        <TooltipProvider>
-          <SidebarProvider>
-            <AppSidebar />
-            <main className="flex-1 overflow-auto">
-              <div className="flex items-center gap-2 border-b border-border px-4 py-2 md:hidden">
-                <SidebarTrigger />
-                <span className="text-sm font-semibold">AIBYAI</span>
-              </div>
-              <Outlet />
-            </main>
-          </SidebarProvider>
-        </TooltipProvider>
-      </StoreProvider>
-    </ThemeProvider>
+    <AuthProvider>
+      <ThemeProvider>
+        <StoreProvider>
+          <TooltipProvider>
+            <SidebarProvider>
+              <AppSidebar />
+              <main className="flex-1 overflow-auto">
+                <div className="flex items-center gap-2 border-b border-border px-4 py-2 md:hidden">
+                  <SidebarTrigger />
+                  <span className="text-sm font-semibold">AIBYAI</span>
+                </div>
+                <Outlet />
+              </main>
+            </SidebarProvider>
+          </TooltipProvider>
+        </StoreProvider>
+      </ThemeProvider>
+    </AuthProvider>
   );
 }
 

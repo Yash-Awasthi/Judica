@@ -60,6 +60,11 @@ export async function googleOAuthPlugin(fastify: FastifyInstance): Promise<void>
       if (!returnedState || !/^[0-9a-f]{64}$/.test(returnedState)) {
         return callback(new Error("Invalid OAuth state parameter"));
       }
+      // Reject unknown or already-consumed states (CSRF protection)
+      if (!pendingOAuthStates.has(returnedState)) {
+        return callback(new Error("Unknown or expired OAuth state parameter"));
+      }
+      pendingOAuthStates.delete(returnedState);
       callback();
     },
     discovery: {

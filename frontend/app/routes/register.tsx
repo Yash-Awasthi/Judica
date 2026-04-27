@@ -4,12 +4,14 @@ import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle } from "lucide-react";
+import { useAuth } from "~/context/AuthContext";
 
 export default function RegisterPage() {
   const navigate = useNavigate();
+  const { login } = useAuth();
+
   const [username, setUsername] = useState("");
-  const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
@@ -26,9 +28,23 @@ export default function RegisterPage() {
 
     setIsLoading(true);
     try {
-      // Demo mode: simulate registration delay
-      await new Promise((res) => setTimeout(res, 800));
-      navigate("/login");
+      const res = await fetch("/api/auth/register", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password }),
+      });
+
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.error ?? `Registration failed: ${res.status}`);
+      }
+
+      // Registration sets auth cookies; load user then redirect
+      await login(username, password);
+      navigate("/dashboard");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Registration failed. Please try again.");
     } finally {
       setIsLoading(false);
     }
@@ -52,27 +68,24 @@ export default function RegisterPage() {
             <p className="text-sm font-medium text-center">Get started for free</p>
           </CardHeader>
           <CardContent className="space-y-4">
+            {error && (
+              <div className="flex items-start gap-2 rounded-md bg-destructive/10 border border-destructive/20 p-3 text-sm text-destructive">
+                <AlertCircle className="size-4 mt-0.5 shrink-0" />
+                <span>{error}</span>
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="username">Username</Label>
                 <Input
                   id="username"
-                  placeholder="Choose a username"
+                  placeholder="Choose a username (letters, numbers, underscores)"
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   autoComplete="username"
-                  required
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="you@example.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  autoComplete="email"
+                  minLength={3}
+                  maxLength={30}
                   required
                 />
               </div>
@@ -81,10 +94,11 @@ export default function RegisterPage() {
                 <Input
                   id="password"
                   type="password"
-                  placeholder="Create a password"
+                  placeholder="At least 12 characters"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete="new-password"
+                  minLength={12}
                   required
                 />
               </div>
@@ -100,10 +114,6 @@ export default function RegisterPage() {
                   required
                 />
               </div>
-
-              {error && (
-                <p className="text-xs text-red-400">{error}</p>
-              )}
 
               <Button type="submit" className="w-full" disabled={isLoading}>
                 {isLoading ? (

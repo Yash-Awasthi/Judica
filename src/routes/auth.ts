@@ -181,6 +181,8 @@ const authPlugin: FastifyPluginAsync = async (fastify) => {
     const [user] = await db.select({
       id: users.id,
       username: users.username,
+      email: users.email,
+      role: users.role,
       customInstructions: users.customInstructions,
       createdAt: users.createdAt,
     }).from(users).where(eq(users.id, request.userId!)).limit(1);

@@ -1,7 +1,7 @@
 import { createContext, useContext, useState, useEffect, type ReactNode } from "react";
 
 interface AuthUser {
-  id: string;
+  id: number;
   username: string;
   email: string;
   role: "admin" | "member" | "viewer";
@@ -10,52 +10,65 @@ interface AuthUser {
 interface AuthContextType {
   user: AuthUser | null;
   isAuthenticated: boolean;
+  isLoading: boolean;
   login: (username: string, password: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
+  refreshUser: () => Promise<void>;
 }
-
-const DEMO_USER: AuthUser = {
-  id: "demo-001",
-  username: "admin",
-  email: "admin@aibyai.dev",
-  role: "admin",
-};
-const DEMO_TOKEN = "demo-token-preview-only";
 
 const AuthContext = createContext<AuthContextType | null>(null);
 
+async function fetchCurrentUser(): Promise<AuthUser | null> {
+  try {
+    const res = await fetch("/api/auth/me", { credentials: "include" });
+    if (!res.ok) return null;
+    return res.json();
+  } catch {
+    return null;
+  }
+}
+
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    const token = localStorage.getItem("aibyai_token");
-    const savedUser = localStorage.getItem("aibyai_user");
-    if (token && savedUser) {
-      try {
-        setUser(JSON.parse(savedUser));
-      } catch {
-        localStorage.removeItem("aibyai_token");
-        localStorage.removeItem("aibyai_user");
-      }
-    }
-  }, []);
-
-  const login = async (username: string, _password: string) => {
-    // Demo mode: accept any credentials
-    localStorage.setItem("aibyai_token", DEMO_TOKEN);
-    localStorage.setItem("aibyai_user", JSON.stringify(DEMO_USER));
-    setUser(DEMO_USER);
+  const refreshUser = async () => {
+    const currentUser = await fetchCurrentUser();
+    setUser(currentUser);
   };
 
-  const logout = () => {
-    localStorage.removeItem("aibyai_token");
-    localStorage.removeItem("aibyai_user");
+  useEffect(() => {
+    refreshUser().finally(() => setIsLoading(false));
+  }, []);
+
+  const login = async (username: string, password: string) => {
+    const res = await fetch("/api/auth/login", {
+      method: "POST",
+      credentials: "include",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ username, password }),
+    });
+
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      throw new Error(body.error ?? `Login failed: ${res.status}`);
+    }
+
+    const currentUser = await fetchCurrentUser();
+    setUser(currentUser);
+  };
+
+  const logout = async () => {
+    try {
+      await fetch("/api/auth/logout", { method: "POST", credentials: "include" });
+    } catch {
+      // ignore network errors on logout
+    }
     setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, isAuthenticated: !!user, login, logout }}>
+    <AuthContext.Provider value={{ user, isAuthenticated: !!user, isLoading, login, logout, refreshUser }}>
       {children}
     </AuthContext.Provider>
   );
