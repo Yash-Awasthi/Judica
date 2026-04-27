@@ -1,5 +1,5 @@
 import fastifyRateLimit from "@fastify/rate-limit";
-import Fastify, { type FastifyRequest, type FastifyReply } from "fastify";
+import Fastify from "fastify";
 import fastifyCors from "@fastify/cors";
 import fastifyCompress from "@fastify/compress";
 import fastifyCookie from "@fastify/cookie";
@@ -628,39 +628,9 @@ export async function buildApp() {
   let cachedIndexHtml: string | null = null;
   const indexPath = path.join(publicPath, "index.html");
 
-  // Explicit rate-limit preHandler so static analyzers (CodeQL js/missing-rate-limiting) can detect it.
-  // The global @fastify/rate-limit plugin also enforces limits via config.rateLimit on this route,
-  // but adding a preHandler makes the constraint visible to data-flow analysis.
-  const staticPageRateLimit = async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-    const key = `static_rate:${request.ip}`;
-    const count = await redis.incr(key);
-    if (count === 1) await redis.expire(key, 60);
-    if (count > 60) {
-      reply.header("Retry-After", "60");
-      reply.code(429).send({ error: "Too many requests" });
-    }
-  };
-
-  fastify.get("/", {
-    config: { rateLimit: { max: 60, timeWindow: "1 minute" } },
-    preHandler: [staticPageRateLimit],
-  }, async (request, reply) => {
-    try {
-      // Fix CodeQL alert #64: Eliminate TOCTOU race by reading file directly
-      // and using content hash for cache invalidation instead of stat+read
-      const currentContent = fs.readFileSync(indexPath, "utf8");
-      if (currentContent !== cachedIndexHtml) {
-        cachedIndexHtml = currentContent;
-      }
-      let html = cachedIndexHtml;
-      const nonce = (request as unknown as { cspNonce?: string }).cspNonce || "";
-      html = html.split("<script").join(`<script nonce="${nonce}"`);
-      html = html.split(`nonce="${nonce}" nonce="`).join(`nonce="`);
-      reply.type("text/html").send(html);
-    } catch {
-      reply.code(500).send("Failed to load application index");
-    }
-  });
+  // NOTE: GET / is intentionally NOT registered here — fastify-static intercepts it
+  // and returns an empty body. The setNotFoundHandler below correctly serves index.html
+  // for all non-API routes including /.
 
   if (env.NODE_ENV === "development") {
     import("@bull-board/api").then(async ({ createBullBoard, BullMQAdapter }) => {
