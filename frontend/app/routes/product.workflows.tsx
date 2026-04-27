@@ -12,7 +12,7 @@ import {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Visual Workflow Builder | AIBYAI" },
+    { title: "Visual Workflow Builder | JUDICA" },
     {
       name: "description",
       content:

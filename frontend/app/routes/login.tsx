@@ -65,11 +65,11 @@ export default function LoginPage() {
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center gap-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 relative">
-              <span className="text-sm font-bold text-primary">ai</span>
+              <span className="text-sm font-bold text-primary">J</span>
               <div className="absolute inset-0 rounded-xl bg-primary/20 blur-sm" />
             </div>
             <span className="text-2xl font-bold tracking-tight">
-              ai<span className="text-emerald-400">by</span>ai
+              Judica
             </span>
           </div>
           <p className="text-sm text-muted-foreground">Multi-perspective AI deliberation platform</p>

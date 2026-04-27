@@ -63,7 +63,7 @@ export function HeroSection() {
           ref={subtitleRef}
           className="mt-6 text-base sm:text-lg md:text-xl text-white/50 max-w-2xl mx-auto leading-relaxed opacity-0"
         >
-          AIBYAI orchestrates multi-model AI deliberations — pitting diverse AI perspectives
+          JUDICA orchestrates multi-model AI deliberations — pitting diverse AI perspectives
           against each other to surface deeper insights, challenge assumptions, and reach better conclusions.
         </p>
 

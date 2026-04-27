@@ -1,7 +1,7 @@
 /**
  * Keyboard Shortcut System — Phase 1.25
  *
- * A lightweight, composable keyboard shortcut hook for the aibyai UI.
+ * A lightweight, composable keyboard shortcut hook for the Judica UI.
  *
  * Inspired by:
  * - tinykeys (MIT, jamiebuilds/tinykeys) — tiny key binding library

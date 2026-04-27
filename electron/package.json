@@ -1,5 +1,5 @@
 {
-  "name": "molecule",
+  "name": "judica",
   "version": "0.1.0",
   "description": "Multi-AI deliberation desktop app",
   "main": "dist/main/index.js",
@@ -26,8 +26,8 @@
     "typescript": "^5.4.0"
   },
   "build": {
-    "appId": "com.molecule.app",
-    "productName": "Molecule",
+    "appId": "com.judica.app",
+    "productName": "Judica",
     "directories": {
       "output": "release"
     },

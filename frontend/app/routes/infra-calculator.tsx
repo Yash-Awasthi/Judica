@@ -22,11 +22,11 @@ import { FadeIn, TiltCard, DottedGrid, GlowOrbs } from "~/components/animations"
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Infrastructure Calculator - AIBYAI" },
+    { title: "Infrastructure Calculator - JUDICA" },
     {
       name: "description",
       content:
-        "Calculate GPU and hardware requirements for self-hosting LLMs with AIBYAI. Estimate VRAM, GPU count, and compatibility.",
+        "Calculate GPU and hardware requirements for self-hosting LLMs with JUDICA. Estimate VRAM, GPU count, and compatibility.",
     },
   ];
 }
@@ -255,7 +255,7 @@ export default function InfraCalculator() {
             Infrastructure Calculator
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
-            Estimate GPU and hardware requirements for self-hosting open-source LLMs with AIBYAI.
+            Estimate GPU and hardware requirements for self-hosting open-source LLMs with JUDICA.
             Supports laptop, desktop, and datacenter GPUs with dense and MoE architectures.
           </p>
         </FadeIn>

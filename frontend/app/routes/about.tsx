@@ -28,11 +28,11 @@ import {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "About - AIBYAI" },
+    { title: "About - JUDICA" },
     {
       name: "description",
       content:
-        "AIBYAI exists because single-model AI isn't good enough. Learn about our mission, values, and the team building the future of AI reasoning.",
+        "JUDICA exists because single-model AI isn't good enough. Learn about our mission, values, and the team building the future of AI reasoning.",
     },
   ];
 }
@@ -73,7 +73,7 @@ export default function About() {
             Building the future of AI reasoning
           </h1>
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground">
-            AIBYAI exists because single-model AI isn't good enough. When the
+            JUDICA exists because single-model AI isn't good enough. When the
             stakes are high, you need multiple perspectives, structured debate, and
             verified consensus.
           </p>
@@ -88,7 +88,7 @@ export default function About() {
             <p className="mx-auto mt-6 max-w-3xl text-lg leading-relaxed text-muted-foreground">
               Today's AI gives you one model's best guess. That's not good enough
               for decisions that matter -- legal analysis, medical research,
-              financial planning, engineering design. AIBYAI runs 4-7 AI agents
+              financial planning, engineering design. JUDICA runs 4-7 AI agents
               simultaneously that debate, critique each other, and produce a scored
               consensus you can actually verify. We believe the future of AI isn't
               a single, more powerful model. It's structured deliberation across
@@ -137,7 +137,7 @@ export default function About() {
             Built by the community
           </h2>
           <p className="mx-auto mt-6 max-w-2xl text-lg leading-relaxed text-muted-foreground">
-            AIBYAI was created by{" "}
+            JUDICA was created by{" "}
             <span className="font-medium text-foreground">Yash Awasthi</span> and
             is built in the open by contributors around the world. We believe the
             best AI tools are shaped by the people who use them.
@@ -145,7 +145,7 @@ export default function About() {
           <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
             <Button variant="outline" size="lg" asChild>
               <a
-                href="https://github.com/aibyai"
+                href="https://github.com/Judica"
                 target="_blank"
                 rel="noopener noreferrer"
               >
@@ -155,7 +155,7 @@ export default function About() {
             </Button>
             <Button variant="outline" size="lg" asChild>
               <a
-                href="https://github.com/aibyai/graphs/contributors"
+                href="https://github.com/Judica/graphs/contributors"
                 target="_blank"
                 rel="noopener noreferrer"
               >

@@ -20,10 +20,10 @@ import {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Status - AIBYAI" },
+    { title: "Status - JUDICA" },
     {
       name: "description",
-      content: "AIBYAI platform status and service health monitoring.",
+      content: "JUDICA platform status and service health monitoring.",
     },
   ];
 }
@@ -88,7 +88,7 @@ export default function Status() {
             Platform Status
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
-            Real-time health monitoring for the AIBYAI platform.
+            Real-time health monitoring for the JUDICA platform.
           </p>
         </FadeIn>
       </section>

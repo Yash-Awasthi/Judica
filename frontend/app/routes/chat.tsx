@@ -637,7 +637,7 @@ export function clientLoader() {
 export default function ChatPage() {
   const store = useStore();
   const { user } = useAuth();
-  const userKey = user?.id ? `aibyai-chats-${user.id}` : null;
+  const userKey = user?.id ? `judica-chats-${user.id}` : null;
 
   const [conversations, setConversations] = useState<typeof mockConversations>(() => {
     if (typeof window !== "undefined" && userKey) {
@@ -650,7 +650,7 @@ export default function ChatPage() {
   });
   const [selectedConvId, setSelectedConvId] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
-      return sessionStorage.getItem("aibyai-conv") || null;
+      return sessionStorage.getItem("judica-conv") || null;
     }
     return null;
   });
@@ -664,26 +664,26 @@ export default function ChatPage() {
 
   // Persist selected conversation
   useEffect(() => {
-    if (selectedConvId) sessionStorage.setItem("aibyai-conv", selectedConvId);
-    else sessionStorage.removeItem("aibyai-conv");
+    if (selectedConvId) sessionStorage.setItem("judica-conv", selectedConvId);
+    else sessionStorage.removeItem("judica-conv");
   }, [selectedConvId]);
   const [messageGroups, setMessageGroups] = useState<MessageGroup[]>([]);
   const [inputValue, setInputValue] = useState(() => {
     if (typeof window !== "undefined") {
-      return sessionStorage.getItem("aibyai-draft") ?? "";
+      return sessionStorage.getItem("judica-draft") ?? "";
     }
     return "";
   });
 
   // Persist draft to sessionStorage
   useEffect(() => {
-    sessionStorage.setItem("aibyai-draft", inputValue);
+    sessionStorage.setItem("judica-draft", inputValue);
   }, [inputValue]);
   const [councilMembers, setCouncilMembers] = useState<CouncilMember[]>(defaultMembers);
   const [savedPresets, setSavedPresets] = useState<CouncilPreset[]>(() => {
     if (typeof window !== "undefined") {
       try {
-        const stored = localStorage.getItem("aibyai-presets");
+        const stored = localStorage.getItem("judica-presets");
         return stored ? JSON.parse(stored) : [];
       } catch { return []; }
     }
@@ -692,7 +692,7 @@ export default function ChatPage() {
 
   // Persist presets
   useEffect(() => {
-    localStorage.setItem("aibyai-presets", JSON.stringify(savedPresets));
+    localStorage.setItem("judica-presets", JSON.stringify(savedPresets));
   }, [savedPresets]);
 
   const allPresets = [...BUILT_IN_PRESETS, ...savedPresets];
@@ -1176,7 +1176,7 @@ export default function ChatPage() {
     }
     if (navigator.share) {
       try {
-        await navigator.share({ title: "AIBYAI Council Deliberation", text: shareText });
+        await navigator.share({ title: "JUDICA Council Deliberation", text: shareText });
       } catch {
         // user cancelled or not supported
       }

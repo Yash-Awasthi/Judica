@@ -15,7 +15,7 @@ import { FadeIn, DottedGrid } from "~/components/animations";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "LLM Leaderboard - AIBYAI" },
+    { title: "LLM Leaderboard - JUDICA" },
     {
       name: "description",
       content:
@@ -150,7 +150,7 @@ export default function LLMLeaderboard() {
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
             A community-maintained comparison of large language models. Sorted by Arena Elo rating.
-            AIBYAI supports all listed models through its multi-agent deliberation engine.
+            JUDICA supports all listed models through its multi-agent deliberation engine.
           </p>
         </FadeIn>
       </section>
@@ -264,7 +264,7 @@ export default function LLMLeaderboard() {
             Data as of April 2026. GPQA Diamond (scientific reasoning), SWE-bench Verified
             (real-world coding), Arena Elo from Chatbot Arena. Contribute on{" "}
             <a
-              href="https://github.com/Yash-Awasthi/aibyai"
+              href="https://github.com/Yash-Awasthi/Judica"
               className="text-primary underline underline-offset-4"
               target="_blank"
               rel="noopener noreferrer"

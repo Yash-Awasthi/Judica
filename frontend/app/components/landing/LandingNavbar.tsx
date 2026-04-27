@@ -28,7 +28,7 @@ export function LandingNavbar() {
               <div className="absolute inset-0 rounded-lg bg-[#4d7cff]/10 blur-sm" />
             </div>
             <span className="text-lg font-bold tracking-tight text-white">
-              ai<span className="text-emerald-400">by</span>ai
+              Judica
             </span>
           </Link>
 

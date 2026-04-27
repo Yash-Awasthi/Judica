@@ -24,12 +24,12 @@ const footerLinks = {
     { name: "Deliberation Modes", href: "/product/deliberation-modes" },
   ],
   Resources: [
-    { name: "Documentation", href: "https://github.com/Yash-Awasthi/aibyai/wiki", external: true },
+    { name: "Documentation", href: "https://github.com/Yash-Awasthi/Judica/wiki", external: true },
     { name: "Blog", href: "/blog" },
     { name: "LLM Leaderboard", href: "/llm-leaderboard" },
     { name: "Infra Calculator", href: "/infra-calculator" },
     { name: "Status", href: "/status" },
-    { name: "GitHub", href: "https://github.com/Yash-Awasthi/aibyai", external: true },
+    { name: "GitHub", href: "https://github.com/Yash-Awasthi/Judica", external: true },
   ],
   Company: [
     { name: "About", href: "/about" },
@@ -62,14 +62,14 @@ export function Footer() {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-foreground">
                 <span className="text-xs font-bold text-background">AI</span>
               </div>
-              <span className="font-display text-xl font-bold tracking-tight">aibyai</span>
+              <span className="font-display text-xl font-bold tracking-tight">Judica</span>
             </Link>
             <p className="text-sm text-muted-foreground max-w-xs">
               Open-source multi-agent AI platform. Don't trust one AI — make them debate.
             </p>
             <div className="flex gap-3 mt-4">
               <a
-                href="https://github.com/Yash-Awasthi/aibyai"
+                href="https://github.com/Yash-Awasthi/Judica"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-muted-foreground hover:text-foreground transition-colors"
@@ -77,7 +77,7 @@ export function Footer() {
                 <AnimatedIcon icon={GithubIcon} animation="glow" size={20} />
               </a>
               <a
-                href="https://twitter.com/aibyai"
+                href="https://twitter.com/Judica"
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-muted-foreground hover:text-foreground transition-colors"
@@ -120,7 +120,7 @@ export function Footer() {
 
         <div className="mt-12 pt-8 border-t border-border/50 flex flex-col sm:flex-row items-center justify-between gap-4">
           <p className="text-xs text-muted-foreground">
-            &copy; {new Date().getFullYear()} AIBYAI. Open source under the MIT License.
+            &copy; {new Date().getFullYear()} JUDICA. Open source under the MIT License.
           </p>
           <div className="flex gap-4">
             <Link to="/about" className="text-xs text-muted-foreground hover:text-foreground hover:translate-x-0.5 inline-block transition-all duration-200">

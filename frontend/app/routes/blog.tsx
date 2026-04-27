@@ -21,7 +21,7 @@ import {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Blog - AIBYAI" },
+    { title: "Blog - JUDICA" },
     {
       name: "description",
       content:
@@ -32,11 +32,11 @@ export function meta({}: Route.MetaArgs) {
 
 const posts = [
   {
-    title: "Introducing AIBYAI: Multi-Agent Deliberation for Everyone",
+    title: "Introducing JUDICA: Multi-Agent Deliberation for Everyone",
     date: "April 2026",
     category: "Announcement",
     description:
-      "We're launching AIBYAI -- an open-source platform that runs 4-7 AI agents simultaneously to debate, critique, and produce scored consensus you can actually verify.",
+      "We're launching JUDICA -- an open-source platform that runs 4-7 AI agents simultaneously to debate, critique, and produce scored consensus you can actually verify.",
     comingSoon: false,
   },
   {
@@ -72,11 +72,11 @@ const posts = [
     comingSoon: true,
   },
   {
-    title: "Self-Hosting AIBYAI: Docker to Kubernetes",
+    title: "Self-Hosting JUDICA: Docker to Kubernetes",
     date: "February 2026",
     category: "DevOps",
     description:
-      "A complete guide to running AIBYAI on your own infrastructure -- from a single Docker container to a production Kubernetes cluster.",
+      "A complete guide to running JUDICA on your own infrastructure -- from a single Docker container to a production Kubernetes cluster.",
     comingSoon: true,
   },
 ];

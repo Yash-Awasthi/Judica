@@ -13,7 +13,7 @@ import type { Route } from "./+types/home";
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "AIBYAI - Dashboard" },
+    { title: "JUDICA - Dashboard" },
     { name: "description", content: "AI-powered deliberation platform" },
   ];
 }
@@ -36,7 +36,7 @@ export default function Home() {
   useEffect(() => {
     if (!user?.id) return;
     try {
-      const raw = localStorage.getItem(`aibyai-chats-${user.id}`);
+      const raw = localStorage.getItem(`judica-chats-${user.id}`);
       const all: StoredConv[] = raw ? JSON.parse(raw) : [];
       setRecentConvs(all.slice(0, 6));
     } catch {

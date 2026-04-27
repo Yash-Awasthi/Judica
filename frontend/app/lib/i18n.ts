@@ -1,7 +1,7 @@
 /**
  * Internationalization (i18n) — Phase 1.27
  *
- * Lightweight i18n utilities for the aibyai frontend.
+ * Lightweight i18n utilities for the Judica frontend.
  * Inspired by i18next (MIT, i18next/i18next) and react-i18next patterns.
  *
  * Features:
@@ -24,7 +24,7 @@ export type Translations = Record<string, string | Record<string, string>>;
 // ─── Built-in translations ───────────────────────────────────────────────────
 
 export const en: Translations = {
-  "app.name": "aibyai",
+  "app.name": "Judica",
   "ask.placeholder": "Ask the council...",
   "ask.submit": "Ask",
   "ask.thinking": "The council is deliberating...",
@@ -65,7 +65,7 @@ export const en: Translations = {
 };
 
 export const es: Translations = {
-  "app.name": "aibyai",
+  "app.name": "Judica",
   "ask.placeholder": "Pregunta al consejo...",
   "ask.submit": "Preguntar",
   "ask.thinking": "El consejo está deliberando...",
@@ -87,7 +87,7 @@ export const es: Translations = {
 };
 
 export const fr: Translations = {
-  "app.name": "aibyai",
+  "app.name": "Judica",
   "ask.placeholder": "Demandez au conseil...",
   "ask.submit": "Demander",
   "ask.thinking": "Le conseil délibère...",
@@ -152,7 +152,7 @@ const I18nCtx = React.createContext<I18nContext>({
 
 function detectLanguage(): string {
   if (typeof window === "undefined") return "en";
-  const stored = localStorage.getItem("aibyai_language");
+  const stored = localStorage.getItem("Judica_language");
   if (stored && SUPPORTED_LANGUAGES.includes(stored as SupportedLanguage)) return stored;
   const nav = navigator.language?.split("-")[0] ?? "en";
   return SUPPORTED_LANGUAGES.includes(nav as SupportedLanguage) ? nav : "en";
@@ -168,7 +168,7 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   const setLanguage = useCallback((lang: string) => {
     if (SUPPORTED_LANGUAGES.includes(lang as SupportedLanguage)) {
       setLanguageState(lang);
-      localStorage.setItem("aibyai_language", lang);
+      localStorage.setItem("Judica_language", lang);
     }
   }, []);
 

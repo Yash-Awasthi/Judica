@@ -27,7 +27,7 @@ import {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Pricing - AIBYAI" },
+    { title: "Pricing - JUDICA" },
     {
       name: "description",
       content:

@@ -11,7 +11,7 @@ import {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Desktop App | AIBYAI" },
+    { title: "Desktop App | JUDICA" },
     {
       name: "description",
       content:
@@ -24,7 +24,7 @@ export default function ProductDesktopApp() {
   return (
     <ProductPage
       badge="Desktop"
-      title="AIBYAI on Your"
+      title="JUDICA on Your"
       titleHighlight="Desktop"
       subtitle="Native application for Windows, macOS, and Linux. Full deliberation power without the browser."
       features={[
@@ -76,7 +76,7 @@ export default function ProductDesktopApp() {
           step: "2",
           title: "Install",
           description:
-            "One-click setup. Sign in with your AIBYAI account or connect to a self-hosted instance.",
+            "One-click setup. Sign in with your JUDICA account or connect to a self-hosted instance.",
         },
         {
           step: "3",

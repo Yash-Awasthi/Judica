@@ -86,7 +86,7 @@ export function ProductPage({
               </MagneticButton>
               <MagneticButton>
                 <Button size="lg" variant="outline" asChild>
-                  <a href="https://github.com/Yash-Awasthi/aibyai" target="_blank" rel="noopener noreferrer">
+                  <a href="https://github.com/Yash-Awasthi/Judica" target="_blank" rel="noopener noreferrer">
                     View on GitHub
                   </a>
                 </Button>
@@ -192,7 +192,7 @@ export function ProductPage({
         <FadeIn className="relative mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 text-center">
           <h2 className="font-display text-3xl sm:text-4xl font-bold mb-4">Ready to get started?</h2>
           <p className="text-lg text-muted-foreground mb-8 max-w-xl mx-auto">
-            Deploy AIBYAI in minutes. Open source, self-hosted, and enterprise-ready.
+            Deploy JUDICA in minutes. Open source, self-hosted, and enterprise-ready.
           </p>
           <div className="flex items-center justify-center gap-4">
             <MagneticButton>

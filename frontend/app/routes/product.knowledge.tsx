@@ -11,7 +11,7 @@ import {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Knowledge Bases & RAG | AIBYAI" },
+    { title: "Knowledge Bases & RAG | JUDICA" },
     {
       name: "description",
       content:

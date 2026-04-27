@@ -26,7 +26,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const user = {
     id: `demo-${username}`,
     username,
-    email: `${username}@demo.aibyai.dev`,
+    email: `${username}@demo.Judica.dev`,
     role: username === "admin" ? ("admin" as const) : ("member" as const),
   };
 

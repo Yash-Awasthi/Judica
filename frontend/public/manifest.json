@@ -1,6 +1,6 @@
 {
-  "name": "aibyai — Multi-Agent AI Council",
-  "short_name": "aibyai",
+  "name": "Judica — Multi-Agent AI Council",
+  "short_name": "Judica",
   "description": "Production-grade multi-agent AI orchestration platform",
   "start_url": "/dashboard",
   "display": "standalone",

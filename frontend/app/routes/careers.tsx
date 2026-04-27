@@ -37,11 +37,11 @@ import {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Careers & Contributing - AIBYAI" },
+    { title: "Careers & Contributing - JUDICA" },
     {
       name: "description",
       content:
-        "Help build the future of AI deliberation. AIBYAI is open source -- contribute as a developer, designer, researcher, or writer.",
+        "Help build the future of AI deliberation. JUDICA is open source -- contribute as a developer, designer, researcher, or writer.",
     },
   ];
 }
@@ -80,7 +80,7 @@ const roles = [
     title: "Documentation",
     tech: "Technical Writing",
     description:
-      "Write guides, API docs, tutorials, and architecture documentation. Help users and contributors understand and adopt AIBYAI.",
+      "Write guides, API docs, tutorials, and architecture documentation. Help users and contributors understand and adopt JUDICA.",
   },
 ];
 
@@ -98,7 +98,7 @@ export default function Careers() {
             Help build the future of AI deliberation
           </h1>
           <p className="mx-auto mt-4 max-w-2xl text-lg text-muted-foreground">
-            AIBYAI is open source. Whether you're a developer, designer, or AI
+            JUDICA is open source. Whether you're a developer, designer, or AI
             researcher, there's a place for you.
           </p>
         </FadeIn>
@@ -138,7 +138,7 @@ export default function Careers() {
                     <MagneticButton className="w-full">
                       <Button variant="outline" size="sm" className="w-full" asChild>
                         <a
-                          href="https://github.com/aibyai"
+                          href="https://github.com/Judica"
                           target="_blank"
                           rel="noopener noreferrer"
                         >
@@ -174,7 +174,7 @@ export default function Careers() {
             <MagneticButton className="mt-8">
               <Button size="lg" asChild>
                 <a
-                  href="https://discord.gg/aibyai"
+                  href="https://discord.gg/Judica"
                   target="_blank"
                   rel="noopener noreferrer"
                 >

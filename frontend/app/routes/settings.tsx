@@ -40,7 +40,7 @@ function ToggleRow({
   );
 }
 
-const SETTINGS_KEY = "aibyai_settings";
+const SETTINGS_KEY = "judica_settings";
 
 function loadAISettings() {
   try {

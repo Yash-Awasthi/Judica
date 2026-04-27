@@ -35,7 +35,7 @@ export async function action({ request, context }: Route.ActionArgs) {
   const user = {
     id: `user-${Date.now()}`,
     username,
-    email: `${username}@demo.aibyai.dev`,
+    email: `${username}@demo.Judica.dev`,
     role: "member" as const,
   };
 

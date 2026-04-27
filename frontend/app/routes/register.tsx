@@ -54,7 +54,7 @@ export default function RegisterPage() {
         <div className="text-center space-y-2">
           <div className="flex items-center justify-center gap-2">
             <span className="text-2xl font-bold tracking-tight">
-              ai<span className="text-emerald-400">by</span>ai
+              Judica
             </span>
           </div>
           <p className="text-sm text-muted-foreground">Create your account</p>

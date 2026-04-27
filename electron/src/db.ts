@@ -7,7 +7,7 @@ let db: Database.Database;
 export function getDb(): Database.Database {
   if (db) return db;
 
-  const dbPath = path.join(app.getPath("userData"), "molecule.db");
+  const dbPath = path.join(app.getPath("userData"), "judica.db");
   db = new Database(dbPath);
   db.pragma("journal_mode = WAL");
   db.pragma("foreign_keys = ON");

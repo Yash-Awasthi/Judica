@@ -12,7 +12,7 @@ import {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "19 LLM Providers, Vector DBs & 51 Data Connectors | AIBYAI" },
+    { title: "19 LLM Providers, Vector DBs & 51 Data Connectors | JUDICA" },
     {
       name: "description",
       content:

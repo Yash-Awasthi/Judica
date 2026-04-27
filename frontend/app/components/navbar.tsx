@@ -59,12 +59,12 @@ const productItems = [
 ];
 
 const resourceItems = [
-  { name: "Docs", href: "https://github.com/Yash-Awasthi/aibyai/wiki", icon: BookOpen, external: true },
+  { name: "Docs", href: "https://github.com/Yash-Awasthi/Judica/wiki", icon: BookOpen, external: true },
   { name: "Blog", href: "/blog", icon: FileText },
   { name: "LLM Leaderboard", href: "/llm-leaderboard", icon: BarChart3 },
   { name: "Infra Calculator", href: "/infra-calculator", icon: Calculator },
   { name: "Status", href: "/status", icon: Activity },
-  { name: "Discord", href: "https://discord.gg/aibyai", icon: MessageCircle, external: true },
+  { name: "Discord", href: "https://discord.gg/Judica", icon: MessageCircle, external: true },
 ];
 
 const companyItems = [
@@ -195,7 +195,7 @@ export function Navbar() {
                 }
               `}</style>
             </div>
-            <span className="font-display text-xl font-bold tracking-tight">aibyai</span>
+            <span className="font-display text-xl font-bold tracking-tight">Judica</span>
           </Link>
 
           {/* Desktop Nav */}
@@ -289,7 +289,7 @@ export function Navbar() {
           {/* Right side */}
           <div className="flex items-center gap-2">
             <a
-              href="https://github.com/Yash-Awasthi/aibyai"
+              href="https://github.com/Yash-Awasthi/Judica"
               target="_blank"
               rel="noopener noreferrer"
               className="hidden sm:flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground transition-colors px-2 py-1.5 rounded-md"

@@ -34,7 +34,7 @@ export function LandingFooter() {
           <div className="flex-shrink-0">
             <Link to="/" className="inline-flex items-center gap-2">
               <span className="text-lg font-bold tracking-tight text-white">
-                ai<span className="text-emerald-400">by</span>ai
+                Judica
               </span>
             </Link>
             <p className="mt-2 text-xs text-white/30">
@@ -67,7 +67,7 @@ export function LandingFooter() {
         </div>
 
         <div className="mt-10 pt-6 border-t border-white/5 text-center">
-          <p className="text-xs text-white/20">&copy; 2025 AIBYAI. All rights reserved.</p>
+          <p className="text-xs text-white/20">&copy; 2025 JUDICA. All rights reserved.</p>
         </div>
       </div>
     </footer>

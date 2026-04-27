@@ -12,7 +12,7 @@ import {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "14 Agent Archetypes | AIBYAI" },
+    { title: "14 Agent Archetypes | JUDICA" },
     {
       name: "description",
       content:

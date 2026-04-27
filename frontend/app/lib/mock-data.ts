@@ -418,7 +418,7 @@ export const mockMarketplace = [
   {
     id: "mp_1",
     name: "Advanced Code Reviewer",
-    author: "aibyai-labs",
+    author: "Judica-labs",
     description: "Multi-archetype code review workflow with security and performance analysis",
     category: "development" as const,
     downloads: 1247,
@@ -462,7 +462,7 @@ export const mockMarketplace = [
   {
     id: "mp_5",
     name: "Technical Architecture Planner",
-    author: "aibyai-labs",
+    author: "Judica-labs",
     description: "System design workflow with architect and strategist archetypes",
     category: "development" as const,
     downloads: 1892,
@@ -630,7 +630,7 @@ export const mockUsers = [
   {
     id: "usr_demo123",
     username: "admin",
-    email: "admin@aibyai.dev",
+    email: "admin@Judica.dev",
     role: "admin" as const,
     status: "active" as const,
     lastActive: "2026-04-22T14:30:00Z",
@@ -640,7 +640,7 @@ export const mockUsers = [
   {
     id: "usr_002",
     username: "sarah.chen",
-    email: "sarah.chen@aibyai.dev",
+    email: "sarah.chen@Judica.dev",
     role: "editor" as const,
     status: "active" as const,
     lastActive: "2026-04-22T12:00:00Z",
@@ -650,7 +650,7 @@ export const mockUsers = [
   {
     id: "usr_003",
     username: "marcus.johnson",
-    email: "marcus.j@aibyai.dev",
+    email: "marcus.j@Judica.dev",
     role: "viewer" as const,
     status: "active" as const,
     lastActive: "2026-04-21T16:45:00Z",
@@ -660,7 +660,7 @@ export const mockUsers = [
   {
     id: "usr_004",
     username: "elena.rodriguez",
-    email: "elena.r@aibyai.dev",
+    email: "elena.r@Judica.dev",
     role: "editor" as const,
     status: "active" as const,
     lastActive: "2026-04-22T09:30:00Z",
@@ -670,7 +670,7 @@ export const mockUsers = [
   {
     id: "usr_005",
     username: "james.park",
-    email: "james.park@aibyai.dev",
+    email: "james.park@Judica.dev",
     role: "admin" as const,
     status: "active" as const,
     lastActive: "2026-04-20T17:00:00Z",
@@ -680,7 +680,7 @@ export const mockUsers = [
   {
     id: "usr_006",
     username: "priya.sharma",
-    email: "priya.s@aibyai.dev",
+    email: "priya.s@Judica.dev",
     role: "viewer" as const,
     status: "inactive" as const,
     lastActive: "2026-04-10T08:00:00Z",
@@ -690,7 +690,7 @@ export const mockUsers = [
   {
     id: "usr_007",
     username: "david.kim",
-    email: "david.kim@aibyai.dev",
+    email: "david.kim@Judica.dev",
     role: "editor" as const,
     status: "active" as const,
     lastActive: "2026-04-22T11:15:00Z",
@@ -700,7 +700,7 @@ export const mockUsers = [
   {
     id: "usr_008",
     username: "lisa.wang",
-    email: "lisa.wang@aibyai.dev",
+    email: "lisa.wang@Judica.dev",
     role: "viewer" as const,
     status: "suspended" as const,
     lastActive: "2026-03-28T10:00:00Z",
@@ -710,7 +710,7 @@ export const mockUsers = [
   {
     id: "usr_009",
     username: "alex.thompson",
-    email: "alex.t@aibyai.dev",
+    email: "alex.t@Judica.dev",
     role: "editor" as const,
     status: "active" as const,
     lastActive: "2026-04-21T14:20:00Z",
@@ -720,7 +720,7 @@ export const mockUsers = [
   {
     id: "usr_010",
     username: "nina.patel",
-    email: "nina.p@aibyai.dev",
+    email: "nina.p@Judica.dev",
     role: "viewer" as const,
     status: "active" as const,
     lastActive: "2026-04-22T08:45:00Z",

@@ -143,13 +143,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta name="mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-        <meta name="apple-mobile-web-app-title" content="aibyai" />
+        <meta name="apple-mobile-web-app-title" content="Judica" />
         <Meta />
         <Links />
         <script dangerouslySetInnerHTML={{ __html: `
           (function() {
             try {
-              var theme = localStorage.getItem('aibyai_theme') || 'dark';
+              var theme = localStorage.getItem('judica_theme') || 'dark';
               document.documentElement.classList.toggle('dark', theme === 'dark');
             } catch(e) {}
           })();
@@ -225,10 +225,10 @@ function AppSidebar() {
       <SidebarHeader className="px-3 py-4">
         <NavLink to="/dashboard" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
           <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground text-xs font-bold">
-            A
+            J
           </div>
           <span className="text-sm font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
-            AIBYAI
+            JUDICA
           </span>
         </NavLink>
       </SidebarHeader>
@@ -290,7 +290,7 @@ export default function App() {
   // Client-side auth guard — redirect to /setup if no user profile exists
   useEffect(() => {
     if (isPublicPath(location.pathname)) return;
-    const profile = localStorage.getItem("aibyai_user");
+    const profile = localStorage.getItem("judica_user");
     if (!profile) {
       navigate("/setup", { replace: true });
     }
@@ -316,7 +316,7 @@ export default function App() {
               <main className="flex-1 overflow-auto">
                 <div className="flex items-center gap-2 border-b border-border px-4 py-2 md:hidden">
                   <SidebarTrigger />
-                  <span className="text-sm font-semibold">AIBYAI</span>
+                  <span className="text-sm font-semibold">JUDICA</span>
                 </div>
                 <Outlet />
               </main>

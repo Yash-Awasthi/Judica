@@ -43,8 +43,8 @@ interface SearchResult {
 const mockRepos: Repo[] = [
   {
     id: "repo_1",
-    name: "aibyai-core",
-    url: "https://github.com/org/aibyai-core",
+    name: "Judica-core",
+    url: "https://github.com/org/Judica-core",
     branch: "main",
     fileCount: 234,
     status: "indexed",
@@ -52,8 +52,8 @@ const mockRepos: Repo[] = [
   },
   {
     id: "repo_2",
-    name: "aibyai-frontend",
-    url: "https://github.com/org/aibyai-frontend",
+    name: "Judica-frontend",
+    url: "https://github.com/org/Judica-frontend",
     branch: "main",
     fileCount: 89,
     status: "indexed",

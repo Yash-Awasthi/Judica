@@ -15,14 +15,14 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const saved = localStorage.getItem("aibyai_theme") as Theme | null;
+    const saved = localStorage.getItem("judica_theme") as Theme | null;
     if (saved) setThemeState(saved);
   }, []);
 
   const setTheme = (t: Theme) => {
     setThemeState(t);
     if (typeof window !== "undefined") {
-      localStorage.setItem("aibyai_theme", t);
+      localStorage.setItem("judica_theme", t);
       document.documentElement.classList.toggle("dark", t === "dark");
     }
   };

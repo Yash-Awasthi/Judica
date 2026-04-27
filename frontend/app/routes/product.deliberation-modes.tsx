@@ -10,7 +10,7 @@ import {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "5 Deliberation Modes | AIBYAI" },
+    { title: "5 Deliberation Modes | JUDICA" },
     {
       name: "description",
       content:

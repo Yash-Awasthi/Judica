@@ -11,11 +11,11 @@ import {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "API, MCP & SDK | AIBYAI" },
+    { title: "API, MCP & SDK | JUDICA" },
     {
       name: "description",
       content:
-        "Full REST API access covering every platform capability. Model Context Protocol server for AI agent interoperability. Build on AIBYAI or integrate it into your stack.",
+        "Full REST API access covering every platform capability. Model Context Protocol server for AI agent interoperability. Build on JUDICA or integrate it into your stack.",
     },
   ];
 }
@@ -26,7 +26,7 @@ export default function ProductDeveloperPlatform() {
       badge="For Developers"
       title="API, MCP &"
       titleHighlight="SDK"
-      subtitle="Full REST API access covering every platform capability. Model Context Protocol server for AI agent interoperability. Build on AIBYAI or integrate it into your stack."
+      subtitle="Full REST API access covering every platform capability. Model Context Protocol server for AI agent interoperability. Build on JUDICA or integrate it into your stack."
       features={[
         {
           icon: Code,
@@ -38,7 +38,7 @@ export default function ProductDeveloperPlatform() {
           icon: Radio,
           title: "MCP Protocol",
           description:
-            "Model Context Protocol server supporting stdio, SSE, and streamable-http transports. Let external AI agents use AIBYAI as a tool.",
+            "Model Context Protocol server supporting stdio, SSE, and streamable-http transports. Let external AI agents use JUDICA as a tool.",
         },
         {
           icon: Webhook,

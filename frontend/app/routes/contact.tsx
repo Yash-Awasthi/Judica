@@ -37,11 +37,11 @@ import {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Contact - AIBYAI" },
+    { title: "Contact - JUDICA" },
     {
       name: "description",
       content:
-        "Get in touch with the AIBYAI team. Sales inquiries, support, partnerships, and community links.",
+        "Get in touch with the JUDICA team. Sales inquiries, support, partnerships, and community links.",
     },
   ];
 }
@@ -153,7 +153,7 @@ export default function Contact() {
               </CardHeader>
               <CardContent className="space-y-4">
                 <a
-                  href="https://github.com/aibyai"
+                  href="https://github.com/Judica"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -162,7 +162,7 @@ export default function Contact() {
                   GitHub Issues
                 </a>
                 <a
-                  href="https://discord.gg/aibyai"
+                  href="https://discord.gg/Judica"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-3 text-sm text-muted-foreground transition-colors hover:text-foreground"
@@ -171,11 +171,11 @@ export default function Contact() {
                   Discord Community
                 </a>
                 <a
-                  href="mailto:hello@aibyai.dev"
+                  href="mailto:hello@Judica.dev"
                   className="flex items-center gap-3 text-sm text-muted-foreground transition-colors hover:text-foreground"
                 >
                   <Mail className="h-4 w-4" />
-                  hello@aibyai.dev
+                  hello@Judica.dev
                 </a>
               </CardContent>
             </Card>
@@ -198,7 +198,7 @@ export default function Contact() {
                   className="mt-4 w-full"
                   asChild
                 >
-                  <a href="mailto:sales@aibyai.dev">Contact Sales</a>
+                  <a href="mailto:sales@Judica.dev">Contact Sales</a>
                 </Button>
               </CardContent>
             </Card>

@@ -11,7 +11,7 @@ import {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "Multi-Agent Deliberation Engine | AIBYAI" },
+    { title: "Multi-Agent Deliberation Engine | JUDICA" },
     {
       name: "description",
       content:

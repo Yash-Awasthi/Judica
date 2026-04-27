@@ -66,15 +66,15 @@ import {
 
 export function meta({}: Route.MetaArgs) {
   return [
-    { title: "AIBYAI - Multi-Agent Deliberative AI Platform" },
+    { title: "JUDICA - Multi-Agent Deliberative AI Platform" },
     {
       name: "description",
       content:
-        "Instead of trusting one model's best guess, AIBYAI runs a council of AI agents that argue, critique each other, and produce a scored consensus you can actually verify.",
+        "Instead of trusting one model's best guess, JUDICA runs a council of AI agents that argue, critique each other, and produce a scored consensus you can actually verify.",
     },
     {
       property: "og:title",
-      content: "AIBYAI - Don't trust one AI. Make them debate.",
+      content: "JUDICA - Don't trust one AI. Make them debate.",
     },
     {
       property: "og:description",
@@ -85,7 +85,7 @@ export function meta({}: Route.MetaArgs) {
     { name: "twitter:card", content: "summary_large_image" },
     {
       name: "twitter:title",
-      content: "AIBYAI - Multi-Agent Deliberative AI Platform",
+      content: "JUDICA - Multi-Agent Deliberative AI Platform",
     },
     {
       name: "twitter:description",
@@ -377,7 +377,7 @@ export default function Home() {
 
               <FadeIn delay={0.28}>
                 <p className="mt-4 text-sm text-neutral-400 sm:text-base leading-relaxed">
-                  Instead of trusting one model's best guess, AIBYAI runs a council of
+                  Instead of trusting one model's best guess, JUDICA runs a council of
                   AI agents that argue, critique each other, and produce a scored
                   consensus you can actually verify.
                 </p>
@@ -421,7 +421,7 @@ export default function Home() {
                   </MagneticButton>
                   <MagneticButton>
                     <Button variant="ghost" size="sm" asChild className="h-9 px-4 text-neutral-400 hover:text-white">
-                      <a href="https://github.com/Yash-Awasthi/aibyai" target="_blank" rel="noopener noreferrer">
+                      <a href="https://github.com/Yash-Awasthi/Judica" target="_blank" rel="noopener noreferrer">
                         <GithubIcon className="mr-1.5 h-3.5 w-3.5" />
                         GitHub
                       </a>
@@ -457,9 +457,9 @@ export default function Home() {
                     Single Model
                   </div>
                   <div className="px-4 py-3 text-xs font-medium text-center relative">
-                    {/* Subtle glow behind AIBYAI column header */}
+                    {/* Subtle glow behind JUDICA column header */}
                     <span className="relative z-10 bg-gradient-to-r from-blue-500 to-violet-500 bg-clip-text text-transparent font-semibold">
-                      AIBYAI Council
+                      JUDICA Council
                     </span>
                   </div>
                 </div>
@@ -637,7 +637,7 @@ export default function Home() {
               Ready to rethink how you use AI?
             </h2>
             <p className="mt-4 text-muted-foreground text-base sm:text-lg max-w-xl mx-auto">
-              Deploy AIBYAI in minutes. Self-hosted, open source,
+              Deploy JUDICA in minutes. Self-hosted, open source,
               enterprise-ready.
             </p>
           </FadeIn>

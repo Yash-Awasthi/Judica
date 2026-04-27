@@ -56,7 +56,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      const saved = localStorage.getItem("aibyai_custom_archetypes");
+      const saved = localStorage.getItem("Judica_custom_archetypes");
       if (saved) setCustomArchetypes(JSON.parse(saved));
     } catch {}
   }, []);
@@ -64,7 +64,7 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      const saved = localStorage.getItem("aibyai_custom_models");
+      const saved = localStorage.getItem("Judica_custom_models");
       if (saved) setCustomModels(JSON.parse(saved));
     } catch {}
   }, []);
@@ -72,12 +72,12 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   // Persist to localStorage on change
   useEffect(() => {
     if (typeof window === "undefined") return;
-    localStorage.setItem("aibyai_custom_archetypes", JSON.stringify(customArchetypes));
+    localStorage.setItem("Judica_custom_archetypes", JSON.stringify(customArchetypes));
   }, [customArchetypes]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    localStorage.setItem("aibyai_custom_models", JSON.stringify(customModels));
+    localStorage.setItem("Judica_custom_models", JSON.stringify(customModels));
   }, [customModels]);
 
   const addCustomModel = useCallback((model: Omit<CustomModel, "id">) => {
