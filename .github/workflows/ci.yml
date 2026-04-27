@@ -39,6 +39,12 @@ jobs:
           cache: 'npm'
       - run: npm ci --ignore-scripts
       - run: npx vitest run --coverage
+        env:
+          NODE_ENV: test
+          DATABASE_URL: postgresql://test:test@localhost:5432/test
+          JWT_SECRET: test-jwt-secret-that-is-at-least-32-characters-long
+          MASTER_ENCRYPTION_KEY: 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+          REDIS_URL: redis://localhost:6379
 
   security-audit:
     runs-on: ubuntu-latest
@@ -103,9 +109,9 @@ jobs:
           grype sbom:sbom-npm.json \
             --fail-on high \
             --output sarif \
-            --file grype-results.sarif || true
+            --file grype-results.sarif
           # Always generate output even on findings so we can upload
-          grype sbom:sbom-npm.json --output json --file grype-results.json || true
+          grype sbom:sbom-npm.json --output json --file grype-results.json
         continue-on-error: true
 
       # Upload SARIF results to GitHub Security tab
@@ -139,7 +145,7 @@ jobs:
           cache: 'npm'
       - run: npm ci
       - run: cd frontend && npm ci
-      - run: npm run build --if-present
+      - run: BUILD_TARGET=node npm run build
 
   docker:
     runs-on: ubuntu-latest
