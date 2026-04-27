@@ -15,10 +15,15 @@ contextBridge.exposeInMainWorld("molecule", {
   // Glass mode
   toggleGlass: (on: boolean) => ipcRenderer.invoke("glass:toggle", on),
 
-  // Providers
+  // Providers (legacy)
   listProviders: () => ipcRenderer.invoke("providers:list"),
   setProviders: (providers: string[]) =>
     ipcRenderer.invoke("providers:set", providers),
+
+  // Council members — unified config
+  getCouncilMembers: () => ipcRenderer.invoke("council:getMembers"),
+  setCouncilMembers: (members: unknown[]) =>
+    ipcRenderer.invoke("council:setMembers", members),
 
   // Memory
   getMemory: () => ipcRenderer.invoke("memory:get"),

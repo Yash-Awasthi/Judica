@@ -48,8 +48,25 @@ const views: Partial<Record<Provider, BrowserView>> = {};
 let glassMode = false;
 let activeProviders: Provider[] = ["chatgpt", "gemini", "claude"];
 
-// Verdict rotation: which provider generates the verdict each round
-const verdictRotation: Provider[] = ["chatgpt", "gemini", "claude"];
+// Council members config (synced from renderer via IPC)
+interface CouncilMember {
+  id: string;
+  label: string;
+  enabled: boolean;
+  mode: "browser" | "api";
+  provider: string;
+  model: string;
+  apiKey: string;
+  baseUrl: string;
+}
+
+let councilMembers: CouncilMember[] = [
+  { id: "chatgpt", label: "ChatGPT", enabled: true, mode: "browser", provider: "openai",    model: "gpt-4o",    apiKey: "", baseUrl: "https://api.openai.com/v1" },
+  { id: "gemini",  label: "Gemini",  enabled: true, mode: "browser", provider: "gemini",    model: "gemini-2.0-flash", apiKey: "", baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai" },
+  { id: "claude",  label: "Claude",  enabled: true, mode: "browser", provider: "anthropic", model: "claude-3-5-sonnet-20241022", apiKey: "", baseUrl: "https://api.anthropic.com" },
+];
+
+// Verdict rotation: which member generates the verdict each round
 let verdictIndex = 0;
 
 // ── App lifecycle ─────────────────────────────────────────────────────────────
@@ -216,6 +233,85 @@ async function sendToProvider(
   }
 }
 
+// ── API-based send (for non-browser members) ──────────────────────────────────
+
+async function sendToApi(
+  member: CouncilMember,
+  message: string
+): Promise<{ ok: boolean; text?: string; summary?: string; error?: string }> {
+  try {
+    // Anthropic uses a different request/response format
+    if (member.provider === "anthropic") {
+      const res = await fetch(`${member.baseUrl}/v1/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": member.apiKey,
+          "anthropic-version": "2023-06-01",
+        },
+        body: JSON.stringify({
+          model: member.model,
+          max_tokens: 2048,
+          messages: [{ role: "user", content: message }],
+        }),
+      });
+      if (!res.ok) {
+        const err = await res.text();
+        return { ok: false, error: `Anthropic API error ${res.status}: ${err.slice(0, 200)}` };
+      }
+      const data: any = await res.json();
+      const text = data.content?.[0]?.text ?? "";
+      return { ok: true, text, summary: text.slice(0, 200) };
+    }
+
+    // All other providers: OpenAI-compatible /chat/completions
+    const baseUrl = member.baseUrl.replace(/\/$/, "");
+    const url = baseUrl.endsWith("/chat/completions")
+      ? baseUrl
+      : `${baseUrl}/chat/completions`;
+
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (member.apiKey) headers["Authorization"] = `Bearer ${member.apiKey}`;
+
+    const res = await fetch(url, {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        model: member.model,
+        messages: [{ role: "user", content: message }],
+        stream: false,
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.text();
+      return { ok: false, error: `API error ${res.status}: ${err.slice(0, 200)}` };
+    }
+
+    const data: any = await res.json();
+    const text = data.choices?.[0]?.message?.content ?? "";
+    return { ok: true, text, summary: text.slice(0, 200) };
+  } catch (err: any) {
+    return { ok: false, error: err.message };
+  }
+}
+
+// ── Unified send — routes to browser or API ───────────────────────────────────
+
+async function sendToMember(
+  member: CouncilMember,
+  message: string
+): Promise<{ ok: boolean; text?: string; summary?: string; error?: string }> {
+  if (member.mode === "browser") {
+    const browserId = member.id as Provider;
+    if (views[browserId]) return sendToProvider(browserId, message);
+    return { ok: false, error: `No browser view for ${member.id}` };
+  }
+  return sendToApi(member, message);
+}
+
 async function runDeliberation(
   threadId: string,
   userMessage: string,
@@ -249,16 +345,18 @@ async function runDeliberation(
     messageToSend = `[Context about me: ${memory}]\n\n${messageToSend}`;
   }
 
-  // Send to all active providers in parallel
+  // Send to all enabled council members in parallel
   const opinions: Array<{
-    provider: Provider;
+    provider: string;
     text: string;
     summary: string;
   }> = [];
 
-  const promises = activeProviders.map(async (provider) => {
-    const result = await sendToProvider(provider, messageToSend);
-    const text = result.text ?? "No response.";
+  const enabledMembers = councilMembers.filter((m) => m.enabled);
+
+  const promises = enabledMembers.map(async (member) => {
+    const result = await sendToMember(member, messageToSend);
+    const text = result.text ?? result.error ?? "No response.";
     const summary = result.summary ?? text.slice(0, 150);
 
     // Save to DB
@@ -266,7 +364,7 @@ async function runDeliberation(
       id: randomUUID(),
       threadId,
       role: "opinion",
-      member: provider,
+      member: member.id,
       content: text,
       summary,
       round,
@@ -275,19 +373,20 @@ async function runDeliberation(
     // Stream to UI in real time
     mainWindow.webContents.send("deliberation:opinion", {
       threadId,
-      provider,
+      provider: member.id,
+      label: member.label,
       text,
       summary,
       round,
     });
 
-    opinions.push({ provider, text, summary });
+    opinions.push({ provider: member.id, text, summary });
   });
 
   await Promise.all(promises);
 
-  // Generate verdict — rotate which AI synthesizes it
-  const verdictProvider = verdictRotation[verdictIndex % verdictRotation.length];
+  // Generate verdict — rotate which member synthesizes it
+  const verdictMember = enabledMembers[verdictIndex % enabledMembers.length];
   verdictIndex++;
 
   const opinionLines = opinions
@@ -296,7 +395,7 @@ async function runDeliberation(
 
   const verdictPrompt = `You are synthesizing a council deliberation. Given these AI perspectives:\n\n${opinionLines}\n\nQuestion was: "${userMessage}"\n\nWrite a concise verdict (3-4 sentences): key insight, main disagreements, clear recommendation.`;
 
-  const verdictResult = await sendToProvider(verdictProvider, verdictPrompt);
+  const verdictResult = await sendToMember(verdictMember, verdictPrompt);
   const verdictText = verdictResult.text ?? "Council could not reach a verdict.";
   const verdictSummary =
     verdictResult.summary ?? verdictText.slice(0, 200);
@@ -432,12 +531,25 @@ function registerIPC() {
     return glassMode;
   });
 
-  // Provider management
+  // Provider management (legacy — kept for compat)
   ipcMain.handle("providers:list", () => activeProviders);
   ipcMain.handle("providers:set", (_e, providers: Provider[]) => {
     activeProviders = providers;
     if (glassMode) updateViewBounds();
     return activeProviders;
+  });
+
+  // Council members — the new unified config
+  ipcMain.handle("council:getMembers", () => councilMembers);
+  ipcMain.handle("council:setMembers", (_e, members: CouncilMember[]) => {
+    councilMembers = members;
+    // Keep activeProviders in sync for glass view
+    activeProviders = members
+      .filter((m) => m.enabled && m.mode === "browser")
+      .map((m) => m.id as Provider)
+      .filter((id) => PROVIDERS.includes(id));
+    if (glassMode) updateViewBounds();
+    return true;
   });
 
   // Memory

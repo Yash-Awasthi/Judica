@@ -16,7 +16,17 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "~/components/ui/collapsible";
-import { Settings, Shield, MessageSquare, Brain, Gauge, ChevronDown, Filter, AlignLeft, Key, CheckCircle2 } from "lucide-react";
+import { Settings, Shield, MessageSquare, Brain, Gauge, ChevronDown, Filter, AlignLeft, Users, Plus, Trash2, Globe, Key } from "lucide-react";
+import {
+  type CouncilMember,
+  type MemberMode,
+  API_PROVIDERS,
+  loadCouncilMembers,
+  saveCouncilMembers,
+  newMember,
+} from "~/lib/council";
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
 
 function ToggleRow({
   label,
@@ -40,27 +50,177 @@ function ToggleRow({
   );
 }
 
-const SETTINGS_KEY = "judica_settings";
+// ── Council Member Row ────────────────────────────────────────────────────────
 
-function loadAISettings() {
-  try {
-    const raw = localStorage.getItem(SETTINGS_KEY);
-    return raw
-      ? JSON.parse(raw)
-      : { provider: "anthropic", anthropicKey: "", openaiKey: "" };
-  } catch {
-    return { provider: "anthropic", anthropicKey: "", openaiKey: "" };
-  }
+const BROWSER_CAPABLE = new Set(["chatgpt", "gemini", "claude"]);
+
+function MemberRow({
+  member,
+  onChange,
+  onRemove,
+}: {
+  member: CouncilMember;
+  onChange: (m: CouncilMember) => void;
+  onRemove?: () => void;
+}) {
+  const canBrowser = BROWSER_CAPABLE.has(member.id);
+  const selectedProvider = API_PROVIDERS.find((p) => p.id === member.provider);
+
+  const handleModeChange = (mode: MemberMode) => {
+    onChange({ ...member, mode });
+  };
+
+  const handleProviderChange = (providerId: string) => {
+    const p = API_PROVIDERS.find((x) => x.id === providerId)!;
+    onChange({
+      ...member,
+      provider: providerId,
+      model: p.defaultModel,
+      baseUrl: p.defaultBaseUrl,
+    });
+  };
+
+  return (
+    <div className={`rounded-lg border p-4 space-y-3 transition-opacity ${member.enabled ? "" : "opacity-50"}`}>
+      {/* Header row */}
+      <div className="flex items-center gap-3">
+        <Switch
+          checked={member.enabled}
+          onCheckedChange={(v) => onChange({ ...member, enabled: v })}
+        />
+        <Input
+          className="h-7 text-sm font-medium w-32 px-2"
+          value={member.label}
+          onChange={(e) => onChange({ ...member, label: e.target.value })}
+        />
+
+        {/* Mode toggle — browser only for chatgpt/gemini/claude */}
+        <div className="flex items-center rounded-md border overflow-hidden text-xs ml-auto">
+          {canBrowser && (
+            <button
+              className={`px-3 py-1.5 flex items-center gap-1.5 transition-colors ${
+                member.mode === "browser"
+                  ? "bg-primary text-primary-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+              onClick={() => handleModeChange("browser")}
+            >
+              <Globe className="size-3" />
+              Browser
+            </button>
+          )}
+          <button
+            className={`px-3 py-1.5 flex items-center gap-1.5 transition-colors ${
+              member.mode === "api"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:text-foreground"
+            }`}
+            onClick={() => handleModeChange("api")}
+          >
+            <Key className="size-3" />
+            API
+          </button>
+        </div>
+
+        {onRemove && (
+          <button
+            onClick={onRemove}
+            className="text-muted-foreground hover:text-destructive transition-colors ml-1"
+          >
+            <Trash2 className="size-3.5" />
+          </button>
+        )}
+      </div>
+
+      {/* API config — visible when mode is api */}
+      {member.mode === "api" && (
+        <div className="grid grid-cols-2 gap-2 pl-9">
+          {/* Provider */}
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Provider</Label>
+            <Select value={member.provider} onValueChange={handleProviderChange}>
+              <SelectTrigger className="h-7 text-xs">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {API_PROVIDERS.map((p) => (
+                  <SelectItem key={p.id} value={p.id} className="text-xs">
+                    {p.label}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* Model */}
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">Model</Label>
+            <Input
+              className="h-7 text-xs"
+              placeholder="model name"
+              value={member.model}
+              onChange={(e) => onChange({ ...member, model: e.target.value })}
+            />
+          </div>
+
+          {/* API Key — hidden for Ollama */}
+          {selectedProvider?.needsKey !== false && (
+            <div className="space-y-1 col-span-2">
+              <Label className="text-xs text-muted-foreground">API Key</Label>
+              <Input
+                className="h-7 text-xs font-mono"
+                type="password"
+                placeholder="sk-..."
+                value={member.apiKey}
+                onChange={(e) => onChange({ ...member, apiKey: e.target.value })}
+              />
+            </div>
+          )}
+
+          {/* Base URL — shown for ollama and custom */}
+          {(member.provider === "ollama" || member.provider === "custom") && (
+            <div className="space-y-1 col-span-2">
+              <Label className="text-xs text-muted-foreground">Base URL</Label>
+              <Input
+                className="h-7 text-xs font-mono"
+                placeholder="http://localhost:11434/v1"
+                value={member.baseUrl}
+                onChange={(e) => onChange({ ...member, baseUrl: e.target.value })}
+              />
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
 }
 
-export default function SettingsPage() {
-  const [aiSettings, setAISettings] = useState(loadAISettings);
-  const [saved, setSaved] = useState(false);
+// ── Main Settings Page ────────────────────────────────────────────────────────
 
-  const saveAISettings = () => {
-    localStorage.setItem(SETTINGS_KEY, JSON.stringify(aiSettings));
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+export default function SettingsPage() {
+  const [members, setMembers] = useState<CouncilMember[]>(loadCouncilMembers);
+  const [councilSaved, setCouncilSaved] = useState(false);
+
+  const updateMember = (id: string, updated: CouncilMember) => {
+    setMembers((prev) => prev.map((m) => (m.id === id ? updated : m)));
+  };
+
+  const removeMember = (id: string) => {
+    setMembers((prev) => prev.filter((m) => m.id !== id));
+  };
+
+  const addMember = () => {
+    setMembers((prev) => [...prev, newMember()]);
+  };
+
+  const saveCouncil = () => {
+    saveCouncilMembers(members);
+    // Sync to electron main if running in desktop
+    if (typeof window !== "undefined" && (window as any).molecule) {
+      (window as any).molecule.setCouncilMembers(members);
+    }
+    setCouncilSaved(true);
+    setTimeout(() => setCouncilSaved(false), 2000);
   };
 
   const [autoCouncil, setAutoCouncil] = useState(true);
@@ -68,108 +228,82 @@ export default function SettingsPage() {
   const [coldValidator, setColdValidator] = useState(false);
   const [piiDetection, setPiiDetection] = useState(true);
   const [autoAnonymize, setAutoAnonymize] = useState(false);
-  // Phase 1.1 — content filter toggles (LLM Guard scanner pattern; off by default)
   const [blockProfanity, setBlockProfanity] = useState(false);
   const [blockAdultContent, setBlockAdultContent] = useState(false);
-  // Phase 1.24 — response verbosity control
   const [verbosityLevel, setVerbosityLevel] = useState("standard");
   const [deliberationMode, setDeliberationMode] = useState("standard");
   const [enableStreaming, setEnableStreaming] = useState(true);
-  const [showCost, setShowCost] = useState(true);
-  const [memoryBackend, setMemoryBackend] = useState("local");
   const [quotasOpen, setQuotasOpen] = useState(false);
 
   return (
     <div className="flex-1 overflow-y-auto">
-      <div className="max-w-6xl mx-auto p-6 space-y-6">
+      <div className="max-w-3xl mx-auto p-6 space-y-6">
         <div className="flex items-center gap-3">
           <Settings className="size-6 text-muted-foreground" />
           <div>
             <h1 className="text-xl font-semibold">Settings</h1>
             <p className="text-sm text-muted-foreground">
-              Configure your AI council preferences and system behavior
+              Configure your council members and deliberation preferences
             </p>
           </div>
         </div>
 
-        {/* AI Provider Keys */}
+        {/* Council Members */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Key className="size-4" />
-              AI Provider Keys
+              <Users className="size-4" />
+              Council Members
             </CardTitle>
             <CardDescription>
-              Your keys are stored locally on this device and never sent anywhere else.
+              Toggle members on/off. Switch between <strong>Browser</strong> (uses your existing subscription — no API key) or <strong>API</strong> (uses a key you provide). Mix and match freely.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="space-y-2">
-              <Label>Default provider</Label>
-              <Select
-                value={aiSettings.provider}
-                onValueChange={(v) => setAISettings((s: typeof aiSettings) => ({ ...s, provider: v }))}
-              >
-                <SelectTrigger className="w-48">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="anthropic">Anthropic (Claude)</SelectItem>
-                  <SelectItem value="openai">OpenAI (GPT)</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="anthropic-key">Anthropic API Key</Label>
-              <Input
-                id="anthropic-key"
-                type="password"
-                placeholder="sk-ant-..."
-                value={aiSettings.anthropicKey ?? ""}
-                onChange={(e) => setAISettings((s: typeof aiSettings) => ({ ...s, anthropicKey: e.target.value }))}
+          <CardContent className="space-y-3">
+            {members.map((m) => (
+              <MemberRow
+                key={m.id}
+                member={m}
+                onChange={(updated) => updateMember(m.id, updated)}
+                onRemove={BROWSER_CAPABLE.has(m.id) ? undefined : () => removeMember(m.id)}
               />
-            </div>
+            ))}
 
-            <div className="space-y-2">
-              <Label htmlFor="openai-key">OpenAI API Key</Label>
-              <Input
-                id="openai-key"
-                type="password"
-                placeholder="sk-..."
-                value={aiSettings.openaiKey ?? ""}
-                onChange={(e) => setAISettings((s: typeof aiSettings) => ({ ...s, openaiKey: e.target.value }))}
-              />
-            </div>
+            <button
+              onClick={addMember}
+              className="w-full flex items-center justify-center gap-2 rounded-lg border border-dashed py-3 text-sm text-muted-foreground hover:text-foreground hover:border-border transition-colors"
+            >
+              <Plus className="size-4" />
+              Add member
+            </button>
 
-            <Button onClick={saveAISettings} className="gap-2">
-              {saved ? <CheckCircle2 className="size-4 text-emerald-400" /> : null}
-              {saved ? "Saved" : "Save Keys"}
+            <Button onClick={saveCouncil} size="sm" className="mt-1">
+              {councilSaved ? "Saved ✓" : "Save Council"}
             </Button>
           </CardContent>
         </Card>
 
-        {/* Council Preferences */}
+        {/* Council Behaviour */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <Brain className="size-4" />
-              Council Preferences
+              Council Behaviour
             </CardTitle>
             <CardDescription>
-              Control how the AI council deliberates on your queries
+              Control how the council deliberates
             </CardDescription>
           </CardHeader>
           <CardContent className="divide-y divide-border">
             <ToggleRow
               label="Auto-Council Mode"
-              description="Automatically select optimal archetypes for each query"
+              description="Automatically select optimal members for each query"
               checked={autoCouncil}
               onCheckedChange={setAutoCouncil}
             />
             <ToggleRow
               label="Enable Debate Round"
-              description="Enable multi-round deliberation between archetypes"
+              description="Enable multi-round deliberation between members"
               checked={debateRound}
               onCheckedChange={setDebateRound}
             />
@@ -182,77 +316,19 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Privacy & Safety */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Shield className="size-4" />
-              Privacy &amp; Safety
-            </CardTitle>
-            <CardDescription>
-              Manage data protection and safety guardrails
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="divide-y divide-border">
-            <ToggleRow
-              label="PII Detection"
-              description="Scan messages for personally identifiable information"
-              checked={piiDetection}
-              onCheckedChange={setPiiDetection}
-            />
-            <ToggleRow
-              label="Auto-anonymize High Risk"
-              description="Automatically redact detected PII before sending to providers"
-              checked={autoAnonymize}
-              onCheckedChange={setAutoAnonymize}
-            />
-          </CardContent>
-        </Card>
-
-        {/* Phase 1.1 — Content Filters (LLM Guard scanner pattern) */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Filter className="size-4" />
-              Content Filters
-            </CardTitle>
-            <CardDescription>
-              Applied as a scanner layer before input reaches models and after output returns.
-              Both filters are <strong>off by default</strong> — toggling on stores your preference per account.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="divide-y divide-border">
-            <ToggleRow
-              label="Block Profanity"
-              description="Redact profanity from your input and AI responses using a pattern scanner."
-              checked={blockProfanity}
-              onCheckedChange={setBlockProfanity}
-            />
-            <ToggleRow
-              label="Block Adult / Explicit Content"
-              description="Block adult or sexually explicit content in input and output. Off by default."
-              checked={blockAdultContent}
-              onCheckedChange={setBlockAdultContent}
-            />
-          </CardContent>
-        </Card>
+        {/* Chat Preferences */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <MessageSquare className="size-4" />
               Chat Preferences
             </CardTitle>
-            <CardDescription>
-              Customize your chat experience and display options
-            </CardDescription>
           </CardHeader>
           <CardContent className="space-y-0 divide-y divide-border">
             <div className="flex items-center justify-between py-4">
               <div className="space-y-0.5">
                 <Label className="text-sm font-medium">Default Deliberation Mode</Label>
-                <p className="text-sm text-muted-foreground">
-                  Choose the default reasoning strategy for council sessions
-                </p>
+                <p className="text-sm text-muted-foreground">Reasoning strategy for council sessions</p>
               </div>
               <Select value={deliberationMode} onValueChange={setDeliberationMode}>
                 <SelectTrigger className="w-44">
@@ -269,29 +345,20 @@ export default function SettingsPage() {
             </div>
             <ToggleRow
               label="Enable Streaming"
-              description="Stream archetype responses as they are generated"
+              description="Stream member responses as they are generated"
               checked={enableStreaming}
               onCheckedChange={setEnableStreaming}
             />
-            <ToggleRow
-              label="Show Cost Per Message"
-              description="Display estimated token cost alongside each response"
-              checked={showCost}
-              onCheckedChange={setShowCost}
-            />
-            {/* Phase 1.24 — Response Verbosity Control */}
             <div className="flex items-center justify-between py-4">
               <div className="space-y-0.5">
                 <Label className="text-sm font-medium flex items-center gap-1.5">
                   <AlignLeft className="size-3.5" />
                   Response Verbosity
                 </Label>
-                <p className="text-sm text-muted-foreground">
-                  Control the depth and length of AI responses
-                </p>
+                <p className="text-sm text-muted-foreground">Depth and length of AI responses</p>
               </div>
               <Select value={verbosityLevel} onValueChange={setVerbosityLevel}>
-                <SelectTrigger className="w-44" aria-label="Response verbosity level">
+                <SelectTrigger className="w-44">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -305,52 +372,58 @@ export default function SettingsPage() {
           </CardContent>
         </Card>
 
-        {/* Memory Configuration */}
+        {/* Privacy & Safety */}
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
-              <Brain className="size-4" />
-              Memory Configuration
+              <Shield className="size-4" />
+              Privacy &amp; Safety
             </CardTitle>
-            <CardDescription>
-              Manage long-term memory storage and retrieval
-            </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center justify-between py-2">
-              <div className="space-y-0.5">
-                <Label className="text-sm font-medium">Memory Backend</Label>
-                <p className="text-sm text-muted-foreground">
-                  Select the storage engine for memory chunks
-                </p>
-              </div>
-              <Select value={memoryBackend} onValueChange={setMemoryBackend}>
-                <SelectTrigger className="w-44">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="local">Local</SelectItem>
-                  <SelectItem value="qdrant">Qdrant</SelectItem>
-                  <SelectItem value="getzep">GetZep</SelectItem>
-                  <SelectItem value="google_drive">Google Drive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="rounded-md bg-muted/50 px-4 py-3 text-sm text-muted-foreground">
-              1,247 chunks &bull; ~4.8 MB estimated
-            </div>
-            <div className="flex gap-2">
-              <Button variant="outline" size="sm">
-                Compact Memory
-              </Button>
-              <Button variant="destructive" size="sm">
-                Clear All Memory
-              </Button>
-            </div>
+          <CardContent className="divide-y divide-border">
+            <ToggleRow
+              label="PII Detection"
+              description="Scan messages for personally identifiable information"
+              checked={piiDetection}
+              onCheckedChange={setPiiDetection}
+            />
+            <ToggleRow
+              label="Auto-anonymize High Risk"
+              description="Automatically redact detected PII before sending"
+              checked={autoAnonymize}
+              onCheckedChange={setAutoAnonymize}
+            />
           </CardContent>
         </Card>
 
-        {/* Quotas & Limits */}
+        {/* Content Filters */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Filter className="size-4" />
+              Content Filters
+            </CardTitle>
+            <CardDescription>
+              Both filters are <strong>off by default</strong>.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="divide-y divide-border">
+            <ToggleRow
+              label="Block Profanity"
+              description="Redact profanity from input and AI responses."
+              checked={blockProfanity}
+              onCheckedChange={setBlockProfanity}
+            />
+            <ToggleRow
+              label="Block Adult / Explicit Content"
+              description="Block adult or sexually explicit content in input and output."
+              checked={blockAdultContent}
+              onCheckedChange={setBlockAdultContent}
+            />
+          </CardContent>
+        </Card>
+
+        {/* Quotas */}
         <Collapsible open={quotasOpen} onOpenChange={setQuotasOpen}>
           <Card>
             <CollapsibleTrigger className="w-full">
@@ -360,15 +433,9 @@ export default function SettingsPage() {
                     <Gauge className="size-4" />
                     Quotas &amp; Limits
                   </CardTitle>
-                  <ChevronDown
-                    className={`size-4 text-muted-foreground transition-transform ${
-                      quotasOpen ? "rotate-180" : ""
-                    }`}
-                  />
+                  <ChevronDown className={`size-4 text-muted-foreground transition-transform ${quotasOpen ? "rotate-180" : ""}`} />
                 </div>
-                <CardDescription>
-                  View your current usage against daily limits
-                </CardDescription>
+                <CardDescription>View current usage against daily limits</CardDescription>
               </CardHeader>
             </CollapsibleTrigger>
             <CollapsibleContent>
@@ -379,10 +446,7 @@ export default function SettingsPage() {
                     <span className="text-muted-foreground">23 / 100</span>
                   </div>
                   <div className="h-2 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-primary transition-all"
-                      style={{ width: "23%" }}
-                    />
+                    <div className="h-full rounded-full bg-primary transition-all" style={{ width: "23%" }} />
                   </div>
                 </div>
                 <div className="space-y-2">
@@ -391,10 +455,7 @@ export default function SettingsPage() {
                     <span className="text-muted-foreground">247,562 / 1,000,000</span>
                   </div>
                   <div className="h-2 rounded-full bg-muted overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-primary transition-all"
-                      style={{ width: "24.7%" }}
-                    />
+                    <div className="h-full rounded-full bg-primary transition-all" style={{ width: "24.7%" }} />
                   </div>
                 </div>
               </CardContent>
