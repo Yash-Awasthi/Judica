@@ -16,7 +16,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "~/components/ui/collapsible";
-import { Settings, Shield, MessageSquare, Brain, Gauge, ChevronDown, Filter, AlignLeft, Users, Plus, Trash2, Globe, Key, Loader2, CheckCircle2 } from "lucide-react";
+import { Settings, Shield, MessageSquare, Brain, Gauge, ChevronDown, Filter, AlignLeft, Users, Plus, Trash2, Globe, Key, Loader2, CheckCircle2, Link2 } from "lucide-react";
 import {
   type CouncilMember,
   type MemberMode,
@@ -26,6 +26,124 @@ import {
   newMember,
 } from "~/lib/council";
 import { connectProvider, isProviderConnected } from "~/lib/deliberate";
+
+// ── Connected Accounts ────────────────────────────────────────────────────────
+
+const BROWSER_PROVIDERS = [
+  {
+    id: "chatgpt",
+    name: "ChatGPT",
+    description: "Uses your ChatGPT Plus / Team subscription",
+    logo: (
+      <svg viewBox="0 0 24 24" className="size-6" fill="currentColor">
+        <path d="M22.282 9.821a5.985 5.985 0 0 0-.516-4.91 6.046 6.046 0 0 0-6.51-2.9A6.065 6.065 0 0 0 4.981 4.18a5.985 5.985 0 0 0-3.998 2.9 6.046 6.046 0 0 0 .743 7.097 5.98 5.98 0 0 0 .51 4.911 6.051 6.051 0 0 0 6.515 2.9A5.985 5.985 0 0 0 13.26 24a6.056 6.056 0 0 0 5.772-4.206 5.99 5.99 0 0 0 3.997-2.9 6.056 6.056 0 0 0-.747-7.073zM13.26 22.43a4.476 4.476 0 0 1-2.876-1.04l.141-.081 4.779-2.758a.795.795 0 0 0 .392-.681v-6.737l2.02 1.168a.071.071 0 0 1 .038.052v5.583a4.504 4.504 0 0 1-4.494 4.494zM3.6 18.304a4.47 4.47 0 0 1-.535-3.014l.142.085 4.783 2.759a.771.771 0 0 0 .78 0l5.843-3.369v2.332a.08.08 0 0 1-.033.062L9.74 19.95a4.5 4.5 0 0 1-6.14-1.646zM2.34 7.896a4.485 4.485 0 0 1 2.366-1.973V11.6a.766.766 0 0 0 .388.676l5.815 3.355-2.02 1.168a.076.076 0 0 1-.071 0l-4.83-2.786A4.504 4.504 0 0 1 2.34 7.872zm16.597 3.855l-5.843-3.368 2.02-1.167a.076.076 0 0 1 .071 0l4.83 2.786a4.494 4.494 0 0 1-.676 8.105v-5.678a.79.79 0 0 0-.402-.678zm2.01-3.023l-.141-.085-4.774-2.782a.776.776 0 0 0-.785 0L9.409 9.23V6.897a.066.066 0 0 1 .028-.061l4.83-2.787a4.5 4.5 0 0 1 6.68 4.66zm-12.64 4.135l-2.02-1.164a.08.08 0 0 1-.038-.057V6.075a4.5 4.5 0 0 1 7.375-3.453l-.142.08L8.704 5.46a.795.795 0 0 0-.393.681zm1.097-2.365l2.602-1.5 2.607 1.5v2.999l-2.597 1.5-2.607-1.5z"/>
+      </svg>
+    ),
+  },
+  {
+    id: "gemini",
+    name: "Gemini",
+    description: "Uses your Google account — Gemini Advanced optional",
+    logo: (
+      <svg viewBox="0 0 24 24" className="size-6" fill="none">
+        <path d="M12 24A14.304 14.304 0 0 0 0 12 14.304 14.304 0 0 0 12 0a14.304 14.304 0 0 0 12 12 14.304 14.304 0 0 0-12 12z" fill="url(#gemini-grad)"/>
+        <defs>
+          <linearGradient id="gemini-grad" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#4285F4"/>
+            <stop offset="1" stopColor="#34A853"/>
+          </linearGradient>
+        </defs>
+      </svg>
+    ),
+  },
+  {
+    id: "claude",
+    name: "Claude",
+    description: "Uses your Anthropic / Claude Pro subscription",
+    logo: (
+      <svg viewBox="0 0 24 24" className="size-6" fill="currentColor">
+        <path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128-2.962-.77-.284-.283v-.351l.256-.283 4.5.064.13-.13v-.283l-4.629-1.424-.387-.516.129-.477.411-.194 5.077 1.295.098-.098-.048-.177L9.01 8.287l.098-.597.468-.258.597.194 2.109 4.242.09-.012.645-5.025.354-.384.497.065.32.384-.226 5.045.069.069 2.281-4.403.516-.258.565.258.113.636-3.242 5.433.048.177 4.952-1.296.42.194.13.413-.387.529-4.548 1.424v.283l.13.13h4.484l.256.283v.354l-.256.283-4.484.77-.098.11.098.256 4.71 2.647.097.516-.29.484-5.654-1.682-.128.064-1.069 4.823-.485.388-.515-.388-1.066-4.823-.13-.064-5.65 1.682-.293-.484.1-.516z"/>
+      </svg>
+    ),
+  },
+];
+
+function ConnectedAccountsCard() {
+  const [statuses, setStatuses] = useState<Record<string, boolean | null>>({
+    chatgpt: null, gemini: null, claude: null,
+  });
+  const [connecting, setConnecting] = useState<string | null>(null);
+
+  useEffect(() => {
+    BROWSER_PROVIDERS.forEach(async (p) => {
+      const ok = await isProviderConnected(p.id);
+      setStatuses((prev) => ({ ...prev, [p.id]: ok }));
+    });
+  }, []);
+
+  const handleConnect = async (id: string) => {
+    setConnecting(id);
+    await connectProvider(id);
+    const ok = await isProviderConnected(id);
+    setStatuses((prev) => ({ ...prev, [id]: ok }));
+    setConnecting(null);
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Link2 className="size-4" />
+          Connected Accounts
+        </CardTitle>
+        <CardDescription>
+          Connect your existing subscriptions — no API key needed. Judica opens a sign-in window and saves your session.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {BROWSER_PROVIDERS.map((p) => {
+          const status = statuses[p.id];
+          const isConnecting = connecting === p.id;
+          return (
+            <div key={p.id} className="flex items-center gap-4 rounded-lg border p-4">
+              <div className="shrink-0 text-foreground/80">{p.logo}</div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium">{p.name}</p>
+                <p className="text-xs text-muted-foreground">{p.description}</p>
+              </div>
+              <div className="flex items-center gap-3 shrink-0">
+                <div className="flex items-center gap-1.5 text-xs">
+                  {status === null ? (
+                    <Loader2 className="size-3 animate-spin text-muted-foreground" />
+                  ) : status ? (
+                    <><CheckCircle2 className="size-3.5 text-green-500" /><span className="text-green-600 dark:text-green-400">Connected</span></>
+                  ) : (
+                    <><span className="size-2 rounded-full bg-amber-400 inline-block" /><span className="text-muted-foreground">Not signed in</span></>
+                  )}
+                </div>
+                <Button
+                  size="sm"
+                  variant={status ? "outline" : "default"}
+                  className="h-8 text-xs gap-1.5"
+                  onClick={() => handleConnect(p.id)}
+                  disabled={isConnecting}
+                >
+                  {isConnecting ? (
+                    <><Loader2 className="size-3 animate-spin" />Opening…</>
+                  ) : status ? (
+                    <><Globe className="size-3" />Reconnect</>
+                  ) : (
+                    <><Globe className="size-3" />Sign in</>
+                  )}
+                </Button>
+              </div>
+            </div>
+          );
+        })}
+      </CardContent>
+    </Card>
+  );
+}
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -299,6 +417,9 @@ export default function SettingsPage() {
             </p>
           </div>
         </div>
+
+        {/* Connected Accounts */}
+        <ConnectedAccountsCard />
 
         {/* Council Members */}
         <Card>

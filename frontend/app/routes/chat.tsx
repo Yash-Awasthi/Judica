@@ -19,6 +19,12 @@ import {
 } from "~/components/ui/select";
 import { ScrollArea } from "~/components/ui/scroll-area";
 import { useSidebar } from "~/components/ui/sidebar";
+import { Switch } from "~/components/ui/switch";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "~/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -75,6 +81,9 @@ interface CouncilMember {
   model: string;
   /** Phase 1.2 — per-member mute toggle */
   muted?: boolean;
+  /** Per-member capability flags */
+  deepThinking?: boolean;
+  webSearch?: boolean;
 }
 
 interface CouncilPreset {
@@ -1502,6 +1511,85 @@ export default function ChatPage() {
                   >
                     {member.muted ? <VolumeX className="size-3" /> : <Volume2 className="size-3" />}
                   </Button>
+
+                  {/* Per-member configure */}
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+                        title="Configure member"
+                        disabled={isStreaming}
+                      >
+                        <Settings2 className="size-3" />
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent side="left" align="start" className="w-64 p-3 space-y-3">
+                      <p className="text-xs font-semibold">{member.name} — Options</p>
+
+                      {/* Model */}
+                      <div className="space-y-1">
+                        <Label className="text-xs text-muted-foreground">Model</Label>
+                        <Select
+                          value={member.model}
+                          onValueChange={(v) => {
+                            if (v === "__new_model__") { setInlineModelTarget(member.id); setInlineModelOpen(true); return; }
+                            updateMember(member.id, "model", v);
+                          }}
+                        >
+                          <SelectTrigger className="h-7 text-xs">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {store.allModels.map((m) => (
+                              <SelectItem key={m.id} value={m.id} className="text-xs">{m.label}</SelectItem>
+                            ))}
+                            <SelectItem value="__new_model__" className="text-xs">
+                              <span className="flex items-center gap-1.5 text-primary"><Plus className="size-3" />Add model…</span>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Deep Thinking */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-medium">Deep Thinking</p>
+                          <p className="text-[10px] text-muted-foreground">Extended reasoning / o1 mode</p>
+                        </div>
+                        <Switch
+                          checked={!!member.deepThinking}
+                          onCheckedChange={(v) => setCouncilMembers(prev => prev.map(m => m.id === member.id ? { ...m, deepThinking: v } : m))}
+                        />
+                      </div>
+
+                      {/* Web Search */}
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-xs font-medium">Web Search</p>
+                          <p className="text-[10px] text-muted-foreground">Ground answers in live web results</p>
+                        </div>
+                        <Switch
+                          checked={!!member.webSearch}
+                          onCheckedChange={(v) => setCouncilMembers(prev => prev.map(m => m.id === member.id ? { ...m, webSearch: v } : m))}
+                        />
+                      </div>
+
+                      {/* Mute shortcut */}
+                      <div className="flex items-center justify-between border-t pt-2">
+                        <div>
+                          <p className="text-xs font-medium">Mute</p>
+                          <p className="text-[10px] text-muted-foreground">Skip this member this round</p>
+                        </div>
+                        <Switch
+                          checked={!!member.muted}
+                          onCheckedChange={(v) => setCouncilMembers(prev => prev.map(m => m.id === member.id ? { ...m, muted: v } : m))}
+                        />
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+
                   <Button
                     variant="ghost"
                     size="icon"
@@ -1541,6 +1629,17 @@ export default function ChatPage() {
                     </SelectItem>
                   </SelectContent>
                 </Select>
+                {/* Active flags */}
+                {(member.deepThinking || member.webSearch) && (
+                  <div className="flex gap-1 pt-0.5">
+                    {member.deepThinking && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-500/15 text-purple-400 font-medium">Deep Thinking</span>
+                    )}
+                    {member.webSearch && (
+                      <span className="text-[9px] px-1.5 py-0.5 rounded bg-blue-500/15 text-blue-400 font-medium">Web Search</span>
+                    )}
+                  </div>
+                )}
               </div>
             );
           })}
