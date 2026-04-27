@@ -14,7 +14,7 @@
     "dist:all": "npm run build && electron-builder --mac --win --linux"
   },
   "dependencies": {
-    "better-sqlite3": "^9.4.3",
+    "better-sqlite3": "^11.10.0",
     "electron-store": "^8.1.0"
   },
   "devDependencies": {
@@ -24,6 +24,9 @@
     "electron": "^30.0.0",
     "electron-builder": "^24.13.3",
     "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=22.0.0"
   },
   "build": {
     "appId": "com.judica.app",
