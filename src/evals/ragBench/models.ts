@@ -2,13 +2,13 @@
  * Enterprise RAG Benchmark — Models
  *
  * Types for running Onyx's EnterpriseRAG-Bench (500K-doc benchmark)
- * against aibyai's retrieval and generation pipeline.
+ * against judica's retrieval and generation pipeline.
  */
 
 export interface BenchmarkConfig {
   /** Path or URL to benchmark dataset (JSONL). */
   datasetPath: string;
-  /** aibyai API base URL. */
+  /** judica API base URL. */
   apiBaseUrl: string;
   /** API key for authentication. */
   apiKey?: string;

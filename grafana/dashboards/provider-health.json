@@ -30,7 +30,7 @@
       },
       "targets": [
         {
-          "expr": "100 * (1 - (sum(rate(aibyai_provider_call_duration_seconds_count{status=\"error\"}[5m])) by (provider) / sum(rate(aibyai_provider_call_duration_seconds_count[5m])) by (provider)))",
+          "expr": "100 * (1 - (sum(rate(judica_provider_call_duration_seconds_count{status=\"error\"}[5m])) by (provider) / sum(rate(judica_provider_call_duration_seconds_count[5m])) by (provider)))",
           "legendFormat": "{{provider}}",
           "refId": "A"
         }
@@ -50,17 +50,17 @@
       },
       "targets": [
         {
-          "expr": "histogram_quantile(0.50, sum(rate(aibyai_provider_call_duration_seconds_bucket[5m])) by (le, provider))",
+          "expr": "histogram_quantile(0.50, sum(rate(judica_provider_call_duration_seconds_bucket[5m])) by (le, provider))",
           "legendFormat": "{{provider}} p50",
           "refId": "A"
         },
         {
-          "expr": "histogram_quantile(0.95, sum(rate(aibyai_provider_call_duration_seconds_bucket[5m])) by (le, provider))",
+          "expr": "histogram_quantile(0.95, sum(rate(judica_provider_call_duration_seconds_bucket[5m])) by (le, provider))",
           "legendFormat": "{{provider}} p95",
           "refId": "B"
         },
         {
-          "expr": "histogram_quantile(0.99, sum(rate(aibyai_provider_call_duration_seconds_bucket[5m])) by (le, provider))",
+          "expr": "histogram_quantile(0.99, sum(rate(judica_provider_call_duration_seconds_bucket[5m])) by (le, provider))",
           "legendFormat": "{{provider}} p99",
           "refId": "C"
         }
@@ -80,12 +80,12 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(aibyai_tokens_total{type=\"prompt\"}[1h])) by (provider, model) * 1000",
+          "expr": "sum(rate(judica_tokens_total{type=\"prompt\"}[1h])) by (provider, model) * 1000",
           "legendFormat": "{{provider}}/{{model}} (prompt)",
           "refId": "A"
         },
         {
-          "expr": "sum(rate(aibyai_tokens_total{type=\"completion\"}[1h])) by (provider, model) * 1000",
+          "expr": "sum(rate(judica_tokens_total{type=\"completion\"}[1h])) by (provider, model) * 1000",
           "legendFormat": "{{provider}}/{{model}} (completion)",
           "refId": "B"
         }
@@ -105,7 +105,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(aibyai_tokens_total[5m])) by (provider)",
+          "expr": "sum(rate(judica_tokens_total[5m])) by (provider)",
           "legendFormat": "{{provider}}",
           "refId": "A"
         }
@@ -125,7 +125,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(aibyai_provider_call_duration_seconds_count[5m])) by (provider)",
+          "expr": "sum(rate(judica_provider_call_duration_seconds_count[5m])) by (provider)",
           "legendFormat": "{{provider}}",
           "refId": "A"
         }
@@ -146,7 +146,7 @@
       },
       "targets": [
         {
-          "expr": "sum(rate(aibyai_provider_call_duration_seconds_count{status=\"error\"}[5m])) by (provider)",
+          "expr": "sum(rate(judica_provider_call_duration_seconds_count{status=\"error\"}[5m])) by (provider)",
           "legendFormat": "{{provider}} errors",
           "refId": "A"
         }
@@ -174,17 +174,17 @@
       },
       "targets": [
         {
-          "expr": "aibyai_queue_depth{queue=\"main\"}",
+          "expr": "judica_queue_depth{queue=\"main\"}",
           "legendFormat": "Main Queue",
           "refId": "A"
         },
         {
-          "expr": "aibyai_queue_depth{queue=\"dead_letter\"}",
+          "expr": "judica_queue_depth{queue=\"dead_letter\"}",
           "legendFormat": "Dead Letter Queue",
           "refId": "B"
         },
         {
-          "expr": "aibyai_queue_depth{queue=\"retry\"}",
+          "expr": "judica_queue_depth{queue=\"retry\"}",
           "legendFormat": "Retry Queue",
           "refId": "C"
         }
@@ -213,7 +213,7 @@
       },
       "targets": [
         {
-          "expr": "100 * rate(aibyai_cache_operations_total{operation=\"hit\"}[5m]) / (rate(aibyai_cache_operations_total{operation=\"hit\"}[5m]) + rate(aibyai_cache_operations_total{operation=\"miss\"}[5m]))",
+          "expr": "100 * rate(judica_cache_operations_total{operation=\"hit\"}[5m]) / (rate(judica_cache_operations_total{operation=\"hit\"}[5m]) + rate(judica_cache_operations_total{operation=\"miss\"}[5m]))",
           "legendFormat": "Hit Rate",
           "refId": "A"
         }
@@ -233,17 +233,17 @@
       },
       "targets": [
         {
-          "expr": "aibyai_db_pool_connections{state=\"total\"}",
+          "expr": "judica_db_pool_connections{state=\"total\"}",
           "legendFormat": "Total",
           "refId": "A"
         },
         {
-          "expr": "aibyai_db_pool_connections{state=\"idle\"}",
+          "expr": "judica_db_pool_connections{state=\"idle\"}",
           "legendFormat": "Idle",
           "refId": "B"
         },
         {
-          "expr": "aibyai_db_pool_connections{state=\"active\"}",
+          "expr": "judica_db_pool_connections{state=\"active\"}",
           "legendFormat": "Active",
           "refId": "C"
         }
@@ -251,12 +251,12 @@
     }
   ],
   "schemaVersion": 39,
-  "tags": ["aibyai", "providers"],
+  "tags": ["judica", "providers"],
   "templating": { "list": [{ "name": "DS_PROMETHEUS", "type": "datasource", "query": "prometheus", "current": { "text": "Prometheus", "value": "prometheus" }, "hide": 0 }] },
   "time": { "from": "now-3h", "to": "now" },
   "timepicker": {},
   "timezone": "browser",
   "title": "Provider Health & Queue Monitoring",
-  "uid": "aibyai-provider-health",
+  "uid": "judica-provider-health",
   "version": 1
 }

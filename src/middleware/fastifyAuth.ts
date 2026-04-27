@@ -64,7 +64,7 @@ export async function fastifyOptionalAuth(request: FastifyRequest, _reply: Fasti
   if (!token) return;
 
   try {
-    const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'], issuer: "aibyai", audience: env.NODE_ENV, clockTolerance: 30 });
+    const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'], issuer: "judica", audience: env.NODE_ENV, clockTolerance: 30 });
     const payload = jwtPayloadSchema.parse(decoded);
 
     if (await isTokenRevoked(token)) return;
@@ -107,7 +107,7 @@ export async function fastifyRequireAuth(request: FastifyRequest, reply: Fastify
   }
 
   try {
-    const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'], issuer: "aibyai", audience: env.NODE_ENV, clockTolerance: 30 });
+    const decoded = jwt.verify(token, env.JWT_SECRET, { algorithms: ['HS256'], issuer: "judica", audience: env.NODE_ENV, clockTolerance: 30 });
     const payload = jwtPayloadSchema.parse(decoded);
 
     // Unified revocation check — always use hashed token

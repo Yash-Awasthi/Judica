@@ -17,7 +17,7 @@ describe("Demo Service", () => {
   describe("getDemoConfig", () => {
     it("returns default URL when DEMO_URL is not set", () => {
       const config = getDemoConfig();
-      expect(config.url).toBe("https://aibyai.example.com");
+      expect(config.url).toBe("https://judica.example.com");
     });
 
     it("respects DEMO_URL env variable", () => {
@@ -70,7 +70,7 @@ describe("Demo Service", () => {
 
   describe("formatDemoSection", () => {
     const baseConfig: DemoConfig = {
-      url: "https://aibyai.example.com",
+      url: "https://judica.example.com",
       description: "Test description",
       features: ["Feature one", "Feature two"],
       lastUpdated: "2025-01-01",
@@ -85,7 +85,7 @@ describe("Demo Service", () => {
       const output = formatDemoSection(baseConfig);
       expect(output).toContain("**Live:**");
       // URL should be present (escaped form)
-      expect(output).toContain("aibyai.example.com");
+      expect(output).toContain("judica.example.com");
     });
 
     it("includes video URL when present", () => {

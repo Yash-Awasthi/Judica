@@ -1,16 +1,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: aibyai-backend
-  namespace: aibyai
+  name: judica-backend
+  namespace: judica
   labels:
-    app: aibyai-backend
+    app: judica-backend
     app.kubernetes.io/component: backend
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: aibyai-backend
+      app: judica-backend
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -19,17 +19,17 @@ spec:
   template:
     metadata:
       labels:
-        app: aibyai-backend
+        app: judica-backend
         app.kubernetes.io/component: backend
     spec:
-      serviceAccountName: aibyai
+      serviceAccountName: judica
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 1000
       containers:
         - name: backend
-          image: ghcr.io/yash-awasthi/aibyai/backend:latest
+          image: ghcr.io/yash-awasthi/judica/backend:latest
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -43,22 +43,22 @@ spec:
             - name: DATABASE_URL
               valueFrom:
                 secretKeyRef:
-                  name: aibyai-secrets
+                  name: judica-secrets
                   key: DATABASE_URL
             - name: REDIS_URL
               valueFrom:
                 secretKeyRef:
-                  name: aibyai-secrets
+                  name: judica-secrets
                   key: REDIS_URL
             - name: JWT_SECRET
               valueFrom:
                 secretKeyRef:
-                  name: aibyai-secrets
+                  name: judica-secrets
                   key: JWT_SECRET
             - name: MASTER_ENCRYPTION_KEY
               valueFrom:
                 secretKeyRef:
-                  name: aibyai-secrets
+                  name: judica-secrets
                   key: MASTER_ENCRYPTION_KEY
           livenessProbe:
             httpGet:

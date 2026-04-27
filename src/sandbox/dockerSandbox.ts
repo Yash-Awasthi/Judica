@@ -39,7 +39,7 @@ const DOCKER_TIMEOUT_MIN_MS = 1_000;
 const DOCKER_TIMEOUT_DEFAULT_MS = 30_000;
 const DOCKER_TIMEOUT_MAX_MS = 120_000;
 
-const SANDBOX_IMAGE = process.env.SANDBOX_IMAGE ?? "aibyai-sandbox:latest";
+const SANDBOX_IMAGE = process.env.SANDBOX_IMAGE ?? "judica-sandbox:latest";
 
 // Language runner map — determines how code is invoked inside the container
 const LANGUAGE_RUNNERS: Record<string, (codeFile: string) => string[]> = {
@@ -87,7 +87,7 @@ export async function getOrCreateUserVolume(userId: string): Promise<string> {
   }
 
   const docker = new Docker();
-  const volumeName = `aibyai-sandbox-${userId}`;
+  const volumeName = `judica-sandbox-${userId}`;
 
   try {
     // Inspect throws if the volume does not exist
@@ -111,13 +111,13 @@ export async function cleanupUserSandbox(userId: string): Promise<void> {
   }
 
   const docker = new Docker();
-  const volumeName = `aibyai-sandbox-${userId}`;
+  const volumeName = `judica-sandbox-${userId}`;
 
   // Stop & remove any containers that still reference this volume
   try {
     const containers: import("./dockerTypes.js").DockerContainerInfo[] = await docker.listContainers({ all: true });
     for (const info of containers) {
-      const labelMatch = (info.Labels ?? {})["aibyai.userId"] === userId;
+      const labelMatch = (info.Labels ?? {})["judica.userId"] === userId;
       if (labelMatch) {
         const container = docker.getContainer(info.Id);
         try { await container.stop({ t: 2 }); } catch { /* already stopped */ }
@@ -217,9 +217,9 @@ export async function execInDocker(opts: DockerExecOptions): Promise<DockerExecR
     User: "nobody",
     Env: containerEnv,
     Labels: {
-      "aibyai.userId": userId,
-      "aibyai.sessionId": sessionId ?? "",
-      "aibyai.language": language,
+      "judica.userId": userId,
+      "judica.sessionId": sessionId ?? "",
+      "judica.language": language,
     },
     AttachStdout: true,
     AttachStderr: true,

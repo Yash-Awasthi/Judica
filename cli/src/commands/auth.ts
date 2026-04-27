@@ -8,7 +8,7 @@ export const authCommand = new Command("auth")
 
 authCommand
   .command("login")
-  .description("Authenticate with the aibyai server")
+  .description("Authenticate with the judica server")
   .option("-s, --server <url>", "Server URL")
   .option("-t, --token <token>", "API token (PAT)")
   .option("-u, --username <username>", "Username")

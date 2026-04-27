@@ -1,8 +1,8 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: aibyai
-  namespace: aibyai
+  name: judica
+  namespace: judica
   annotations:
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
@@ -14,30 +14,30 @@ spec:
   # Uncomment and fill for TLS:
   # tls:
   #   - hosts:
-  #       - aibyai.example.com
-  #     secretName: aibyai-tls
+  #       - judica.example.com
+  #     secretName: judica-tls
   rules:
-    - host: aibyai.local
+    - host: judica.local
       http:
         paths:
           - path: /api
             pathType: Prefix
             backend:
               service:
-                name: aibyai-backend
+                name: judica-backend
                 port:
                   number: 3000
           - path: /health
             pathType: Prefix
             backend:
               service:
-                name: aibyai-backend
+                name: judica-backend
                 port:
                   number: 3000
           - path: /
             pathType: Prefix
             backend:
               service:
-                name: aibyai-frontend
+                name: judica-frontend
                 port:
                   number: 4173

@@ -15,7 +15,7 @@ export const askCommand = new Command("ask")
     try {
       const api = new ApiClient();
       if (!api.isAuthenticated) {
-        spinner.fail("Not authenticated. Run: aibyai auth login");
+        spinner.fail("Not authenticated. Run: judica auth login");
         process.exit(1);
       }
 

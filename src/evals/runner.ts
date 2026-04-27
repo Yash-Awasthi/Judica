@@ -1,5 +1,5 @@
 /**
- * Eval Runner — executes evaluation datasets against the aibyai API.
+ * Eval Runner — executes evaluation datasets against the judica API.
  */
 
 import { randomUUID } from "crypto";

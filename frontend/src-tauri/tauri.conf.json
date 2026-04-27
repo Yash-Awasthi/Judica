@@ -1,8 +1,8 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "aibyai",
+  "productName": "judica",
   "version": "0.1.0",
-  "identifier": "com.aibyai.app",
+  "identifier": "com.judica.app",
   "build": {
     "frontendDist": "../build/client",
     "devUrl": "http://localhost:5173",
@@ -12,7 +12,7 @@
   "app": {
     "windows": [
       {
-        "title": "aibyai",
+        "title": "judica",
         "width": 1280,
         "height": 820,
         "minWidth": 900,

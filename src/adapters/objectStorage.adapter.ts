@@ -7,7 +7,7 @@
  * For MinIO/S3/R2: uses @aws-sdk/client-s3 and @aws-sdk/s3-request-presigner
  * if available, otherwise throws a clear configuration error.
  *
- * For local: uses Node.js fs/promises, writing to /tmp/aibyai-storage.
+ * For local: uses Node.js fs/promises, writing to /tmp/judica-storage.
  */
 
 import fs from "fs/promises";
@@ -19,7 +19,7 @@ import logger from "../lib/logger.js";
 type S3Client = import("@aws-sdk/client-s3").S3Client;
 type S3ClientConfig = import("@aws-sdk/client-s3").S3ClientConfig;
 
-const LOCAL_STORAGE_DIR = process.env.LOCAL_STORAGE_DIR ?? "/tmp/aibyai-storage";
+const LOCAL_STORAGE_DIR = process.env.LOCAL_STORAGE_DIR ?? "/tmp/judica-storage";
 
 type StorageProvider = "minio" | "s3" | "r2" | "gcs" | "local";
 
@@ -72,7 +72,7 @@ export class ObjectStorageAdapter {
 
   constructor() {
     this.provider = getProvider();
-    this.bucket = process.env.STORAGE_BUCKET ?? "aibyai";
+    this.bucket = process.env.STORAGE_BUCKET ?? "judica";
     this.localDir = LOCAL_STORAGE_DIR;
   }
 

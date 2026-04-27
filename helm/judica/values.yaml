@@ -1,10 +1,10 @@
-# Default values for aibyai.
+# Default values for judica.
 # This is a YAML-formatted file.
 
 replicaCount: 1
 
 image:
-  repository: ghcr.io/yash-awasthi/aibyai
+  repository: ghcr.io/yash-awasthi/judica
   tag: latest
   pullPolicy: IfNotPresent
 
@@ -56,7 +56,7 @@ ingress:
     nginx.ingress.kubernetes.io/proxy-body-size: "50m"
     nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
   hosts:
-    - host: aibyai.local
+    - host: judica.local
       paths:
         - path: /
           pathType: Prefix

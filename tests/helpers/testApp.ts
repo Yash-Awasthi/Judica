@@ -63,7 +63,7 @@ export function signTestToken(
   const defaultOptions: jwt.SignOptions = {
     expiresIn: "15m",
     algorithm: "HS256",
-    issuer: "aibyai",
+    issuer: "judica",
     audience: process.env.NODE_ENV || "test",
   };
   const mergedOptions = { ...defaultOptions, ...options };

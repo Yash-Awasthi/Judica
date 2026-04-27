@@ -275,7 +275,7 @@ export async function scrapeUrl(url: string): Promise<ScrapeResult> {
   // Native fallback
   const safeUrl = await validateSafeUrl(url);
   const resp = await fetch(safeUrl, {
-    headers: { "User-Agent": "aibyai-bot/1.0" },
+    headers: { "User-Agent": "judica-bot/1.0" },
     signal: AbortSignal.timeout(10_000),
   });
   if (!resp.ok) throw new Error(`Failed to fetch ${url}: ${resp.status}`);

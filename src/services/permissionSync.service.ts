@@ -1,6 +1,6 @@
 /**
  * Permission Sync Service — syncs document-level ACLs from source connectors
- * into aibyai's access control system (Memory.accessControlList).
+ * into judica's access control system (Memory.accessControlList).
  * Called by the connector sync worker after ingestion.
  *
  * Each connector source has its own permission model:

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Database restore script for AIBYAI
+# Database restore script for JUDICA
 # Usage: ./scripts/restore.sh <backup_file>
 #
 # Environment variables:
@@ -13,7 +13,7 @@ if [ -z "${BACKUP_FILE}" ]; then
   echo "Usage: ./scripts/restore.sh <backup_file>"
   echo ""
   echo "Available backups:"
-  ls -1t backups/aibyai_*.sql* 2>/dev/null || echo "  (none found in ./backups/)"
+  ls -1t backups/judica_*.sql* 2>/dev/null || echo "  (none found in ./backups/)"
   exit 1
 fi
 

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "AIBYAI — AI Search & Deliberation",
+  "name": "JUDICA — AI Search & Deliberation",
   "version": "1.0.0",
-  "description": "Quick access to AIBYAI search, summarization, and deliberation from any tab.",
+  "description": "Quick access to JUDICA search, summarization, and deliberation from any tab.",
   "permissions": [
     "sidePanel",
     "activeTab",
@@ -22,14 +22,14 @@
         "default": "Ctrl+Shift+A",
         "mac": "Command+Shift+A"
       },
-      "description": "Toggle AIBYAI side panel"
+      "description": "Toggle JUDICA side panel"
     }
   },
   "omnibox": {
     "keyword": "ai"
   },
   "action": {
-    "default_title": "Open AIBYAI",
+    "default_title": "Open JUDICA",
     "default_icon": {
       "16": "icons/icon16.png",
       "48": "icons/icon48.png",

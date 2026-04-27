@@ -11,12 +11,12 @@
  * Claude Desktop config (~/.claude/claude_desktop_config.json):
  * {
  *   "mcpServers": {
- *     "aibyai": {
+ *     "judica": {
  *       "command": "npx",
- *       "args": ["tsx", "/path/to/aibyai/src/mcp/cli.ts"],
+ *       "args": ["tsx", "/path/to/judica/src/mcp/cli.ts"],
  *       "env": {
- *         "AIBYAI_API_URL": "http://localhost:3000",
- *         "AIBYAI_API_KEY": "your-jwt-token"
+ *         "JUDICA_API_URL": "http://localhost:3000",
+ *         "JUDICA_API_KEY": "your-jwt-token"
  *       }
  *     }
  *   }
@@ -52,7 +52,7 @@ function parseArgs(): Partial<MCPServerConfig> {
       case "--help":
       case "-h":
         process.stderr.write(`
-aibyai MCP Server — expose aibyai as tools for AI agents
+judica MCP Server — expose judica as tools for AI agents
 
 Usage:
   npx tsx src/mcp/cli.ts [options]
@@ -60,25 +60,25 @@ Usage:
 Options:
   --transport, -t   Transport mode: stdio (default), sse, streamable-http
   --port, -p        Port for SSE/HTTP transport (default: 3100)
-  --api-url         aibyai API base URL (default: http://localhost:3000)
+  --api-url         judica API base URL (default: http://localhost:3000)
   --api-key         API key / JWT token for authentication
-  --name            Server name (default: aibyai-mcp)
+  --name            Server name (default: judica-mcp)
   --help, -h        Show this help
 
 Environment variables:
-  AIBYAI_API_URL    Same as --api-url
-  AIBYAI_API_KEY    Same as --api-key
-  AIBYAI_MCP_PORT   Same as --port
+  JUDICA_API_URL    Same as --api-url
+  JUDICA_API_KEY    Same as --api-key
+  JUDICA_MCP_PORT   Same as --port
 `);
         process.exit(0);
     }
   }
 
   // Environment variable fallbacks
-  if (!config.apiBaseUrl) config.apiBaseUrl = process.env.AIBYAI_API_URL;
-  if (!config.apiKey) config.apiKey = process.env.AIBYAI_API_KEY;
-  if (!config.port && process.env.AIBYAI_MCP_PORT) {
-    config.port = parseInt(process.env.AIBYAI_MCP_PORT, 10);
+  if (!config.apiBaseUrl) config.apiBaseUrl = process.env.JUDICA_API_URL;
+  if (!config.apiKey) config.apiKey = process.env.JUDICA_API_KEY;
+  if (!config.port && process.env.JUDICA_MCP_PORT) {
+    config.port = parseInt(process.env.JUDICA_MCP_PORT, 10);
   }
 
   return config;

@@ -1,5 +1,5 @@
-# Production overrides for aibyai Helm chart
-# Usage: helm upgrade --install aibyai ./helm/aibyai -f helm/aibyai/values.prod.yaml
+# Production overrides for judica Helm chart
+# Usage: helm upgrade --install judica ./helm/judica -f helm/judica/values.prod.yaml
 
 replicaCount: 2
 
@@ -42,14 +42,14 @@ ingress:
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
     cert-manager.io/cluster-issuer: letsencrypt-prod
   hosts:
-    - host: aibyai.example.com
+    - host: judica.example.com
       paths:
         - path: /
           pathType: Prefix
   tls:
-    - secretName: aibyai-tls
+    - secretName: judica-tls
       hosts:
-        - aibyai.example.com
+        - judica.example.com
 
 postgresql:
   enabled: true
@@ -94,5 +94,5 @@ affinity:
               - key: app.kubernetes.io/name
                 operator: In
                 values:
-                  - aibyai
+                  - judica
           topologyKey: kubernetes.io/hostname

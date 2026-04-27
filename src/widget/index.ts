@@ -1,5 +1,5 @@
 /**
- * Widget Entry Point — auto-registers the <aibyai-widget> custom element.
+ * Widget Entry Point — auto-registers the <judica-widget> custom element.
  */
 
 export { AibyaiWidget } from "./widget.js";
@@ -16,7 +16,7 @@ export { generateWidgetStyles } from "./styles.js";
 // Auto-register the custom element when loaded in a browser context
 if (typeof customElements !== "undefined") {
   const { AibyaiWidget } = await import("./widget.js");
-  if (!customElements.get("aibyai-widget")) {
-    customElements.define("aibyai-widget", AibyaiWidget);
+  if (!customElements.get("judica-widget")) {
+    customElements.define("judica-widget", AibyaiWidget);
   }
 }

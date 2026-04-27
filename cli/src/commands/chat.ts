@@ -9,11 +9,11 @@ export const chatCommand = new Command("chat")
   .action(async (options) => {
     const api = new ApiClient();
     if (!api.isAuthenticated) {
-      console.log(chalk.red("Not authenticated. Run: aibyai auth login"));
+      console.log(chalk.red("Not authenticated. Run: judica auth login"));
       process.exit(1);
     }
 
-    console.log(chalk.bold("aibyai Interactive Chat"));
+    console.log(chalk.bold("judica Interactive Chat"));
     console.log(chalk.dim("Type your message and press Enter. Type 'exit' or Ctrl+C to quit.\n"));
 
     const rl = readline.createInterface({

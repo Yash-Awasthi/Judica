@@ -8,7 +8,7 @@ import logger from "./logger.js";
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
-const HKDF_SALT = Buffer.from("aibyai-encryption-v1", "utf8");
+const HKDF_SALT = Buffer.from("judica-encryption-v1", "utf8");
 const HKDF_INFO = Buffer.from("aes-256-gcm-key", "utf8");
 
 // Support multiple key versions for rotation

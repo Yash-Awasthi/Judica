@@ -27,7 +27,7 @@ const log = logger.child({ service: "tenantIsolation" });
 
 const ALGORITHM = "aes-256-gcm";
 const IV_LENGTH = 12;
-const HKDF_SALT = Buffer.from("aibyai-tenant-isolation-v1", "utf8");
+const HKDF_SALT = Buffer.from("judica-tenant-isolation-v1", "utf8");
 const HKDF_INFO = Buffer.from("per-tenant-aes-256-gcm", "utf8");
 
 // ─── Key Derivation ────────────────────────────────────────────────────────────

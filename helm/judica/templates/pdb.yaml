@@ -2,26 +2,26 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ include "aibyai.fullname" . }}-backend
+  name: {{ include "judica.fullname" . }}-backend
   labels:
-    {{- include "aibyai.labels" . | nindent 4 }}
+    {{- include "judica.labels" . | nindent 4 }}
     app.kubernetes.io/component: backend
 spec:
   minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
   selector:
     matchLabels:
-      {{- include "aibyai.backend.selectorLabels" . | nindent 6 }}
+      {{- include "judica.backend.selectorLabels" . | nindent 6 }}
 ---
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: {{ include "aibyai.fullname" . }}-frontend
+  name: {{ include "judica.fullname" . }}-frontend
   labels:
-    {{- include "aibyai.labels" . | nindent 4 }}
+    {{- include "judica.labels" . | nindent 4 }}
     app.kubernetes.io/component: frontend
 spec:
   minAvailable: {{ .Values.podDisruptionBudget.minAvailable }}
   selector:
     matchLabels:
-      {{- include "aibyai.frontend.selectorLabels" . | nindent 6 }}
+      {{- include "judica.frontend.selectorLabels" . | nindent 6 }}
 {{- end }}

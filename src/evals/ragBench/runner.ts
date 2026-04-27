@@ -1,7 +1,7 @@
 /**
  * Enterprise RAG Benchmark — Runner
  *
- * Loads benchmark datasets, executes queries against aibyai's search API,
+ * Loads benchmark datasets, executes queries against judica's search API,
  * scores with LLM-as-judge, and aggregates metrics.
  *
  * Modeled after Onyx's EnterpriseRAG-Bench evaluation pipeline.

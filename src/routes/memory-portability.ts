@@ -90,7 +90,7 @@ export async function memoryPortabilityPlugin(app: FastifyInstance) {
     };
 
     reply.header("Content-Type", "application/json");
-    reply.header("Content-Disposition", `attachment; filename=aibyai-memory-${Date.now()}.json`);
+    reply.header("Content-Disposition", `attachment; filename=judica-memory-${Date.now()}.json`);
     return reply.send(JSON.stringify(payload, null, 2));
   });
 

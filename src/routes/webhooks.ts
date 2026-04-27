@@ -342,7 +342,7 @@ const webhooksPlugin: FastifyPluginAsync = async (fastify) => {
       const resourceId = (request.headers["x-goog-resource-id"] as string) ?? "";
       const resourceUri = (request.headers["x-goog-resource-uri"] as string) ?? "";
       const resourceState = (request.headers["x-goog-resource-state"] as string) ?? "change";
-      const connectorId = (request.headers["x-aibyai-connector-id"] as string) ?? undefined;
+      const connectorId = (request.headers["x-judica-connector-id"] as string) ?? undefined;
 
       // Extract file ID from resource URI if available
       const fileIdMatch = resourceUri.match(/\/files\/([^/?]+)/);

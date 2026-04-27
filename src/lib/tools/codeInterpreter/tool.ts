@@ -1,5 +1,5 @@
 /**
- * Code Interpreter Tool — registers as a tool in aibyai's tool registry.
+ * Code Interpreter Tool — registers as a tool in judica's tool registry.
  *
  * Wraps the CodeInterpreterClient for use as an LLM tool call.
  * Handles file caching, output truncation, and graceful fallback.

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * aibyai CLI — interact with aibyai from the terminal.
+ * judica CLI — interact with judica from the terminal.
  *
  * Commands:
  *   ask <question>       — Ask a question and get an AI response
@@ -27,8 +27,8 @@ import { historyCommand } from "./commands/history.js";
 const program = new Command();
 
 program
-  .name("aibyai")
-  .description("aibyai CLI — Multi-Agent Deliberative Intelligence Platform")
+  .name("judica")
+  .description("judica CLI — Multi-Agent Deliberative Intelligence Platform")
   .version("0.1.0");
 
 program.addCommand(askCommand);

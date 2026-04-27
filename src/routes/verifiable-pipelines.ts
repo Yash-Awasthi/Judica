@@ -231,7 +231,7 @@ const verifiablePipelinesPlugin: FastifyPluginAsync = async (fastify) => {
     async (req, reply) => {
       try {
         const vlog = await buildVerifiableLog(req.params.runId, req.userId!.toString());
-        const filename = `aibyai-run-${req.params.runId.slice(0, 8)}-verifiable.json`;
+        const filename = `judica-run-${req.params.runId.slice(0, 8)}-verifiable.json`;
         reply.header("Content-Disposition", `attachment; filename="${filename}"`);
         reply.header("Content-Type", "application/json");
         return reply.send(vlog);

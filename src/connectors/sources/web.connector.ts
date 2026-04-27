@@ -42,7 +42,7 @@ export class WebConnector implements LoadConnector {
     for (const url of this.urls) {
       try {
         const resp = await fetch(url, {
-          headers: { "User-Agent": "AIBYAI-Connector/1.0" },
+          headers: { "User-Agent": "JUDICA-Connector/1.0" },
           signal: AbortSignal.timeout(30_000),
         });
 

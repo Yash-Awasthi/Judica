@@ -121,7 +121,7 @@ async function hashBackupCodes(codes: string[]): Promise<string[]> {
 // ─── QR code URL ─────────────────────────────────────────────────────────────
 
 function buildOtpAuthUrl(secret: string, username: string): string {
-  const issuer = encodeURIComponent("AiByAi");
+  const issuer = encodeURIComponent("Judica");
   const account = encodeURIComponent(username);
   return `otpauth://totp/${issuer}:${account}?secret=${secret}&issuer=${issuer}&algorithm=SHA1&digits=${TOTP_DIGITS}&period=${TOTP_STEP}`;
 }

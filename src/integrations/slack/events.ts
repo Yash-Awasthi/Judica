@@ -57,7 +57,7 @@ export interface SlackEventContext {
   config: SlackBotConfig;
   channelConfigs: Map<string, SlackChannelConfig>;
   bot: SlackBot;
-  /** API base URL for aibyai queries. */
+  /** API base URL for judica queries. */
   apiBaseUrl: string;
   /** API key for internal calls. */
   apiKey?: string;
@@ -139,7 +139,7 @@ async function handleAppMention(
   );
 }
 
-/** Query aibyai and send response to Slack. */
+/** Query judica and send response to Slack. */
 async function processAndRespond(
   query: string,
   channel: string,
@@ -153,7 +153,7 @@ async function processAndRespond(
   }
 
   try {
-    // Call aibyai API
+    // Call judica API
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
     };

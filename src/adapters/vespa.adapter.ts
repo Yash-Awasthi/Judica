@@ -70,7 +70,7 @@ interface VespaSearchResponse {
   };
 }
 
-const DEFAULT_SCHEMA = "aibyai_doc";
+const DEFAULT_SCHEMA = "judica_doc";
 const DEFAULT_NAMESPACE = "default";
 
 export class VespaAdapter implements VectorDbAdapter {

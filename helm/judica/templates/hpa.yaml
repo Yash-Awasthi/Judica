@@ -2,15 +2,15 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: {{ include "aibyai.fullname" . }}-backend
+  name: {{ include "judica.fullname" . }}-backend
   labels:
-    {{- include "aibyai.labels" . | nindent 4 }}
+    {{- include "judica.labels" . | nindent 4 }}
     app.kubernetes.io/component: backend
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ include "aibyai.fullname" . }}-backend
+    name: {{ include "judica.fullname" . }}-backend
   minReplicas: {{ .Values.autoscaling.minReplicas }}
   maxReplicas: {{ .Values.autoscaling.maxReplicas }}
   metrics:
@@ -32,15 +32,15 @@ spec:
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: {{ include "aibyai.fullname" . }}-frontend
+  name: {{ include "judica.fullname" . }}-frontend
   labels:
-    {{- include "aibyai.labels" . | nindent 4 }}
+    {{- include "judica.labels" . | nindent 4 }}
     app.kubernetes.io/component: frontend
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: {{ include "aibyai.fullname" . }}-frontend
+    name: {{ include "judica.fullname" . }}-frontend
   minReplicas: {{ .Values.autoscaling.minReplicas }}
   maxReplicas: {{ .Values.autoscaling.maxReplicas }}
   metrics:

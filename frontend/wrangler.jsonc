@@ -4,7 +4,7 @@
  */
 {
 	"$schema": "node_modules/wrangler/config-schema.json",
-	"name": "aibyai-frontend",
+	"name": "judica-frontend",
 	"compatibility_date": "2026-02-28",
 	"compatibility_flags": ["nodejs_compat"],
 	"main": "./workers/app.ts",
@@ -96,6 +96,6 @@
 	 * - DATA_PROXY: locally binds to LocalDataProxyService; virtualized on camelAI deploy
 	 */
 	"services": [
-		{ "binding": "DATA_PROXY", "service": "aibyai-frontend", "entrypoint": "LocalDataProxyService" }
+		{ "binding": "DATA_PROXY", "service": "judica-frontend", "entrypoint": "LocalDataProxyService" }
 	]
 }

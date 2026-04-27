@@ -46,7 +46,7 @@ export async function fineTunePlugin(app: FastifyInstance) {
 
     const jsonl = serializeAsJSONL(dataset);
     reply.header("Content-Type", "application/jsonl");
-    reply.header("Content-Disposition", "attachment; filename=aibyai-finetune.jsonl");
+    reply.header("Content-Disposition", "attachment; filename=judica-finetune.jsonl");
     return reply.send(jsonl);
   });
 

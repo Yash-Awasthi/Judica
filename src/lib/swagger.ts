@@ -14,17 +14,17 @@ export async function registerSwagger(fastify: FastifyInstance): Promise<void> {
     openapi: {
       openapi: "3.0.3",
       info: {
-        title: "AIBYAI API",
+        title: "JUDICA API",
         version: "1.0.0",
         description:
           "Multimodal Multi-Agent Deliberative Intelligence Platform — 4+ AI agents debate, critique, and synthesize answers through structured deliberation.",
         contact: {
-          name: "AIBYAI",
-          url: "https://github.com/Yash-Awasthi/aibyai",
+          name: "JUDICA",
+          url: "https://github.com/Yash-Awasthi/Judica",
         },
         license: {
           name: "ISC",
-          url: "https://github.com/Yash-Awasthi/aibyai/blob/main/LICENSE",
+          url: "https://github.com/Yash-Awasthi/Judica/blob/main/LICENSE",
         },
       },
       servers: [

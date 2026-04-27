@@ -12,12 +12,12 @@ export interface DemoConfig {
 }
 
 /**
- * Default demo configuration for the aibyai project.
+ * Default demo configuration for the judica project.
  * Populate the DEMO_URL environment variable to enable.
  */
 export function getDemoConfig(): DemoConfig {
   return {
-    url: process.env.DEMO_URL || "https://aibyai.example.com",
+    url: process.env.DEMO_URL || "https://judica.example.com",
     videoUrl: process.env.DEMO_VIDEO_URL || undefined,
     description: "AI Council - Multi-agent deliberation platform with streaming verdicts",
     features: [

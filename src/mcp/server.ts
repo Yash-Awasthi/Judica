@@ -1,7 +1,7 @@
 /**
- * MCP Server — standalone Model Context Protocol server for aibyai.
+ * MCP Server — standalone Model Context Protocol server for judica.
  *
- * Exposes aibyai's knowledge base, search, and council capabilities
+ * Exposes judica's knowledge base, search, and council capabilities
  * as MCP tools and resources for external AI agents (Claude Desktop,
  * Cursor, Continue.dev, etc.).
  *
@@ -10,8 +10,8 @@
  * - SSE — for HTTP-based clients
  * - streamable-http — for modern MCP clients
  *
- * The server acts as a thin proxy to the aibyai HTTP API, translating
- * MCP tool calls into API requests. It does NOT import aibyai internals
+ * The server acts as a thin proxy to the judica HTTP API, translating
+ * MCP tool calls into API requests. It does NOT import judica internals
  * directly — it communicates via the public API, so it can run as a
  * separate process or even on a different machine.
  *
@@ -152,7 +152,7 @@ export class MCPServer {
       result: {
         resources: [
           {
-            uri: "aibyai://knowledge-bases",
+            uri: "judica://knowledge-bases",
             name: "Knowledge Bases",
             description: "List of all knowledge bases",
             mimeType: "application/json",
@@ -160,13 +160,13 @@ export class MCPServer {
         ],
         resourceTemplates: [
           {
-            uriTemplate: "aibyai://knowledge-bases/{kbId}/documents",
+            uriTemplate: "judica://knowledge-bases/{kbId}/documents",
             name: "KB Documents",
             description: "Documents in a specific knowledge base",
             mimeType: "application/json",
           },
           {
-            uriTemplate: "aibyai://conversations/{conversationId}",
+            uriTemplate: "judica://conversations/{conversationId}",
             name: "Conversation",
             description: "Full conversation history",
             mimeType: "application/json",
@@ -229,7 +229,7 @@ export class MCPServer {
     args: Record<string, unknown>,
   ): Promise<unknown> {
     switch (toolName) {
-      case "aibyai_search": {
+      case "judica_search": {
         const searchType = (args.search_type as string) || "hybrid";
         const params = new URLSearchParams({
           q: args.query as string,
@@ -240,13 +240,13 @@ export class MCPServer {
         return this.apiRequest(`/api/memory/search?${params.toString()}`);
       }
 
-      case "aibyai_list_knowledge_bases":
+      case "judica_list_knowledge_bases":
         return this.apiRequest("/api/kb");
 
-      case "aibyai_get_document":
+      case "judica_get_document":
         return this.apiRequest(`/api/kb/${args.kb_id}/documents/${encodeURIComponent(args.document_name as string)}`);
 
-      case "aibyai_ingest_document":
+      case "judica_ingest_document":
         return this.apiRequest(`/api/kb/${args.kb_id}/documents`, {
           method: "POST",
           body: JSON.stringify({
@@ -256,7 +256,7 @@ export class MCPServer {
           }),
         });
 
-      case "aibyai_ask":
+      case "judica_ask":
         return this.apiRequest("/api/ask", {
           method: "POST",
           body: JSON.stringify({
@@ -266,12 +266,12 @@ export class MCPServer {
           }),
         });
 
-      case "aibyai_list_conversations": {
+      case "judica_list_conversations": {
         const limit = args.limit ?? 10;
         return this.apiRequest(`/api/history?limit=${limit}`);
       }
 
-      case "aibyai_get_conversation":
+      case "judica_get_conversation":
         return this.apiRequest(`/api/history/${args.conversation_id}`);
 
       default:
@@ -280,16 +280,16 @@ export class MCPServer {
   }
 
   private async fetchResource(uri: string): Promise<unknown> {
-    if (uri === "aibyai://knowledge-bases") {
+    if (uri === "judica://knowledge-bases") {
       return this.apiRequest("/api/kb");
     }
 
-    const kbDocsMatch = uri.match(/^aibyai:\/\/knowledge-bases\/([^/]+)\/documents$/);
+    const kbDocsMatch = uri.match(/^judica:\/\/knowledge-bases\/([^/]+)\/documents$/);
     if (kbDocsMatch) {
       return this.apiRequest(`/api/kb/${kbDocsMatch[1]}/documents`);
     }
 
-    const convMatch = uri.match(/^aibyai:\/\/conversations\/([^/]+)$/);
+    const convMatch = uri.match(/^judica:\/\/conversations\/([^/]+)$/);
     if (convMatch) {
       return this.apiRequest(`/api/history/${convMatch[1]}`);
     }

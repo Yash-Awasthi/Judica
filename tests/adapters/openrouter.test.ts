@@ -98,8 +98,8 @@ describe("OpenRouterAdapter", () => {
       expect(options.method).toBe("POST");
       expect(options.headers["Content-Type"]).toBe("application/json");
       expect(options.headers["Authorization"]).toBe(`Bearer ${mockApiKey}`);
-      expect(options.headers["HTTP-Referer"]).toBe("https://aibyai.app");
-      expect(options.headers["X-Title"]).toBe("AIBYAI Council");
+      expect(options.headers["HTTP-Referer"]).toBe("https://judica.app");
+      expect(options.headers["X-Title"]).toBe("JUDICA Council");
     });
 
     it("formats messages correctly with system_prompt prepended", async () => {

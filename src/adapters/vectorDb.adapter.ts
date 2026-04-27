@@ -136,7 +136,7 @@ export function initVectorAdapterFromEnv(): void {
     setVectorAdapter(
       new VespaAdapter({
         endpoint,
-        appName: process.env.VESPA_APP_NAME ?? "aibyai",
+        appName: process.env.VESPA_APP_NAME ?? "judica",
         namespace: process.env.VESPA_NAMESPACE,
       }),
     );

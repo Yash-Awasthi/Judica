@@ -45,7 +45,7 @@ async function noopWithSpan<T>(
 
 let _initialized = false;
 
-export let tracer = trace.getTracer("aibyai");
+export let tracer = trace.getTracer("judica");
 
 /**
  * Initialize the OpenTelemetry SDK.
@@ -89,7 +89,7 @@ export async function initOtel(): Promise<void> {
     ]);
 
     const resource = new Resource({
-      [SEMRESATTRS_SERVICE_NAME]: "aibyai",
+      [SEMRESATTRS_SERVICE_NAME]: "judica",
       [SEMRESATTRS_SERVICE_VERSION]: serviceVersion,
     });
 
@@ -118,7 +118,7 @@ export async function initOtel(): Promise<void> {
     sdk.start();
 
     // Update the module-level tracer to use the initialized provider
-    tracer = trace.getTracer("aibyai", serviceVersion);
+    tracer = trace.getTracer("judica", serviceVersion);
 
     // Graceful shutdown
     process.on("SIGTERM", () => {

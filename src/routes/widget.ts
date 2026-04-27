@@ -88,7 +88,7 @@ export default async function widgetPlugin(fastify: FastifyInstance): Promise<vo
       querystring: {
         type: "object",
         properties: {
-          baseUrl: { type: "string", description: "Your aibyai server URL" },
+          baseUrl: { type: "string", description: "Your judica server URL" },
           apiKey: { type: "string", description: "API key for widget auth" },
           mode: { type: "string", enum: ["floating", "inline"] },
           kbId: { type: "string", description: "Default knowledge base ID" },
@@ -102,13 +102,13 @@ export default async function widgetPlugin(fastify: FastifyInstance): Promise<vo
     const mode = escAttr(q.mode || "floating");
     const kbId = q.kbId ? `\n  data-kb-id="${escAttr(q.kbId)}"` : "";
 
-    const snippet = `<!-- AIBYAI Chat Widget -->
+    const snippet = `<!-- JUDICA Chat Widget -->
 <script src="${baseUrl}/api/widget/embed.js" defer></script>
-<aibyai-widget
+<judica-widget
   data-api-base-url="${baseUrl}"
   data-api-key="${apiKey}"
   data-mode="${mode}"${kbId}
-></aibyai-widget>`;
+></judica-widget>`;
 
     reply.send({ snippet, usage: "Paste this HTML before </body> on any page." });
   });
@@ -254,12 +254,12 @@ class AibyaiWidget extends HTMLElement {
 
   _restoreSession() {
     try {
-      var data = localStorage.getItem("aibyai-widget-session");
+      var data = localStorage.getItem("judica-widget-session");
       if (data) { var parsed = JSON.parse(data); this.sessionId = parsed.sessionId; this.messages = parsed.messages || []; }
     } catch {}
   }
   _saveSession() {
-    try { localStorage.setItem("aibyai-widget-session", JSON.stringify({ sessionId: this.sessionId, messages: this.messages })); } catch {}
+    try { localStorage.setItem("judica-widget-session", JSON.stringify({ sessionId: this.sessionId, messages: this.messages })); } catch {}
   }
 
   _render() {
@@ -370,8 +370,8 @@ class AibyaiWidget extends HTMLElement {
   _esc(s) { var d = document.createElement("div"); d.textContent = s || ""; return d.innerHTML; }
 }
 
-if (!customElements.get("aibyai-widget")) {
-  customElements.define("aibyai-widget", AibyaiWidget);
+if (!customElements.get("judica-widget")) {
+  customElements.define("judica-widget", AibyaiWidget);
 }
 })();`;
 }

@@ -361,7 +361,7 @@ registerTool(
     try {
       const encoded = encodeURIComponent(query.replace(/ /g, "_"));
       const res = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encoded}`, {
-        headers: { "User-Agent": "AIBYAI/1.0 (council deliberation platform)" },
+        headers: { "User-Agent": "JUDICA/1.0 (council deliberation platform)" },
         signal: AbortSignal.timeout(10000)
       });
       if (!res.ok) {

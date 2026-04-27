@@ -1,8 +1,8 @@
 [package]
-name = "aibyai-desktop"
+name = "judica-desktop"
 version = "0.1.0"
-description = "aibyai Desktop — Multi-Agent Deliberative Intelligence Platform"
-authors = ["aibyai"]
+description = "judica Desktop — Multi-Agent Deliberative Intelligence Platform"
+authors = ["judica"]
 edition = "2021"
 
 [build-dependencies]

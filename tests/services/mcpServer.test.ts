@@ -96,7 +96,7 @@ describe("mcpServer.service", () => {
       expect(res.result).toBeDefined();
       const result = res.result as Record<string, unknown>;
       expect(result.protocolVersion).toBe("2024-11-05");
-      expect(result.serverInfo).toEqual({ name: "aibyai-mcp", version: "1.0.0" });
+      expect(result.serverInfo).toEqual({ name: "judica-mcp", version: "1.0.0" });
     });
 
     it("should handle tools/list", async () => {

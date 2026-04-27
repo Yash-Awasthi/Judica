@@ -1,5 +1,5 @@
 /**
- * CLI API Client — handles HTTP requests to the aibyai server.
+ * CLI API Client — handles HTTP requests to the judica server.
  */
 
 import { getConfig } from "./config.js";

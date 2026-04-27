@@ -6,7 +6,7 @@
  * - Enterprise Edition (EE): SSO, SAML, audit logs, advanced RBAC, analytics
  *
  * EE features overlay on top of CE — the CE codebase is always the base.
- * EE is detected via AIBYAI_EDITION env var or license key presence.
+ * EE is detected via JUDICA_EDITION env var or license key presence.
  */
 
 export type Edition = "ce" | "ee";
@@ -14,12 +14,12 @@ export type Edition = "ce" | "ee";
 /**
  * Detect the current edition.
  * EE is enabled when:
- *   1. AIBYAI_EDITION=ee is set, OR
- *   2. A valid license key is present in AIBYAI_LICENSE_KEY
+ *   1. JUDICA_EDITION=ee is set, OR
+ *   2. A valid license key is present in JUDICA_LICENSE_KEY
  */
 export function getEdition(): Edition {
-  if (process.env.AIBYAI_EDITION === "ee") return "ee";
-  if (process.env.AIBYAI_LICENSE_KEY) return "ee";
+  if (process.env.JUDICA_EDITION === "ee") return "ee";
+  if (process.env.JUDICA_LICENSE_KEY) return "ee";
   return "ce";
 }
 
@@ -33,7 +33,7 @@ export function requireEE(featureName: string): void {
   if (!IS_EE) {
     throw new Error(
       `Feature '${featureName}' requires Enterprise Edition. ` +
-      `Set AIBYAI_EDITION=ee or provide a valid AIBYAI_LICENSE_KEY.`,
+      `Set JUDICA_EDITION=ee or provide a valid JUDICA_LICENSE_KEY.`,
     );
   }
 }

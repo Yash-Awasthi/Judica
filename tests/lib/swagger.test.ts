@@ -31,7 +31,7 @@ describe("Swagger Config", () => {
 
     await registerSwagger(mockFastify);
     expect(swaggerOpts.openapi.openapi).toBe("3.0.3");
-    expect(swaggerOpts.openapi.info.title).toBe("AIBYAI API");
+    expect(swaggerOpts.openapi.info.title).toBe("JUDICA API");
     expect(swaggerOpts.openapi.info.version).toBe("1.0.0");
   });
 

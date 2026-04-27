@@ -30,7 +30,7 @@ export const pool = new pg.Pool({
   connectionTimeoutMillis: 5_000,
   statement_timeout: 30_000,
   // Set application_name for pg_stat_activity visibility
-  application_name: "aibyai-api",
+  application_name: "judica-api",
   ssl: sslConfig,
 });
 

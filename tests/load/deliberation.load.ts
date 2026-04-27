@@ -1,5 +1,5 @@
 /**
- * Load test: Autocannon configuration for AIBYAI API
+ * Load test: Autocannon configuration for JUDICA API
  *
  * Target: 200 concurrent deliberations, < 2s p95 latency
  *
@@ -168,7 +168,7 @@ async function runScenario(scenario: Scenario): Promise<Result> {
 
 async function main() {
   console.log("═══════════════════════════════════════════════════════════════");
-  console.log("  AIBYAI Load Test Suite");
+  console.log("  JUDICA Load Test Suite");
   console.log(`  Target: ${BASE_URL}`);
   console.log(`  Connections: ${CONNECTIONS}, Duration: ${DURATION}s`);
   console.log("═══════════════════════════════════════════════════════════════");

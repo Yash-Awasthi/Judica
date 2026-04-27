@@ -17,7 +17,7 @@ import { AppError } from "../middleware/errorHandler.js";
 import { randomBytes } from "crypto";
 import type { DockerConstructor, DockerClient, DockerContainer } from "./dockerTypes.js";
 
-const SANDBOX_IMAGE = process.env.SANDBOX_IMAGE ?? "aibyai-sandbox:latest";
+const SANDBOX_IMAGE = process.env.SANDBOX_IMAGE ?? "judica-sandbox:latest";
 const SESSION_IDLE_TIMEOUT_MS = 30 * 60 * 1000; // 30 minutes
 const SESSION_MAX_LIFETIME_MS = 4 * 60 * 60 * 1000; // 4 hours
 const MAX_OUTPUT_SIZE = 1024 * 1024; // 1MB per command
@@ -111,7 +111,7 @@ export async function createSession(
 
   const docker = new Docker();
   const sessionId = generateSessionId();
-  const volumeName = `aibyai-sandbox-${userId}-${sessionId}`;
+  const volumeName = `judica-sandbox-${userId}-${sessionId}`;
 
   // Create persistent volume
   await docker.createVolume({ Name: volumeName });
@@ -146,9 +146,9 @@ export async function createSession(
     User: "sandbox",
     Env: containerEnv,
     Labels: {
-      "aibyai.sandbox": "true",
-      "aibyai.sessionId": sessionId,
-      "aibyai.userId": userId,
+      "judica.sandbox": "true",
+      "judica.sessionId": sessionId,
+      "judica.userId": userId,
     },
     HostConfig: {
       Memory: 1024 * 1024 * 1024, // 1GB

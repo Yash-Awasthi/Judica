@@ -227,7 +227,7 @@ function handleHelpCommand(): InteractionResponse {
       { name: "/search <query>", value: "Search the knowledge base", inline: false },
       { name: "/help", value: "Show this help message", inline: false },
     ],
-    footer: { text: "Powered by aibyai" },
+    footer: { text: "Powered by judica" },
   };
 
   return {

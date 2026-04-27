@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: aibyai
+    name: judica
     runtime: docker
     dockerfilePath: ./Dockerfile
     dockerContext: .
@@ -20,9 +20,9 @@ services:
       - key: MASTER_ENCRYPTION_KEY
         sync: false   # Generate: node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
       - key: OAUTH_CALLBACK_BASE_URL
-        sync: false   # Your Render URL: https://aibyai.onrender.com
+        sync: false   # Your Render URL: https://judica.onrender.com
       - key: FRONTEND_URL
-        sync: false   # Same as above (backend serves the frontend): https://aibyai.onrender.com
+        sync: false   # Same as above (backend serves the frontend): https://judica.onrender.com
       # ── At least one AI key required ──────────────────────────────────────
       - key: OPENAI_API_KEY
         sync: false

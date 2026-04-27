@@ -55,8 +55,8 @@ node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 | `DATABASE_URL` | Your Supabase connection string |
 | `REDIS_URL` | Your Upstash Redis URL |
 | `MASTER_ENCRYPTION_KEY` | 64-char hex string (generated above) |
-| `OAUTH_CALLBACK_BASE_URL` | `https://aibyai.onrender.com` (your Render URL) |
-| `FRONTEND_URL` | `https://aibyai.onrender.com` |
+| `OAUTH_CALLBACK_BASE_URL` | `https://judica.onrender.com` (your Render URL) |
+| `FRONTEND_URL` | `https://judica.onrender.com` |
 | `OPENAI_API_KEY` | At least one AI key is required |
 
 5. Click **Apply** — Render builds the Docker image and deploys
@@ -80,7 +80,7 @@ This creates all tables and enables pgvector indexes.
 1. Go to [console.cloud.google.com](https://console.cloud.google.com)
 2. Create a project → **APIs & Services → Credentials → Create OAuth client**
 3. Application type: **Web application**
-4. Authorised redirect URIs: `https://aibyai.onrender.com/api/auth/google/callback`
+4. Authorised redirect URIs: `https://judica.onrender.com/api/auth/google/callback`
 5. Copy **Client ID** and **Client Secret** → set as `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` in Render
 
 ---
@@ -88,8 +88,8 @@ This creates all tables and enables pgvector indexes.
 ## Step 7 — Set up GitHub OAuth (for sign-in)
 
 1. Go to [github.com/settings/developers](https://github.com/settings/developers) → New OAuth App
-2. Homepage URL: `https://aibyai.onrender.com`
-3. Callback URL: `https://aibyai.onrender.com/api/auth/github/callback`
+2. Homepage URL: `https://judica.onrender.com`
+3. Callback URL: `https://judica.onrender.com/api/auth/github/callback`
 4. Copy **Client ID** and generate a **Client Secret** → set as `GITHUB_CLIENT_ID` / `GITHUB_CLIENT_SECRET` in Render
 
 ---

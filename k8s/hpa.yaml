@@ -1,16 +1,16 @@
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: aibyai-backend
-  namespace: aibyai
+  name: judica-backend
+  namespace: judica
   labels:
-    app: aibyai-backend
+    app: judica-backend
     app.kubernetes.io/component: backend
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: aibyai-backend
+    name: judica-backend
   minReplicas: 2
   maxReplicas: 10
   metrics:
@@ -30,16 +30,16 @@ spec:
 apiVersion: autoscaling/v2
 kind: HorizontalPodAutoscaler
 metadata:
-  name: aibyai-frontend
-  namespace: aibyai
+  name: judica-frontend
+  namespace: judica
   labels:
-    app: aibyai-frontend
+    app: judica-frontend
     app.kubernetes.io/component: frontend
 spec:
   scaleTargetRef:
     apiVersion: apps/v1
     kind: Deployment
-    name: aibyai-frontend
+    name: judica-frontend
   minReplicas: 1
   maxReplicas: 5
   metrics:

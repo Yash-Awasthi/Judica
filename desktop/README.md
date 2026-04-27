@@ -1,4 +1,4 @@
-# aibyai Desktop
+# judica Desktop
 
 Cross-platform desktop application built with [Tauri 2](https://v2.tauri.app/).
 
@@ -38,7 +38,7 @@ cargo tauri build
 - **Native window** with system chrome
 - **Secure credential storage** via OS keychain (macOS Keychain, Windows Credential Manager, Linux Secret Service)
 - **Auto-update** support via Tauri updater plugin
-- **Deep links** (`aibyai://` protocol)
+- **Deep links** (`judica://` protocol)
 - **System notifications**
 - **Clipboard** integration
 - **DevTools** in debug builds

@@ -1,11 +1,11 @@
 /**
- * Widget Models — types for the embeddable aibyai chat widget.
+ * Widget Models — types for the embeddable judica chat widget.
  *
  * Modeled after Onyx's widget/ (Lit web component).
  */
 
 export interface WidgetConfig {
-  /** aibyai API base URL. */
+  /** judica API base URL. */
   apiBaseUrl: string;
   /** API key or JWT for authentication. */
   apiKey?: string;
@@ -34,7 +34,7 @@ export interface WidgetConfig {
 export const DEFAULT_WIDGET_CONFIG: WidgetConfig = {
   apiBaseUrl: "",
   mode: "floating",
-  title: "AIBYAI",
+  title: "JUDICA",
   placeholder: "Ask a question...",
   primaryColor: "#6366f1",
   position: "bottom-right",

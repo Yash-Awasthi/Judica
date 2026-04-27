@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: aibyai
+  name: judica
   labels:
-    app.kubernetes.io/name: aibyai
+    app.kubernetes.io/name: judica
     app.kubernetes.io/managed-by: kubectl

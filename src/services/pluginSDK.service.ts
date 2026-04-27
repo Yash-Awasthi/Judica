@@ -1,7 +1,7 @@
 import logger from "../lib/logger.js";
 
 /**
- * Plugin SDK: register custom tool packages that extend AIBYAI capabilities.
+ * Plugin SDK: register custom tool packages that extend JUDICA capabilities.
  * Plugins declare tools, lifecycle hooks, and configuration schemas.
  */
 

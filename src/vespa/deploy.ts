@@ -43,10 +43,10 @@ export async function deployVespaApp(endpoint: string): Promise<void> {
     <search />
     <document-api />
   </container>
-  <content id="aibyai" version="1.0">
+  <content id="judica" version="1.0">
     <redundancy>1</redundancy>
     <documents>
-      <document type="aibyai_doc" mode="index" />
+      <document type="judica_doc" mode="index" />
     </documents>
     <nodes>
       <node hostalias="node1" distribution-key="0" />
@@ -127,7 +127,7 @@ async function buildAppPackageZip(
 
   const entries: ZipEntry[] = [
     { name: "services.xml", data: encoder.encode(servicesXml) },
-    { name: "schemas/aibyai_doc.sd", data: encoder.encode(schemaContent) },
+    { name: "schemas/judica_doc.sd", data: encoder.encode(schemaContent) },
   ];
 
   return buildZip(entries);

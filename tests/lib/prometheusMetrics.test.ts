@@ -33,7 +33,7 @@ describe("Prometheus Metrics Utility", () => {
     const metrics = await import("../../src/lib/prometheusMetrics.js");
     const { default: client } = await import("prom-client");
 
-    expect(client.collectDefaultMetrics).toHaveBeenCalledWith({ prefix: "aibyai_" });
+    expect(client.collectDefaultMetrics).toHaveBeenCalledWith({ prefix: "judica_" });
     expect(metrics.httpRequestDuration).toBeDefined();
     expect(metrics.httpRequestTotal).toBeDefined();
     expect(metrics.deliberationDuration).toBeDefined();

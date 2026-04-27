@@ -1,9 +1,9 @@
 /**
- * AiByAiChatWidget — full Shadow DOM web component for drop-in chat embedding.
+ * JudicaChatWidget — full Shadow DOM web component for drop-in chat embedding.
  *
  * This file contains the component as a TypeScript class (for type checking),
  * but the canonical runtime artifact is the IIFE string produced by
- * `buildAiByAiChatComponentJS()` in widget.ts, which is what gets served
+ * `buildJudicaChatComponentJS()` in widget.ts, which is what gets served
  * at GET /api/widget/embed.js.
  *
  * Attributes:
@@ -29,7 +29,7 @@ export interface ChatMessage {
   isStreaming?: boolean;
 }
 
-export const SESSION_KEY = "aibyai-chat-session-v2";
+export const SESSION_KEY = "judica-chat-session-v2";
 
 /** Minimal markdown renderer: bold, italic, inline-code, line breaks, links. */
 export function renderMarkdown(text: string): string {
@@ -53,7 +53,7 @@ export function renderMarkdown(text: string): string {
 }
 
 /** Build the full IIFE JavaScript string for the widget — no build step needed. */
-export function buildAiByAiChatComponentJS(): string {
+export function buildJudicaChatComponentJS(): string {
   return `(function(){
 "use strict";
 
@@ -228,7 +228,7 @@ var ICON_BOT   = '<svg viewBox="0 0 24 24"><path d="M12 2a2 2 0 012 2c0 .74-.4 1
 var ICON_CLEAR = '<svg viewBox="0 0 24 24"><path d="M6 19c0 1.1.9 2 2 2h8c1.1 0 2-.9 2-2V7H6v12zM19 4h-3.5l-1-1h-5l-1 1H5v2h14V4z"/></svg>';
 
 /* ─── Web Component ─────────────────────────────────────────────────────── */
-class AiByAiChat extends HTMLElement {
+class JudicaChat extends HTMLElement {
   constructor() {
     super();
     this._shadow = this.attachShadow({ mode: 'closed' });
@@ -340,7 +340,7 @@ class AiByAiChat extends HTMLElement {
     shadow.querySelector('.clear-btn').addEventListener('click', function() {
       self._messages = [];
       self._sessionId = null;
-      try { sessionStorage.removeItem('aibyai-chat-session-v2'); } catch(e) {}
+      try { sessionStorage.removeItem('judica-chat-session-v2'); } catch(e) {}
       self._renderMessages();
     });
 
@@ -493,7 +493,7 @@ class AiByAiChat extends HTMLElement {
 
   _saveSession() {
     try {
-      sessionStorage.setItem('aibyai-chat-session-v2', JSON.stringify({
+      sessionStorage.setItem('judica-chat-session-v2', JSON.stringify({
         sessionId: this._sessionId,
         messages: this._messages.filter(function(m) { return !m.isStreaming; }),
       }));
@@ -502,7 +502,7 @@ class AiByAiChat extends HTMLElement {
 
   _restoreSession() {
     try {
-      var raw = sessionStorage.getItem('aibyai-chat-session-v2');
+      var raw = sessionStorage.getItem('judica-chat-session-v2');
       if (!raw) return;
       var data = JSON.parse(raw);
       if (data.sessionId) this._sessionId = data.sessionId;
@@ -519,8 +519,8 @@ class AiByAiChat extends HTMLElement {
 }
 
 /* ─── Auto-register ─────────────────────────────────────────────────────── */
-if (typeof customElements !== 'undefined' && !customElements.get('aibyai-chat')) {
-  customElements.define('aibyai-chat', AiByAiChat);
+if (typeof customElements !== 'undefined' && !customElements.get('judica-chat')) {
+  customElements.define('judica-chat', JudicaChat);
 }
 
 })();`;

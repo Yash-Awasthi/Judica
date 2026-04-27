@@ -132,7 +132,7 @@ async function executeCode(
   language: CodeLanguage,
   timeoutMs: number = EXECUTION_TIMEOUT_MS,
 ): Promise<{ stdout: string; stderr: string; exitCode: number; durationMs: number }> {
-  const tmpDir = join(tmpdir(), "aibyai-code-agent");
+  const tmpDir = join(tmpdir(), "judica-code-agent");
   await mkdir(tmpDir, { recursive: true });
 
   const ext = language === "python" ? "py" : "js";

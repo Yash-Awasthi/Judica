@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Database backup script for AIBYAI
+# Database backup script for JUDICA
 # Usage: ./scripts/backup.sh [backup_dir]
 #
 # Environment variables:
@@ -14,7 +14,7 @@ BACKUP_DIR="${1:-${BACKUP_DIR:-./backups}}"
 BACKUP_RETAIN="${BACKUP_RETAIN:-7}"
 BACKUP_COMPRESS="${BACKUP_COMPRESS:-true}"
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
-BACKUP_FILE="${BACKUP_DIR}/aibyai_${TIMESTAMP}.sql"
+BACKUP_FILE="${BACKUP_DIR}/judica_${TIMESTAMP}.sql"
 
 # Ensure backup directory exists
 mkdir -p "${BACKUP_DIR}"
@@ -49,7 +49,7 @@ echo "[$(date -Iseconds)] Backup complete: ${BACKUP_FILE} (${FILE_SIZE})"
 PRUNED=0
 if [ "${BACKUP_RETAIN}" -gt 0 ]; then
   # List backup files sorted oldest first, skip the newest BACKUP_RETAIN
-  for old_file in $(ls -1t "${BACKUP_DIR}"/aibyai_*.sql* 2>/dev/null | tail -n +$((BACKUP_RETAIN + 1))); do
+  for old_file in $(ls -1t "${BACKUP_DIR}"/judica_*.sql* 2>/dev/null | tail -n +$((BACKUP_RETAIN + 1))); do
     rm -f "${old_file}"
     PRUNED=$((PRUNED + 1))
   done

@@ -1,9 +1,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "aibyai.fullname" . }}-frontend
+  name: {{ include "judica.fullname" . }}-frontend
   labels:
-    {{- include "aibyai.labels" . | nindent 4 }}
+    {{- include "judica.labels" . | nindent 4 }}
     app.kubernetes.io/component: frontend
 spec:
   {{- if not .Values.autoscaling.enabled }}
@@ -11,7 +11,7 @@ spec:
   {{- end }}
   selector:
     matchLabels:
-      {{- include "aibyai.frontend.selectorLabels" . | nindent 6 }}
+      {{- include "judica.frontend.selectorLabels" . | nindent 6 }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -20,13 +20,13 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "aibyai.frontend.selectorLabels" . | nindent 8 }}
+        {{- include "judica.frontend.selectorLabels" . | nindent 8 }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "aibyai.serviceAccountName" . }}
+      serviceAccountName: {{ include "judica.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -57,7 +57,7 @@ spec:
             failureThreshold: 3
           env:
             - name: VITE_API_URL
-              value: "http://{{ include "aibyai.fullname" . }}-backend:{{ .Values.backend.port }}"
+              value: "http://{{ include "judica.fullname" . }}-backend:{{ .Values.backend.port }}"
           resources:
             {{- toYaml .Values.resources.frontend | nindent 12 }}
       {{- with .Values.nodeSelector }}

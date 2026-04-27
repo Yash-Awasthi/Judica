@@ -9,7 +9,7 @@ vi.mock("../../src/widget/models.js", () => ({
   DEFAULT_WIDGET_CONFIG: {
     apiBaseUrl: "",
     mode: "floating",
-    title: "AIBYAI",
+    title: "JUDICA",
     placeholder: "Ask a question...",
     primaryColor: "#6366f1",
     position: "bottom-right",
@@ -137,7 +137,7 @@ describe("GET /embed.js", () => {
     await handler(makeReq(), reply);
 
     const bundle = vi.mocked(reply.send).mock.calls[0][0] as string;
-    expect(bundle).toContain("aibyai-widget");
+    expect(bundle).toContain("judica-widget");
   });
 });
 
@@ -154,7 +154,7 @@ describe("GET /config", () => {
 
     expect(reply.send).toHaveBeenCalledWith(
       expect.objectContaining({
-        title: "AIBYAI",
+        title: "JUDICA",
         primaryColor: "#6366f1",
         position: "bottom-right",
         mode: "floating",
@@ -169,7 +169,7 @@ describe("GET /config", () => {
     await handler(req, reply);
 
     expect(reply.send).toHaveBeenCalledWith(
-      expect.objectContaining({ title: "AIBYAI" })
+      expect.objectContaining({ title: "JUDICA" })
     );
   });
 
@@ -227,7 +227,7 @@ describe("GET /snippet", () => {
 
     expect(reply.send).toHaveBeenCalledWith(
       expect.objectContaining({
-        snippet: expect.stringContaining("<aibyai-widget"),
+        snippet: expect.stringContaining("<judica-widget"),
         usage: expect.any(String),
       })
     );

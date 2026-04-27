@@ -32,7 +32,7 @@ export interface FineTuneDataset {
 }
 
 const MIN_EXAMPLES = 50;
-const DEFAULT_SYSTEM = "You are a helpful AI assistant on the aibyai council.";
+const DEFAULT_SYSTEM = "You are a helpful AI assistant on the judica council.";
 
 /**
  * Build a fine-tuning dataset from rated council responses.

@@ -38,7 +38,7 @@ function render(): void {
             type="url"
             id="api-url"
             class="form-input"
-            placeholder="https://your-instance.aibyai.com"
+            placeholder="https://your-instance.judica.com"
             value="${state.apiUrl}"
           />
           <small class="form-hint">The base URL of your AI by AI backend.</small>

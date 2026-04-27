@@ -15,7 +15,7 @@ import type {
 import { DEFAULT_WIDGET_CONFIG, DEFAULT_THEME } from "./models.js";
 import { generateWidgetStyles } from "./styles.js";
 
-const SESSION_STORAGE_KEY = "aibyai-widget-session";
+const SESSION_STORAGE_KEY = "judica-widget-session";
 
 export class AibyaiWidget extends HTMLElement {
   private shadow: ShadowRoot;
@@ -155,27 +155,27 @@ export class AibyaiWidget extends HTMLElement {
     this.shadow.innerHTML = `
       <style>${generateWidgetStyles(this.theme)}</style>
 
-      ${isFloating ? `<button class="aibyai-launcher ${pos}" aria-label="Open chat">💬</button>` : ""}
+      ${isFloating ? `<button class="judica-launcher ${pos}" aria-label="Open chat">💬</button>` : ""}
 
-      <div class="aibyai-widget-container ${isFloating ? `floating ${pos}` : "inline"} ${isFloating && !this.isOpen ? "hidden" : ""}">
-        <div class="aibyai-header">
+      <div class="judica-widget-container ${isFloating ? `floating ${pos}` : "inline"} ${isFloating && !this.isOpen ? "hidden" : ""}">
+        <div class="judica-header">
           <span>${this.escapeHtml(this.config.title)}</span>
-          ${isFloating ? '<button class="aibyai-header-close" aria-label="Close">✕</button>' : ""}
+          ${isFloating ? '<button class="judica-header-close" aria-label="Close">✕</button>' : ""}
         </div>
-        <div class="aibyai-messages"></div>
-        <div class="aibyai-input-area">
-          <textarea class="aibyai-input" placeholder="${this.escapeHtml(this.config.placeholder)}" rows="1"></textarea>
-          <button class="aibyai-send" aria-label="Send" disabled>▶</button>
+        <div class="judica-messages"></div>
+        <div class="judica-input-area">
+          <textarea class="judica-input" placeholder="${this.escapeHtml(this.config.placeholder)}" rows="1"></textarea>
+          <button class="judica-send" aria-label="Send" disabled>▶</button>
         </div>
       </div>
     `;
 
     // Cache DOM refs
-    this.container = this.shadow.querySelector(".aibyai-widget-container");
-    this.messagesEl = this.shadow.querySelector(".aibyai-messages");
-    this.inputEl = this.shadow.querySelector(".aibyai-input");
-    this.sendBtn = this.shadow.querySelector(".aibyai-send");
-    this.launcher = this.shadow.querySelector(".aibyai-launcher");
+    this.container = this.shadow.querySelector(".judica-widget-container");
+    this.messagesEl = this.shadow.querySelector(".judica-messages");
+    this.inputEl = this.shadow.querySelector(".judica-input");
+    this.sendBtn = this.shadow.querySelector(".judica-send");
+    this.launcher = this.shadow.querySelector(".judica-launcher");
 
     // Re-render existing messages
     this.renderMessages();
@@ -195,7 +195,7 @@ export class AibyaiWidget extends HTMLElement {
 
   private createMessageElement(msg: WidgetMessage): HTMLElement {
     const el = document.createElement("div");
-    el.className = `aibyai-message ${msg.role}`;
+    el.className = `judica-message ${msg.role}`;
     el.setAttribute("data-id", msg.id);
 
     let html = this.escapeHtml(msg.content);
@@ -203,18 +203,18 @@ export class AibyaiWidget extends HTMLElement {
     html = html.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
 
     if (msg.isStreaming) {
-      html += '<span class="aibyai-typing"><span class="aibyai-typing-dot"></span><span class="aibyai-typing-dot"></span><span class="aibyai-typing-dot"></span></span>';
+      html += '<span class="judica-typing"><span class="judica-typing-dot"></span><span class="judica-typing-dot"></span><span class="judica-typing-dot"></span></span>';
     }
 
     el.innerHTML = html;
 
     if (msg.sources && msg.sources.length > 0 && this.config.showSources) {
       const sourcesEl = document.createElement("div");
-      sourcesEl.className = "aibyai-sources";
+      sourcesEl.className = "judica-sources";
       sourcesEl.innerHTML = msg.sources
         .map((s: WidgetSource, i: number) => {
           if (s.url) {
-            return `<a class="aibyai-source-link" href="${this.escapeHtml(s.url)}" target="_blank" rel="noopener">[${i + 1}] ${this.escapeHtml(s.title)}</a>`;
+            return `<a class="judica-source-link" href="${this.escapeHtml(s.url)}" target="_blank" rel="noopener">[${i + 1}] ${this.escapeHtml(s.title)}</a>`;
           }
           return `<span>[${i + 1}] ${this.escapeHtml(s.title)}</span>`;
         })
@@ -246,7 +246,7 @@ export class AibyaiWidget extends HTMLElement {
       this.inputEl?.focus();
     });
 
-    this.shadow.querySelector(".aibyai-header-close")?.addEventListener("click", () => {
+    this.shadow.querySelector(".judica-header-close")?.addEventListener("click", () => {
       this.isOpen = false;
       this.updateVisibility();
     });

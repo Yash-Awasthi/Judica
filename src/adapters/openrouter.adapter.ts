@@ -17,8 +17,8 @@ export class OpenRouterAdapter extends OpenAICompatibleAdapter {
   // Read referer from env to support white-label deployments
   protected override getExtraHeaders(): Record<string, string> {
     return {
-      "HTTP-Referer": process.env.OPENROUTER_REFERER || "https://aibyai.app",
-      "X-Title": process.env.OPENROUTER_TITLE || "AIBYAI Council",
+      "HTTP-Referer": process.env.OPENROUTER_REFERER || "https://judica.app",
+      "X-Title": process.env.OPENROUTER_TITLE || "JUDICA Council",
     };
   }
 

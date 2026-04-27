@@ -112,7 +112,7 @@ export async function handleMCPRequest(request: MCPRequest): Promise<MCPResponse
           result: {
             protocolVersion: "2024-11-05",
             capabilities: { tools: {} },
-            serverInfo: { name: "aibyai-mcp", version: "1.0.0" },
+            serverInfo: { name: "judica-mcp", version: "1.0.0" },
           },
         };
 
@@ -176,7 +176,7 @@ export async function handleMCPRequest(request: MCPRequest): Promise<MCPResponse
 // ─── Built-in Deliberation Tools ────────────────────────────────────────────
 
 /**
- * Register the default AIBYAI deliberation tools.
+ * Register the default JUDICA deliberation tools.
  */
 export function registerDefaultTools(): void {
   registerTool({
@@ -201,7 +201,7 @@ export function registerDefaultTools(): void {
 
   registerTool({
     name: "search_knowledge",
-    description: "Search the AIBYAI knowledge base using federated search",
+    description: "Search the JUDICA knowledge base using federated search",
     inputSchema: {
       type: "object",
       properties: {

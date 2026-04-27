@@ -1,9 +1,9 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: {{ include "aibyai.fullname" . }}-backend
+  name: {{ include "judica.fullname" . }}-backend
   labels:
-    {{- include "aibyai.labels" . | nindent 4 }}
+    {{- include "judica.labels" . | nindent 4 }}
     app.kubernetes.io/component: backend
   {{- with .Values.podAnnotations }}
   annotations:
@@ -15,7 +15,7 @@ spec:
   {{- end }}
   selector:
     matchLabels:
-      {{- include "aibyai.backend.selectorLabels" . | nindent 6 }}
+      {{- include "judica.backend.selectorLabels" . | nindent 6 }}
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -24,7 +24,7 @@ spec:
   template:
     metadata:
       labels:
-        {{- include "aibyai.backend.selectorLabels" . | nindent 8 }}
+        {{- include "judica.backend.selectorLabels" . | nindent 8 }}
       {{- with .Values.podAnnotations }}
       annotations:
         {{- toYaml . | nindent 8 }}
@@ -34,7 +34,7 @@ spec:
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
       {{- end }}
-      serviceAccountName: {{ include "aibyai.serviceAccountName" . }}
+      serviceAccountName: {{ include "judica.serviceAccountName" . }}
       securityContext:
         {{- toYaml .Values.podSecurityContext | nindent 8 }}
       containers:
@@ -65,19 +65,19 @@ spec:
             failureThreshold: {{ .Values.readinessProbe.failureThreshold }}
           envFrom:
             - configMapRef:
-                name: {{ include "aibyai.fullname" . }}-config
+                name: {{ include "judica.fullname" . }}-config
             - secretRef:
-                name: {{ include "aibyai.fullname" . }}-secrets
+                name: {{ include "judica.fullname" . }}-secrets
           env:
             - name: PORT
               value: {{ .Values.backend.port | quote }}
             {{- if .Values.postgresql.enabled }}
             - name: DATABASE_URL
-              value: "postgresql://{{ .Values.postgresql.auth.username }}:$(POSTGRESQL_PASSWORD)@{{ include "aibyai.fullname" . }}-postgresql:5432/{{ .Values.postgresql.auth.database }}"
+              value: "postgresql://{{ .Values.postgresql.auth.username }}:$(POSTGRESQL_PASSWORD)@{{ include "judica.fullname" . }}-postgresql:5432/{{ .Values.postgresql.auth.database }}"
             {{- end }}
             {{- if .Values.redis.enabled }}
             - name: REDIS_URL
-              value: "redis://:$(REDIS_PASSWORD)@{{ include "aibyai.fullname" . }}-redis-master:6379"
+              value: "redis://:$(REDIS_PASSWORD)@{{ include "judica.fullname" . }}-redis-master:6379"
             {{- end }}
           resources:
             {{- toYaml .Values.resources.backend | nindent 12 }}

@@ -14,7 +14,7 @@ export function generateAccessToken(userId: number, username: string, role: stri
   return jwt.sign({ userId, username, role }, env.JWT_SECRET, {
     algorithm: "HS256",
     expiresIn: ACCESS_TOKEN_EXPIRY,
-    issuer: "aibyai",
+    issuer: "judica",
     audience: env.NODE_ENV,
   });
 }

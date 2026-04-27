@@ -44,7 +44,7 @@ let subIdCounter = 1;
 
 const VAPID_PUBLIC_KEY  = env.VAPID_PUBLIC_KEY  ?? "BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDkBNnVo-FgT_b_xfJw6boiUiPFiqCUG3WvhIrxhMklE";
 const VAPID_PRIVATE_KEY = env.VAPID_PRIVATE_KEY ?? "";
-const VAPID_EMAIL       = env.VAPID_EMAIL       ?? "admin@aibyai.dev";
+const VAPID_EMAIL       = env.VAPID_EMAIL       ?? "admin@judica.dev";
 
 // Lazy-load web-push to avoid crash if not installed
 async function getWebPush(): Promise<{

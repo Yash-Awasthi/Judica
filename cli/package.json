@@ -1,10 +1,10 @@
 {
-  "name": "@aibyai/cli",
+  "name": "@judica/cli",
   "version": "0.1.0",
-  "description": "aibyai CLI — interact with aibyai from the terminal",
+  "description": "judica CLI — interact with judica from the terminal",
   "type": "module",
   "bin": {
-    "aibyai": "./dist/index.js"
+    "judica": "./dist/index.js"
   },
   "scripts": {
     "build": "tsc",

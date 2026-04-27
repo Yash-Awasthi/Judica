@@ -1,10 +1,10 @@
 apiVersion: v1
 kind: Service
 metadata:
-  name: aibyai-backend
-  namespace: aibyai
+  name: judica-backend
+  namespace: judica
   labels:
-    app: aibyai-backend
+    app: judica-backend
     app.kubernetes.io/component: backend
 spec:
   type: ClusterIP
@@ -14,4 +14,4 @@ spec:
       protocol: TCP
       name: http
   selector:
-    app: aibyai-backend
+    app: judica-backend

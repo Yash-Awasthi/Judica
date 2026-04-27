@@ -36,7 +36,7 @@ let configInstance: Conf<ConfigSchema> | null = null;
 export function getConfig(): Conf<ConfigSchema> {
   if (!configInstance) {
     configInstance = new Conf<ConfigSchema>({
-      projectName: "aibyai",
+      projectName: "judica",
       schema,
     });
   }

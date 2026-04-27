@@ -45,7 +45,7 @@ export class BraintrustEvalProvider implements EvalProvider {
           Authorization: `Bearer ${this.apiKey}`,
         },
         body: JSON.stringify({
-          project_name: "aibyai-evals",
+          project_name: "judica-evals",
           experiment_name: run.name,
           metadata: {
             startedAt: run.startedAt.toISOString(),

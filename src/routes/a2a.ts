@@ -68,10 +68,10 @@ const agentRegistry = new Map<string, AgentCard>();
 const taskRegistry  = new Map<string, A2ATask>();
 
 // Built-in agent card for THIS server
-const SELF_AGENT_ID = "aibyai-council";
+const SELF_AGENT_ID = "judica-council";
 const selfCard: AgentCard = {
   id: SELF_AGENT_ID,
-  name: "aibyai Council",
+  name: "judica Council",
   description: "Multi-agent AI council with deliberation, research, and task management capabilities",
   url: "/api/a2a/tasks",
   version: "1.0.0",

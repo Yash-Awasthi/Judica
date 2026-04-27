@@ -10,7 +10,7 @@ export const tenantBranding = pgTable("TenantBranding", {
   brandName: text("brandName"),
   customDomain: text("customDomain").unique(),
   customCss: text("customCss"),
-  hideAiByAiBranding: boolean("hideAiByAiBranding").default(false).notNull(),
+  hideJudicaBranding: boolean("hideJudicaBranding").default(false).notNull(),
   emailFromName: text("emailFromName"),
   emailFromAddress: text("emailFromAddress"),
   supportUrl: text("supportUrl"),

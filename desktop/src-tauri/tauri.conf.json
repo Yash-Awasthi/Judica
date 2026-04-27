@@ -1,7 +1,7 @@
 {
-  "productName": "aibyai",
+  "productName": "judica",
   "version": "0.1.0",
-  "identifier": "com.aibyai.desktop",
+  "identifier": "com.judica.desktop",
   "build": {
     "beforeDevCommand": "cd ../frontend && npm run dev",
     "devUrl": "http://localhost:5173",
@@ -9,10 +9,10 @@
     "frontendDist": "../frontend/dist"
   },
   "app": {
-    "title": "aibyai",
+    "title": "judica",
     "windows": [
       {
-        "title": "aibyai — Multi-Agent Deliberative Intelligence",
+        "title": "judica — Multi-Agent Deliberative Intelligence",
         "width": 1200,
         "height": 800,
         "minWidth": 800,
@@ -23,7 +23,7 @@
       }
     ],
     "security": {
-      "csp": "default-src 'self'; connect-src 'self' http://localhost:* https://*.aibyai.com wss://*.aibyai.com; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:"
+      "csp": "default-src 'self'; connect-src 'self' http://localhost:* https://*.judica.com wss://*.judica.com; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; font-src 'self' data:"
     }
   },
   "bundle": {
@@ -61,7 +61,7 @@
       "active": true,
       "pubkey": "",
       "endpoints": [
-        "https://releases.aibyai.com/{{target}}/{{arch}}/{{current_version}}"
+        "https://releases.judica.com/{{target}}/{{arch}}/{{current_version}}"
       ]
     }
   }

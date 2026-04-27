@@ -1,16 +1,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: aibyai-frontend
-  namespace: aibyai
+  name: judica-frontend
+  namespace: judica
   labels:
-    app: aibyai-frontend
+    app: judica-frontend
     app.kubernetes.io/component: frontend
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: aibyai-frontend
+      app: judica-frontend
   strategy:
     type: RollingUpdate
     rollingUpdate:
@@ -19,17 +19,17 @@ spec:
   template:
     metadata:
       labels:
-        app: aibyai-frontend
+        app: judica-frontend
         app.kubernetes.io/component: frontend
     spec:
-      serviceAccountName: aibyai
+      serviceAccountName: judica
       securityContext:
         runAsNonRoot: true
         runAsUser: 1000
         fsGroup: 1000
       containers:
         - name: frontend
-          image: ghcr.io/yash-awasthi/aibyai/frontend:latest
+          image: ghcr.io/yash-awasthi/judica/frontend:latest
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
@@ -37,7 +37,7 @@ spec:
               protocol: TCP
           env:
             - name: VITE_API_URL
-              value: "http://aibyai-backend:3000"
+              value: "http://judica-backend:3000"
           livenessProbe:
             httpGet:
               path: /

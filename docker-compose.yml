@@ -120,13 +120,13 @@ services:
     # Or schedule via host cron: 0 2 * * * cd /path/to/project && docker compose run --rm db-backup
     # L-14: Backup files are gzip-compressed but NOT encrypted at rest.
     # For sensitive deployments, pipe through gpg or use an encrypted volume:
-    #   pg_dump ... | gpg --symmetric --cipher-algo AES256 > /backups/aibyai_$TIMESTAMP.sql.gz.gpg
+    #   pg_dump ... | gpg --symmetric --cipher-algo AES256 > /backups/judica_$TIMESTAMP.sql.gz.gpg
     entrypoint: >
       sh -c '
         TIMESTAMP=$$(date +%Y%m%d_%H%M%S) &&
-        pg_dump --no-owner --no-acl --clean --if-exists | gzip > /backups/aibyai_$$TIMESTAMP.sql.gz &&
-        echo "[$$TIMESTAMP] Backup complete: $$(du -h /backups/aibyai_$$TIMESTAMP.sql.gz | cut -f1)" &&
-        ls -1t /backups/aibyai_*.sql.gz | tail -n +8 | xargs -r rm -f &&
+        pg_dump --no-owner --no-acl --clean --if-exists | gzip > /backups/judica_$$TIMESTAMP.sql.gz &&
+        echo "[$$TIMESTAMP] Backup complete: $$(du -h /backups/judica_$$TIMESTAMP.sql.gz | cut -f1)" &&
+        ls -1t /backups/judica_*.sql.gz | tail -n +8 | xargs -r rm -f &&
         echo "Retained last 7 backups"
       '
     restart: "no"

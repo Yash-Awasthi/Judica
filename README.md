@@ -8,7 +8,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 [![SQLite](https://img.shields.io/badge/SQLite-Local-003B57?style=for-the-badge&logo=sqlite&logoColor=white)](https://sqlite.org/)
-[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey?style=for-the-badge)](https://github.com/Yash-Awasthi/aibyai/releases)
+[![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey?style=for-the-badge)](https://github.com/Yash-Awasthi/Judica/releases)
 
 <br />
 
@@ -90,7 +90,7 @@ Toggle the embedded AI panels to appear/disappear in the window. Off by default 
 
 ## Download
 
-Pre-built binaries are attached to each [GitHub Release](https://github.com/Yash-Awasthi/aibyai/releases).
+Pre-built binaries are attached to each [GitHub Release](https://github.com/Yash-Awasthi/Judica/releases).
 
 | Platform | File |
 |---|---|
@@ -167,8 +167,8 @@ Tables:
 ### Dev
 
 ```bash
-git clone https://github.com/Yash-Awasthi/aibyai.git
-cd aibyai/electron
+git clone https://github.com/Yash-Awasthi/Judica.git
+cd judica/electron
 
 npm install
 npm run dev
@@ -233,6 +233,6 @@ Sessions are isolated per provider using Electron's persistent session partition
 
 *Judica — Latin: "Judge. Vindicate. Decide."*
 
-[Releases](https://github.com/Yash-Awasthi/aibyai/releases) · [Issues](https://github.com/Yash-Awasthi/aibyai/issues)
+[Releases](https://github.com/Yash-Awasthi/Judica/releases) · [Issues](https://github.com/Yash-Awasthi/Judica/issues)
 
 </div>

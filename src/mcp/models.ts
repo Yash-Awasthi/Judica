@@ -1,10 +1,10 @@
 /**
  * MCP (Model Context Protocol) Server Models.
  *
- * Defines the types for aibyai's standalone MCP server, which exposes
+ * Defines the types for judica's standalone MCP server, which exposes
  * search, knowledge base, document management, and council capabilities
  * as MCP tools and resources — allowing external AI agents (Claude Desktop,
- * Cursor, etc.) to interact with aibyai's knowledge layer.
+ * Cursor, etc.) to interact with judica's knowledge layer.
  *
  * Modeled after Onyx's MCP integration.
  */
@@ -49,9 +49,9 @@ export interface MCPServerConfig {
   name: string;
   /** Server version. */
   version: string;
-  /** aibyai API base URL the MCP server proxies to. */
+  /** judica API base URL the MCP server proxies to. */
   apiBaseUrl: string;
-  /** API key or JWT for authenticating with aibyai. */
+  /** API key or JWT for authenticating with judica. */
   apiKey?: string;
   /** Default knowledge base ID for search operations. */
   defaultKbId?: string;
@@ -62,7 +62,7 @@ export interface MCPServerConfig {
 }
 
 export const DEFAULT_MCP_CONFIG: MCPServerConfig = {
-  name: "aibyai-mcp",
+  name: "judica-mcp",
   version: "0.1.0",
   apiBaseUrl: "http://localhost:3000",
   transport: "stdio",
