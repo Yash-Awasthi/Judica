@@ -35,7 +35,9 @@ import {
 const isDev = process.env.NODE_ENV === "development";
 const UI_URL = isDev
   ? "http://localhost:5173"
-  : `file://${path.join(process.resourcesPath, "ui", "index.html")}`;
+  : app.isPackaged
+    ? `file://${path.join(process.resourcesPath, "ui", "index.html")}`
+    : `file://${path.join(__dirname, "../../../frontend/build/client/index.html")}`;
 
 const WINDOW_WIDTH = 1400;
 const WINDOW_HEIGHT = 900;
