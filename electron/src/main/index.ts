@@ -5,8 +5,11 @@ import {
   ipcMain,
   session,
   shell,
+  protocol,
+  net,
 } from "electron";
 import path from "path";
+import { pathToFileURL } from "url";
 import { randomUUID } from "crypto";
 import {
   getDb,
@@ -33,11 +36,14 @@ import {
 // ── Constants ────────────────────────────────────────────────────────────────
 
 const isDev = process.env.NODE_ENV === "development";
-const UI_URL = isDev
-  ? "http://localhost:5173"
-  : app.isPackaged
-    ? `file://${path.join(process.resourcesPath, "ui", "index.html")}`
-    : `file://${path.join(__dirname, "../../../frontend/build/client/index.html")}`;
+
+// Register app:// protocol so React Router sees pathname "/" instead of the
+// full file path (which would match no routes and render a black screen).
+protocol.registerSchemesAsPrivileged([
+  { scheme: "app", privileges: { standard: true, secure: true, supportFetchAPI: true } },
+]);
+
+const UI_URL = isDev ? "http://localhost:5173" : "app://./index.html";
 
 const WINDOW_WIDTH = 1400;
 const WINDOW_HEIGHT = 900;
@@ -84,6 +90,21 @@ let verdictIndex = 0;
 // ── App lifecycle ─────────────────────────────────────────────────────────────
 
 app.whenReady().then(() => {
+  // Serve built frontend via app:// so React Router sees "/" as pathname
+  if (!isDev) {
+    const uiDir = app.isPackaged
+      ? path.join(process.resourcesPath, "ui")
+      : path.join(__dirname, "../../../frontend/build/client");
+
+    protocol.handle("app", (req) => {
+      const { pathname } = new URL(req.url);
+      // For SPA: any path that isn't a static asset gets index.html
+      const assetPath = path.join(uiDir, pathname);
+      const target = pathname.includes(".") ? assetPath : path.join(uiDir, "index.html");
+      return net.fetch(pathToFileURL(target).toString());
+    });
+  }
+
   getDb(); // initialize SQLite
   createMainWindow();
   createProviderViews();
