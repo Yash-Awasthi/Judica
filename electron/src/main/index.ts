@@ -122,10 +122,15 @@ function createMainWindow() {
 
 // ── BrowserViews (AI provider panels) ────────────────────────────────────────
 
+// Plain Chrome UA — avoids Google blocking OAuth/sign-in in Electron windows
+const CHROME_UA =
+  "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+
 function createProviderViews() {
   for (const provider of PROVIDERS) {
     // Each provider gets its own persistent session (cookies/login saved)
     const ses = session.fromPartition(`persist:${provider}`);
+    ses.setUserAgent(CHROME_UA);
 
     const view = new BrowserView({
       webPreferences: {
@@ -610,17 +615,26 @@ function registerIPC() {
 
   // Provider browser connection — opens a visible login window using the same
   // persistent session as the hidden BrowserView, so cookies carry over.
+  // We spoof the user-agent to look like plain Chrome so Google OAuth works
+  // (Google blocks login in windows that advertise "Electron" in their UA).
   ipcMain.handle("provider:connect", async (_e, provider: string) => {
     const providerUrl = PROVIDER_URLS[provider as Provider] ?? `https://${provider}.com`;
     const ses = session.fromPartition(`persist:${provider}`);
 
+    // Spoof UA on this session so Google does not block OAuth
+    const chromeUA =
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36";
+    ses.setUserAgent(chromeUA);
+
     const loginWin = new BrowserWindow({
-      width: 900,
-      height: 700,
+      width: 960,
+      height: 720,
       title: `Sign in to ${PROVIDER_LABELS[provider as Provider] ?? provider}`,
-      webPreferences: { session: ses },
-      parent: mainWindow ?? undefined,
-      modal: false,
+      webPreferences: {
+        session: ses,
+        contextIsolation: true,
+        nodeIntegration: false,
+      },
       autoHideMenuBar: true,
     });
 

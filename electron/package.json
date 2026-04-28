@@ -4,6 +4,7 @@
   "description": "Multi-AI deliberation desktop app",
   "main": "dist/main/index.js",
   "scripts": {
+    "postinstall": "electron-rebuild -f -w better-sqlite3",
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:electron\"",
     "dev:frontend": "cd ../frontend && bun run dev",
     "dev:electron": "tsc -p tsconfig.json && electron .",
@@ -18,6 +19,7 @@
     "electron-store": "^8.1.0"
   },
   "devDependencies": {
+    "@electron/rebuild": "^3.6.0",
     "@types/better-sqlite3": "^7.6.8",
     "@types/node": "^20.0.0",
     "concurrently": "^8.2.0",
