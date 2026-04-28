@@ -46,7 +46,7 @@ protocol.registerSchemesAsPrivileged([
   { scheme: "app", privileges: { standard: true, secure: true, supportFetchAPI: true } },
 ]);
 
-const UI_URL = isDev ? "http://localhost:5173" : "app://./index.html";
+const UI_URL = isDev ? "http://localhost:5173" : "app://localhost/";
 
 // Script injected into every login window to hide automation signals
 const WEBDRIVER_PATCH = `
