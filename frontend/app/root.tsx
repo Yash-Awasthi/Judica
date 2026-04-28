@@ -284,8 +284,13 @@ export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  // Client-side auth guard — redirect to /setup if no user profile exists
+  // In Electron, skip landing page and go straight to /chat
   useEffect(() => {
+    if (location.pathname === "/" && typeof window !== "undefined" && (window as any).molecule) {
+      navigate("/chat", { replace: true });
+      return;
+    }
+    // Client-side auth guard — redirect to /setup if no user profile exists
     if (isPublicPath(location.pathname)) return;
     const profile = localStorage.getItem("judica_user");
     if (!profile) {

@@ -24,7 +24,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setUserState(JSON.parse(raw));
+      if (raw) {
+        setUserState(JSON.parse(raw));
+      } else if (typeof window !== "undefined" && (window as any).molecule) {
+        // Electron desktop — no backend auth needed, auto-login as local user
+        const localUser: AuthUser = { id: "local", username: "You" };
+        setUserState(localUser);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(localUser));
+      }
     } catch {
       // ignore
     }
