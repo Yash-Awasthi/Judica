@@ -37,6 +37,9 @@ import {
 
 const isDev = process.env.NODE_ENV === "development";
 
+// Remove Electron's webdriver flag so Google OAuth doesn't block sign-in
+app.commandLine.appendSwitch("disable-blink-features", "AutomationControlled");
+
 // Register app:// protocol so React Router sees pathname "/" instead of the
 // full file path (which would match no routes and render a black screen).
 protocol.registerSchemesAsPrivileged([
@@ -44,6 +47,12 @@ protocol.registerSchemesAsPrivileged([
 ]);
 
 const UI_URL = isDev ? "http://localhost:5173" : "app://./index.html";
+
+// Script injected into every login window to hide automation signals
+const WEBDRIVER_PATCH = `
+  Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+  window.chrome = window.chrome || { runtime: {}, app: {}, csi: () => {}, loadTimes: () => {} };
+`;
 
 const WINDOW_WIDTH = 1400;
 const WINDOW_HEIGHT = 900;
@@ -659,6 +668,11 @@ function registerIPC() {
         nodeIntegration: false,
       },
       autoHideMenuBar: true,
+    });
+
+    // Patch webdriver detection before any page JS runs
+    loginWin.webContents.on("did-start-loading", () => {
+      loginWin.webContents.executeJavaScript(WEBDRIVER_PATCH).catch(() => {});
     });
 
     loginWin.loadURL(providerUrl);
