@@ -49,6 +49,13 @@ import {
   X,
   ImageIcon,
   Activity,
+  Trophy,
+  Network,
+  Cpu,
+  Swords,
+  CreditCard,
+  Globe,
+  Radio,
 } from "lucide-react";
 
 import { TooltipProvider } from "~/components/ui/tooltip";
@@ -145,6 +152,10 @@ const navGroups = [
       { to: "/stm", icon: MemoryStick, label: "STM" },
       { to: "/deep-research", icon: Search, label: "Deep Research" },
       { to: "/image-gen", icon: ImageIcon, label: "Image Gen" },
+      { to: "/ab-compare", icon: Trophy, label: "A/B Arena" },
+      { to: "/simulation", icon: Swords, label: "Simulation" },
+      { to: "/knowledge-graph", icon: Network, label: "Knowledge Graph" },
+      { to: "/fine-tune", icon: Cpu, label: "Fine-Tune" },
     ],
   },
   {
@@ -153,6 +164,9 @@ const navGroups = [
       { to: "/language-models", icon: Brain, label: "Language Models" },
       { to: "/settings", icon: Settings, label: "Settings" },
       { to: "/profile", icon: UserCircle, label: "Profile" },
+      { to: "/billing", icon: CreditCard, label: "Billing" },
+      { to: "/web-search", icon: Globe, label: "Web Search" },
+      { to: "/rooms", icon: Radio, label: "Rooms" },
     ],
   },
   {

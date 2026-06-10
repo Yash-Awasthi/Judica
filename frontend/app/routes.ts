@@ -68,4 +68,11 @@ export default [
   route("admin/system", "routes/admin-system.tsx"),
   route("admin/audit", "routes/admin-audit.tsx"),
   route("admin/traces", "routes/admin-traces.tsx"),
+  route("ab-compare", "routes/ab-compare.tsx"),
+  route("fine-tune", "routes/fine-tune.tsx"),
+  route("knowledge-graph", "routes/knowledge-graph.tsx"),
+  route("simulation", "routes/simulation.tsx"),
+  route("billing", "routes/billing.tsx"),
+  route("web-search", "routes/web-search.tsx"),
+  route("rooms", "routes/rooms.tsx"),
 ] satisfies RouteConfig;
