@@ -16,7 +16,8 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "~/components/ui/collapsible";
-import { Settings, Shield, MessageSquare, Brain, Gauge, ChevronDown, Filter, AlignLeft, Users, Plus, Trash2, Globe, Key, Loader2, CheckCircle2, Link2 } from "lucide-react";
+import { Settings, Shield, MessageSquare, Brain, Gauge, ChevronDown, Filter, AlignLeft, Users, Plus, Trash2, Globe, Key, Loader2, CheckCircle2, Link2, MemoryStick } from "lucide-react";
+import { STMPanel } from "~/components/STMPanel";
 import {
   type CouncilMember,
   type MemberMode,
@@ -597,6 +598,23 @@ export default function SettingsPage() {
         </Card>
 
         {/* Quotas */}
+        {/* STM Modules */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <MemoryStick className="size-4" />
+              STM Modules
+            </CardTitle>
+            <CardDescription>
+              Prompt modifiers applied to every council member each round.
+              Visit <a href="/stm" className="text-primary hover:underline">STM</a> for full session history.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <STMPanel />
+          </CardContent>
+        </Card>
+
         <Collapsible open={quotasOpen} onOpenChange={setQuotasOpen}>
           <Card>
             <CollapsibleTrigger className="w-full">

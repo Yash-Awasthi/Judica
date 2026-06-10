@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { loadActiveSTM, applySTM, STM_MODULES, type STMModuleId } from "~/lib/stm";
 import type { Route } from "./+types/chat";
 import {
   deliberate,
@@ -104,6 +105,7 @@ export default function Chat() {
   const [threadId, setThreadId]         = useState<string>("");
   const [groups, setGroups]             = useState<MsgGroup[]>([]);
   const [streaming, setStreaming]       = useState(false);
+  const [activeSTM, setActiveSTM]       = useState<STMModuleId[]>([]);
   const [muted, setMuted]               = useState<Set<string>>(new Set());
   const [input, setInput]               = useState("");
   const [copied, setCopied]             = useState<string | null>(null); // key of last copied item
@@ -117,6 +119,9 @@ export default function Chat() {
   const taRef      = useRef<HTMLTextAreaElement | null>(null);
   const councilRef = useRef(council); // stable ref for callbacks
   useEffect(() => { councilRef.current = council; }, [council]);
+
+  // Load active STM modules from localStorage on mount
+  useEffect(() => { setActiveSTM(loadActiveSTM()); }, []);
 
   // ── Bootstrap ──────────────────────────────────────────────────────────────
 
@@ -283,6 +288,18 @@ export default function Chat() {
     setGroups(prev => [...prev, group]);
     setStreaming(true);
 
+    // Record STM injection history (best-effort, async)
+    if (activeSTM.length > 0) {
+      const applied = activeSTM
+        .map((id) => STM_MODULES.find((m) => m.id === id)?.injection)
+        .filter(Boolean) as string[];
+      fetch("/api/stm/history", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ query: prompt, modules: activeSTM, applied }),
+      }).catch(() => {});
+    }
+
     try {
       await deliberate({ threadId, message: prompt, round: group.round });
     } catch (err) {
@@ -437,6 +454,15 @@ export default function Chat() {
             >
               <Download size={10} />
             </button>
+          )}
+          {activeSTM.length > 0 && (
+            <a
+              href="/stm"
+              style={{ background: "transparent", border: `1px solid hsl(245 80% 65%/0.5)`, borderRadius: "3px", padding: "3px 9px", fontFamily: MONO, fontSize: "10px", color: "hsl(245 80% 70%)", letterSpacing: "0.08em", textDecoration: "none", display: "inline-flex", alignItems: "center", gap: "4px" }}
+              title="STM modules active — click to manage"
+            >
+              ◈ STM:{activeSTM.length}
+            </a>
           )}
           <button
             onClick={handleGlass}
