@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect, useCallback, useMemo } from "react";
-import { loadActiveSTM, applySTM, STM_MODULES, type STMModuleId } from "~/lib/stm";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { loadActiveSTM, STM_MODULES, type STMModuleId } from "~/lib/stm";
 import type { Route } from "./+types/chat";
 import { useContextMention } from '~/hooks/useContextMention';
 import { ContextPill, type MentionType } from '~/components/ContextPill';

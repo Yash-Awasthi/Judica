@@ -17,7 +17,7 @@ import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
 import {
   Code2, Send, Loader2, X, AlertTriangle,
-  Clock, CheckCircle2, ShieldAlert, Zap, Cpu, GitBranch,
+  Clock, CheckCircle2,
 } from "lucide-react";
 
 interface Mention { type: MentionType; label: string; value: string }

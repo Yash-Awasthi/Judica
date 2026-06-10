@@ -15,7 +15,7 @@
 **Send one question. Get independent answers from 3 to 51 AI models simultaneously.
 Judica runs a council, scores each response, and synthesizes a verdict.**
 
-[Quick Start](#quick-start) · [Architecture](#architecture) · [Features](#features) · [API](#api-reference) · [Deploy](#deployment)
+[Quick Start](#quick-start) · [Architecture](#architecture) · [Features](#features) · [API](#api-reference) · [Deploy](#deployment) · [ARCHITECTURE.md](./ARCHITECTURE.md)
 
 </div>
 
@@ -81,37 +81,35 @@ npm run dev                   # Vite on :5173
 ## Architecture
 
 ```
-judica/
+Judica/
 ├── src/                        # Fastify backend (Node.js + TypeScript)
+│   ├── app.ts                  # Server bootstrap + plugin registration
 │   ├── routes/                 # 140+ API route plugins
 │   ├── services/               # Business logic (80+ services)
-│   ├── lib/                    # Core libraries
-│   │   ├── deepResearch/       # Multi-step research engine
-│   │   ├── ultraplinian.ts     # Mass-parallel model orchestration
-│   │   ├── evaluation.ts       # Session scoring (quality, coherence, consensus)
-│   │   └── redis.ts / drizzle.ts
-│   ├── agents/                 # Agent loop + tool execution
-│   ├── connectors/             # 50+ data source connectors
-│   ├── workflow/               # Node-based workflow executor
-│   ├── kg/                     # Knowledge graph
 │   └── db/                     # Drizzle ORM schema + migrations
 │
 ├── frontend/                   # React Router 7 SPA
 │   └── app/
-│       ├── routes/             # Page routes (chat, workflows, KB, admin, …)
-│       ├── components/         # UI components (shadcn/ui based)
-│       └── lib/                # Client libs (deliberate, council, etc.)
+│       ├── routes/             # 90+ file-based page routes
+│       ├── components/         # 38 shared components
+│       ├── hooks/              # useContextMention, useEasterEggs, …
+│       └── lib/                # deliberate, council, stm, utils
 │
-├── extensions/                 # Chrome extension
 ├── tests/
-│   ├── e2e/                    # Playwright end-to-end tests
-│   ├── integration/            # Backend integration tests
-│   └── load/                   # autocannon load tests
+│   ├── e2e/                    # Playwright end-to-end (55+ specs)
+│   └── services/               # Vitest unit + integration (80+ specs)
 │
+├── electron/                   # Desktop wrapper
+├── extensions/chrome/          # Chrome extension (Manifest V3)
+├── cli/                        # Node.js CLI
+├── docs/                       # Extended documentation
+├── ARCHITECTURE.md             # Deep-dive architecture reference
 ├── docker-compose.yml
-├── install.sh                  # One-command installer
-└── .env.example                # All 200+ config options documented
+├── install.sh                  # One-command Docker installer
+└── .env.example                # 200+ documented config options
 ```
+
+> See [ARCHITECTURE.md](./ARCHITECTURE.md) for the full system design including data-flow diagrams, component inventory, and deployment options.
 
 ### Request Flow
 
@@ -148,9 +146,11 @@ Browser → React Router SPA
 |---|---|
 | **ULTRAPLINIAN** | Fire 10/24/36/45/51 models, score by composite metric, crown winner |
 | **GODMODE CLASSIC** | Raw parallel compare — no scoring, just speed |
-| **Parseltongue** | Code-aware deliberation with syntax analysis |
+| **Parseltongue** | 5 parallel specialists (reviewer, security, performance, correctness, architect) with inline DiffViewer on suggested code |
 | **AutoTune** | Auto-optimize system prompts via feedback loops |
 | **STM** | Short-term memory modules: hedge reducer, direct mode, curiosity bias — with full session injection history at `/stm` |
+| **CodeGen** | SSE code generation with live editor, 8 stacks, sandboxed preview iframe, iterate loop, and Myers diff apply |
+| **@context syntax** | Type `@file:`, `@symbol:`, or `@web:` in any prompt to inject live file/symbol/web context as pills |
 
 ### Data & Knowledge
 
@@ -160,7 +160,8 @@ Browser → React Router SPA
 | **50+ connectors** | Slack, Notion, GitHub, Jira, Confluence, Google Drive, … |
 | **Connector sync** | Load / Poll / Slim sync modes with scheduling |
 | **Knowledge Graph** | Entity/relation extraction over ingested docs |
-| **Deep Research** | Multi-step research with source citations |
+| **Deep Research** | Multi-step research with inline citation badges, confidence scores, collapsible sources panel, and related-questions chips |
+| **Projects** | Per-project memory panel, file attachments (drag-and-drop), and custom system instructions with STM toggles |
 
 ### Platform
 
@@ -196,31 +197,46 @@ The backend exposes a fully documented OpenAPI spec at `/api/docs` (Swagger UI).
 Key endpoints:
 
 ```
-POST /api/deliberate              — start a deliberation session (SSE)
-POST /api/ultraplinian/stream     — ULTRAPLINIAN mass-parallel (SSE)
-GET  /api/analytics/overview      — usage stats
-GET  /api/kb                      — list knowledge bases
-POST /api/kb/:id/upload           — upload document to KB
-GET  /api/workflows               — list workflows
-POST /api/workflows               — create workflow
-POST /api/workflows/:id/run       — execute workflow
-GET  /api/evaluation/metrics      — evaluation stats
-GET  /api/memory/stats            — memory stats
-POST /api/memory/compact          — trigger compaction
-GET  /api/connectors              — list connectors
-POST /api/connectors              — create connector
-POST /api/connectors/:id/sync     — trigger sync
-POST /api/parseltongue/analyze    — code-aware specialist review (SSE)
-POST /api/autotune/run            — run AutoTune parameter benchmark
-GET  /api/stm/active              — get active STM modules
-POST /api/stm/active              — set active STM modules
-GET  /api/stm/history             — session injection history
-DELETE /api/stm/history           — clear injection history
-POST /api/research                — create deep research job
-GET  /api/research/:id/stream     — stream research progress (SSE)
-GET  /api/admin/users             — user management (admin)
-GET  /api/admin/audit-logs        — audit log (admin)
-GET  /api/system/info             — deployment info
+POST /api/deliberate                   — start a deliberation session (SSE)
+POST /api/ultraplinian/stream          — ULTRAPLINIAN mass-parallel (SSE)
+GET  /api/analytics/overview           — usage stats
+GET  /api/kb                           — list knowledge bases
+POST /api/kb/:id/upload                — upload document to KB
+GET  /api/workflows                    — list workflows
+POST /api/workflows/:id/run            — execute workflow
+GET  /api/evaluation/metrics           — evaluation stats
+GET  /api/memory/entries               — list memory entries
+POST /api/memory/entries               — add memory entry
+DELETE /api/memory/entries/:id         — forget memory entry
+GET  /api/connectors                   — list connectors
+POST /api/connectors/:id/sync          — trigger sync
+POST /api/parseltongue/analyze         — code specialist review (SSE)
+POST /api/autotune/run                 — AutoTune benchmark (SSE)
+GET  /api/stm/active                   — get active STM modules
+POST /api/stm/toggle                   — toggle STM module
+GET  /api/stm/history                  — session injection history
+POST /api/research/start               — create deep research job
+GET  /api/research/stream/:id          — stream research progress (SSE)
+POST /api/research/related-questions   — generate follow-up questions
+POST /api/codegen/generate             — SSE code generation
+POST /api/codegen/iterate              — SSE iterate on existing code
+POST /api/codegen/compile              — wrap component for iframe preview
+POST /api/diff/apply                   — apply accepted diff hunks to filesystem
+POST /api/diff/rollback                — rollback a prior diff apply
+GET  /api/context/files                — fuzzy-search project files
+GET  /api/context/symbols              — search exported symbols
+GET  /api/context/web                  — web context search
+POST /api/context/resolve              — resolve mention list → file contents
+GET  /api/v1/projects                  — list projects
+POST /api/v1/projects                  — create project
+PATCH /api/v1/projects/:id             — update project
+DELETE /api/v1/projects/:id            — delete project
+GET  /api/v1/projects/:id/files        — list project file attachments
+POST /api/v1/projects/:id/files        — upload file attachment
+DELETE /api/v1/projects/:id/files/:fid — remove file attachment
+GET  /api/admin/users                  — user management (admin)
+GET  /api/admin/audit-logs             — audit log (admin)
+GET  /api/system/info                  — deployment info
 ```
 
 ---
