@@ -62,6 +62,7 @@ import {
   Flag,
   BookOpenCheck,
   MessageSquare,
+  Spider,
 } from "lucide-react";
 
 import { TooltipProvider } from "~/components/ui/tooltip";
@@ -176,6 +177,7 @@ const navGroups = [
       { to: "/api-tokens", icon: Key, label: "API Tokens" },
       { to: "/standard-answers", icon: BookOpenCheck, label: "Standard Answers" },
       { to: "/web-search", icon: Globe, label: "Web Search" },
+      { to: "/scrape", icon: Spider, label: "Scraping" },
       { to: "/rooms", icon: Radio, label: "Rooms" },
     ],
   },

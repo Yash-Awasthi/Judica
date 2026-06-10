@@ -81,4 +81,5 @@ export default [
   route("admin/feature-flags", "routes/admin-feature-flags.tsx"),
   route("standard-answers", "routes/standard-answers.tsx"),
   route("admin/feedback", "routes/admin-feedback.tsx"),
+  route("scrape", "routes/scrape.tsx"),
 ] satisfies RouteConfig;
