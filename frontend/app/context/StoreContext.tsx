@@ -52,40 +52,56 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [customModels, setCustomModels] = useState<CustomModel[]>([]);
   const [customArchetypes, setCustomArchetypes] = useState<CustomArchetype[]>([]);
 
-  // Load from localStorage on mount
+  // ── Helpers ────────────────────────────────────────────────────────────────
+
+  function lsGet<T>(key: string, fallback: T): T {
+    if (typeof window === "undefined") return fallback;
+    try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : fallback; }
+    catch { return fallback; }
+  }
+
+  function lsSet(key: string, value: unknown) {
+    if (typeof window === "undefined") return;
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+  }
+
+  // ── Load archetypes: API first, localStorage fallback ─────────────────────
   useEffect(() => {
     if (typeof window === "undefined") return;
-    try {
-      const saved = localStorage.getItem("Judica_custom_archetypes");
-      if (saved) setCustomArchetypes(JSON.parse(saved));
-    } catch {}
+    fetch("/api/archetypes?custom=true")
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((data) => {
+        const list: CustomArchetype[] = Array.isArray(data)
+          ? data
+          : (data?.archetypes ?? data?.data ?? []);
+        if (list.length > 0) {
+          setCustomArchetypes(list);
+          lsSet("Judica_custom_archetypes", list);
+        } else {
+          // API returned empty — use localStorage seeds
+          setCustomArchetypes(lsGet("Judica_custom_archetypes", []));
+        }
+      })
+      .catch(() => {
+        setCustomArchetypes(lsGet("Judica_custom_archetypes", []));
+      });
   }, []);
 
+  // ── Load custom models: localStorage only (no dedicated API) ──────────────
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    try {
-      const saved = localStorage.getItem("Judica_custom_models");
-      if (saved) setCustomModels(JSON.parse(saved));
-    } catch {}
+    setCustomModels(lsGet("Judica_custom_models", []));
   }, []);
 
-  // Persist to localStorage on change
+  // ── Persist custom models to localStorage ─────────────────────────────────
   useEffect(() => {
-    if (typeof window === "undefined") return;
-    localStorage.setItem("Judica_custom_archetypes", JSON.stringify(customArchetypes));
-  }, [customArchetypes]);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    localStorage.setItem("Judica_custom_models", JSON.stringify(customModels));
+    lsSet("Judica_custom_models", customModels);
   }, [customModels]);
+
+  // ── Model helpers ─────────────────────────────────────────────────────────
 
   const addCustomModel = useCallback((model: Omit<CustomModel, "id">) => {
     const id = `custom-model-${Date.now()}`;
-    setCustomModels((prev) => [
-      ...prev,
-      { ...model, id },
-    ]);
+    setCustomModels((prev) => [...prev, { ...model, id }]);
     return id;
   }, []);
 
@@ -94,21 +110,55 @@ export function StoreProvider({ children }: { children: ReactNode }) {
     ...customModels.map((m) => ({ id: m.id, label: m.label })),
   ];
 
+  // ── Archetype helpers — sync to API + localStorage ────────────────────────
+
   const addCustomArchetype = useCallback((arch: Omit<CustomArchetype, "id">) => {
-    setCustomArchetypes((prev) => [
-      ...prev,
-      { ...arch, id: `custom-arch-${Date.now()}` },
-    ]);
+    const optimisticId = `custom-arch-${Date.now()}`;
+    const newArch: CustomArchetype = { ...arch, id: optimisticId };
+    setCustomArchetypes((prev) => {
+      const next = [...prev, newArch];
+      lsSet("Judica_custom_archetypes", next);
+      return next;
+    });
+    // Persist to backend
+    fetch("/api/archetypes", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(arch),
+    })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((created) => {
+        if (created?.id && created.id !== optimisticId) {
+          setCustomArchetypes((prev) => {
+            const next = prev.map((a) => a.id === optimisticId ? { ...a, id: created.id } : a);
+            lsSet("Judica_custom_archetypes", next);
+            return next;
+          });
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const updateArchetype = useCallback((id: string, data: Partial<CustomArchetype>) => {
-    setCustomArchetypes((prev) =>
-      prev.map((a) => (a.id === id ? { ...a, ...data } : a))
-    );
+    setCustomArchetypes((prev) => {
+      const next = prev.map((a) => (a.id === id ? { ...a, ...data } : a));
+      lsSet("Judica_custom_archetypes", next);
+      return next;
+    });
+    fetch(`/api/archetypes/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(data),
+    }).catch(() => {});
   }, []);
 
   const removeArchetype = useCallback((id: string) => {
-    setCustomArchetypes((prev) => prev.filter((a) => a.id !== id));
+    setCustomArchetypes((prev) => {
+      const next = prev.filter((a) => a.id !== id);
+      lsSet("Judica_custom_archetypes", next);
+      return next;
+    });
+    fetch(`/api/archetypes/${id}`, { method: "DELETE" }).catch(() => {});
   }, []);
 
   return (

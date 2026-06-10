@@ -57,16 +57,31 @@ export default function EvaluationPage() {
   const [error,       setError]       = useState<string | null>(null);
   const [loading,     setLoading]     = useState(true);
 
-  // ── Load historical eval results from backend ─────────────────────────────
+  // ── Load evaluation dashboard from backend ────────────────────────────────
   useEffect(() => {
-    fetch("/api/evaluation/results?limit=50")
-      .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((data) => {
-        const list: EvalEntry[] = Array.isArray(data) ? data : (data?.results ?? data?.evals ?? []);
-        if (list.length > 0) setEvals(list);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
+    Promise.allSettled([
+      fetch("/api/evaluation/dashboard?days=30").then((r) => r.ok ? r.json() : null),
+      fetch("/api/evaluation/metrics").then((r) => r.ok ? r.json() : null),
+    ])
+    .then(([dashResult, metricsResult]) => {
+      const dash = dashResult.status === "fulfilled" ? dashResult.value : null;
+      if (dash?.currentPerformance) {
+        // Synthesize a summary EvalEntry from dashboard data
+        const perf = dash.currentPerformance;
+        const synth: EvalEntry = {
+          id:           "eval_live",
+          conversation: `Last ${dash.period ?? "30 days"} performance`,
+          quality:      Math.round(perf.overallScore ?? 0),
+          coherence:    perf.quality     ?? 0,
+          consensus:    perf.consensus   ?? 0,
+          diversity:    perf.diversity   ?? 0,
+          date:         new Date().toISOString().split("T")[0],
+        };
+        setEvals((prev) => [synth, ...prev.filter((e) => !e.id.startsWith("eval_live"))]);
+      }
+    })
+    .catch(() => {})
+    .finally(() => setLoading(false));
   }, []);
 
   const { avgQuality, avgCoherence, avgConsensus, avgDiversity } = useMemo(() => {

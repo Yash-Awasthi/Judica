@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
@@ -126,9 +126,9 @@ const initialItems: MarketplaceItem[] = [
   },
 ];
 
-// Mock initial starred and installed states
-const INITIAL_STARRED = new Set(["1", "6", "8"]);
-const INITIAL_INSTALLED = new Set(["1", "6", "9", "10"]);
+// Default seed starred/installed (shown until API loads)
+const INITIAL_STARRED = new Set<string>();
+const INITIAL_INSTALLED = new Set<string>();
 
 const typeColors: Record<ItemType, string> = {
   archetype: "bg-blue-500/20 text-blue-400",
@@ -158,6 +158,26 @@ export default function MarketplacePage() {
   const [filterMine, setFilterMine] = useState(false);
   const [filterInstalled, setFilterInstalled] = useState(false);
 
+  // ── Load marketplace items from backend ─────────────────────────────────────
+  useEffect(() => {
+    fetch("/api/marketplace/items?limit=100")
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((data) => {
+        const list: MarketplaceItem[] = Array.isArray(data) ? data : (data?.items ?? data?.data ?? []);
+        if (list.length > 0) setItems(list);
+      })
+      .catch(() => { /* keep initialItems as fallback */ });
+
+    // Load user's starred and installed state
+    fetch("/api/marketplace/me")
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((data) => {
+        if (data?.starred) setStarred(new Set<string>(data.starred));
+        if (data?.installed) setInstalled(new Set<string>(data.installed));
+      })
+      .catch(() => {});
+  }, []);
+
   // Publish dialog
   const [publishOpen, setPublishOpen] = useState(false);
   const [publishForm, setPublishForm] = useState<PublishForm>({
@@ -172,16 +192,19 @@ export default function MarketplacePage() {
   const toggleStar = (id: string) => {
     setStarred((prev) => {
       const next = new Set(prev);
-      if (next.has(id)) {
+      const wasStarred = next.has(id);
+      if (wasStarred) {
         next.delete(id);
         setItems((items) =>
-          items.map((item) => (item.id === id ? { ...item, stars: item.stars - 1 } : item))
+          items.map((item) => (item.id === id ? { ...item, stars: Math.max(0, item.stars - 1) } : item))
         );
+        fetch(`/api/marketplace/items/${id}/star`, { method: "DELETE" }).catch(() => {});
       } else {
         next.add(id);
         setItems((items) =>
           items.map((item) => (item.id === id ? { ...item, stars: item.stars + 1 } : item))
         );
+        fetch(`/api/marketplace/items/${id}/star`, { method: "POST" }).catch(() => {});
       }
       return next;
     });
@@ -190,29 +213,25 @@ export default function MarketplacePage() {
   const handleInstall = (id: string) => {
     if (installing.has(id)) return;
     if (installed.has(id)) {
-      // Uninstall
-      setInstalled((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
-      });
+      // Uninstall — optimistic
+      setInstalled((prev) => { const next = new Set(prev); next.delete(id); return next; });
       setItems((items) =>
         items.map((item) => (item.id === id ? { ...item, installs: Math.max(0, item.installs - 1) } : item))
       );
+      fetch(`/api/marketplace/items/${id}/install`, { method: "DELETE" }).catch(() => {});
       return;
     }
+    // Install — optimistic with loading state
     setInstalling((prev) => new Set(prev).add(id));
-    setTimeout(() => {
-      setInstalling((prev) => {
-        const next = new Set(prev);
-        next.delete(id);
-        return next;
+    fetch(`/api/marketplace/items/${id}/install`, { method: "POST" })
+      .catch(() => {})
+      .finally(() => {
+        setInstalling((prev) => { const next = new Set(prev); next.delete(id); return next; });
+        setInstalled((prev) => new Set(prev).add(id));
+        setItems((items) =>
+          items.map((item) => (item.id === id ? { ...item, installs: item.installs + 1 } : item))
+        );
       });
-      setInstalled((prev) => new Set(prev).add(id));
-      setItems((items) =>
-        items.map((item) => (item.id === id ? { ...item, installs: item.installs + 1 } : item))
-      );
-    }, 1000);
   };
 
   const handleDownloadJson = (item: MarketplaceItem) => {
@@ -240,9 +259,9 @@ export default function MarketplacePage() {
   const handlePublish = async () => {
     if (!publishForm.name || !publishForm.type) return;
     setPublishLoading(true);
-    await new Promise((r) => setTimeout(r, 800));
-    const newItem: MarketplaceItem = {
-      id: `pub_${Date.now()}`,
+    const optimisticId = `pub_${Date.now()}`;
+    const optimistic: MarketplaceItem = {
+      id: optimisticId,
       name: publishForm.name,
       type: publishForm.type as ItemType,
       author: CURRENT_USER,
@@ -251,11 +270,32 @@ export default function MarketplacePage() {
       installs: 0,
       isMine: true,
     };
-    setItems((prev) => [newItem, ...prev]);
-    setInstalled((prev) => new Set(prev).add(newItem.id));
+    setItems((prev) => [optimistic, ...prev]);
+    setInstalled((prev) => new Set(prev).add(optimisticId));
     setPublishLoading(false);
     setPublishOpen(false);
     setPublishForm({ name: "", description: "", type: "", content: "", tags: "" });
+
+    // Persist to backend, swap id on success
+    fetch("/api/marketplace/items", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name:        publishForm.name,
+        description: publishForm.description,
+        type:        publishForm.type,
+        content:     publishForm.content,
+        tags:        publishForm.tags.split(",").map((t) => t.trim()).filter(Boolean),
+      }),
+    })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((created: MarketplaceItem) => {
+        if (created?.id && created.id !== optimisticId) {
+          setItems((prev) => prev.map((item) => item.id === optimisticId ? { ...item, id: created.id } : item));
+          setInstalled((prev) => { const next = new Set(prev); next.delete(optimisticId); next.add(created.id); return next; });
+        }
+      })
+      .catch(() => {});
   };
 
   const filtered = items.filter((item) => {

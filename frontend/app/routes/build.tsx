@@ -4,11 +4,7 @@
  * Kanban board for the council task graph.
  * Supports drag-and-drop column lanes (HTML5 native DnD),
  * task creation, claim/release, work stealing, and review submission.
- *
- * Inspired by:
- * - dnd-kit (thefrontendguy/dnd-kit) — drag-and-drop for React
- * - React Flow (@xyflow/react) — used in the Graph View tab
- * - Taskade — agent task graph UI
+ * All state is persisted via /api/build/tasks backend.
  */
 import { useState, useCallback, useEffect, useRef } from "react";
 import { Badge } from "~/components/ui/badge";
@@ -42,6 +38,7 @@ import {
   Shuffle,
   Trash2,
   ChevronRight,
+  Loader2,
 } from "lucide-react";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
@@ -85,23 +82,58 @@ const STATUS_ICONS: Record<TaskStatus, React.ReactNode> = {
   blocked:     <AlertCircle className="w-3 h-3" />,
 };
 
-// ─── localStorage helpers ─────────────────────────────────────────────────────
+// ─── API helpers ──────────────────────────────────────────────────────────────
 
-const LS_KEY = "judica-build-tasks";
-let nextId = Date.now();
-
-function loadAllTasks(): BuildTask[] {
-  try {
-    return JSON.parse(localStorage.getItem(LS_KEY) ?? "[]");
-  } catch { return []; }
+async function apiGet(path: string) {
+  const res = await fetch(path);
+  if (!res.ok) throw new Error(`GET ${path} → ${res.status}`);
+  return res.json();
 }
 
-function saveAllTasks(tasks: BuildTask[]) {
-  localStorage.setItem(LS_KEY, JSON.stringify(tasks));
+async function apiPost(path: string, body?: unknown) {
+  const res = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) throw new Error(`POST ${path} → ${res.status}`);
+  return res.json();
 }
 
-function mutate(fn: (tasks: BuildTask[]) => BuildTask[]) {
-  saveAllTasks(fn(loadAllTasks()));
+async function apiPatch(path: string, body: unknown) {
+  const res = await fetch(path, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`PATCH ${path} → ${res.status}`);
+  return res.json();
+}
+
+async function apiDelete(path: string) {
+  const res = await fetch(path, { method: "DELETE" });
+  if (!res.ok) throw new Error(`DELETE ${path} → ${res.status}`);
+  return res.ok;
+}
+
+// Map raw API task to our interface
+function mapTask(raw: any): BuildTask {
+  return {
+    id:          raw.id,
+    userId:      raw.userId ?? raw.user_id ?? 1,
+    parentId:    raw.parentId ?? raw.parent_id ?? null,
+    title:       raw.title ?? "",
+    description: raw.description ?? null,
+    status:      raw.status ?? "planned",
+    claimedBy:   raw.claimedBy ?? raw.claimed_by ?? null,
+    claimedAt:   raw.claimedAt ?? raw.claimed_at ?? null,
+    output:      raw.output ?? null,
+    submittedAt: raw.submittedAt ?? raw.submitted_at ?? null,
+    isLocked:    raw.isLocked ?? raw.is_locked ?? false,
+    meta:        raw.meta ?? {},
+    createdAt:   raw.createdAt ?? raw.created_at ?? new Date().toISOString(),
+    updatedAt:   raw.updatedAt ?? raw.updated_at ?? new Date().toISOString(),
+  };
 }
 
 // ─── TaskCard ─────────────────────────────────────────────────────────────────
@@ -124,30 +156,29 @@ function TaskCard({
   const handleClaim = async () => {
     setLoading(true);
     try {
-      mutate(tasks => tasks.map(t =>
-        t.id === task.id ? { ...t, status: "claimed", claimedBy: "user", claimedAt: new Date().toISOString() } : t
-      ));
+      await apiPost(`/api/build/tasks/${task.id}/claim`);
       onRefresh();
-    } finally { setLoading(false); }
+    } catch { /* ignore — UI optimism not needed, refresh covers it */ }
+    finally { setLoading(false); }
   };
 
   const handleRelease = async () => {
     setLoading(true);
     try {
-      mutate(tasks => tasks.map(t =>
-        t.id === task.id ? { ...t, status: "planned", claimedBy: null, claimedAt: null } : t
-      ));
+      await apiPost(`/api/build/tasks/${task.id}/release`);
       onRefresh();
-    } finally { setLoading(false); }
+    } catch { }
+    finally { setLoading(false); }
   };
 
   const handleDelete = async () => {
     if (!confirm(`Delete task "${task.title}"?`)) return;
     setLoading(true);
     try {
-      mutate(tasks => tasks.filter(t => t.id !== task.id && t.parentId !== task.id));
+      await apiDelete(`/api/build/tasks/${task.id}`);
       onRefresh();
-    } finally { setLoading(false); }
+    } catch { }
+    finally { setLoading(false); }
   };
 
   return (
@@ -168,7 +199,7 @@ function TaskCard({
           className="text-gray-400 hover:text-red-500 shrink-0"
           disabled={loading}
         >
-          <Trash2 className="w-3 h-3" />
+          {loading ? <Loader2 className="w-3 h-3 animate-spin" /> : <Trash2 className="w-3 h-3" />}
         </button>
       </div>
 
@@ -280,55 +311,49 @@ function TaskDetailPanel({
     if (!output.trim()) return;
     setLoading(true);
     try {
-      mutate(tasks => tasks.map(t =>
-        t.id === task.id ? { ...t, status: "review", output, submittedAt: new Date().toISOString() } : t
-      ));
+      await apiPost(`/api/build/tasks/${task.id}/submit`, { output });
       onRefresh();
       onClose();
-    } finally { setLoading(false); }
+    } catch { }
+    finally { setLoading(false); }
   };
 
   const handleAddSubtask = async () => {
     if (!subtaskTitle.trim()) return;
     setLoading(true);
     try {
-      const now = new Date().toISOString();
-      const sub: BuildTask = {
-        id: ++nextId,
-        userId: 1, parentId: task.id,
-        title: subtaskTitle, description: null,
-        status: "planned", claimedBy: null, claimedAt: null,
-        output: null, submittedAt: null, isLocked: false,
-        meta: {}, createdAt: now, updatedAt: now,
-      };
-      mutate(tasks => [...tasks, sub]);
+      await apiPost("/api/build/tasks", {
+        title: subtaskTitle,
+        parentId: task.id,
+        status: "planned",
+      });
       setSubtaskTitle("");
       onRefresh();
-    } finally { setLoading(false); }
+    } catch { }
+    finally { setLoading(false); }
   };
 
   const handleReview = async (verdict: "approved" | "rejected") => {
     setLoading(true);
     try {
-      mutate(tasks => tasks.map(t =>
-        t.id === task.id
-          ? { ...t, status: verdict === "approved" ? "done" : "blocked" }
-          : t
-      ));
+      await apiPatch(`/api/build/tasks/${task.id}/status`, {
+        status: verdict === "approved" ? "done" : "blocked",
+        feedback: reviewFeedback || undefined,
+      });
       onRefresh();
       onClose();
-    } finally { setLoading(false); }
+    } catch { }
+    finally { setLoading(false); }
   };
 
   const handleMerge = async () => {
     setLoading(true);
     try {
-      mutate(tasks => tasks.map(t =>
-        t.id === task.id ? { ...t, status: "done" } : t
-      ));
+      await apiPatch(`/api/build/tasks/${task.id}/status`, { status: "done" });
       onRefresh();
       onClose();
-    } finally { setLoading(false); }
+    } catch { }
+    finally { setLoading(false); }
   };
 
   return (
@@ -362,6 +387,7 @@ function TaskDetailPanel({
             className="text-xs"
           />
           <Button size="sm" onClick={handleSubmit} disabled={loading || !output.trim()}>
+            {loading ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : null}
             Submit for Review
           </Button>
         </div>
@@ -424,6 +450,11 @@ function TaskDetailPanel({
           Claimed by <span className="font-mono">{task.claimedBy}</span>
         </p>
       )}
+      {task.createdAt && (
+        <p className="text-xs text-gray-400">
+          Created {new Date(task.createdAt).toLocaleString()}
+        </p>
+      )}
     </div>
   );
 }
@@ -431,44 +462,52 @@ function TaskDetailPanel({
 // ─── Main ─────────────────────────────────────────────────────────────────────
 
 export default function BuildPage() {
-  const [tasks, setTasks] = useState<BuildTask[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [tasks, setTasks]               = useState<BuildTask[]>([]);
+  const [loading, setLoading]           = useState(false);
+  const [error, setError]               = useState<string | null>(null);
   const [selectedTask, setSelectedTask] = useState<BuildTask | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
-  const [newTitle, setNewTitle] = useState("");
-  const [newDesc, setNewDesc] = useState("");
+  const [newTitle, setNewTitle]         = useState("");
+  const [newDesc, setNewDesc]           = useState("");
   const [stealAgentId, setStealAgentId] = useState("agent-1");
+  const [stealMsg, setStealMsg]         = useState<string | null>(null);
   const dragTask = useRef<BuildTask | null>(null);
 
-  const loadTasks = useCallback(() => {
+  const loadTasks = useCallback(async () => {
     setLoading(true);
-    setTasks(loadAllTasks());
-    setLoading(false);
+    setError(null);
+    try {
+      const data = await apiGet("/api/build/tasks");
+      const list: BuildTask[] = (data.tasks ?? data.data ?? data ?? []).map(mapTask);
+      setTasks(list);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load tasks");
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
 
-  const tasksByStatus = useCallback((status: TaskStatus) =>
-    tasks.filter((t) => t.status === status && t.parentId === null),
+  const tasksByStatus = useCallback(
+    (status: TaskStatus) => tasks.filter((t) => t.status === status && t.parentId === null),
     [tasks],
   );
 
   const handleCreateTask = async () => {
     if (!newTitle.trim()) return;
-    const now = new Date().toISOString();
-    const task: BuildTask = {
-      id: ++nextId,
-      userId: 1, parentId: null,
-      title: newTitle, description: newDesc || null,
-      status: "planned", claimedBy: null, claimedAt: null,
-      output: null, submittedAt: null, isLocked: false,
-      meta: {}, createdAt: now, updatedAt: now,
-    };
-    mutate(tasks => [...tasks, task]);
-    setNewTitle("");
-    setNewDesc("");
-    setShowCreateDialog(false);
-    loadTasks();
+    try {
+      await apiPost("/api/build/tasks", {
+        title:       newTitle,
+        description: newDesc || null,
+        status:      "planned",
+        parentId:    null,
+      });
+      setNewTitle("");
+      setNewDesc("");
+      setShowCreateDialog(false);
+      loadTasks();
+    } catch { /* ignore — board will stay consistent */ }
   };
 
   const handleDragStart = (e: React.DragEvent, task: BuildTask) => {
@@ -480,24 +519,48 @@ export default function BuildPage() {
     e.preventDefault();
     const t = dragTask.current;
     if (!t || t.status === status) return;
-    mutate(tasks => tasks.map(task =>
-      task.id === t.id ? { ...task, status } : task
-    ));
-    loadTasks();
     dragTask.current = null;
+
+    // Optimistic update
+    setTasks((prev) => prev.map((task) => task.id === t.id ? { ...task, status } : task));
+
+    try {
+      await apiPatch(`/api/build/tasks/${t.id}/status`, { status });
+    } catch {
+      // Roll back on failure
+      loadTasks();
+    }
   };
 
-  const handleSteal = () => {
-    const allTasks = loadAllTasks();
-    const available = allTasks.find(t => t.status === "planned" && !t.claimedBy);
-    if (available) {
-      mutate(tasks => tasks.map(t =>
-        t.id === available.id ? { ...t, status: "claimed", claimedBy: stealAgentId, claimedAt: new Date().toISOString() } : t
-      ));
-      alert(`Stolen: "${available.title}" → claimed by ${stealAgentId}`);
-      loadTasks();
-    } else {
-      alert("No available tasks to steal.");
+  const handleSteal = async () => {
+    setStealMsg(null);
+    try {
+      // Try POST /api/build/tasks/steal first
+      const res = await fetch("/api/build/tasks/steal", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ agentId: stealAgentId }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const stolen = data.task ? mapTask(data.task) : null;
+        if (stolen) {
+          setStealMsg(`Stolen: "${stolen.title}" → claimed by ${stealAgentId}`);
+          loadTasks();
+          return;
+        }
+      }
+      // Fallback: find first planned unclaimed task and claim it
+      const planned = tasks.find((t) => t.status === "planned" && !t.claimedBy);
+      if (planned) {
+        await apiPost(`/api/build/tasks/${planned.id}/claim`);
+        setStealMsg(`Stolen: "${planned.title}" → claimed by ${stealAgentId}`);
+        loadTasks();
+      } else {
+        setStealMsg("No available tasks to steal.");
+      }
+    } catch {
+      setStealMsg("Error stealing task.");
     }
   };
 
@@ -546,22 +609,35 @@ export default function BuildPage() {
         </div>
       </div>
 
+      {/* Status bar */}
+      {(error || stealMsg) && (
+        <div className={`px-6 py-2 text-xs shrink-0 ${error ? "bg-red-50 text-red-600 dark:bg-red-950 dark:text-red-400" : "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300"}`}>
+          {error ?? stealMsg}
+        </div>
+      )}
+
       {/* Board + Detail */}
       <div className="flex flex-1 overflow-hidden">
         {/* Kanban */}
-        <div className="flex gap-3 p-4 overflow-x-auto flex-1">
-          {COLUMNS.map((col) => (
-            <KanbanColumn
-              key={col.id}
-              column={col}
-              tasks={tasksByStatus(col.id)}
-              onRefresh={loadTasks}
-              onSelect={(t) => setSelectedTask(t)}
-              onDragStart={handleDragStart}
-              onDrop={handleDrop}
-            />
-          ))}
-        </div>
+        {loading && tasks.length === 0 ? (
+          <div className="flex-1 flex items-center justify-center">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          <div className="flex gap-3 p-4 overflow-x-auto flex-1">
+            {COLUMNS.map((col) => (
+              <KanbanColumn
+                key={col.id}
+                column={col}
+                tasks={tasksByStatus(col.id)}
+                onRefresh={loadTasks}
+                onSelect={(t) => setSelectedTask(t)}
+                onDragStart={handleDragStart}
+                onDrop={handleDrop}
+              />
+            ))}
+          </div>
+        )}
 
         {/* Detail panel */}
         {selectedTask && (
