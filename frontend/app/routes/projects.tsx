@@ -18,7 +18,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "~/components/ui/dropdown-menu";
-import { FolderOpen, Plus, MessageSquare, MoreVertical, Pencil, Trash2 } from "lucide-react";
+import { FolderOpen, Plus, MessageSquare, MoreVertical, Pencil, Trash2, ChevronLeft, Paperclip, Brain, BookOpen } from "lucide-react";
+import { ProjectMemoryPanel } from "~/components/ProjectMemoryPanel";
+import { ProjectFileAttachments } from "~/components/ProjectFileAttachments";
+import { ProjectInstructions } from "~/components/ProjectInstructions";
 
 async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
   const res = await fetch(url, {
@@ -47,6 +50,8 @@ export default function ProjectsPage() {
   const [error, setError] = useState<string | null>(null);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [editProject, setEditProject] = useState<Project | null>(null);
+  const [selectedProject, setSelectedProject] = useState<Project | null>(null);
+  const [activeTab, setActiveTab] = useState<"memory" | "files" | "instructions">("memory");
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
 
@@ -120,6 +125,61 @@ export default function ProjectsPage() {
     );
   }
 
+  // ── Project detail panel ───────────────────────────────────────────────────
+  if (selectedProject) {
+    const tabs: Array<{ id: typeof activeTab; icon: React.ElementType; label: string }> = [
+      { id: "memory",       icon: Brain,      label: "Memory"       },
+      { id: "files",        icon: Paperclip,  label: "Files"        },
+      { id: "instructions", icon: BookOpen,   label: "Instructions" },
+    ];
+    return (
+      <div className="flex-1 flex flex-col overflow-hidden h-screen">
+        {/* Detail header */}
+        <div className="border-b border-border px-5 py-3 flex items-center gap-3 shrink-0">
+          <Button variant="ghost" size="sm" className="gap-1.5 text-xs" onClick={() => setSelectedProject(null)}>
+            <ChevronLeft className="size-3.5" /> All Projects
+          </Button>
+          <div className="h-4 w-px bg-border" />
+          <FolderOpen className="size-4 text-muted-foreground" />
+          <span className="font-medium text-sm">{selectedProject.name}</span>
+          {selectedProject.description && (
+            <span className="text-xs text-muted-foreground hidden sm:block truncate max-w-xs">{selectedProject.description}</span>
+          )}
+          <div className="ml-auto flex gap-1.5">
+            <Button variant="outline" size="sm" className="gap-1.5 text-xs h-7" onClick={() => openEdit(selectedProject)}>
+              <Pencil className="size-3" /> Edit
+            </Button>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="border-b border-border px-5 flex gap-1 shrink-0">
+          {tabs.map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`flex items-center gap-1.5 px-3 py-2.5 text-xs font-medium border-b-2 transition-colors ${
+                activeTab === t.id
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <t.icon className="size-3.5" />
+              {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Tab content */}
+        <div className="flex-1 overflow-y-auto p-5">
+          {activeTab === "memory"       && <ProjectMemoryPanel    projectId={selectedProject.id} />}
+          {activeTab === "files"        && <ProjectFileAttachments projectId={selectedProject.id} />}
+          {activeTab === "instructions" && <ProjectInstructions   projectId={selectedProject.id} />}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 overflow-y-auto">
       {error && (
@@ -152,6 +212,7 @@ export default function ProjectsPage() {
             <Card
               key={project.id}
               className="cursor-pointer hover:ring-2 hover:ring-primary/20 transition-all"
+              onClick={() => { setSelectedProject(project); setActiveTab("memory"); }}
             >
               <CardHeader className="pb-2">
                 <div className="flex items-start justify-between gap-2">
@@ -173,12 +234,12 @@ export default function ProjectsPage() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => openEdit(project)} className="gap-2 text-xs">
+                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); openEdit(project); }} className="gap-2 text-xs">
                         <Pencil className="size-3" />
                         Edit
                       </DropdownMenuItem>
                       <DropdownMenuItem
-                        onClick={() => handleDelete(project.id)}
+                        onClick={(e) => { e.stopPropagation(); handleDelete(project.id); }}
                         className="gap-2 text-xs text-red-400 focus:text-red-400"
                       >
                         <Trash2 className="size-3" />
