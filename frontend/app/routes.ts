@@ -47,6 +47,7 @@ export default [
   route("autotune", "routes/autotune.tsx"),
   route("stm", "routes/stm.tsx"),
   route("deep-research", "routes/deep-research.tsx"),
+  route("image-gen", "routes/image-gen.tsx"),
   route("connectors/onboarding", "routes/connectors-onboarding.tsx"),
   route("connectors/sync", "routes/connectors-sync.tsx"),
   route("contacts", "routes/contacts.tsx"),

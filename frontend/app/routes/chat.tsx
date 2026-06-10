@@ -109,6 +109,8 @@ export default function Chat() {
   const [muted, setMuted]               = useState<Set<string>>(new Set());
   const [input, setInput]               = useState("");
   const [copied, setCopied]             = useState<string | null>(null); // key of last copied item
+  const [speaking, setSpeaking]         = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [showThreads, setShowThreads]   = useState(false);
   const [showHelp, setShowHelp]         = useState(false);
@@ -366,6 +368,35 @@ export default function Chat() {
     });
   };
 
+  // TTS — read the synthesis verdict aloud via /api/tts
+  const speakVerdict = useCallback(async (text: string) => {
+    if (!text) return;
+    // Stop any current playback
+    if (audioRef.current) {
+      audioRef.current.pause();
+      audioRef.current = null;
+    }
+    if (speaking) { setSpeaking(false); return; }
+    setSpeaking(true);
+    try {
+      const res = await fetch("/api/tts", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ text: text.slice(0, 2000) }),
+      });
+      if (!res.ok) throw new Error("TTS unavailable");
+      const blob = await res.blob();
+      const url  = URL.createObjectURL(blob);
+      const audio = new Audio(url);
+      audioRef.current = audio;
+      audio.onended = () => { setSpeaking(false); URL.revokeObjectURL(url); };
+      audio.onerror = () => { setSpeaking(false); URL.revokeObjectURL(url); };
+      audio.play().catch(() => setSpeaking(false));
+    } catch {
+      setSpeaking(false);
+    }
+  }, [speaking]);
+
   // ── Derived ────────────────────────────────────────────────────────────────
 
   const activeMembers  = council.filter(m => m.enabled);
@@ -580,13 +611,24 @@ export default function Chat() {
             if (last?.verdict) {
               const key = `verdict:${last.id}`;
               return (
-                <button
-                  className="copy-btn"
-                  onClick={() => handleCopy(key, last.verdict)}
-                  style={{ background: "transparent", border: "none", cursor: "pointer", color: copied === key ? C.green : C.textDim, padding: "1px", display: "flex", alignItems: "center" }}
-                >
-                  {copied === key ? <Check size={9} /> : <Copy size={9} />}
-                </button>
+                <span style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                  <button
+                    className="copy-btn"
+                    onClick={() => handleCopy(key, last.verdict)}
+                    title="Copy synthesis"
+                    style={{ background: "transparent", border: "none", cursor: "pointer", color: copied === key ? C.green : C.textDim, padding: "1px", display: "flex", alignItems: "center" }}
+                  >
+                    {copied === key ? <Check size={9} /> : <Copy size={9} />}
+                  </button>
+                  <button
+                    className="copy-btn"
+                    onClick={() => speakVerdict(last.verdict)}
+                    title={speaking ? "Stop" : "Read aloud"}
+                    style={{ background: "transparent", border: "none", cursor: "pointer", color: speaking ? C.cyan : C.textDim, padding: "1px", display: "flex", alignItems: "center" }}
+                  >
+                    {speaking ? <VolumeX size={9} /> : <Volume2 size={9} />}
+                  </button>
+                </span>
               );
             }
             return null;

@@ -47,6 +47,7 @@ import {
   MemoryStick,
   Bell,
   X,
+  ImageIcon,
 } from "lucide-react";
 
 import { TooltipProvider } from "~/components/ui/tooltip";
@@ -138,6 +139,7 @@ const navGroups = [
       { to: "/autotune", icon: SlidersHorizontal, label: "AutoTune" },
       { to: "/stm", icon: MemoryStick, label: "STM" },
       { to: "/deep-research", icon: Search, label: "Deep Research" },
+      { to: "/image-gen", icon: ImageIcon, label: "Image Gen" },
     ],
   },
   {
