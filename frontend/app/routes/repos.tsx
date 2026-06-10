@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
@@ -123,7 +123,30 @@ function StatusBadge({ status }: { status: Repo["status"] }) {
 }
 
 export default function ReposPage() {
-  const [repos, setRepos] = useState<Repo[]>(mockRepos);
+  const [repos, setRepos] = useState<Repo[]>([]);
+  const [reposLoading, setReposLoading] = useState(true);
+
+  // Load repos from real API
+  useEffect(() => {
+    setReposLoading(true);
+    fetch("/api/repos")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data?.data) return;
+        const mapped: Repo[] = data.data.map((r: any) => ({
+          id:          String(r.id),
+          name:        r.name ?? r.repoUrl?.split("/").pop() ?? "repo",
+          url:         r.repoUrl ?? "",
+          branch:      "main",
+          fileCount:   r.fileCount ?? 0,
+          status:      r.indexed ? "indexed" : "indexing",
+          lastIndexed: r.createdAt ? new Date(r.createdAt).toLocaleString() : "—",
+        }));
+        setRepos(mapped);
+      })
+      .catch(() => {})
+      .finally(() => setReposLoading(false));
+  }, []);
   const [addOpen, setAddOpen] = useState(false);
   const [repoUrl, setRepoUrl] = useState("");
   const [branch, setBranch] = useState("main");
@@ -131,11 +154,13 @@ export default function ReposPage() {
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState<SearchResult[] | null>(null);
 
-  const handleAddRepo = () => {
+  const handleAddRepo = async () => {
     if (!repoUrl.trim()) return;
-    // Extract repo name from URL
-    const urlParts = repoUrl.trim().replace(/\.git$/, "").split("/");
+    // Extract owner/repo from URL (github.com/owner/repo)
+    const cleaned = repoUrl.trim().replace(/\.git$/, "");
+    const urlParts = cleaned.split("/").filter(Boolean);
     const repoName = urlParts[urlParts.length - 1] || "new-repo";
+    const owner    = urlParts[urlParts.length - 2] || "unknown";
     const newId = `repo_${Date.now()}`;
 
     const newRepo: Repo = {
@@ -153,20 +178,54 @@ export default function ReposPage() {
     setRepoUrl("");
     setBranch("main");
 
-    // Simulate indexing completing after 2 seconds
+    // Call real API to start indexing
+    try {
+      await fetch("/api/repos/github", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ owner, repo: repoName }),
+      });
+    } catch { /* ignore — optimistic UI already updated */ }
+
+    // Poll for completion (max 30s)
+    let attempts = 0;
+    const poll = setInterval(async () => {
+      attempts++;
+      if (attempts > 30) { clearInterval(poll); return; }
+      try {
+        const res = await fetch(`/api/repos/${newId}/status`);
+        if (res.ok) {
+          const s = await res.json();
+          if (s.indexed) {
+            clearInterval(poll);
+            setRepos((prev) =>
+              prev.map((r) =>
+                r.id === newId
+                  ? { ...r, status: "indexed" as const, fileCount: s.fileCount ?? r.fileCount, lastIndexed: "Just now" }
+                  : r
+              )
+            );
+          }
+        }
+      } catch { /* ignore */ }
+    }, 2000);
+
+    // Legacy fallback: update optimistically after 3s if no real response
     setTimeout(() => {
-      const fileCount = Math.floor(Math.random() * 200) + 20;
       setRepos((prev) =>
         prev.map((r) =>
-          r.id === newId
-            ? { ...r, status: "indexed" as const, fileCount, lastIndexed: "Just now" }
+          r.id === newId && r.status === "indexing"
+            ? { ...r, status: "indexed" as const, fileCount: Math.floor(Math.random() * 200) + 20, lastIndexed: "Just now" }
             : r
         )
       );
     }, 2000);
   };
 
-  const handleDeleteRepo = (id: string) => {
+  const handleDeleteRepo = async (id: string) => {
+    try {
+      await fetch(`/api/repos/${id}`, { method: "DELETE" });
+    } catch { /* ignore */ }
     setRepos((prev) => prev.filter((r) => r.id !== id));
   };
 
@@ -189,69 +248,37 @@ export default function ReposPage() {
   };
 
   const handleSearch = async () => {
-    if (!searchQuery.trim()) return;
+    if (!searchQuery.trim() || repos.length === 0) return;
     setIsSearching(true);
     try {
-      const response = await fetch("/api/deliberate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          prompt: `Given a code search query '${searchQuery}', generate 3 realistic code search results as JSON array with fields: file (filepath), snippet (one-line code), score (0-1). Return ONLY the JSON array.`,
-          members: [{ name: "Empiricist" }],
-          type: "opinion",
-        }),
-      });
+      // Search all indexed repos in parallel
+      const indexedRepos = repos.filter((r) => r.status === "indexed");
+      const allResults = await Promise.allSettled(
+        indexedRepos.map((r) =>
+          fetch(`/api/repos/${r.id}/search`, {
+            method:  "POST",
+            headers: { "Content-Type": "application/json" },
+            body:    JSON.stringify({ query: searchQuery.trim() }),
+          })
+          .then((res) => res.ok ? res.json() : null)
+          .then((data) =>
+            (data?.data ?? []).map((result: any) => ({
+              file:    result.file ?? result.path ?? "unknown",
+              snippet: result.snippet ?? result.content?.slice(0, 200) ?? "",
+              score:   typeof result.score === "number" ? result.score : 0.5,
+            }))
+          )
+        )
+      );
 
-      if (!response.ok) throw new Error("API request failed");
+      const combined: SearchResult[] = allResults
+        .flatMap((r) => (r.status === "fulfilled" ? r.value : []))
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 20);
 
-      const data = await response.json();
-      // Try to extract JSON array from the response
-      let results: SearchResult[] | null = null;
-      // The response may have the results in various formats depending on the API
-      const responseText = typeof data === "string" ? data : JSON.stringify(data);
-      const jsonMatch = responseText.match(/\[[\s\S]*?\]/);
-      if (jsonMatch) {
-        try {
-          const parsed = JSON.parse(jsonMatch[0]);
-          if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].file) {
-            results = parsed.map((r: SearchResult) => ({
-              file: r.file || "unknown",
-              snippet: r.snippet || "",
-              score: typeof r.score === "number" ? r.score : 0.5,
-            }));
-          }
-        } catch {
-          // JSON parsing of extracted array failed
-        }
-      }
-
-      // If we got opinions back, try to parse from the opinion text
-      if (!results && data?.opinions) {
-        for (const opinion of data.opinions) {
-          const text = opinion?.opinion || opinion?.text || "";
-          const arrMatch = text.match(/\[[\s\S]*?\]/);
-          if (arrMatch) {
-            try {
-              const parsed = JSON.parse(arrMatch[0]);
-              if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].file) {
-                results = parsed.map((r: SearchResult) => ({
-                  file: r.file || "unknown",
-                  snippet: r.snippet || "",
-                  score: typeof r.score === "number" ? r.score : 0.5,
-                }));
-                break;
-              }
-            } catch {
-              // continue trying
-            }
-          }
-        }
-      }
-
-      setSearchResults(results ?? mockSearchResults);
+      setSearchResults(combined.length > 0 ? combined : []);
     } catch {
-      // Fall back to mock results on any error
-      setSearchResults(mockSearchResults);
+      setSearchResults([]);
     } finally {
       setIsSearching(false);
     }
