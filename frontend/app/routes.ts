@@ -96,4 +96,8 @@ export default [
   route("craft", "routes/craft.tsx"),
   route("video-transcript", "routes/video-transcript.tsx"),
   route("task-routing", "routes/task-routing.tsx"),
+  route("interrupt-resume", "routes/interrupt-resume.tsx"),
+  route("blind-council", "routes/blind-council.tsx"),
+  route("what-if", "routes/what-if.tsx"),
+  route("verifiable", "routes/verifiable.tsx"),
 ] satisfies RouteConfig;

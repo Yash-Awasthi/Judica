@@ -73,6 +73,9 @@ import {
   PenTool,
   Video,
   Route,
+  PauseCircle,
+  EyeOff,
+  GitMerge,
 } from "lucide-react";
 
 import { TooltipProvider } from "~/components/ui/tooltip";
@@ -184,6 +187,10 @@ const navGroups = [
       { to: "/video-transcript", icon: Video, label: "Video Transcript" },
       { to: "/rss", icon: Rss, label: "RSS Feeds" },
       { to: "/task-routing", icon: Route, label: "Task Routing" },
+      { to: "/interrupt-resume", icon: PauseCircle, label: "Interrupt/Resume" },
+      { to: "/blind-council", icon: EyeOff, label: "Blind Council" },
+      { to: "/what-if", icon: GitMerge, label: "What-If" },
+      { to: "/verifiable", icon: ShieldCheck, label: "Verifiable" },
     ],
   },
   {
