@@ -38,6 +38,8 @@ import {
   Eye,
   Hammer,
   Zap,
+  Code2,
+  SlidersHorizontal,
 } from "lucide-react";
 
 import { TooltipProvider } from "~/components/ui/tooltip";
@@ -118,6 +120,8 @@ const navGroups = [
       { to: "/build", icon: Hammer, label: "Build" },
       { to: "/god-mode", icon: Eye, label: "God Mode" },
       { to: "/ultraplinian", icon: Zap, label: "ULTRAPLINIAN" },
+      { to: "/parseltongue", icon: Code2, label: "Parseltongue" },
+      { to: "/autotune", icon: SlidersHorizontal, label: "AutoTune" },
     ],
   },
   {

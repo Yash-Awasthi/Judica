@@ -43,6 +43,8 @@ export default [
   route("build", "routes/build.tsx"),
   route("god-mode", "routes/god-mode.tsx"),
   route("ultraplinian", "routes/ultraplinian.tsx"),
+  route("parseltongue", "routes/parseltongue.tsx"),
+  route("autotune", "routes/autotune.tsx"),
   route("admin/users", "routes/admin-users.tsx"),
   route("admin/analytics", "routes/admin-analytics.tsx"),
   route("admin/system", "routes/admin-system.tsx"),
