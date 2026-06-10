@@ -79,6 +79,11 @@ import {
   Scale,
   ClipboardList,
   Filter,
+  TrendingUp,
+  AlertTriangle,
+  Volume2,
+  Minimize2,
+  Microscope,
 } from "lucide-react";
 
 import { TooltipProvider } from "~/components/ui/tooltip";
@@ -197,6 +202,13 @@ const navGroups = [
       { to: "/honesty", icon: Scale, label: "Honesty" },
       { to: "/sop", icon: ClipboardList, label: "SOPs" },
       { to: "/prompt-filter", icon: Filter, label: "Prompt Filter" },
+      { to: "/member-evolution", icon: TrendingUp, label: "Member Evolution" },
+      { to: "/negation", icon: AlertTriangle, label: "Negation" },
+      { to: "/cross-memory", icon: Brain, label: "Cross-Memory" },
+      { to: "/verbosity", icon: Volume2, label: "Verbosity" },
+      { to: "/token-conservation", icon: Minimize2, label: "Token Conservation" },
+      { to: "/specialisation", icon: Microscope, label: "Specialisation" },
+      { to: "/skill-selection", icon: Wrench, label: "Skill Selection" },
     ],
   },
   {

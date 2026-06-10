@@ -103,4 +103,11 @@ export default [
   route("honesty", "routes/honesty.tsx"),
   route("sop", "routes/sop.tsx"),
   route("prompt-filter", "routes/prompt-filter.tsx"),
+  route("member-evolution", "routes/member-evolution.tsx"),
+  route("negation", "routes/negation.tsx"),
+  route("cross-memory", "routes/cross-memory.tsx"),
+  route("verbosity", "routes/verbosity.tsx"),
+  route("token-conservation", "routes/token-conservation.tsx"),
+  route("specialisation", "routes/specialisation.tsx"),
+  route("skill-selection", "routes/skill-selection.tsx"),
 ] satisfies RouteConfig;
