@@ -1,4 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
+import path from 'path';
+
+const STORAGE_STATE = path.resolve('tests/e2e/.auth/user.json');
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -18,19 +21,42 @@ export default defineConfig({
   },
 
   projects: [
+    // ── Auth setup — runs once, saves session ────────────────────────────────
+    {
+      name: 'setup',
+      testMatch: /auth\.setup\.ts/,
+    },
+
+    // ── Main browser tests — depend on auth setup ────────────────────────────
     {
       name: 'chromium',
-      use: { ...devices['Desktop Chrome'] },
+      use: {
+        ...devices['Desktop Chrome'],
+        storageState: STORAGE_STATE,
+      },
+      dependencies: ['setup'],
+      testIgnore: /auth\.setup\.ts/,
     },
+
     // Firefox and WebKit only locally — too slow for CI
     ...(!process.env.CI ? [
       {
         name: 'firefox',
-        use: { ...devices['Desktop Firefox'] },
+        use: {
+          ...devices['Desktop Firefox'],
+          storageState: STORAGE_STATE,
+        },
+        dependencies: ['setup'],
+        testIgnore: /auth\.setup\.ts/,
       },
       {
         name: 'webkit',
-        use: { ...devices['Desktop Safari'] },
+        use: {
+          ...devices['Desktop Safari'],
+          storageState: STORAGE_STATE,
+        },
+        dependencies: ['setup'],
+        testIgnore: /auth\.setup\.ts/,
       },
     ] : []),
   ],

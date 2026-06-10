@@ -198,6 +198,10 @@ import taskRoutingPlugin from "./routes/task-routing.js";
 import sandboxSessionsPlugin from "./routes/sandbox-sessions.js";
 import councilCheckpointsPlugin from "./routes/council-checkpoints.js";
 import ultraplinianPlugin from "./routes/ultraplinian.js";
+import godmodePlugin from "./routes/godmode.js";
+import parseltonguePlugin from "./routes/parseltongue.js";
+import autotunePlugin from "./routes/autotune.js";
+import stmPlugin from "./routes/stm.js";
 import { ingestionQueue, researchQueue, repoQueue, compactionQueue } from "./queue/queues.js";
 import { googleOAuthPlugin } from "./auth/google.oauth.js";
 import { githubOAuthPlugin } from "./auth/github.strategy.js";
@@ -610,6 +614,22 @@ export async function buildApp() {
     await scope.register(fastifyRateLimit, { max: 5, timeWindow: "1 minute" });
     await scope.register(ultraplinianPlugin, { prefix: "/api/ultraplinian" });
   });
+  await fastify.register(async (scope) => {
+    // GODMODE CLASSIC — raw parallel compare, lighter than ULTRAPLINIAN
+    await scope.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute" });
+    await scope.register(godmodePlugin, { prefix: "/api/godmode" });
+  });
+  await fastify.register(async (scope) => {
+    // PARSELTONGUE — code analysis fires multiple specialist roles in parallel
+    await scope.register(fastifyRateLimit, { max: 20, timeWindow: "1 minute" });
+    await scope.register(parseltonguePlugin, { prefix: "/api/parseltongue" });
+  });
+  await fastify.register(async (scope) => {
+    // AUTOTUNE — prompt optimizer, expensive (multiple model calls per run)
+    await scope.register(fastifyRateLimit, { max: 10, timeWindow: "1 minute" });
+    await scope.register(autotunePlugin, { prefix: "/api/autotune" });
+  });
+  await fastify.register(stmPlugin, { prefix: "/api/stm" });
   await fastify.register(async (scope) => {
     await scope.register(fastifyRateLimit, { max: 20, timeWindow: "1 minute" });
     await scope.register(uploadsPlugin, { prefix: "/api/uploads" });

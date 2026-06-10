@@ -328,6 +328,12 @@ function WorkflowEditor({ workflow, onBack, onUpdateWorkflow }: { workflow: Work
       setSaveMessage("Failed to save workflow.");
       setTimeout(() => setSaveMessage(null), 2500);
     }
+    // Persist graph to backend (fire-and-forget)
+    fetch(`/api/workflows/${workflow.id}`, {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ nodes, edges, nodeCount: nodes.length }),
+    }).catch(() => {});
   }, [workflow, nodes, edges, onUpdateWorkflow]);
 
   const handleRun = useCallback(async () => {
@@ -527,24 +533,33 @@ export default function WorkflowsPage() {
   const [editingWorkflow, setEditingWorkflow] = useState<Workflow | null>(null);
   const [newWorkflowOpen, setNewWorkflowOpen] = useState(false);
 
-  // Load workflows from localStorage on mount, merge with initialWorkflows
+  // Load workflows — try API first, fall back to localStorage
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("workflows");
-      if (raw) {
-        const saved: Workflow[] = JSON.parse(raw);
-        if (Array.isArray(saved)) {
-          const initialIds = new Set(initialWorkflows.map((w) => w.id));
-          const extras = saved.filter((w) => !initialIds.has(w.id));
-          // Also update initial workflows with any saved state changes
-          const merged = initialWorkflows.map((iw) => {
-            const savedVersion = saved.find((sw) => sw.id === iw.id);
-            return savedVersion ?? iw;
-          });
-          setWorkflows([...merged, ...extras]);
-        }
-      }
-    } catch {}
+    fetch("/api/workflows?limit=100")
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((data) => {
+        const list: Workflow[] = Array.isArray(data) ? data : (data?.workflows ?? []);
+        if (list.length > 0) { setWorkflows(list); return; }
+        throw new Error("empty");
+      })
+      .catch(() => {
+        // Fall back to localStorage
+        try {
+          const raw = localStorage.getItem("workflows");
+          if (raw) {
+            const saved: Workflow[] = JSON.parse(raw);
+            if (Array.isArray(saved)) {
+              const initialIds = new Set(initialWorkflows.map((w) => w.id));
+              const extras = saved.filter((w) => !initialIds.has(w.id));
+              const merged = initialWorkflows.map((iw) => {
+                const savedVersion = saved.find((sw) => sw.id === iw.id);
+                return savedVersion ?? iw;
+              });
+              setWorkflows([...merged, ...extras]);
+            }
+          }
+        } catch {}
+      });
   }, []);
 
   // Save workflows to localStorage whenever they change
@@ -569,8 +584,22 @@ export default function WorkflowsPage() {
       lastRun: "Never",
     };
     setWorkflows((prev) => [...prev, newWorkflow]);
-    // Optionally enter the editor for the new workflow immediately
     setEditingWorkflow(newWorkflow);
+
+    // Persist to backend, swap optimistic id if server returns one
+    fetch("/api/workflows", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ name, description: description || "New workflow" }),
+    })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((created: Workflow) => {
+        if (created?.id) {
+          setWorkflows((prev) => prev.map((w) => w.id === newWorkflow.id ? { ...w, id: created.id } : w));
+          setEditingWorkflow((prev) => prev?.id === newWorkflow.id ? { ...prev, id: created.id } : prev);
+        }
+      })
+      .catch(() => {});
   };
 
   if (editingWorkflow) {

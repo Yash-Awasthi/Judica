@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "DOM"],
+    "strict": true,
+    "types": ["chrome"],
+    "jsx": "react",
+    "jsxFactory": "React.createElement",
+    "jsxFragmentFactory": "React.Fragment",
+    "outDir": "dist",
+    "rootDir": ".",
+    "skipLibCheck": true
+  },
+  "include": ["*.ts", "*.tsx"],
+  "exclude": ["dist", "node_modules", "build.js"]
+}

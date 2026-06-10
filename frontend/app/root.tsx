@@ -1,4 +1,6 @@
 import { useEffect } from "react";
+import { useEasterEggs } from "~/hooks/useEasterEggs";
+import { EasterEggToast } from "~/components/EasterEggToast";
 import {
   isRouteErrorResponse,
   Links,
@@ -155,8 +157,19 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <script dangerouslySetInnerHTML={{ __html: `
           (function() {
             try {
-              var theme = localStorage.getItem('judica_theme') || 'dark';
-              document.documentElement.classList.toggle('dark', theme === 'dark');
+              var theme = localStorage.getItem('judica_theme') || 'default-dark';
+              var root  = document.documentElement;
+              // Remove prior state
+              root.classList.remove('dark');
+              root.removeAttribute('data-theme');
+              if (theme === 'default-dark') {
+                root.classList.add('dark');
+              } else if (theme === 'matrix' || theme === 'glyph') {
+                root.classList.add('dark');
+                root.setAttribute('data-theme', theme);
+              }
+              // legacy 'dark' value compat
+              if (theme === 'dark') root.classList.add('dark');
             } catch(e) {}
           })();
         `}} />
@@ -285,6 +298,16 @@ function AppSidebar() {
 export default function App() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { egg, dismiss } = useEasterEggs();
+
+  // Register PWA service worker
+  useEffect(() => {
+    if (typeof window !== "undefined" && "serviceWorker" in navigator) {
+      navigator.serviceWorker
+        .register("/sw.js", { scope: "/" })
+        .catch(() => { /* non-fatal in dev */ });
+    }
+  }, []);
 
   // In Electron, skip landing page and go straight to /chat
   useEffect(() => {
@@ -324,6 +347,7 @@ export default function App() {
                 </div>
                 <Outlet />
               </main>
+              <EasterEggToast egg={egg} dismiss={dismiss} />
             </SidebarProvider>
           </TooltipProvider>
         </StoreProvider>
