@@ -392,6 +392,12 @@ export default function SettingsPage() {
     }
     setCouncilSaved(true);
     setTimeout(() => setCouncilSaved(false), 2000);
+    // Persist to backend (fire-and-forget)
+    fetch("/api/settings/council", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ members }),
+    }).catch(() => {});
   };
 
   const [autoCouncil, setAutoCouncil] = useState(true);
@@ -405,6 +411,56 @@ export default function SettingsPage() {
   const [deliberationMode, setDeliberationMode] = useState("standard");
   const [enableStreaming, setEnableStreaming] = useState(true);
   const [quotasOpen, setQuotasOpen] = useState(false);
+
+  // Quotas from API
+  const [quotas, setQuotas] = useState<{ requests: number; requestsLimit: number; tokens: number; tokensLimit: number } | null>(null);
+
+  // ── Load preferences from backend ──────────────────────────────────────────
+  useEffect(() => {
+    fetch("/api/settings/preferences")
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((data) => {
+        if (data.autoCouncil     !== undefined) setAutoCouncil(data.autoCouncil);
+        if (data.debateRound     !== undefined) setDebateRound(data.debateRound);
+        if (data.coldValidator   !== undefined) setColdValidator(data.coldValidator);
+        if (data.piiDetection    !== undefined) setPiiDetection(data.piiDetection);
+        if (data.autoAnonymize   !== undefined) setAutoAnonymize(data.autoAnonymize);
+        if (data.blockProfanity  !== undefined) setBlockProfanity(data.blockProfanity);
+        if (data.blockAdultContent !== undefined) setBlockAdultContent(data.blockAdultContent);
+        if (data.verbosityLevel  !== undefined) setVerbosityLevel(data.verbosityLevel);
+        if (data.deliberationMode !== undefined) setDeliberationMode(data.deliberationMode);
+        if (data.enableStreaming  !== undefined) setEnableStreaming(data.enableStreaming);
+      })
+      .catch(() => {});
+
+    // Load quotas from analytics overview
+    fetch("/api/analytics/overview")
+      .then((r) => r.ok ? r.json() : Promise.reject())
+      .then((data) => {
+        setQuotas({
+          requests:      data.requestsToday    ?? data.conversationsToday ?? 0,
+          requestsLimit: data.requestsLimit    ?? 100,
+          tokens:        data.totalTokensUsed  ?? 0,
+          tokensLimit:   data.tokensLimit      ?? 1_000_000,
+        });
+      })
+      .catch(() => {});
+  }, []);
+
+  // ── Save preferences when any toggle changes ───────────────────────────────
+  useEffect(() => {
+    const prefs = {
+      autoCouncil, debateRound, coldValidator, piiDetection,
+      autoAnonymize, blockProfanity, blockAdultContent,
+      verbosityLevel, deliberationMode, enableStreaming,
+    };
+    fetch("/api/settings/preferences", {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(prefs),
+    }).catch(() => {});
+  }, [autoCouncil, debateRound, coldValidator, piiDetection, autoAnonymize,
+      blockProfanity, blockAdultContent, verbosityLevel, deliberationMode, enableStreaming]);
 
   return (
     <div className="flex-1 overflow-y-auto">
@@ -631,24 +687,32 @@ export default function SettingsPage() {
             </CollapsibleTrigger>
             <CollapsibleContent>
               <CardContent className="space-y-5">
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>Daily Requests</span>
-                    <span className="text-muted-foreground">23 / 100</span>
+                {quotas === null ? (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Loader2 className="size-3 animate-spin" /> Loading usage…
                   </div>
-                  <div className="h-2 rounded-full bg-muted overflow-hidden">
-                    <div className="h-full rounded-full bg-primary transition-all" style={{ width: "23%" }} />
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between text-sm">
-                    <span>Daily Tokens</span>
-                    <span className="text-muted-foreground">247,562 / 1,000,000</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-muted overflow-hidden">
-                    <div className="h-full rounded-full bg-primary transition-all" style={{ width: "24.7%" }} />
-                  </div>
-                </div>
+                ) : (
+                  <>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span>Daily Requests</span>
+                        <span className="text-muted-foreground">{quotas.requests.toLocaleString()} / {quotas.requestsLimit.toLocaleString()}</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-muted overflow-hidden">
+                        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(100, (quotas.requests / quotas.requestsLimit) * 100).toFixed(1)}%` }} />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between text-sm">
+                        <span>Daily Tokens</span>
+                        <span className="text-muted-foreground">{quotas.tokens.toLocaleString()} / {quotas.tokensLimit.toLocaleString()}</span>
+                      </div>
+                      <div className="h-2 rounded-full bg-muted overflow-hidden">
+                        <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${Math.min(100, (quotas.tokens / quotas.tokensLimit) * 100).toFixed(1)}%` }} />
+                      </div>
+                    </div>
+                  </>
+                )}
               </CardContent>
             </CollapsibleContent>
           </Card>
