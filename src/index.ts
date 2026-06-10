@@ -7,6 +7,7 @@ import { initSocket } from "./lib/socket.js";
 import { startSweepers } from "./lib/sweeper.js";
 import { startWorkers, stopWorkers } from "./queue/workers.js";
 import { startMemoryCrons } from "./queue/memoryCrons.js";
+import { startSyncWorker, stopSyncWorker } from "./lib/connectorSync/syncWorker.js";
 import { cleanupRateLimitRedis } from "./middleware/rateLimit.js";
 import { cleanupCostTrackerInterval } from "./lib/realtimeCost.js";
 import { drizzle } from "drizzle-orm/node-postgres";
@@ -55,6 +56,7 @@ try {
   startSweepers();
   startMemoryCrons();
   startWorkers();
+  startSyncWorker(); // connector schedule poller — 60s tick
 
   // Initialize WebSocket on the underlying Node.js HTTP server
   initSocket(app.server);
@@ -97,6 +99,13 @@ const shutdown = async (signal: string) => {
     logger.info("BullMQ workers stopped");
   } catch (err) {
     logger.error({ err }, "Error stopping workers");
+  }
+
+  try {
+    stopSyncWorker();
+    logger.info("Connector sync worker stopped");
+  } catch (err) {
+    logger.error({ err }, "Error stopping sync worker");
   }
 
   try {

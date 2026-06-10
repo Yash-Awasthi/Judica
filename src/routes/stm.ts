@@ -16,6 +16,11 @@ import {
 import { db } from "../lib/drizzle.js";
 import { userSettings } from "../db/schema/users.js";
 import { eq } from "drizzle-orm";
+import redis from "../lib/redis.js";
+
+const STM_HISTORY_TTL   = 60 * 60 * 24 * 7; // 7 days
+const STM_HISTORY_MAX   = 100;               // max entries per user
+function stmHistoryKey(userId: number) { return `stm:history:${userId}`; }
 
 const stmPlugin: FastifyPluginAsync = async (fastify) => {
 
@@ -88,6 +93,47 @@ const stmPlugin: FastifyPluginAsync = async (fastify) => {
       };
     }
   );
+
+  // POST /api/stm/history — record an injection event (called by deliberation)
+  fastify.post<{ Body: { query: string; modules: STMModuleId[]; applied: string[] } }>(
+    "/history",
+    { preHandler: fastifyRequireAuth },
+    async (request) => {
+      const { query, modules = [], applied = [] } = request.body ?? {};
+      if (!query || typeof query !== "string") {
+        throw new AppError(400, "query is required");
+      }
+      const entry = JSON.stringify({
+        id:        crypto.randomUUID(),
+        timestamp: Date.now(),
+        query:     query.slice(0, 500),
+        modules,
+        applied,
+      });
+      const key = stmHistoryKey(request.userId!);
+      await redis.lpush(key, entry);
+      await redis.ltrim(key, 0, STM_HISTORY_MAX - 1);
+      await redis.expire(key, STM_HISTORY_TTL);
+      return { ok: true };
+    }
+  );
+
+  // GET /api/stm/history — get injection history for current user
+  fastify.get("/history", { preHandler: fastifyRequireAuth }, async (request) => {
+    const key  = stmHistoryKey(request.userId!);
+    const raw  = await redis.lrange(key, 0, STM_HISTORY_MAX - 1);
+    const entries = raw
+      .map((s) => { try { return JSON.parse(s); } catch { return null; } })
+      .filter(Boolean);
+    return { entries };
+  });
+
+  // DELETE /api/stm/history — clear history for current user
+  fastify.delete("/history", { preHandler: fastifyRequireAuth }, async (request) => {
+    const key = stmHistoryKey(request.userId!);
+    await redis.del(key);
+    return { ok: true };
+  });
 };
 
 export default stmPlugin;

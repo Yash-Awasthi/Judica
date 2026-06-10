@@ -210,6 +210,28 @@ const redisWrapper = {
     }
   },
 
+  // ── List operations ────────────────────────────────────────────────────────
+
+  async lpush(key: string, ...values: string[]): Promise<number> {
+    validateKey(key);
+    try { return await getRedis().lpush(key, ...values); } catch { return 0; }
+  },
+
+  async lrange(key: string, start: number, stop: number): Promise<string[]> {
+    validateKey(key);
+    try { return await getRedis().lrange(key, start, stop); } catch { return []; }
+  },
+
+  async ltrim(key: string, start: number, stop: number): Promise<string> {
+    validateKey(key);
+    try { return await getRedis().ltrim(key, start, stop); } catch { return "OK"; }
+  },
+
+  async llen(key: string): Promise<number> {
+    validateKey(key);
+    try { return await getRedis().llen(key); } catch { return 0; }
+  },
+
   // Redis Streams support for multi-replica pub/sub
   async xadd(key: string, id: string, ...fieldValues: string[]): Promise<string | null> {
     validateKey(key);

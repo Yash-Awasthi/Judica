@@ -8,6 +8,7 @@
  */
 
 import { randomUUID } from "node:crypto";
+import { nextCronRunAt } from "../lib/connectorSync/syncWorker.js";
 import { db } from "../lib/drizzle.js";
 import {
   connectorSyncJobs,
@@ -485,10 +486,8 @@ export async function triggerScheduledSyncs(): Promise<{ triggered: number }> {
         schedule.syncMode as SyncMode,
       );
 
-      // Update schedule timestamps
-      // Simple next-run calculation: advance by the smallest cron interval
-      // A full cron parser would be used in production; for now advance 1 hour
-      const nextRun = new Date(now.getTime() + 60 * 60_000);
+      // Compute next run from cron expression
+      const nextRun = nextCronRunAt(schedule.cronExpression, now);
       await db
         .update(connectorSyncSchedules)
         .set({
