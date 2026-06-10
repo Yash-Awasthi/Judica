@@ -76,6 +76,9 @@ import {
   PauseCircle,
   EyeOff,
   GitMerge,
+  Scale,
+  ClipboardList,
+  Filter,
 } from "lucide-react";
 
 import { TooltipProvider } from "~/components/ui/tooltip";
@@ -191,6 +194,9 @@ const navGroups = [
       { to: "/blind-council", icon: EyeOff, label: "Blind Council" },
       { to: "/what-if", icon: GitMerge, label: "What-If" },
       { to: "/verifiable", icon: ShieldCheck, label: "Verifiable" },
+      { to: "/honesty", icon: Scale, label: "Honesty" },
+      { to: "/sop", icon: ClipboardList, label: "SOPs" },
+      { to: "/prompt-filter", icon: Filter, label: "Prompt Filter" },
     ],
   },
   {

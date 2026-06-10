@@ -100,4 +100,7 @@ export default [
   route("blind-council", "routes/blind-council.tsx"),
   route("what-if", "routes/what-if.tsx"),
   route("verifiable", "routes/verifiable.tsx"),
+  route("honesty", "routes/honesty.tsx"),
+  route("sop", "routes/sop.tsx"),
+  route("prompt-filter", "routes/prompt-filter.tsx"),
 ] satisfies RouteConfig;
