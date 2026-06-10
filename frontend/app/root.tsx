@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState, useCallback, useRef } from "react";
 import { useEasterEggs } from "~/hooks/useEasterEggs";
 import { EasterEggToast } from "~/components/EasterEggToast";
 import {
@@ -45,6 +45,8 @@ import {
   Plug,
   RefreshCcw,
   MemoryStick,
+  Bell,
+  X,
 } from "lucide-react";
 
 import { TooltipProvider } from "~/components/ui/tooltip";
@@ -245,6 +247,186 @@ function ThemeToggleButton() {
   );
 }
 
+// ── Notification bell ─────────────────────────────────────────────────────────
+
+interface Notif {
+  id:        number;
+  type:      string;
+  title:     string;
+  message?:  string;
+  isRead:    boolean;
+  createdAt: string;
+}
+
+function NotificationBell() {
+  const [open,        setOpen]        = useState(false);
+  const [unread,      setUnread]      = useState(0);
+  const [notifs,      setNotifs]      = useState<Notif[]>([]);
+  const [loadingList, setLoadingList] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Fetch unread count (lightweight — runs on interval)
+  const fetchCount = useCallback(async () => {
+    try {
+      const res = await fetch("/api/notifications/count");
+      if (res.ok) {
+        const data = await res.json();
+        setUnread(data.unreadCount ?? 0);
+      }
+    } catch { /* ignore */ }
+  }, []);
+
+  // Fetch full notification list (only when panel opens)
+  const fetchList = useCallback(async () => {
+    setLoadingList(true);
+    try {
+      const res = await fetch("/api/notifications?limit=8");
+      if (res.ok) {
+        const data = await res.json();
+        setNotifs(data.notifications ?? []);
+        setUnread(data.unreadCount ?? 0);
+      }
+    } catch { /* ignore */ }
+    setLoadingList(false);
+  }, []);
+
+  // Poll count every 60 s
+  useEffect(() => {
+    fetchCount();
+    timerRef.current = setInterval(fetchCount, 60_000);
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [fetchCount]);
+
+  // Fetch full list when opened
+  useEffect(() => {
+    if (open) fetchList();
+  }, [open, fetchList]);
+
+  // Close on outside click
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  const markRead = async (id: number) => {
+    try {
+      await fetch(`/api/notifications/${id}/read`, { method: "POST" });
+      setNotifs((prev) => prev.map((n) => n.id === id ? { ...n, isRead: true } : n));
+      setUnread((c) => Math.max(0, c - 1));
+    } catch { /* ignore */ }
+  };
+
+  const dismiss = async (id: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    try {
+      await fetch(`/api/notifications/${id}/dismiss`, { method: "POST" });
+      setNotifs((prev) => prev.filter((n) => n.id !== id));
+      setUnread((c) => Math.max(0, c - 1));
+    } catch { /* ignore */ }
+  };
+
+  const dismissAll = async () => {
+    try {
+      await fetch("/api/notifications/dismiss-all", { method: "POST" });
+      setNotifs([]);
+      setUnread(0);
+    } catch { /* ignore */ }
+  };
+
+  return (
+    <div ref={panelRef} className="relative group-data-[collapsible=icon]:hidden">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="relative flex items-center justify-center size-7 rounded-md hover:bg-muted/60 transition-colors text-muted-foreground hover:text-foreground"
+        title="Notifications"
+      >
+        <Bell className="size-3.5" />
+        {unread > 0 && (
+          <span
+            className="absolute -top-0.5 -right-0.5 flex items-center justify-center rounded-full bg-destructive text-[9px] font-bold text-destructive-foreground"
+            style={{ minWidth: "14px", height: "14px", padding: "0 2px" }}
+          >
+            {unread > 9 ? "9+" : unread}
+          </span>
+        )}
+      </button>
+
+      {open && (
+        <div
+          className="absolute left-full top-0 ml-2 z-50 rounded-xl shadow-xl"
+          style={{
+            width: "280px",
+            background: "hsl(var(--popover))",
+            border: "1px solid hsl(var(--border))",
+          }}
+        >
+          <div className="flex items-center justify-between px-3 py-2.5 border-b border-border">
+            <span className="text-xs font-semibold">Notifications</span>
+            {notifs.length > 0 && (
+              <button
+                onClick={dismissAll}
+                className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Dismiss all
+              </button>
+            )}
+          </div>
+
+          <div className="max-h-72 overflow-y-auto">
+            {loadingList ? (
+              <div className="flex items-center justify-center py-6 text-xs text-muted-foreground">
+                Loading…
+              </div>
+            ) : notifs.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-8 gap-2">
+                <Bell className="size-5 text-muted-foreground/30" />
+                <p className="text-xs text-muted-foreground">No notifications</p>
+              </div>
+            ) : (
+              notifs.map((n) => (
+                <div
+                  key={n.id}
+                  onClick={() => { if (!n.isRead) markRead(n.id); }}
+                  className="flex items-start gap-2 px-3 py-2.5 cursor-pointer hover:bg-muted/40 transition-colors group/item"
+                  style={{ borderBottom: "1px solid hsl(var(--border)/0.4)" }}
+                >
+                  {!n.isRead && (
+                    <span className="mt-1.5 size-1.5 rounded-full bg-primary shrink-0" />
+                  )}
+                  <div className={`flex-1 min-w-0 ${n.isRead ? "pl-3.5" : ""}`}>
+                    <p className={`text-xs font-medium leading-tight ${n.isRead ? "text-muted-foreground" : ""}`}>
+                      {n.title}
+                    </p>
+                    {n.message && (
+                      <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">{n.message}</p>
+                    )}
+                    <p className="text-[10px] text-muted-foreground/60 mt-1">
+                      {new Date(n.createdAt).toLocaleString()}
+                    </p>
+                  </div>
+                  <button
+                    onClick={(e) => dismiss(n.id, e)}
+                    className="shrink-0 mt-0.5 opacity-0 group-hover/item:opacity-100 text-muted-foreground hover:text-foreground transition-all"
+                  >
+                    <X className="size-3" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function AppSidebar() {
   const { user, logout } = useAuth();
   const displayName = user?.username ?? "Guest";
@@ -253,14 +435,17 @@ function AppSidebar() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader className="px-3 py-4">
-        <NavLink to="/dashboard" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
-          <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground text-xs font-bold">
-            J
-          </div>
-          <span className="text-sm font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
-            JUDICA
-          </span>
-        </NavLink>
+        <div className="flex items-center justify-between">
+          <NavLink to="/dashboard" className="flex items-center gap-2 group-data-[collapsible=icon]:justify-center">
+            <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary text-primary-foreground text-xs font-bold">
+              J
+            </div>
+            <span className="text-sm font-semibold tracking-tight group-data-[collapsible=icon]:hidden">
+              JUDICA
+            </span>
+          </NavLink>
+          <NotificationBell />
+        </div>
       </SidebarHeader>
       <SidebarContent>
         {navGroups.map((group) => (

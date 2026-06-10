@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { mockUser } from "~/lib/mock-data";
+import { useAuth } from "~/context/AuthContext";
 import { cn } from "~/lib/utils";
 import { useTheme } from "~/context/ThemeContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "~/components/ui/card";
@@ -71,35 +71,62 @@ function GoogleIcon() {
 }
 
 export default function ProfilePage() {
-  const [name, setName] = useState(mockUser.name);
-  const [customInstructions, setCustomInstructions] = useState(mockUser.customInstructions);
+  const { user } = useAuth();
+  const displayName   = user?.username ?? "User";
+  const email         = user?.email    ?? "";
+  const role          = user?.role     ?? "user";
+
+  const [name, setName] = useState(displayName);
+  const [customInstructions, setCustomInstructions] = useState(user?.customInstructions ?? "");
   const { theme: currentTheme, setTheme: applyTheme } = useTheme();
   const [themeSelection, setThemeSelection] = useState<"auto" | "light" | "dark">(
     currentTheme === "dark" ? "dark" : currentTheme === "light" ? "light" : "auto"
   );
-  const [defaultPreset, setDefaultPreset] = useState(mockUser.defaultPreset);
-  const [defaultRounds, setDefaultRounds] = useState(String(mockUser.defaultRounds));
-  const [githubConnected, setGithubConnected] = useState(mockUser.connectedAccounts.github);
-  const [googleConnected, setGoogleConnected] = useState(mockUser.connectedAccounts.google);
+  const [defaultPreset, setDefaultPreset] = useState("default");
+  const [defaultRounds, setDefaultRounds] = useState("3");
+  const [githubConnected, setGithubConnected] = useState(false);
+  const [googleConnected, setGoogleConnected] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [isSavingInstructions, setIsSavingInstructions] = useState(false);
   const [instructionsSaved, setInstructionsSaved] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
-  const initials = name
+  // Sync user data once loaded
+  useEffect(() => {
+    if (user) {
+      setName(user.username ?? "");
+      setCustomInstructions(user.customInstructions ?? "");
+    }
+  }, [user?.id]);
+
+  const initials = (name || displayName)
     .split(" ")
     .map((n) => n[0])
     .join("")
     .toUpperCase()
-    .slice(0, 2);
+    .slice(0, 2) || "?";
 
-  function handleSaveInstructions() {
+  async function handleSaveInstructions() {
     setIsSavingInstructions(true);
-    setTimeout(() => {
-      setIsSavingInstructions(false);
+    setSaveError(null);
+    try {
+      const res = await fetch("/api/auth/me", {
+        method:  "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({ custom_instructions: customInstructions }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error((data as { message?: string }).message ?? `Save failed (${res.status})`);
+      }
       setInstructionsSaved(true);
-      setTimeout(() => setInstructionsSaved(false), 2000);
-    }, 500);
+      setTimeout(() => setInstructionsSaved(false), 2500);
+    } catch (err) {
+      setSaveError(err instanceof Error ? err.message : "Save failed");
+    } finally {
+      setIsSavingInstructions(false);
+    }
   }
 
   return (
@@ -112,9 +139,9 @@ export default function ProfilePage() {
           </div>
           <div className="flex-1 min-w-0">
             <h1 className="text-xl font-semibold tracking-tight">{name}</h1>
-            <p className="text-sm text-muted-foreground">{mockUser.email}</p>
+            <p className="text-sm text-muted-foreground">{email}</p>
             <Badge variant="secondary" className="mt-1">
-              {mockUser.role}
+              {role}
             </Badge>
           </div>
           <Button
@@ -150,7 +177,7 @@ export default function ProfilePage() {
               <div className="relative">
                 <Input
                   id="email"
-                  value={mockUser.email}
+                  value={email}
                   disabled
                   className="opacity-60"
                 />
@@ -162,7 +189,7 @@ export default function ProfilePage() {
               <div>
                 <Badge variant="outline" className="flex items-center gap-1 w-fit">
                   <Shield className="size-3" />
-                  {mockUser.role.charAt(0).toUpperCase() + mockUser.role.slice(1)}
+                  {role.charAt(0).toUpperCase() + role.slice(1)}
                 </Badge>
               </div>
             </div>
@@ -189,6 +216,9 @@ export default function ProfilePage() {
               className="resize-none"
               placeholder="Enter custom instructions for the AI council..."
             />
+            {saveError && (
+              <p className="text-xs text-destructive">{saveError}</p>
+            )}
             <div className="flex items-center justify-between">
               <span className="text-xs text-muted-foreground">
                 {customInstructions.length}/2000
