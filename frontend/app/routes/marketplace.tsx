@@ -160,7 +160,7 @@ export default function MarketplacePage() {
 
   // ── Load marketplace items from backend ─────────────────────────────────────
   useEffect(() => {
-    fetch("/api/marketplace/items?limit=100")
+    fetch("/api/marketplace?limit=100")
       .then((r) => (r.ok ? r.json() : Promise.reject()))
       .then((data) => {
         const list: MarketplaceItem[] = Array.isArray(data) ? data : (data?.items ?? data?.data ?? []);
@@ -198,13 +198,13 @@ export default function MarketplacePage() {
         setItems((items) =>
           items.map((item) => (item.id === id ? { ...item, stars: Math.max(0, item.stars - 1) } : item))
         );
-        fetch(`/api/marketplace/items/${id}/star`, { method: "DELETE" }).catch(() => {});
+        fetch(`/api/marketplace/${id}/star`, { method: "DELETE" }).catch(() => {});
       } else {
         next.add(id);
         setItems((items) =>
           items.map((item) => (item.id === id ? { ...item, stars: item.stars + 1 } : item))
         );
-        fetch(`/api/marketplace/items/${id}/star`, { method: "POST" }).catch(() => {});
+        fetch(`/api/marketplace/${id}/star`, { method: "POST" }).catch(() => {});
       }
       return next;
     });
@@ -218,12 +218,12 @@ export default function MarketplacePage() {
       setItems((items) =>
         items.map((item) => (item.id === id ? { ...item, installs: Math.max(0, item.installs - 1) } : item))
       );
-      fetch(`/api/marketplace/items/${id}/install`, { method: "DELETE" }).catch(() => {});
+      fetch(`/api/marketplace/${id}/install`, { method: "DELETE" }).catch(() => {});
       return;
     }
     // Install — optimistic with loading state
     setInstalling((prev) => new Set(prev).add(id));
-    fetch(`/api/marketplace/items/${id}/install`, { method: "POST" })
+    fetch(`/api/marketplace/${id}/install`, { method: "POST" })
       .catch(() => {})
       .finally(() => {
         setInstalling((prev) => { const next = new Set(prev); next.delete(id); return next; });
@@ -277,7 +277,7 @@ export default function MarketplacePage() {
     setPublishForm({ name: "", description: "", type: "", content: "", tags: "" });
 
     // Persist to backend, swap id on success
-    fetch("/api/marketplace/items", {
+    fetch("/api/marketplace", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

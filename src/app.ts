@@ -202,6 +202,7 @@ import godmodePlugin from "./routes/godmode.js";
 import parseltonguePlugin from "./routes/parseltongue.js";
 import autotunePlugin from "./routes/autotune.js";
 import stmPlugin from "./routes/stm.js";
+import settingsPlugin from "./routes/settings.js";
 import { ingestionQueue, researchQueue, repoQueue, compactionQueue } from "./queue/queues.js";
 import { googleOAuthPlugin } from "./auth/google.oauth.js";
 import { githubOAuthPlugin } from "./auth/github.strategy.js";
@@ -487,6 +488,7 @@ export async function buildApp() {
   // Natural language web selectors — Phase 3.12
   await fastify.register(webSelectorsPlugin,       { prefix: "/api" });
   await fastify.register(structuredExtractionPlugin, { prefix: "/api/extraction" });
+  await fastify.register(settingsPlugin,        { prefix: "/api/settings" });
   await fastify.register(tracesPlugin,          { prefix: "/api/traces" });
   await fastify.register(analyticsPlugin,       { prefix: "/api/analytics" });
   await fastify.register(reposPlugin,           { prefix: "/api/repos" });

@@ -333,6 +333,51 @@ const marketplacePlugin: FastifyPluginAsync = async (fastify) => {
     return { content: item.content, type: item.type, name: item.name };
   });
 
+    // GET /me — return current user's starred and installed item IDs
+  fastify.get("/me", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
+    const userId = request.userId!;
+
+    const starRows = await db
+      .select({ itemId: marketplaceStars.itemId })
+      .from(marketplaceStars)
+      .where(eq(marketplaceStars.userId, userId));
+
+    return {
+      starred:   starRows.map((r) => r.itemId),
+      installed: [] as string[], // tracked client-side; installs are imported to user account
+    };
+  });
+
+    // DELETE /:id/install — uninstall (decrement download counter)
+  fastify.delete("/:id/install", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
+    const { id } = request.params as { id: string };
+
+    await db
+      .update(marketplaceItems)
+      .set({ downloads: sql`GREATEST(${marketplaceItems.downloads} - 1, 0)` })
+      .where(eq(marketplaceItems.id, id));
+
+    return { success: true };
+  });
+
+    // DELETE /:id/star — unstar
+  fastify.delete("/:id/star", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
+    const { id } = request.params as { id: string };
+    const userId = request.userId!;
+
+    await db.transaction(async (tx) => {
+      await tx
+        .delete(marketplaceStars)
+        .where(and(eq(marketplaceStars.userId, userId), eq(marketplaceStars.itemId, id)));
+      await tx
+        .update(marketplaceItems)
+        .set({ stars: sql`GREATEST(${marketplaceItems.stars} - 1, 0)` })
+        .where(eq(marketplaceItems.id, id));
+    });
+
+    return { starred: false };
+  });
+
     // POST /:id/star — toggle star (atomic using ON CONFLICT and transaction)
   fastify.post("/:id/star", { preHandler: fastifyRequireAuth }, async (request, _reply) => {
     const { id } = request.params as { id: string };
