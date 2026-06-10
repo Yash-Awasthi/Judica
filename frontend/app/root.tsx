@@ -61,8 +61,14 @@ import {
   Key,
   Flag,
   BookOpenCheck,
-  MessageSquare,
   Spider,
+  ShieldCheck,
+  Wand2,
+  DollarSign,
+  ShieldAlert,
+  Braces,
+  Waves,
+  History,
 } from "lucide-react";
 
 import { TooltipProvider } from "~/components/ui/tooltip";
@@ -165,6 +171,19 @@ const navGroups = [
       { to: "/fine-tune", icon: Cpu, label: "Fine-Tune" },
       { to: "/sandbox", icon: Terminal, label: "Sandbox" },
       { to: "/agents", icon: Bot, label: "Agents" },
+      { to: "/image-transform", icon: Wand2, label: "Image Transform" },
+      { to: "/extraction", icon: Braces, label: "Extraction" },
+      { to: "/echo-chamber", icon: Waves, label: "Echo Chamber" },
+      { to: "/council-checkpoints", icon: History, label: "Checkpoints" },
+    ],
+  },
+  {
+    label: "Quality",
+    items: [
+      { to: "/quality", icon: ShieldCheck, label: "Quality Center" },
+      { to: "/moderation", icon: ShieldAlert, label: "Moderation" },
+      { to: "/semantic-cache", icon: Database, label: "Semantic Cache" },
+      { to: "/fallback-chains", icon: GitBranch, label: "Fallback Chains" },
     ],
   },
   {
@@ -174,6 +193,7 @@ const navGroups = [
       { to: "/settings", icon: Settings, label: "Settings" },
       { to: "/profile", icon: UserCircle, label: "Profile" },
       { to: "/billing", icon: CreditCard, label: "Billing" },
+      { to: "/costs", icon: DollarSign, label: "Cost Analytics" },
       { to: "/api-tokens", icon: Key, label: "API Tokens" },
       { to: "/standard-answers", icon: BookOpenCheck, label: "Standard Answers" },
       { to: "/web-search", icon: Globe, label: "Web Search" },

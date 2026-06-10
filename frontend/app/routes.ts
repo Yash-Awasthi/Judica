@@ -82,4 +82,13 @@ export default [
   route("standard-answers", "routes/standard-answers.tsx"),
   route("admin/feedback", "routes/admin-feedback.tsx"),
   route("scrape", "routes/scrape.tsx"),
+  route("quality", "routes/quality.tsx"),
+  route("image-transform", "routes/image-transform.tsx"),
+  route("costs", "routes/costs.tsx"),
+  route("moderation", "routes/moderation.tsx"),
+  route("semantic-cache", "routes/semantic-cache.tsx"),
+  route("fallback-chains", "routes/fallback-chains.tsx"),
+  route("extraction", "routes/extraction.tsx"),
+  route("echo-chamber", "routes/echo-chamber.tsx"),
+  route("council-checkpoints", "routes/council-checkpoints.tsx"),
 ] satisfies RouteConfig;
