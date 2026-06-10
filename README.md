@@ -150,7 +150,7 @@ Browser → React Router SPA
 | **GODMODE CLASSIC** | Raw parallel compare — no scoring, just speed |
 | **Parseltongue** | Code-aware deliberation with syntax analysis |
 | **AutoTune** | Auto-optimize system prompts via feedback loops |
-| **STM modules** | Hedge reducer, direct mode, curiosity bias |
+| **STM** | Short-term memory modules: hedge reducer, direct mode, curiosity bias — with full session injection history at `/stm` |
 
 ### Data & Knowledge
 
@@ -171,9 +171,21 @@ Browser → React Router SPA
 | **Evaluation** | Auto-scoring: quality, coherence, consensus, diversity |
 | **Memory** | Long-term memory with local / Pinecone / Weaviate backends |
 | **Marketplace** | Share and install prompts, archetypes, workflows |
-| **Multi-tenant** | Workspaces, SCIM, SSO (Google OAuth) |
+| **Multi-tenant** | Workspaces, SCIM, SSO (Google OAuth + GitHub OAuth) |
 | **Observability** | Prometheus metrics, Grafana dashboards, trace logs |
 | **Billing** | Stripe integration with per-seat and usage-based plans |
+
+### Chrome Extension
+
+`extensions/chrome/` — Manifest V3 extension that puts the council everywhere:
+
+| Component | Description |
+|---|---|
+| **Sidebar** | Full deliberation panel anchored to any page via `Cmd/Ctrl+Shift+A` |
+| **Popup** | Quick-ask a single question from the toolbar |
+| **Context menu** | Right-click selected text → send to council |
+| **Content script** | Injects council replies inline on supported sites |
+| **Options page** | Set backend URL, API key, default council preset |
 
 ---
 
@@ -198,6 +210,14 @@ POST /api/memory/compact          — trigger compaction
 GET  /api/connectors              — list connectors
 POST /api/connectors              — create connector
 POST /api/connectors/:id/sync     — trigger sync
+POST /api/parseltongue/analyze    — code-aware specialist review (SSE)
+POST /api/autotune/run            — run AutoTune parameter benchmark
+GET  /api/stm/active              — get active STM modules
+POST /api/stm/active              — set active STM modules
+GET  /api/stm/history             — session injection history
+DELETE /api/stm/history           — clear injection history
+POST /api/research                — create deep research job
+GET  /api/research/:id/stream     — stream research progress (SSE)
 GET  /api/admin/users             — user management (admin)
 GET  /api/admin/audit-logs        — audit log (admin)
 GET  /api/system/info             — deployment info

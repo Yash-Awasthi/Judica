@@ -40,6 +40,11 @@ import {
   Zap,
   Code2,
   SlidersHorizontal,
+  FlaskConical,
+  Search,
+  Plug,
+  RefreshCcw,
+  MemoryStick,
 } from "lucide-react";
 
 import { TooltipProvider } from "~/components/ui/tooltip";
@@ -112,6 +117,13 @@ const navGroups = [
     ],
   },
   {
+    label: "Connectors",
+    items: [
+      { to: "/connectors/onboarding", icon: Plug, label: "Add Connector" },
+      { to: "/connectors/sync", icon: RefreshCcw, label: "Sync Status" },
+    ],
+  },
+  {
     label: "Workspace",
     items: [
       { to: "/projects", icon: FolderOpen, label: "Projects" },
@@ -122,6 +134,8 @@ const navGroups = [
       { to: "/ultraplinian", icon: Zap, label: "ULTRAPLINIAN" },
       { to: "/parseltongue", icon: Code2, label: "Parseltongue" },
       { to: "/autotune", icon: SlidersHorizontal, label: "AutoTune" },
+      { to: "/stm", icon: MemoryStick, label: "STM" },
+      { to: "/deep-research", icon: Search, label: "Deep Research" },
     ],
   },
   {
