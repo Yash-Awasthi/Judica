@@ -4,7 +4,6 @@ import type { Route } from "./+types/chat";
 import { useContextMention } from '~/hooks/useContextMention';
 import { ContextPill, type MentionType } from '~/components/ContextPill';
 
-interface Mention { type: MentionType; label: string; value: string }
 import {
   deliberate,
   onOpinion,
@@ -26,6 +25,8 @@ import {
   type CouncilMember,
 } from "~/lib/council";
 import { Plus, Settings2, Trash2, X, ChevronDown, ChevronRight, Download, VolumeX, Volume2, Copy, Check } from "lucide-react";
+
+interface Mention { type: MentionType; label: string; value: string }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -696,16 +697,17 @@ export default function Chat() {
 
       {/* ─── @context picker overlay ────────────────────────────────── */}
       {mention.isOpen && (
-        <div style={{ position: "fixed", top: mention.anchorPos.top, left: mention.anchorPos.left, zIndex: 9000, background: "#111", border: `1px solid ${C.border}`, borderRadius: 8, width: 300, maxHeight: 260, overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 8px 32px #000b" }}>
-          <div style={{ padding: "5px 10px", borderBottom: `1px solid #222`, fontSize: 10, color: C.greenDim, letterSpacing: "0.1em" }}>
-            {mention.mentionType ? mention.mentionType.toUpperCase() : "CONTEXT"} · {mention.query || "type to search…"}
-          </div>
-          <div style={{ overflowY: "auto", flex: 1 }}>
-            <div style={{ padding: "8px 10px", color: C.textDim, fontSize: 11 }}>
-              type @file: · @symbol: · @web: then search
-            </div>
-          </div>
-        </div>
+        <ContextPickerOverlay
+          mention={mention}
+          borderColor={C.border}
+          greenDim={C.greenDim}
+          textDim={C.textDim}
+          mono={MONO}
+          onSelect={(label, value) => {
+            setMentions(prev => [...prev, { type: (mention.mentionType ?? 'file') as any, label, value }])
+            mention.closePicker()
+          }}
+        />
       )}
 
       {/* ─── Settings panel ─────────────────────────────────────────────── */}
@@ -872,3 +874,107 @@ const bStyle: React.CSSProperties = {
   padding: "8px 14px", fontFamily: MONO, fontSize: "10px", color: C.greenDim,
   cursor: "pointer", letterSpacing: "0.1em",
 };
+
+// ── Context picker overlay with live API results ───────────────────────────────
+
+interface PickerResult { label: string; value: string; meta?: string }
+
+function ContextPickerOverlay({
+  mention, borderColor, greenDim, textDim, mono, onSelect,
+}: {
+  mention: ReturnType<typeof import("~/hooks/useContextMention").useContextMention>
+  borderColor: string; greenDim: string; textDim: string; mono: string
+  onSelect: (label: string, value: string) => void
+}) {
+  const [results, setResults] = useState<PickerResult[]>([])
+  const [loading, setLoading] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    if (!mention.isOpen || !mention.mentionType) { setResults([]); return }
+
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true)
+      try {
+        const q = encodeURIComponent(mention.query ?? '')
+        let url = ''
+        if (mention.mentionType === 'file')   url = `/api/context/files?q=${q}`
+        if (mention.mentionType === 'symbol') url = `/api/context/symbols?q=${q}`
+        if (mention.mentionType === 'web')    url = `/api/context/web?q=${q}`
+        if (!url) { setResults([]); setLoading(false); return }
+
+        const res = await fetch(url)
+        if (!res.ok) throw new Error()
+        const data = await res.json()
+        // normalize: files → {path,name}, symbols → {name,kind,file}, web → {title,url}
+        const items: PickerResult[] = (data.results ?? data ?? []).slice(0, 8).map((r: any) => ({
+          label: r.name ?? r.title ?? r.path ?? String(r),
+          value: r.path ?? r.url ?? r.name ?? String(r),
+          meta:  r.kind ?? r.file ?? r.domain ?? undefined,
+        }))
+        setResults(items)
+      } catch {
+        setResults([])
+      }
+      setLoading(false)
+    }, 150)
+
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
+  }, [mention.isOpen, mention.mentionType, mention.query])
+
+  const typeLabel = mention.mentionType ? mention.mentionType.toUpperCase() : 'CONTEXT'
+
+  return (
+    <div style={{
+      position: "fixed", top: mention.anchorPos.top, left: mention.anchorPos.left,
+      zIndex: 9000, background: "#0d0d0d", border: `1px solid ${borderColor}`,
+      borderRadius: 8, width: 300, maxHeight: 280, overflow: "hidden",
+      display: "flex", flexDirection: "column", boxShadow: "0 8px 32px #000c",
+      fontFamily: mono,
+    }}>
+      {/* Header */}
+      <div style={{ padding: "5px 10px", borderBottom: `1px solid #1a1a1a`, fontSize: 10, color: greenDim, letterSpacing: "0.1em", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <span>{typeLabel} {mention.query ? `· "${mention.query}"` : ''}</span>
+        {loading && <span style={{ color: textDim, fontSize: 9 }}>…</span>}
+      </div>
+
+      {/* Results */}
+      <div style={{ overflowY: "auto", flex: 1 }}>
+        {!mention.mentionType ? (
+          <div style={{ padding: "10px 12px" }}>
+            {[['@file:', 'search project files'], ['@symbol:', 'search exports/functions'], ['@web:', 'search the web']].map(([cmd, hint]) => (
+              <div key={cmd} style={{ display: "flex", gap: 8, marginBottom: 7, fontSize: 11 }}>
+                <span style={{ color: greenDim, width: 72, flexShrink: 0 }}>{cmd}</span>
+                <span style={{ color: textDim }}>{hint}</span>
+              </div>
+            ))}
+          </div>
+        ) : results.length === 0 && !loading ? (
+          <div style={{ padding: "10px 12px", fontSize: 11, color: textDim }}>
+            {mention.query ? 'No results' : `Type to search ${typeLabel.toLowerCase()}s…`}
+          </div>
+        ) : (
+          results.map((r, i) => (
+            <div
+              key={i}
+              onClick={() => onSelect(r.label, r.value)}
+              style={{
+                padding: "7px 12px", cursor: "pointer", borderBottom: `1px solid #111`,
+                display: "flex", flexDirection: "column", gap: 2,
+              }}
+              onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = "#1a2a1a" }}
+              onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = "transparent" }}
+            >
+              <span style={{ fontSize: 12, color: "#c8ffc8", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{r.label}</span>
+              {r.meta && <span style={{ fontSize: 10, color: textDim }}>{r.meta}</span>}
+            </div>
+          ))
+        )}
+      </div>
+      <div style={{ padding: "4px 10px", borderTop: `1px solid #111`, fontSize: 9, color: textDim }}>
+        ↑↓ navigate · Enter select · Esc close
+      </div>
+    </div>
+  )
+}

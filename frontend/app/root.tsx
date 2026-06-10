@@ -185,6 +185,7 @@ const navGroups = [
       { to: "/knowledge-graph", icon: Network, label: "Knowledge Graph" },
       { to: "/fine-tune", icon: Cpu, label: "Fine-Tune" },
       { to: "/sandbox", icon: Terminal, label: "Sandbox" },
+      { to: "/codegen", icon: Code2, label: "CodeGen" },
       { to: "/agents", icon: Bot, label: "Agents" },
       { to: "/image-transform", icon: Wand2, label: "Image Transform" },
       { to: "/extraction", icon: Braces, label: "Extraction" },
