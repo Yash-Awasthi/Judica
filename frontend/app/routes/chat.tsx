@@ -20,7 +20,7 @@ import {
   API_PROVIDERS,
   type CouncilMember,
 } from "~/lib/council";
-import { Plus, Settings2, Trash2, X, ChevronDown, ChevronRight } from "lucide-react";
+import { Plus, Settings2, Trash2, X, ChevronDown, ChevronRight, Download, VolumeX, Volume2, Copy, Check } from "lucide-react";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -28,8 +28,9 @@ interface MsgGroup {
   id: string;
   round: number;
   prompt: string;
-  opinions: Record<string, string>; // member label → streamed text
+  opinions: Record<string, string>; // member label → full text
   verdict: string;
+  error: string;
   done: boolean;
 }
 
@@ -48,20 +49,52 @@ export function meta(_: Route.MetaArgs) {
 // ─── Palette ──────────────────────────────────────────────────────────────────
 
 const C = {
-  bg:      "#080808",
-  bgAlt:   "#050505",
-  bgPanel: "#0a0a0a",
-  border:  "#162a16",
-  green:   "#00ff88",
-  greenDim:"#4a8a4a",
-  cyan:    "#00ccff",
-  cyanDim: "#a0e8ff",
-  text:    "#c8ffc8",
-  textDim: "#3a5a3a",
-  red:     "#ff4455",
+  bg:       "#080808",
+  bgAlt:    "#050505",
+  bgPanel:  "#0a0a0a",
+  border:   "#162a16",
+  green:    "#00ff88",
+  greenDim: "#4a8a4a",
+  cyan:     "#00ccff",
+  cyanDim:  "#a0e8ff",
+  text:     "#c8ffc8",
+  textDim:  "#3a5a3a",
+  red:      "#ff3355",
+  amber:    "#ffaa00",
 } as const;
 
 const MONO = "'JetBrains Mono','Fira Code','Cascadia Code',monospace";
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+function isMolecule() {
+  return typeof window !== "undefined" && "molecule" in window;
+}
+
+function threadTitle(prompt: string) {
+  return prompt.slice(0, 60).trim() + (prompt.length > 60 ? "…" : "");
+}
+
+function exportMarkdown(groups: MsgGroup[], title: string): string {
+  const lines = [`# ${title}`, ""];
+  for (const g of groups) {
+    lines.push(`## Round ${g.round}`, "", `> ${g.prompt}`, "");
+    for (const [label, text] of Object.entries(g.opinions)) {
+      lines.push(`### ${label}`, "", text, "");
+    }
+    if (g.verdict) lines.push(`### Synthesis`, "", g.verdict, "");
+    lines.push("---", "");
+  }
+  return lines.join("\n");
+}
+
+function downloadText(filename: string, content: string) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob([content], { type: "text/markdown" }));
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -71,14 +104,19 @@ export default function Chat() {
   const [threadId, setThreadId]         = useState<string>("");
   const [groups, setGroups]             = useState<MsgGroup[]>([]);
   const [streaming, setStreaming]       = useState(false);
+  const [muted, setMuted]               = useState<Set<string>>(new Set());
   const [input, setInput]               = useState("");
+  const [copied, setCopied]             = useState<string | null>(null); // key of last copied item
   const [showSettings, setShowSettings] = useState(false);
   const [showThreads, setShowThreads]   = useState(false);
+  const [showHelp, setShowHelp]         = useState(false);
   const [glassOn, setGlassOn]           = useState(false);
 
   const colRefs    = useRef<Record<string, HTMLDivElement | null>>({});
   const verdictRef = useRef<HTMLDivElement | null>(null);
   const taRef      = useRef<HTMLTextAreaElement | null>(null);
+  const councilRef = useRef(council); // stable ref for callbacks
+  useEffect(() => { councilRef.current = council; }, [council]);
 
   // ── Bootstrap ──────────────────────────────────────────────────────────────
 
@@ -91,11 +129,19 @@ export default function Chat() {
         await hydrateThread(raw[0].id);
       } else {
         const id = await createThread();
-        const t: Thread = { id, title: "New deliberation", updated_at: Date.now() };
-        setThreads([t]);
+        setThreads([{ id, title: "New deliberation", updated_at: Date.now() }]);
         setThreadId(id);
       }
     })();
+
+    // deliberation:started — electron fires this when deliberation begins
+    let offStarted = () => {};
+    if (isMolecule()) {
+      offStarted = (window as any).molecule.on(
+        "deliberation:started",
+        () => setStreaming(true)
+      );
+    }
 
     const offOpinion = onOpinion((data: MoleculeOpinion) => {
       setGroups(prev => {
@@ -121,41 +167,74 @@ export default function Chat() {
         requestAnimationFrame(() => { verdictRef.current!.scrollTop = verdictRef.current!.scrollHeight; });
     });
 
-    const offDone = onDone(() => {
+    const offDone = onDone((data: { round: number }) => {
       setStreaming(false);
       setGroups(prev => {
         if (!prev.length) return prev;
         const last = prev[prev.length - 1];
-        return [...prev.slice(0, -1), { ...last, done: true }];
+        const updated = { ...last, done: true };
+        // auto-title the thread after round 1
+        if (data.round === 1 && last.prompt) {
+          setThreads(ts => ts.map(t =>
+            t.id === threadId ? { ...t, title: threadTitle(last.prompt) } : t
+          ));
+        }
+        return [...prev.slice(0, -1), updated];
       });
     });
 
-    return () => { offOpinion(); offVerdict(); offDone(); };
+    return () => { offStarted(); offOpinion(); offVerdict(); offDone(); };
+  }, []);  // threadId captured via closure in onDone is fine since it doesn't change after mount per-session
+
+  // ── Global keyboard shortcuts ──────────────────────────────────────────────
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setShowSettings(false);
+        setShowThreads(false);
+        setShowHelp(false);
+      }
+      if ((e.ctrlKey || e.metaKey) && e.key === "k") {
+        e.preventDefault();
+        taRef.current?.focus();
+      }
+      if (e.key === "?" && !["INPUT","TEXTAREA","SELECT"].includes((e.target as Element)?.tagName)) {
+        setShowHelp(p => !p);
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
   }, []);
 
   // ── Thread hydration ───────────────────────────────────────────────────────
+  // DB stores member.id (e.g. "chatgpt"); columns key by member.label (e.g. "ChatGPT").
+  // We resolve via councilRef to keep the function stable.
 
-  const hydrateThread = async (id: string) => {
+  const hydrateThread = useCallback(async (id: string) => {
+    const idToLabel = Object.fromEntries(councilRef.current.map(c => [c.id, c.label]));
     const msgs = (await getMessages(id)) as Array<{
       id: string; role: string; member: string | null; content: string; round: number;
     }>;
     const byRound: Record<number, MsgGroup> = {};
     for (const m of msgs) {
       if (!byRound[m.round])
-        byRound[m.round] = { id: m.id, round: m.round, prompt: "", opinions: {}, verdict: "", done: true };
-      if (m.role === "user")                         byRound[m.round].prompt            = m.content;
-      if (m.role === "opinion" && m.member)          byRound[m.round].opinions[m.member] = m.content;
-      if (m.role === "verdict")                      byRound[m.round].verdict            = m.content;
+        byRound[m.round] = { id: m.id, round: m.round, prompt: "", opinions: {}, verdict: "", error: "", done: true };
+      if (m.role === "user")        byRound[m.round].prompt = m.content;
+      if (m.role === "opinion" && m.member) {
+        const label = idToLabel[m.member] ?? m.member;
+        byRound[m.round].opinions[label] = m.content;
+      }
+      if (m.role === "verdict")     byRound[m.round].verdict = m.content;
     }
     setGroups(Object.values(byRound).sort((a, b) => a.round - b.round));
-  };
+  }, []);
 
   // ── Thread actions ─────────────────────────────────────────────────────────
 
   const handleNewThread = async () => {
     const id = await createThread();
-    const t: Thread = { id, title: "New deliberation", updated_at: Date.now() };
-    setThreads(prev => [t, ...prev]);
+    setThreads(prev => [{ id, title: "New deliberation", updated_at: Date.now() }, ...prev]);
     setThreadId(id);
     setGroups([]);
     setShowThreads(false);
@@ -184,13 +263,13 @@ export default function Chat() {
     }
   };
 
-  // ── Send ───────────────────────────────────────────────────────────────────
+  // ── Send / Stop ────────────────────────────────────────────────────────────
 
   const handleSend = useCallback(async () => {
     const prompt = input.trim();
     if (!prompt || streaming) return;
     setInput("");
-    if (taRef.current) { taRef.current.style.height = "20px"; }
+    if (taRef.current) taRef.current.style.height = "20px";
 
     const group: MsgGroup = {
       id: crypto.randomUUID(),
@@ -198,6 +277,7 @@ export default function Chat() {
       prompt,
       opinions: {},
       verdict: "",
+      error: "",
       done: false,
     };
     setGroups(prev => [...prev, group]);
@@ -205,10 +285,25 @@ export default function Chat() {
 
     try {
       await deliberate({ threadId, message: prompt, round: group.round });
-    } catch {
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Deliberation failed.";
       setStreaming(false);
+      setGroups(prev => {
+        if (!prev.length) return prev;
+        const last = prev[prev.length - 1];
+        return [...prev.slice(0, -1), { ...last, error: msg, done: true }];
+      });
     }
   }, [input, streaming, threadId, groups.length]);
+
+  const handleStop = () => {
+    setStreaming(false);
+    setGroups(prev => {
+      if (!prev.length) return prev;
+      const last = prev[prev.length - 1];
+      return [...prev.slice(0, -1), { ...last, done: true }];
+    });
+  };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
@@ -227,46 +322,77 @@ export default function Chat() {
     await toggleGlass(next);
   };
 
-  // ── Active members ─────────────────────────────────────────────────────────
+  // ── Copy ───────────────────────────────────────────────────────────────────
 
-  const activeMembers = council.filter(m => m.enabled);
-  const currentThread = threads.find(t => t.id === threadId);
+  const handleCopy = useCallback((key: string, text: string) => {
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 1800);
+    });
+  }, []);
+
+  // ── Export ─────────────────────────────────────────────────────────────────
+
+  const handleExport = () => {
+    const title = threads.find(t => t.id === threadId)?.title ?? "deliberation";
+    const md = exportMarkdown(groups, title);
+    downloadText(`${title.slice(0, 40).replace(/[^a-z0-9]/gi, "-")}.md`, md);
+  };
+
+  // ── Mute ───────────────────────────────────────────────────────────────────
+
+  const handleMute = (label: string) => {
+    setMuted(prev => {
+      const next = new Set(prev);
+      if (next.has(label)) next.delete(label); else next.add(label);
+      return next;
+    });
+  };
+
+  // ── Derived ────────────────────────────────────────────────────────────────
+
+  const activeMembers  = council.filter(m => m.enabled);
+  const currentThread  = threads.find(t => t.id === threadId);
+  const totalRounds    = groups.length;
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div style={{ fontFamily: MONO, background: C.bg, color: C.text, height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <style>{`
-        @keyframes blink { 50% { opacity: 0; } }
+        @keyframes blink  { 50% { opacity: 0; } }
+        @keyframes dots   { 0%,20% { content:'●○○' } 40%,60% { content:'●●○' } 80%,100% { content:'●●●' } }
         ::-webkit-scrollbar { width: 4px; height: 4px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #162a16; border-radius: 2px; }
         textarea::placeholder { color: #3a5a3a; }
-        input::placeholder { color: #3a5a3a; }
-        select option { background: #0d0d0d; }
+        input::placeholder   { color: #3a5a3a; }
+        select option        { background: #0d0d0d; }
+        .col-muted           { opacity: 0.35; filter: saturate(0); }
+        .copy-btn:hover      { color: #00ff88 !important; }
       `}</style>
 
-      {/* Header */}
-      <div style={{ display: "flex", alignItems: "center", gap: "12px", padding: "8px 14px", borderBottom: `1px solid ${C.border}`, background: C.bgAlt, flexShrink: 0, position: "relative", zIndex: 30 }}>
-        <span style={{ fontSize: "12px", fontWeight: 700, letterSpacing: "0.3em", color: C.green }}>JUDICA</span>
+      {/* ─── Header ─────────────────────────────────────────────────────── */}
+      <div style={{ display: "flex", alignItems: "center", gap: "10px", padding: "7px 14px", borderBottom: `1px solid ${C.border}`, background: C.bgAlt, flexShrink: 0, position: "relative", zIndex: 30 }}>
+        <span style={{ fontSize: "12px", fontWeight: 700, letterSpacing: "0.3em", color: C.green, flexShrink: 0 }}>JUDICA</span>
         <span style={{ color: C.border }}>│</span>
 
         {/* Thread picker */}
         <button
           onClick={() => setShowThreads(p => !p)}
-          style={{ display: "flex", alignItems: "center", gap: "6px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: "3px", padding: "3px 10px", fontFamily: MONO, fontSize: "10px", color: C.greenDim, cursor: "pointer", letterSpacing: "0.1em" }}
+          style={{ display: "flex", alignItems: "center", gap: "5px", background: "transparent", border: `1px solid ${C.border}`, borderRadius: "3px", padding: "3px 9px", fontFamily: MONO, fontSize: "10px", color: C.greenDim, cursor: "pointer", letterSpacing: "0.08em", maxWidth: "200px" }}
         >
-          <span style={{ maxWidth: "180px", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {currentThread?.title ?? "—"}
           </span>
-          <ChevronDown size={9} />
+          <ChevronDown size={9} style={{ flexShrink: 0 }} />
         </button>
 
         {showThreads && (
-          <div style={{ position: "absolute", top: "100%", left: "124px", background: "#0d0d0d", border: `1px solid ${C.border}`, borderRadius: "3px", minWidth: "240px", boxShadow: "0 8px 32px #000c" }}>
+          <div style={{ position: "absolute", top: "100%", left: "120px", background: "#0d0d0d", border: `1px solid ${C.border}`, borderRadius: "3px", minWidth: "240px", boxShadow: "0 8px 32px #000d", zIndex: 40 }}>
             <button
               onClick={handleNewThread}
-              style={{ display: "flex", alignItems: "center", gap: "8px", width: "100%", padding: "8px 12px", background: "transparent", border: "none", borderBottom: `1px solid ${C.border}`, fontFamily: MONO, fontSize: "10px", color: C.green, cursor: "pointer", letterSpacing: "0.1em" }}
+              style={{ display: "flex", alignItems: "center", gap: "7px", width: "100%", padding: "8px 12px", background: "transparent", border: "none", borderBottom: `1px solid ${C.border}`, fontFamily: MONO, fontSize: "10px", color: C.green, cursor: "pointer", letterSpacing: "0.1em" }}
             >
               <Plus size={9} /> NEW THREAD
             </button>
@@ -275,13 +401,12 @@ export default function Chat() {
                 <div
                   key={t.id}
                   onClick={() => handleSelectThread(t.id)}
-                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 12px", cursor: "pointer", background: t.id === threadId ? "#162a1625" : "transparent", borderBottom: `1px solid ${C.border}20` }}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "7px 12px", cursor: "pointer", background: t.id === threadId ? "#162a1625" : "transparent", borderBottom: `1px solid ${C.border}18` }}
                   onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = "#162a1615"; }}
                   onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = t.id === threadId ? "#162a1625" : "transparent"; }}
                 >
                   <span style={{ fontSize: "11px", color: t.id === threadId ? C.green : C.greenDim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "185px", display: "flex", alignItems: "center", gap: "4px" }}>
-                    {t.id === threadId && <ChevronRight size={9} />}
-                    {t.title}
+                    {t.id === threadId && <ChevronRight size={9} />}{t.title}
                   </span>
                   <button
                     onClick={e => handleDeleteThread(e, t.id)}
@@ -295,13 +420,36 @@ export default function Chat() {
           </div>
         )}
 
+        {/* Round badge */}
+        {totalRounds > 0 && (
+          <span style={{ fontSize: "9px", color: C.textDim, letterSpacing: "0.15em", flexShrink: 0 }}>
+            {totalRounds} RND{totalRounds !== 1 ? "S" : ""}
+          </span>
+        )}
+
         {/* Right controls */}
-        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "8px" }}>
+        <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "6px" }}>
+          {groups.length > 0 && (
+            <button
+              onClick={handleExport}
+              title="Export as Markdown"
+              style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "3px", padding: "4px 8px", cursor: "pointer", color: C.greenDim, display: "flex", alignItems: "center" }}
+            >
+              <Download size={10} />
+            </button>
+          )}
           <button
             onClick={handleGlass}
-            style={{ background: "transparent", border: `1px solid ${glassOn ? C.green : C.border}`, borderRadius: "3px", padding: "3px 10px", fontFamily: MONO, fontSize: "10px", color: glassOn ? C.green : C.greenDim, cursor: "pointer", letterSpacing: "0.1em" }}
+            style={{ background: "transparent", border: `1px solid ${glassOn ? C.green : C.border}`, borderRadius: "3px", padding: "3px 9px", fontFamily: MONO, fontSize: "10px", color: glassOn ? C.green : C.greenDim, cursor: "pointer", letterSpacing: "0.08em" }}
           >
             {glassOn ? "GLASS ●" : "GLASS ○"}
+          </button>
+          <button
+            onClick={() => setShowHelp(p => !p)}
+            title="Keyboard shortcuts (?)"
+            style={{ background: "transparent", border: `1px solid ${C.border}`, borderRadius: "3px", padding: "3px 7px", fontFamily: MONO, fontSize: "10px", color: C.greenDim, cursor: "pointer", letterSpacing: "0.08em" }}
+          >
+            ?
           </button>
           <button
             onClick={() => setShowSettings(true)}
@@ -312,70 +460,115 @@ export default function Chat() {
         </div>
       </div>
 
-      {/* Arena — AI columns */}
+      {/* ─── Arena columns ──────────────────────────────────────────────── */}
       <div style={{ display: "flex", flex: 1, overflow: "hidden", borderBottom: `1px solid ${C.border}` }}>
         {activeMembers.length === 0 ? (
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", color: C.textDim, fontSize: "11px", letterSpacing: "0.2em" }}>
-            NO MEMBERS ENABLED — OPEN SETTINGS ⚙
+            NO MEMBERS ENABLED — OPEN ⚙ SETTINGS
           </div>
         ) : (
-          activeMembers.map((m, idx) => (
-            <div
-              key={m.id}
-              style={{ flex: 1, display: "flex", flexDirection: "column", borderRight: idx < activeMembers.length - 1 ? `1px solid ${C.border}` : "none", overflow: "hidden", minWidth: 0 }}
-            >
-              {/* Column header */}
-              <div style={{ padding: "5px 12px", borderBottom: `1px solid ${C.border}`, fontSize: "10px", letterSpacing: "0.15em", color: C.green, background: C.bgPanel, flexShrink: 0, display: "flex", alignItems: "center", gap: "7px" }}>
-                <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: C.green, display: "inline-block", opacity: 0.75, flexShrink: 0 }} />
-                {m.label.toUpperCase()}
-                <span style={{ marginLeft: "auto", fontSize: "9px", color: C.textDim, letterSpacing: "0.05em" }}>
-                  {m.mode === "api" ? m.model : "browser"}
-                </span>
-              </div>
-
-              {/* Column scroll body */}
+          activeMembers.map((m, idx) => {
+            const isMuted = muted.has(m.label);
+            return (
               <div
-                ref={el => { colRefs.current[m.label] = el; }}
-                style={{ flex: 1, overflowY: "auto", padding: "12px 14px" }}
+                key={m.id}
+                className={isMuted ? "col-muted" : ""}
+                style={{ flex: 1, display: "flex", flexDirection: "column", borderRight: idx < activeMembers.length - 1 ? `1px solid ${C.border}` : "none", overflow: "hidden", minWidth: 0, transition: "opacity 0.2s" }}
               >
-                {groups.length === 0 && (
-                  <span style={{ color: C.textDim, fontSize: "11px", letterSpacing: "0.1em" }}>awaiting prompt_</span>
-                )}
-                {groups.map((g, gi) => {
-                  const text      = g.opinions[m.label] ?? "";
-                  const isLast    = gi === groups.length - 1;
-                  const isTicking = isLast && !g.done && streaming;
-                  return (
-                    <div key={g.id} style={{ marginBottom: "22px" }}>
-                      <div style={{ fontSize: "9px", color: C.textDim, letterSpacing: "0.15em", marginBottom: "5px" }}>
-                        RND {g.round}
-                      </div>
-                      <div style={{ fontSize: "11px", color: C.greenDim, marginBottom: "8px", paddingLeft: "8px", borderLeft: `2px solid ${C.border}`, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                        {g.prompt}
-                      </div>
-                      <div style={{ fontSize: "12px", lineHeight: 1.75, color: C.text, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
-                        {text || (!isTicking && <span style={{ color: C.textDim }}>—</span>)}
-                        {isTicking && (
-                          <span style={{ display: "inline-block", width: "7px", height: "13px", background: C.green, animation: "blink 1s step-end infinite", verticalAlign: "text-bottom", marginLeft: text ? "2px" : 0 }} />
+                {/* Column header */}
+                <div style={{ padding: "5px 10px", borderBottom: `1px solid ${C.border}`, fontSize: "10px", letterSpacing: "0.14em", color: isMuted ? C.textDim : C.green, background: C.bgPanel, flexShrink: 0, display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{ width: "6px", height: "6px", borderRadius: "50%", background: isMuted ? C.textDim : C.green, display: "inline-block", opacity: 0.8, flexShrink: 0 }} />
+                  {m.label.toUpperCase()}
+                  <span style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: "6px" }}>
+                    <span style={{ fontSize: "9px", color: C.textDim }}>{m.mode === "api" ? m.model : "browser"}</span>
+                    <button
+                      onClick={() => handleMute(m.label)}
+                      title={isMuted ? "Unmute" : "Mute"}
+                      style={{ background: "transparent", border: "none", cursor: "pointer", color: isMuted ? C.amber : C.textDim, padding: "1px", display: "flex", alignItems: "center" }}
+                    >
+                      {isMuted ? <VolumeX size={10} /> : <Volume2 size={10} />}
+                    </button>
+                  </span>
+                </div>
+
+                {/* Column body */}
+                <div
+                  ref={el => { colRefs.current[m.label] = el; }}
+                  style={{ flex: 1, overflowY: "auto", padding: "12px 14px" }}
+                >
+                  {groups.length === 0 && (
+                    <span style={{ color: C.textDim, fontSize: "11px", letterSpacing: "0.1em" }}>awaiting prompt_</span>
+                  )}
+                  {groups.map((g, gi) => {
+                    const text      = g.opinions[m.label] ?? "";
+                    const isLast    = gi === groups.length - 1;
+                    const isTicking = isLast && !g.done && streaming;
+                    const copyKey   = `${g.id}:${m.label}`;
+                    return (
+                      <div key={g.id} style={{ marginBottom: "22px" }}>
+                        {/* Round label + copy */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px", marginBottom: "5px" }}>
+                          <span style={{ fontSize: "9px", color: C.textDim, letterSpacing: "0.15em" }}>RND {g.round}</span>
+                          {text && (
+                            <button
+                              className="copy-btn"
+                              onClick={() => handleCopy(copyKey, text)}
+                              title="Copy"
+                              style={{ background: "transparent", border: "none", cursor: "pointer", color: copied === copyKey ? C.green : C.textDim, padding: "1px", display: "flex", alignItems: "center", transition: "color 0.15s" }}
+                            >
+                              {copied === copyKey ? <Check size={9} /> : <Copy size={9} />}
+                            </button>
+                          )}
+                        </div>
+                        {/* Prompt echo */}
+                        <div style={{ fontSize: "11px", color: C.greenDim, marginBottom: "8px", paddingLeft: "8px", borderLeft: `2px solid ${C.border}`, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                          {g.prompt}
+                        </div>
+                        {/* Error */}
+                        {g.error && isLast && (
+                          <div style={{ fontSize: "11px", color: C.red, marginBottom: "6px" }}>⚠ {g.error}</div>
                         )}
+                        {/* Opinion text */}
+                        <div style={{ fontSize: "12px", lineHeight: 1.78, color: C.text, whiteSpace: "pre-wrap", wordBreak: "break-word" }}>
+                          {text || (!isTicking && <span style={{ color: C.textDim }}>—</span>)}
+                          {isTicking && (
+                            <span style={{ display: "inline-block", width: "7px", height: "13px", background: C.green, animation: "blink 1s step-end infinite", verticalAlign: "text-bottom", marginLeft: text ? "2px" : 0 }} />
+                          )}
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
 
-      {/* Synthesis/verdict strip */}
+      {/* ─── Synthesis strip ────────────────────────────────────────────── */}
       <div style={{ borderBottom: `1px solid ${C.border}`, background: "#060c06", flexShrink: 0, maxHeight: "25vh", display: "flex", flexDirection: "column" }}>
-        <div style={{ padding: "4px 12px", fontSize: "9px", letterSpacing: "0.2em", color: C.cyan, borderBottom: `1px solid #0a2533`, flexShrink: 0 }}>
+        <div style={{ padding: "4px 12px", fontSize: "9px", letterSpacing: "0.2em", color: C.cyan, borderBottom: `1px solid #0a2533`, flexShrink: 0, display: "flex", alignItems: "center", gap: "8px" }}>
           SYNTHESIS
+          {(() => {
+            const last = groups[groups.length - 1];
+            if (last?.verdict) {
+              const key = `verdict:${last.id}`;
+              return (
+                <button
+                  className="copy-btn"
+                  onClick={() => handleCopy(key, last.verdict)}
+                  style={{ background: "transparent", border: "none", cursor: "pointer", color: copied === key ? C.green : C.textDim, padding: "1px", display: "flex", alignItems: "center" }}
+                >
+                  {copied === key ? <Check size={9} /> : <Copy size={9} />}
+                </button>
+              );
+            }
+            return null;
+          })()}
         </div>
         <div
           ref={verdictRef}
-          style={{ padding: "10px 14px", fontSize: "12px", lineHeight: 1.75, color: C.cyanDim, overflowY: "auto", flex: 1, whiteSpace: "pre-wrap", wordBreak: "break-word" }}
+          style={{ padding: "10px 14px", fontSize: "12px", lineHeight: 1.78, color: C.cyanDim, overflowY: "auto", flex: 1, whiteSpace: "pre-wrap", wordBreak: "break-word" }}
         >
           {(() => {
             const last = groups[groups.length - 1];
@@ -387,7 +580,7 @@ export default function Chat() {
         </div>
       </div>
 
-      {/* Input row */}
+      {/* ─── Input row ──────────────────────────────────────────────────── */}
       <div style={{ display: "flex", alignItems: "flex-end", gap: "10px", padding: "10px 14px", background: C.bgAlt, flexShrink: 0 }}>
         <span style={{ color: C.green, fontSize: "15px", flexShrink: 0, marginBottom: "1px", opacity: 0.8 }}>›</span>
         <textarea
@@ -399,29 +592,25 @@ export default function Chat() {
           rows={1}
           style={{ flex: 1, background: "transparent", border: "none", outline: "none", color: C.text, fontFamily: MONO, fontSize: "13px", resize: "none", lineHeight: 1.5, minHeight: "20px", maxHeight: "120px", overflowY: "auto" }}
         />
-        <button
-          onClick={handleSend}
-          disabled={streaming || !input.trim()}
-          style={{
-            background: streaming || !input.trim() ? "transparent" : C.green,
-            color: streaming || !input.trim() ? C.greenDim : "#050505",
-            border: `1px solid ${streaming || !input.trim() ? C.border : C.green}`,
-            borderRadius: "3px",
-            padding: "6px 16px",
-            fontFamily: MONO,
-            fontSize: "11px",
-            fontWeight: 700,
-            letterSpacing: "0.12em",
-            cursor: streaming || !input.trim() ? "default" : "pointer",
-            flexShrink: 0,
-            transition: "all 0.15s",
-          }}
-        >
-          {streaming ? "···" : "SEND"}
-        </button>
+        {streaming ? (
+          <button
+            onClick={handleStop}
+            style={{ background: "transparent", color: C.red, border: `1px solid ${C.red}`, borderRadius: "3px", padding: "6px 16px", fontFamily: MONO, fontSize: "11px", fontWeight: 700, letterSpacing: "0.12em", cursor: "pointer", flexShrink: 0 }}
+          >
+            STOP
+          </button>
+        ) : (
+          <button
+            onClick={handleSend}
+            disabled={!input.trim()}
+            style={{ background: !input.trim() ? "transparent" : C.green, color: !input.trim() ? C.greenDim : "#050505", border: `1px solid ${!input.trim() ? C.border : C.green}`, borderRadius: "3px", padding: "6px 16px", fontFamily: MONO, fontSize: "11px", fontWeight: 700, letterSpacing: "0.12em", cursor: !input.trim() ? "default" : "pointer", flexShrink: 0, transition: "all 0.15s" }}
+          >
+            SEND
+          </button>
+        )}
       </div>
 
-      {/* Settings panel */}
+      {/* ─── Settings panel ─────────────────────────────────────────────── */}
       {showSettings && (
         <SettingsPanel
           council={council}
@@ -430,7 +619,34 @@ export default function Chat() {
         />
       )}
 
-      {/* Click-away to close threads dropdown */}
+      {/* ─── Help overlay ───────────────────────────────────────────────── */}
+      {showHelp && (
+        <div
+          style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.82)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center" }}
+          onClick={() => setShowHelp(false)}
+        >
+          <div
+            style={{ background: "#0d0d0d", border: `1px solid ${C.border}`, borderRadius: "4px", padding: "22px 28px", minWidth: "280px", fontFamily: MONO }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ fontSize: "10px", letterSpacing: "0.22em", color: C.green, marginBottom: "14px" }}>SHORTCUTS</div>
+            {[
+              ["Enter",      "Send prompt"],
+              ["Shift+Enter","New line"],
+              ["Ctrl/⌘ K",  "Focus input"],
+              ["?",          "Toggle this help"],
+              ["Esc",        "Close overlays"],
+            ].map(([k, v]) => (
+              <div key={k} style={{ display: "flex", gap: "16px", marginBottom: "8px" }}>
+                <span style={{ fontSize: "10px", color: C.green, width: "90px", flexShrink: 0 }}>{k}</span>
+                <span style={{ fontSize: "10px", color: C.textDim }}>{v}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Click-away backdrop for threads dropdown */}
       {showThreads && (
         <div style={{ position: "fixed", inset: 0, zIndex: 29 }} onClick={() => setShowThreads(false)} />
       )}
@@ -440,11 +656,7 @@ export default function Chat() {
 
 // ─── Settings Panel ───────────────────────────────────────────────────────────
 
-function SettingsPanel({
-  council,
-  onSave,
-  onClose,
-}: {
+function SettingsPanel({ council, onSave, onClose }: {
   council: CouncilMember[];
   onSave: (c: CouncilMember[]) => void;
   onClose: () => void;
@@ -460,7 +672,6 @@ function SettingsPanel({
   return (
     <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.87)", zIndex: 50, display: "flex", alignItems: "center", justifyContent: "center" }}>
       <div style={{ background: "#0d0d0d", border: `1px solid ${C.border}`, borderRadius: "4px", width: "560px", maxHeight: "80vh", overflow: "auto", padding: "20px", fontFamily: MONO }}>
-
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "18px" }}>
           <span style={{ fontSize: "11px", letterSpacing: "0.22em", color: C.green }}>COUNCIL CONFIG</span>
           <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.greenDim, cursor: "pointer", padding: 0 }}>
@@ -470,14 +681,12 @@ function SettingsPanel({
 
         {local.map(m => (
           <div key={m.id} style={{ marginBottom: "6px", border: `1px solid ${C.border}`, borderRadius: "3px", overflow: "hidden" }}>
-
-            {/* Member row */}
             <div
               style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 10px", background: C.bgPanel, cursor: "pointer" }}
               onClick={() => setExpanded(p => p === m.id ? null : m.id)}
             >
               <span style={{ width: "7px", height: "7px", borderRadius: "50%", background: m.enabled ? C.green : C.textDim, flexShrink: 0 }} />
-              <span style={{ flex: 1, fontSize: "11px", color: m.enabled ? C.text : C.textDim, letterSpacing: "0.05em" }}>{m.label}</span>
+              <span style={{ flex: 1, fontSize: "11px", color: m.enabled ? C.text : C.textDim }}>{m.label}</span>
               <span style={{ fontSize: "9px", color: C.textDim }}>{m.mode === "api" ? m.model : "browser"}</span>
               <button
                 onClick={e => { e.stopPropagation(); toggle(m.id); }}
@@ -493,21 +702,20 @@ function SettingsPanel({
               </button>
             </div>
 
-            {/* Expanded config */}
             {expanded === m.id && (
               <div style={{ padding: "12px 10px", background: "#080808", borderTop: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: "9px" }}>
-                <SettingsRow label="LABEL">
+                <SRow label="LABEL">
                   <input value={m.label} onChange={e => update(m.id, { label: e.target.value })} style={iStyle} />
-                </SettingsRow>
-                <SettingsRow label="MODE">
+                </SRow>
+                <SRow label="MODE">
                   <select value={m.mode} onChange={e => update(m.id, { mode: e.target.value as "browser" | "api" })} style={iStyle}>
                     <option value="browser">browser</option>
                     <option value="api">api</option>
                   </select>
-                </SettingsRow>
+                </SRow>
                 {m.mode === "api" && (
                   <>
-                    <SettingsRow label="PROVIDER">
+                    <SRow label="PROVIDER">
                       <select
                         value={m.provider}
                         onChange={e => {
@@ -518,17 +726,17 @@ function SettingsPanel({
                       >
                         {API_PROVIDERS.map(p => <option key={p.id} value={p.id}>{p.label}</option>)}
                       </select>
-                    </SettingsRow>
-                    <SettingsRow label="MODEL">
+                    </SRow>
+                    <SRow label="MODEL">
                       <input value={m.model} onChange={e => update(m.id, { model: e.target.value })} style={iStyle} />
-                    </SettingsRow>
-                    <SettingsRow label="API KEY">
+                    </SRow>
+                    <SRow label="API KEY">
                       <input type="password" value={m.apiKey} onChange={e => update(m.id, { apiKey: e.target.value })} style={iStyle} placeholder="sk-…" />
-                    </SettingsRow>
+                    </SRow>
                     {(m.provider === "ollama" || m.provider === "custom") && (
-                      <SettingsRow label="BASE URL">
+                      <SRow label="BASE URL">
                         <input value={m.baseUrl} onChange={e => update(m.id, { baseUrl: e.target.value })} style={iStyle} />
-                      </SettingsRow>
+                      </SRow>
                     )}
                   </>
                 )}
@@ -538,17 +746,15 @@ function SettingsPanel({
         ))}
 
         <div style={{ display: "flex", gap: "8px", marginTop: "14px" }}>
-          <button onClick={add}             style={{ ...bStyle, flex: 1 }}>+ ADD MEMBER</button>
-          <button onClick={() => onSave(local)} style={{ ...bStyle, background: C.green, color: "#050505", border: `1px solid ${C.green}` }}>SAVE</button>
+          <button onClick={add}                  style={{ ...bStyle, flex: 1 }}>+ ADD MEMBER</button>
+          <button onClick={() => onSave(local)}  style={{ ...bStyle, background: C.green, color: "#050505", border: `1px solid ${C.green}` }}>SAVE</button>
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Settings helpers ─────────────────────────────────────────────────────────
-
-function SettingsRow({ label, children }: { label: string; children: React.ReactNode }) {
+function SRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
       <span style={{ fontSize: "9px", letterSpacing: "0.15em", color: C.textDim, width: "72px", flexShrink: 0 }}>{label}</span>
@@ -558,26 +764,13 @@ function SettingsRow({ label, children }: { label: string; children: React.React
 }
 
 const iStyle: React.CSSProperties = {
-  width: "100%",
-  background: "#0a0a0a",
-  border: `1px solid ${C.border}`,
-  borderRadius: "2px",
-  padding: "4px 8px",
-  fontFamily: MONO,
-  fontSize: "11px",
-  color: C.text,
-  outline: "none",
-  boxSizing: "border-box",
+  width: "100%", background: "#0a0a0a", border: `1px solid ${C.border}`,
+  borderRadius: "2px", padding: "4px 8px", fontFamily: MONO,
+  fontSize: "11px", color: C.text, outline: "none", boxSizing: "border-box",
 };
 
 const bStyle: React.CSSProperties = {
-  background: "transparent",
-  border: `1px solid ${C.border}`,
-  borderRadius: "3px",
-  padding: "8px 14px",
-  fontFamily: MONO,
-  fontSize: "10px",
-  color: C.greenDim,
-  cursor: "pointer",
-  letterSpacing: "0.1em",
+  background: "transparent", border: `1px solid ${C.border}`, borderRadius: "3px",
+  padding: "8px 14px", fontFamily: MONO, fontSize: "10px", color: C.greenDim,
+  cursor: "pointer", letterSpacing: "0.1em",
 };
