@@ -9,8 +9,6 @@ import { useState, useRef, useCallback } from "react";
 import { useContextMention } from "~/hooks/useContextMention";
 import { ContextPill, type MentionType } from "~/components/ContextPill";
 import { DiffViewer } from "~/components/DiffViewer";
-
-interface Mention { type: MentionType; label: string; value: string }
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { ScrollArea } from "~/components/ui/scroll-area";
@@ -21,6 +19,55 @@ import {
   Code2, Send, Loader2, X, AlertTriangle,
   Clock, CheckCircle2, ShieldAlert, Zap, Cpu, GitBranch,
 } from "lucide-react";
+
+interface Mention { type: MentionType; label: string; value: string }
+
+// ── Code block extractor ───────────────────────────────────────────────────────
+
+interface CodeBlock { lang: string; code: string; before: string; after: string }
+
+function extractFirstCodeBlock(text: string): CodeBlock | null {
+  const match = text.match(/^([\s\S]*?)```(\w*)\n([\s\S]*?)```([\s\S]*)$/)
+  if (!match) return null
+  return { before: match[1], lang: match[2] || 'text', code: match[3], after: match[4] }
+}
+
+function SpecialistOutput({ text, original, roleId }: { text: string; original: string; roleId: string }) {
+  const block = extractFirstCodeBlock(text)
+
+  if (!block || !original.trim() || block.code.trim() === original.trim()) {
+    return (
+      <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 font-mono text-xs">
+        {text}
+      </div>
+    )
+  }
+
+  return (
+    <div className="space-y-3">
+      {block.before.trim() && (
+        <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 font-mono text-xs">
+          {block.before.trim()}
+        </div>
+      )}
+      <div style={{ border: '1px solid #2a2a2a', borderRadius: 6, overflow: 'hidden' }}>
+        <div style={{ padding: '4px 10px', background: '#0a0a0a', borderBottom: '1px solid #1e1e1e', fontSize: 10, color: '#555', letterSpacing: '0.1em' }}>
+          SUGGESTED DIFF · {roleId.toUpperCase()} · {block.lang}
+        </div>
+        <DiffViewer
+          filename={`input.${block.lang}`}
+          original={original}
+          modified={block.code}
+        />
+      </div>
+      {block.after.trim() && (
+        <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 font-mono text-xs">
+          {block.after.trim()}
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -192,52 +239,6 @@ export default function ParseltonguesPage() {
 
   const doneCount = responses.filter((r) => r.status === "done").length;
 
-// ── Code block extractor ───────────────────────────────────────────────────────
-
-interface CodeBlock { lang: string; code: string; before: string; after: string }
-
-function extractFirstCodeBlock(text: string): CodeBlock | null {
-  const match = text.match(/^([\s\S]*?)```(\w*)\n([\s\S]*?)```([\s\S]*)$/)
-  if (!match) return null
-  return { before: match[1], lang: match[2] || 'text', code: match[3], after: match[4] }
-}
-
-function SpecialistOutput({ text, original, roleId }: { text: string; original: string; roleId: string }) {
-  const block = extractFirstCodeBlock(text)
-
-  if (!block || !original.trim() || block.code.trim() === original.trim()) {
-    return (
-      <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 font-mono text-xs">
-        {text}
-      </div>
-    )
-  }
-
-  return (
-    <div className="space-y-3">
-      {block.before.trim() && (
-        <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 font-mono text-xs">
-          {block.before.trim()}
-        </div>
-      )}
-      <div style={{ border: '1px solid #2a2a2a', borderRadius: 6, overflow: 'hidden' }}>
-        <div style={{ padding: '4px 10px', background: '#0a0a0a', borderBottom: '1px solid #1e1e1e', fontSize: 10, color: '#555', letterSpacing: '0.1em' }}>
-          SUGGESTED DIFF · {roleId.toUpperCase()} · {block.lang}
-        </div>
-        <DiffViewer
-          filename={`input.${block.lang}`}
-          original={original}
-          modified={block.code}
-        />
-      </div>
-      {block.after.trim() && (
-        <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground/90 font-mono text-xs">
-          {block.after.trim()}
-        </div>
-      )}
-    </div>
-  )
-}
 
   return (
     <div className="flex h-screen overflow-hidden">
