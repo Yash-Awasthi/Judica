@@ -120,11 +120,10 @@ export default function Chat() {
   const [showHelp, setShowHelp]         = useState(false);
   const [glassOn, setGlassOn]           = useState(false);
   const [mentions, setMentions]         = useState<Mention[]>([]);
-  const mention                         = useContextMention(taRef);
-
   const colRefs    = useRef<Record<string, HTMLDivElement | null>>({});
   const verdictRef = useRef<HTMLDivElement | null>(null);
   const taRef      = useRef<HTMLTextAreaElement | null>(null);
+  const mention                         = useContextMention(taRef);
   const councilRef = useRef(council); // stable ref for callbacks
   useEffect(() => { councilRef.current = council; }, [council]);
 

@@ -6,6 +6,10 @@
  */
 
 import { useState, useRef, useCallback } from "react";
+import { useContextMention } from "~/hooks/useContextMention";
+import { ContextPill, type MentionType } from "~/components/ContextPill";
+
+interface Mention { type: MentionType; label: string; value: string }
 import { Button } from "~/components/ui/button";
 import { Badge } from "~/components/ui/badge";
 import { ScrollArea } from "~/components/ui/scroll-area";
@@ -64,6 +68,9 @@ const DEFAULT_STYLE = { border: "border-border", bg: "bg-muted/20", label: "text
 
 export default function ParseltonguesPage() {
   const [code, setCode]         = useState("");
+  const [mentions, setMentions] = useState<Mention[]>([]);
+  const codeRef                 = useRef<HTMLTextAreaElement | null>(null);
+  const mention                 = useContextMention(codeRef);
   const [question, setQuestion] = useState("");
   const [responses, setResponses] = useState<RoleResponse[]>([]);
   const [init, setInit]         = useState<InitEvent | null>(null);
@@ -199,14 +206,34 @@ export default function ParseltonguesPage() {
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col gap-4 p-4">
           <div className="flex-1 flex flex-col gap-1.5">
             <Label className="text-xs text-muted-foreground">Code</Label>
+            {mentions.length > 0 && (
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 3, marginBottom: 4 }}>
+                {mentions.map((m, i) => (
+                  <ContextPill key={i} type={m.type} label={m.label} value={m.value}
+                    onRemove={() => setMentions(prev => prev.filter((_, j) => j !== i))} />
+                ))}
+              </div>
+            )}
             <Textarea
+              ref={codeRef}
               value={code}
-              onChange={(e) => setCode(e.target.value)}
+              onChange={(e) => { mention.onTextareaChange(e); setCode(e.target.value); }}
+              onKeyDown={(e) => { mention.onKeyDown(e as any); }}
               placeholder={"// paste code here...\nfunction example() {\n  ...\n}"}
               className="flex-1 font-mono text-xs resize-none min-h-[300px]"
               disabled={isLoading}
               style={{ fontFamily: "monospace" }}
             />
+            {mention.isOpen && (
+              <div style={{ position: "fixed", top: mention.anchorPos.top, left: mention.anchorPos.left, zIndex: 9000, background: "#111", border: "1px solid #333", borderRadius: 8, width: 280, maxHeight: 220, overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 8px 32px rgba(0,0,0,0.7)" }}>
+                <div style={{ padding: "5px 10px", borderBottom: "1px solid #222", fontSize: 11, color: "#888" }}>
+                  {mention.mentionType ? mention.mentionType.toUpperCase() : "CONTEXT"} · {mention.query || "type @file: @symbol: @web:"}
+                </div>
+                <div style={{ padding: "8px 10px", color: "#555", fontSize: 11 }}>
+                  Press Esc to close
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="space-y-1.5">

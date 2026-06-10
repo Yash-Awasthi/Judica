@@ -204,6 +204,8 @@ import autotunePlugin from "./routes/autotune.js";
 import stmPlugin from "./routes/stm.js";
 import settingsPlugin from "./routes/settings.js";
 import { contextRoutes } from "./routes/context.js";
+import { diffRoutes } from "./routes/diff.js";
+import { codegenRoutes } from "./routes/codegen.js";
 import { ingestionQueue, researchQueue, repoQueue, compactionQueue } from "./queue/queues.js";
 import { googleOAuthPlugin } from "./auth/google.oauth.js";
 import { githubOAuthPlugin } from "./auth/github.strategy.js";
@@ -634,6 +636,8 @@ export async function buildApp() {
   });
   await fastify.register(stmPlugin, { prefix: "/api/stm" });
   await fastify.register(contextRoutes);
+  await fastify.register(diffRoutes);
+  await fastify.register(codegenRoutes);
   await fastify.register(async (scope) => {
     await scope.register(fastifyRateLimit, { max: 20, timeWindow: "1 minute" });
     await scope.register(uploadsPlugin, { prefix: "/api/uploads" });
