@@ -69,6 +69,10 @@ import {
   Braces,
   Waves,
   History,
+  Rss,
+  PenTool,
+  Video,
+  Route,
 } from "lucide-react";
 
 import { TooltipProvider } from "~/components/ui/tooltip";
@@ -175,6 +179,11 @@ const navGroups = [
       { to: "/extraction", icon: Braces, label: "Extraction" },
       { to: "/echo-chamber", icon: Waves, label: "Echo Chamber" },
       { to: "/council-checkpoints", icon: History, label: "Checkpoints" },
+      { to: "/reasoning", icon: Brain, label: "Reasoning" },
+      { to: "/craft", icon: PenTool, label: "Craft" },
+      { to: "/video-transcript", icon: Video, label: "Video Transcript" },
+      { to: "/rss", icon: Rss, label: "RSS Feeds" },
+      { to: "/task-routing", icon: Route, label: "Task Routing" },
     ],
   },
   {

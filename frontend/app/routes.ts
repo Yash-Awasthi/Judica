@@ -91,4 +91,9 @@ export default [
   route("extraction", "routes/extraction.tsx"),
   route("echo-chamber", "routes/echo-chamber.tsx"),
   route("council-checkpoints", "routes/council-checkpoints.tsx"),
+  route("reasoning", "routes/reasoning.tsx"),
+  route("rss", "routes/rss.tsx"),
+  route("craft", "routes/craft.tsx"),
+  route("video-transcript", "routes/video-transcript.tsx"),
+  route("task-routing", "routes/task-routing.tsx"),
 ] satisfies RouteConfig;
