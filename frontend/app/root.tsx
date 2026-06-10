@@ -56,6 +56,8 @@ import {
   CreditCard,
   Globe,
   Radio,
+  Terminal,
+  Bot,
 } from "lucide-react";
 
 import { TooltipProvider } from "~/components/ui/tooltip";
@@ -156,6 +158,8 @@ const navGroups = [
       { to: "/simulation", icon: Swords, label: "Simulation" },
       { to: "/knowledge-graph", icon: Network, label: "Knowledge Graph" },
       { to: "/fine-tune", icon: Cpu, label: "Fine-Tune" },
+      { to: "/sandbox", icon: Terminal, label: "Sandbox" },
+      { to: "/agents", icon: Bot, label: "Agents" },
     ],
   },
   {

@@ -75,4 +75,6 @@ export default [
   route("billing", "routes/billing.tsx"),
   route("web-search", "routes/web-search.tsx"),
   route("rooms", "routes/rooms.tsx"),
+  route("sandbox", "routes/sandbox.tsx"),
+  route("agents", "routes/agents.tsx"),
 ] satisfies RouteConfig;
