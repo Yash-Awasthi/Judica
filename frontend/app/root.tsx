@@ -60,6 +60,8 @@ import {
   Bot,
   Key,
   Flag,
+  BookOpenCheck,
+  MessageSquare,
 } from "lucide-react";
 
 import { TooltipProvider } from "~/components/ui/tooltip";
@@ -172,6 +174,7 @@ const navGroups = [
       { to: "/profile", icon: UserCircle, label: "Profile" },
       { to: "/billing", icon: CreditCard, label: "Billing" },
       { to: "/api-tokens", icon: Key, label: "API Tokens" },
+      { to: "/standard-answers", icon: BookOpenCheck, label: "Standard Answers" },
       { to: "/web-search", icon: Globe, label: "Web Search" },
       { to: "/rooms", icon: Radio, label: "Rooms" },
     ],
@@ -185,6 +188,7 @@ const navGroups = [
       { to: "/admin/audit", icon: ScrollText, label: "Audit Log" },
       { to: "/admin/traces", icon: Activity, label: "Traces" },
       { to: "/admin/feature-flags", icon: Flag, label: "Feature Flags" },
+      { to: "/admin/feedback", icon: MessageSquare, label: "Feedback" },
     ],
   },
 ];
