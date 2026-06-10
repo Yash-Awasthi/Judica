@@ -48,6 +48,7 @@ import {
   Bell,
   X,
   ImageIcon,
+  Activity,
 } from "lucide-react";
 
 import { TooltipProvider } from "~/components/ui/tooltip";
@@ -157,6 +158,7 @@ const navGroups = [
       { to: "/admin/analytics", icon: BarChart3, label: "Analytics" },
       { to: "/admin/system", icon: Server, label: "System" },
       { to: "/admin/audit", icon: ScrollText, label: "Audit Log" },
+      { to: "/admin/traces", icon: Activity, label: "Traces" },
     ],
   },
 ];

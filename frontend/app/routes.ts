@@ -55,4 +55,5 @@ export default [
   route("admin/analytics", "routes/admin-analytics.tsx"),
   route("admin/system", "routes/admin-system.tsx"),
   route("admin/audit", "routes/admin-audit.tsx"),
+  route("admin/traces", "routes/admin-traces.tsx"),
 ] satisfies RouteConfig;
