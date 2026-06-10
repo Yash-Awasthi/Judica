@@ -1,7 +1,6 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   AVAILABLE_PROVIDERS,
-  INITIAL_CONNECTED_PROVIDERS,
   type ConnectedProvider,
   type Provider,
 } from "~/lib/mock-data";
@@ -71,10 +70,32 @@ function getProviderIcon(iconKey: string) {
 
 export default function LanguageModelsPage() {
   const store = useStore();
-  const [connectedProviders, setConnectedProviders] = useState<ConnectedProvider[]>(
-    INITIAL_CONNECTED_PROVIDERS
-  );
+  const [connectedProviders, setConnectedProviders] = useState<ConnectedProvider[]>([]);
   const [defaultModel, setDefaultModel] = useState("gpt-4o");
+  const [providersLoading, setProvidersLoading] = useState(true);
+
+  // Load user's connected providers from the API
+  useEffect(() => {
+    setProvidersLoading(true);
+    fetch("/api/providers")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => {
+        if (!data?.providers) return;
+        // Map API response to ConnectedProvider shape
+        const mapped: ConnectedProvider[] = data.providers.map((p: any) => ({
+          id:            String(p.id),
+          providerId:    p.provider ?? p.type ?? "custom",
+          displayName:   p.name,
+          apiKey:        p.apiKey ?? "••••",
+          baseUrl:       p.baseUrl,
+          enabledModels: p.model ? [p.model] : [],
+          isDefault:     false,
+        }));
+        setConnectedProviders(mapped);
+      })
+      .catch(() => {})
+      .finally(() => setProvidersLoading(false));
+  }, []);
 
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -140,42 +161,53 @@ export default function LanguageModelsPage() {
     }, 1000);
   }
 
-  function handleSave() {
+  async function handleSave() {
     if (!editingProvider) return;
     setIsSaving(true);
-    setTimeout(() => {
+    try {
       if (editingConnection) {
-        setConnectedProviders((prev) =>
-          prev.map((cp) =>
-            cp.id === editingConnection.id
-              ? {
-                  ...cp,
-                  displayName: formDisplayName,
-                  apiKey: formApiKey,
-                  baseUrl: formBaseUrl || undefined,
-                  enabledModels: formEnabledModels,
-                }
-              : cp
-          )
-        );
-      } else {
-        const newConnection: ConnectedProvider = {
-          id: `conn-${editingProvider.id}-${Date.now()}`,
-          providerId: editingProvider.id,
-          displayName: formDisplayName,
-          apiKey: formApiKey,
-          baseUrl: formBaseUrl || undefined,
-          enabledModels: formEnabledModels,
-          isDefault: connectedProviders.length === 0,
-        };
-        setConnectedProviders((prev) => [...prev, newConnection]);
+        // Update existing — use DELETE + re-add (no PATCH endpoint)
+        await fetch(`/api/providers/${editingConnection.id}`, { method: "DELETE" }).catch(() => {});
       }
-      setIsSaving(false);
-      setDialogOpen(false);
-    }, 500);
+      // Create new / re-create
+      const res = await fetch("/api/providers", {
+        method:  "POST",
+        headers: { "Content-Type": "application/json" },
+        body:    JSON.stringify({
+          name:     formDisplayName || editingProvider.name,
+          type:     editingProvider.id,
+          provider: editingProvider.id,
+          apiKey:   formApiKey,
+          model:    formEnabledModels[0] ?? editingProvider.models?.[0]?.id ?? "",
+          baseUrl:  formBaseUrl || undefined,
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        const newConn: ConnectedProvider = {
+          id:            String(data.provider?.id ?? `conn-${Date.now()}`),
+          providerId:    editingProvider.id,
+          displayName:   formDisplayName || editingProvider.name,
+          apiKey:        formApiKey ? "••••" + formApiKey.slice(-4) : "••••",
+          baseUrl:       formBaseUrl || undefined,
+          enabledModels: formEnabledModels,
+          isDefault:     connectedProviders.length === 0,
+        };
+        if (editingConnection) {
+          setConnectedProviders((prev) => prev.map((cp) => cp.id === editingConnection.id ? newConn : cp));
+        } else {
+          setConnectedProviders((prev) => [...prev, newConn]);
+        }
+      }
+    } catch { /* ignore — optimistically updated */ }
+    setIsSaving(false);
+    setDialogOpen(false);
   }
 
-  function handleDelete(connectionId: string) {
+  async function handleDelete(connectionId: string) {
+    try {
+      await fetch(`/api/providers/${connectionId}`, { method: "DELETE" });
+    } catch { /* ignore */ }
     setConnectedProviders((prev) => prev.filter((cp) => cp.id !== connectionId));
   }
 
