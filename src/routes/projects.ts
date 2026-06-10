@@ -120,6 +120,63 @@ const projectsPlugin: FastifyPluginAsync = async (fastify) => {
     }
     return { success: true };
   });
+
+  // ── File attachments ─────────────────────────────────────────────────────
+
+  interface ProjectFileEntry {
+    id: string;
+    filename: string;
+    size: number;
+    added_at: string;
+  }
+
+  // In-memory file store keyed by projectId (swap for DB/R2 when ready)
+  const fileStore = new Map<string, ProjectFileEntry[]>();
+
+  // GET /:projectId/files
+  fastify.get("/:projectId/files", async (request, _reply) => {
+    const { projectId } = request.params as { projectId: string };
+    return fileStore.get(projectId) ?? [];
+  });
+
+  // POST /:projectId/files — multipart upload
+  fastify.post("/:projectId/files", async (request, reply) => {
+    const { projectId } = request.params as { projectId: string };
+    const data = await (request as any).file?.();
+    if (!data) throw new AppError(400, "No file provided");
+
+    const MAX_SIZE = 5 * 1024 * 1024;
+    const chunks: Buffer[] = [];
+    let total = 0;
+    for await (const chunk of data.file) {
+      total += chunk.length;
+      if (total > MAX_SIZE) throw new AppError(413, "File too large (max 5 MB)");
+      chunks.push(chunk);
+    }
+
+    const fileId = `file_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const entry: ProjectFileEntry = {
+      id: fileId,
+      filename: data.filename ?? "upload",
+      size: total,
+      added_at: new Date().toISOString(),
+    };
+
+    const existing = fileStore.get(projectId) ?? [];
+    if (existing.length >= 10) throw new AppError(400, "Maximum 10 files per project");
+    fileStore.set(projectId, [...existing, entry]);
+
+    return reply.code(201).send(entry);
+  });
+
+  // DELETE /:projectId/files/:fileId
+  fastify.delete("/:projectId/files/:fileId", async (request, _reply) => {
+    const { projectId, fileId } = request.params as { projectId: string; fileId: string };
+    const files = fileStore.get(projectId) ?? [];
+    if (!files.find((f) => f.id === fileId)) throw new AppError(404, "File not found");
+    fileStore.set(projectId, files.filter((f) => f.id !== fileId));
+    return { deleted: true };
+  });
 };
 
 export default projectsPlugin;
