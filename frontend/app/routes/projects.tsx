@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { Loader2 } from "lucide-react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
 import { Input } from "~/components/ui/input";
@@ -19,6 +20,18 @@ import {
 } from "~/components/ui/dropdown-menu";
 import { FolderOpen, Plus, MessageSquare, MoreVertical, Pencil, Trash2 } from "lucide-react";
 
+async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...init?.headers },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as { message?: string }).message ?? `Request failed: ${res.status}`);
+  }
+  return res.json() as Promise<T>;
+}
+
 interface Project {
   id: string;
   name: string;
@@ -27,49 +40,27 @@ interface Project {
   createdAt: string;
 }
 
-const initialProjects: Project[] = [
-  {
-    id: "proj_1",
-    name: "API Redesign",
-    description: "Complete API v2 redesign with GraphQL support",
-    conversationCount: 12,
-    createdAt: "2026-03-15",
-  },
-  {
-    id: "proj_2",
-    name: "ML Pipeline",
-    description: "Production ML pipeline for recommendation engine",
-    conversationCount: 8,
-    createdAt: "2026-04-01",
-  },
-  {
-    id: "proj_3",
-    name: "Security Audit",
-    description: "Q2 security audit and compliance review",
-    conversationCount: 5,
-    createdAt: "2026-04-10",
-  },
-  {
-    id: "proj_4",
-    name: "Mobile App",
-    description: "React Native mobile companion app",
-    conversationCount: 3,
-    createdAt: "2026-04-18",
-  },
-];
-
 export default function ProjectsPage() {
-  const [projects, setProjects] = useState<Project[]>(initialProjects);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [newProjectOpen, setNewProjectOpen] = useState(false);
   const [editProject, setEditProject] = useState<Project | null>(null);
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
 
-  const openNew = () => {
-    setName("");
-    setDescription("");
-    setNewProjectOpen(true);
-  };
+  // ── Load projects ──────────────────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    apiFetch<{ projects: Project[] }>('/api/v1/projects')
+      .then(({ projects: list }) => { if (!cancelled) setProjects(list); })
+      .catch((e) => { if (!cancelled) setError(e.message); })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const openNew = () => { setName(""); setDescription(""); setNewProjectOpen(true); };
 
   const openEdit = (project: Project) => {
     setName(project.name);
@@ -77,37 +68,66 @@ export default function ProjectsPage() {
     setEditProject(project);
   };
 
-  const handleCreate = () => {
+  const handleCreate = async () => {
     if (!name.trim()) return;
-    const newProject: Project = {
-      id: `proj_${Date.now()}`,
-      name: name.trim(),
-      description: description.trim(),
-      conversationCount: 0,
-      createdAt: new Date().toISOString().slice(0, 10),
-    };
-    setProjects((prev) => [newProject, ...prev]);
-    setNewProjectOpen(false);
+    setSaving(true);
+    try {
+      const created = await apiFetch<Project>('/api/v1/projects', {
+        method: 'POST',
+        body: JSON.stringify({ name: name.trim(), description: description.trim() }),
+      });
+      setProjects((prev) => [created, ...prev]);
+      setNewProjectOpen(false);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to create project');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleUpdate = () => {
+  const handleUpdate = async () => {
     if (!editProject || !name.trim()) return;
-    setProjects((prev) =>
-      prev.map((p) =>
-        p.id === editProject.id
-          ? { ...p, name: name.trim(), description: description.trim() }
-          : p
-      )
-    );
-    setEditProject(null);
+    setSaving(true);
+    try {
+      const updated = await apiFetch<Project>(`/api/v1/projects/${editProject.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ name: name.trim(), description: description.trim() }),
+      });
+      setProjects((prev) => prev.map((p) => p.id === editProject.id ? updated : p));
+      setEditProject(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update project');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleDelete = (id: string) => {
-    setProjects((prev) => prev.filter((p) => p.id !== id));
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this project?')) return;
+    try {
+      await apiFetch(`/api/v1/projects/${id}`, { method: 'DELETE' });
+      setProjects((prev) => prev.filter((p) => p.id !== id));
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete project');
+    }
   };
+
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 overflow-y-auto">
+      {error && (
+        <div className="fixed top-4 right-4 z-50 bg-destructive text-destructive-foreground text-xs px-3 py-2 rounded-md shadow-lg flex items-center gap-2">
+          {error}
+          <button onClick={() => setError(null)} className="font-bold">✕</button>
+        </div>
+      )}
       <div className="max-w-6xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -219,7 +239,8 @@ export default function ProjectsPage() {
             <Button variant="outline" onClick={() => setNewProjectOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleCreate} disabled={!name.trim()}>
+            <Button onClick={handleCreate} disabled={!name.trim() || saving} className="gap-2">
+              {saving && <Loader2 className="size-3.5 animate-spin" />}
               Create Project
             </Button>
           </DialogFooter>
@@ -257,7 +278,8 @@ export default function ProjectsPage() {
             <Button variant="outline" onClick={() => setEditProject(null)}>
               Cancel
             </Button>
-            <Button onClick={handleUpdate} disabled={!name.trim()}>
+            <Button onClick={handleUpdate} disabled={!name.trim() || saving} className="gap-2">
+              {saving && <Loader2 className="size-3.5 animate-spin" />}
               Save Changes
             </Button>
           </DialogFooter>

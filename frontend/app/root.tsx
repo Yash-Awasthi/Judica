@@ -35,6 +35,7 @@ import {
   Moon,
   Eye,
   Hammer,
+  Zap,
 } from "lucide-react";
 
 import { TooltipProvider } from "~/components/ui/tooltip";
@@ -114,6 +115,7 @@ const navGroups = [
       { to: "/marketplace", icon: Store, label: "Marketplace" },
       { to: "/build", icon: Hammer, label: "Build" },
       { to: "/god-mode", icon: Eye, label: "God Mode" },
+      { to: "/ultraplinian", icon: Zap, label: "ULTRAPLINIAN" },
     ],
   },
   {

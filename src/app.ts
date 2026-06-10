@@ -197,6 +197,7 @@ import semanticCachePlugin from "./routes/semantic-cache.js";
 import taskRoutingPlugin from "./routes/task-routing.js";
 import sandboxSessionsPlugin from "./routes/sandbox-sessions.js";
 import councilCheckpointsPlugin from "./routes/council-checkpoints.js";
+import ultraplinianPlugin from "./routes/ultraplinian.js";
 import { ingestionQueue, researchQueue, repoQueue, compactionQueue } from "./queue/queues.js";
 import { googleOAuthPlugin } from "./auth/google.oauth.js";
 import { githubOAuthPlugin } from "./auth/github.strategy.js";
@@ -602,6 +603,12 @@ export async function buildApp() {
   await fastify.register(async (scope) => {
     await scope.register(fastifyRateLimit, { max: 30, timeWindow: "1 minute" });
     await scope.register(askPlugin, { prefix: "/api/ask" });
+  });
+  // ULTRAPLINIAN — ultra-parallel multi-model querying (tier: 10/24/36/45/51)
+  await fastify.register(async (scope) => {
+    // Tier 51 = 51 parallel requests; stricter limit to prevent cost runaway
+    await scope.register(fastifyRateLimit, { max: 5, timeWindow: "1 minute" });
+    await scope.register(ultraplinianPlugin, { prefix: "/api/ultraplinian" });
   });
   await fastify.register(async (scope) => {
     await scope.register(fastifyRateLimit, { max: 20, timeWindow: "1 minute" });

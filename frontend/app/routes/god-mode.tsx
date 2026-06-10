@@ -90,26 +90,79 @@ export default function GodModePage() {
       setIsLoading(false);
     });
 
+    // Try Electron IPC first; fall back to backend API
+    let usedElectron = false;
     try {
       await deliberate({ threadId, message: question, round: 1 });
+      usedElectron = true;
     } catch {
-      // Not in Electron — show mock parallel responses
-      const mockTexts = [
-        "From an architectural standpoint, this question touches on fundamental system design principles. The key considerations are scalability, maintainability, and the trade-offs between consistency and availability. A well-structured approach would decompose the problem into orthogonal concerns...",
-        "Pragmatically speaking, the most important factor here is delivery speed and real-world constraints. Theory is valuable but implementation is where design meets reality. I'd focus on the simplest solution that works today and can be evolved tomorrow...",
-        "The ethical dimension of this question deserves attention. Beyond technical correctness, we must ask: who is affected by this decision, and how? Long-term consequences for users and society should weigh heavily in the calculus here...",
-      ];
-      setResponses(enabledMembers.slice(0, 3).map((m, i) => ({
-        alias: m.label,
-        model: m.model || m.provider,
-        text: mockTexts[i % mockTexts.length],
-        latencyMs: 800 + i * 300,
-        tokens: Math.ceil(mockTexts[i % mockTexts.length].length / 4),
-        status: "done",
-      })));
-      setSynthesis("After deliberation, the council converges on a balanced approach: acknowledge the architectural constraints, deliver iteratively, and build ethical review into the process from day one rather than auditing after the fact.");
+      // Not in Electron — will call backend below
+    }
+
+    if (!usedElectron) {
       unsubOpinion(); unsubVerdict(); unsubDone();
-      setIsLoading(false);
+
+      try {
+        const res = await fetch("/api/ask/stream", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ question, mode: "manual", god_mode: true, rounds: 1 }),
+        });
+
+        if (!res.ok || !res.body) throw new Error(`Server error ${res.status}`);
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = "";
+        const startMs = Date.now();
+        const seen = new Set<string>();
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const lines = buf.split("\n");
+          buf = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (!line.startsWith("data: ")) continue;
+            try {
+              const ev = JSON.parse(line.slice(6));
+              if (ev.type === "opinion") {
+                const alias: string = ev.name || "Member";
+                const text: string = ev.opinion || "";
+                const elapsed = Date.now() - startMs;
+                if (!seen.has(alias)) {
+                  seen.add(alias);
+                  setResponses(prev => [
+                    ...prev,
+                    { alias, model: alias, text, latencyMs: elapsed, tokens: Math.ceil(text.length / 4), status: "done" as const },
+                  ]);
+                } else {
+                  setResponses(prev => prev.map(r =>
+                    r.alias === alias
+                      ? { ...r, text, latencyMs: elapsed, tokens: Math.ceil(text.length / 4), status: "done" as const }
+                      : r
+                  ));
+                }
+              } else if (ev.type === "done") {
+                if (ev.verdict) setSynthesis(ev.verdict);
+              } else if (ev.type === "error") {
+                throw new Error(ev.message || "Stream error");
+              }
+            } catch {
+              // malformed line — skip
+            }
+          }
+        }
+      } catch (err) {
+        setResponses(prev => prev.map(r => ({
+          ...r, status: "error" as const,
+          error: err instanceof Error ? err.message : "Request failed",
+        })));
+      } finally {
+        setIsLoading(false);
+      }
     }
   }
 

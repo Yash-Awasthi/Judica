@@ -1,4 +1,4 @@
-import { lazy, Suspense, useState, useCallback } from 'react';
+import { lazy, Suspense, useState, useCallback, useEffect } from 'react';
 import { Badge } from "~/components/ui/badge";
 import { Button } from "~/components/ui/button";
 import { Input } from "~/components/ui/input";
@@ -10,56 +10,42 @@ import {
   Save,
   Trash2,
   GitCommit,
-  Tag,
   ChevronDown,
+  Loader2,
 } from "lucide-react";
 
 const MonacoEditor = lazy(() => import('@monaco-editor/react'));
 
-const mockPrompts = [
-  {
-    id: "p1",
-    name: "System Architect",
-    version: 4,
-    model: "gpt-4o",
-    tags: ["system", "architecture"],
-    content: "You are The Architect, a systems-thinking AI archetype.\n\n## Role\nAnalyze complex systems and identify structural patterns, dependencies, and potential failure modes.\n\n## Instructions\n- Break down the problem into components\n- Identify interfaces between components\n- Evaluate scalability and maintainability\n- Consider {{context}} when analyzing\n\n## Output Format\n1. System Overview\n2. Component Analysis\n3. Dependency Map\n4. Recommendations",
-  },
-  {
-    id: "p2",
-    name: "Code Reviewer",
-    version: 7,
-    model: "claude-sonnet-4-6",
-    tags: ["code", "review"],
-    content: "You are a senior code reviewer.\n\n## Review Checklist\n- [ ] Correctness: Does the code do what it's supposed to?\n- [ ] Performance: Are there any O(n²) or worse algorithms?\n- [ ] Security: Any injection vectors, XSS, or auth issues?\n- [ ] Style: Does it follow {{project_style_guide}}?\n\n## Severity Levels\n- 🔴 Critical: Must fix before merge\n- 🟡 Warning: Should fix, but not blocking\n- 🟢 Suggestion: Nice to have improvement",
-  },
-  {
-    id: "p3",
-    name: "Research Synthesis",
-    version: 2,
-    model: "gpt-4o",
-    tags: ["research", "analysis"],
-    content: "Synthesize research from multiple sources into a coherent analysis.\n\n## Process\n1. Gather key findings from each source\n2. Identify common themes and contradictions\n3. Weight evidence by source reliability\n4. Generate synthesis with citations\n\n## Variables\n- Topic: {{topic}}\n- Sources: {{source_list}}\n- Depth: {{analysis_depth}}",
-  },
-  {
-    id: "p4",
-    name: "Debate Moderator",
-    version: 3,
-    model: "gemini-2.5-pro",
-    tags: ["debate", "moderation"],
-    content: "You moderate multi-agent debates.\n\n## Rules\n1. Each agent gets equal speaking time\n2. Encourage constructive disagreement\n3. Synthesize a verdict when consensus emerges\n4. Flag logical fallacies\n\n## Format\nRound {{round_number}} of {{total_rounds}}\nTopic: {{debate_topic}}",
-  },
-  {
-    id: "p5",
-    name: "Creative Brainstorm",
-    version: 1,
-    model: "claude-sonnet-4-6",
-    tags: ["creative", "ideas"],
-    content: "Generate creative solutions using divergent thinking.\n\n## Techniques\n- SCAMPER method\n- Random association\n- Constraint removal\n- Cross-domain analogy\n\n## Challenge\n{{challenge_description}}\n\n## Output\nGenerate 10 ideas, ranked by novelty and feasibility.",
-  },
-];
+// ── Types ──────────────────────────────────────────────────────────────────
+interface PromptVersion {
+  id: string;
+  versionNum: number;
+  content: string;
+  model: string | null;
+  temperature: number | null;
+  createdAt: string;
+}
 
-type Prompt = typeof mockPrompts[0];
+interface Prompt {
+  id: string;
+  name: string;
+  description: string | null;
+  createdAt: string;
+  versions: PromptVersion[];
+}
+
+// ── API helpers ────────────────────────────────────────────────────────────
+async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...init?.headers },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as { message?: string }).message ?? `Request failed: ${res.status}`);
+  }
+  return res.json() as Promise<T>;
+}
 
 const MODELS = [
   "gpt-4o",
@@ -76,29 +62,72 @@ function extractVariables(content: string): string[] {
 }
 
 export default function PromptsPage() {
-  const [prompts, setPrompts] = useState<Prompt[]>(mockPrompts);
-  const [selectedId, setSelectedId] = useState<string>(mockPrompts[0].id);
+  const [prompts, setPrompts] = useState<Prompt[]>([]);
+  const [selectedId, setSelectedId] = useState<string>('');
+  const [selectedPrompt, setSelectedPrompt] = useState<Prompt | null>(null);
   const [search, setSearch] = useState('');
   const [editedContent, setEditedContent] = useState<Record<string, string>>({});
   const [editedModel, setEditedModel] = useState<Record<string, string>>({});
   const [showModelDropdown, setShowModelDropdown] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [loadingDetail, setLoadingDetail] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  const selectedPrompt = prompts.find((p) => p.id === selectedId) || null;
+  // ── Load prompt list ─────────────────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    apiFetch<{ prompts: Prompt[] }>('/api/prompts')
+      .then(({ prompts: list }) => {
+        if (cancelled) return;
+        setPrompts(list);
+        if (list.length > 0) setSelectedId(list[0].id);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
+    return () => { cancelled = true; };
+  }, []);
 
+  // ── Load detail when selection changes ──────────────────────────────────
+  useEffect(() => {
+    if (!selectedId) return;
+    let cancelled = false;
+    setLoadingDetail(true);
+    apiFetch<Prompt>(`/api/prompts/${selectedId}`)
+      .then((detail) => {
+        if (!cancelled) setSelectedPrompt(detail);
+      })
+      .catch((e) => {
+        if (!cancelled) setError(e.message);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingDetail(false);
+      });
+    return () => { cancelled = true; };
+  }, [selectedId]);
+
+  const latestVersion = selectedPrompt?.versions?.[0] ?? null;
   const currentContent = selectedId
-    ? (editedContent[selectedId] ?? selectedPrompt?.content ?? '')
+    ? (editedContent[selectedId] ?? latestVersion?.content ?? '')
     : '';
-
   const currentModel = selectedId
-    ? (editedModel[selectedId] ?? selectedPrompt?.model ?? 'gpt-4o')
+    ? (editedModel[selectedId] ?? latestVersion?.model ?? 'gpt-4o')
     : 'gpt-4o';
-
   const variables = extractVariables(currentContent);
 
   const filteredPrompts = prompts.filter((p) =>
-    p.name.toLowerCase().includes(search.toLowerCase()) ||
-    p.tags.some((t) => t.toLowerCase().includes(search.toLowerCase()))
+    p.name.toLowerCase().includes(search.toLowerCase())
   );
+
+  const hasUnsavedChanges = !!(selectedId && (
+    (editedContent[selectedId] !== undefined && editedContent[selectedId] !== latestVersion?.content) ||
+    (editedModel[selectedId] !== undefined && editedModel[selectedId] !== latestVersion?.model)
+  ));
 
   const handleContentChange = useCallback((value: string) => {
     if (!selectedId) return;
@@ -111,61 +140,84 @@ export default function PromptsPage() {
     setShowModelDropdown(false);
   }, [selectedId]);
 
-  const handleSave = useCallback(() => {
-    if (!selectedId) return;
-    setPrompts((prev) =>
-      prev.map((p) => {
-        if (p.id !== selectedId) return p;
-        return {
-          ...p,
-          content: editedContent[selectedId] ?? p.content,
-          model: editedModel[selectedId] ?? p.model,
-          version: p.version + 1,
-        };
-      })
-    );
-    setEditedContent((prev) => {
-      const next = { ...prev };
-      delete next[selectedId];
-      return next;
-    });
-    setEditedModel((prev) => {
-      const next = { ...prev };
-      delete next[selectedId];
-      return next;
-    });
-  }, [selectedId, editedContent, editedModel]);
+  const handleSave = useCallback(async () => {
+    if (!selectedId || !selectedPrompt) return;
+    const content = editedContent[selectedId] ?? latestVersion?.content;
+    const model = editedModel[selectedId] ?? latestVersion?.model;
+    if (!content) return;
+    setSaving(true);
+    try {
+      const newVersion = await apiFetch<PromptVersion>(
+        `/api/prompts/${selectedId}/versions`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ content, model }),
+        }
+      );
+      // Update local state with new version
+      setSelectedPrompt((prev) => prev ? { ...prev, versions: [newVersion] } : prev);
+      setPrompts((prev) =>
+        prev.map((p) => p.id === selectedId ? { ...p, versions: [newVersion] } : p)
+      );
+      setEditedContent((prev) => { const n = { ...prev }; delete n[selectedId]; return n; });
+      setEditedModel((prev) => { const n = { ...prev }; delete n[selectedId]; return n; });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to save');
+    } finally {
+      setSaving(false);
+    }
+  }, [selectedId, selectedPrompt, editedContent, editedModel, latestVersion]);
 
-  const handleDelete = useCallback(() => {
+  const handleDelete = useCallback(async () => {
     if (!selectedId) return;
-    const remaining = prompts.filter((p) => p.id !== selectedId);
-    setPrompts(remaining);
-    setSelectedId(remaining[0]?.id || '');
+    if (!confirm('Delete this prompt? This cannot be undone.')) return;
+    try {
+      await apiFetch(`/api/prompts/${selectedId}`, { method: 'DELETE' });
+      const remaining = prompts.filter((p) => p.id !== selectedId);
+      setPrompts(remaining);
+      setSelectedPrompt(null);
+      setSelectedId(remaining[0]?.id ?? '');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete');
+    }
   }, [selectedId, prompts]);
 
-  const handleNewPrompt = useCallback(() => {
-    const newPrompt: Prompt = {
-      id: `p-${Date.now()}`,
-      name: "Untitled Prompt",
-      version: 1,
-      model: "gpt-4o",
-      tags: [],
-      content: "# New Prompt\n\nDescribe the role and instructions here.\n\n## Variables\n- Input: {{input}}",
-    };
-    setPrompts((prev) => [newPrompt, ...prev]);
-    setSelectedId(newPrompt.id);
+  const handleNewPrompt = useCallback(async () => {
+    try {
+      const created = await apiFetch<Prompt>('/api/prompts', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: 'Untitled Prompt',
+          content: '# New Prompt\n\nDescribe the role and instructions here.\n\n## Variables\n- Input: {{input}}',
+        }),
+      });
+      setPrompts((prev) => [created, ...prev]);
+      setSelectedId(created.id);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to create prompt');
+    }
   }, []);
 
-  const hasUnsavedChanges = selectedId && (
-    (editedContent[selectedId] !== undefined && editedContent[selectedId] !== selectedPrompt?.content) ||
-    (editedModel[selectedId] !== undefined && editedModel[selectedId] !== selectedPrompt?.model)
-  );
+  // ── Render ───────────────────────────────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex-1 flex overflow-hidden">
+      {error && (
+        <div className="fixed top-4 right-4 z-50 bg-destructive text-destructive-foreground text-xs px-3 py-2 rounded-md shadow-lg flex items-center gap-2">
+          {error}
+          <button onClick={() => setError(null)} className="font-bold">✕</button>
+        </div>
+      )}
+
       {/* Left sidebar */}
       <div className="w-64 border-r border-border flex flex-col bg-background shrink-0">
-        {/* Sidebar header */}
         <div className="p-3 border-b border-border space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -196,7 +248,6 @@ export default function PromptsPage() {
           </div>
         </div>
 
-        {/* Prompt list */}
         <ScrollArea className="flex-1">
           <div className="p-1.5 space-y-0.5">
             {filteredPrompts.length === 0 && (
@@ -205,6 +256,7 @@ export default function PromptsPage() {
             {filteredPrompts.map((prompt) => {
               const isSelected = prompt.id === selectedId;
               const isDirty = editedContent[prompt.id] !== undefined || editedModel[prompt.id] !== undefined;
+              const vNum = prompt.versions?.[0]?.versionNum ?? 1;
               return (
                 <button
                   key={prompt.id}
@@ -217,27 +269,17 @@ export default function PromptsPage() {
                 >
                   <div className="flex items-center gap-1.5 mb-1">
                     <span className="text-xs font-medium truncate flex-1">{prompt.name}</span>
-                    <Badge
-                      variant="outline"
-                      className="text-[9px] h-4 px-1 shrink-0 gap-0.5"
-                    >
+                    <Badge variant="outline" className="text-[9px] h-4 px-1 shrink-0 gap-0.5">
                       <GitCommit className="size-2" />
-                      v{prompt.version}
+                      v{vNum}
                     </Badge>
                     {isDirty && (
                       <span className="size-1.5 rounded-full bg-orange-400 shrink-0" title="Unsaved changes" />
                     )}
                   </div>
-                  <div className="flex items-center gap-1 flex-wrap">
-                    {prompt.tags.slice(0, 2).map((tag) => (
-                      <span
-                        key={tag}
-                        className="text-[9px] text-muted-foreground bg-muted px-1 rounded"
-                      >
-                        {tag}
-                      </span>
-                    ))}
-                  </div>
+                  {prompt.description && (
+                    <p className="text-[10px] text-muted-foreground truncate">{prompt.description}</p>
+                  )}
                 </button>
               );
             })}
@@ -247,7 +289,11 @@ export default function PromptsPage() {
 
       {/* Main editor area */}
       <div className="flex-1 flex flex-col overflow-hidden">
-        {selectedPrompt ? (
+        {loadingDetail ? (
+          <div className="flex-1 flex items-center justify-center">
+            <Loader2 className="size-5 animate-spin text-muted-foreground" />
+          </div>
+        ) : selectedPrompt ? (
           <>
             {/* Top bar */}
             <div className="h-12 border-b border-border flex items-center px-4 gap-3 bg-background shrink-0">
@@ -256,18 +302,8 @@ export default function PromptsPage() {
                 <span className="text-sm font-medium truncate">{selectedPrompt.name}</span>
                 <Badge variant="outline" className="text-[10px] shrink-0 gap-0.5">
                   <GitCommit className="size-2.5" />
-                  v{selectedPrompt.version}
+                  v{latestVersion?.versionNum ?? 1}
                 </Badge>
-              </div>
-
-              {/* Tags */}
-              <div className="hidden md:flex items-center gap-1">
-                <Tag className="size-3 text-muted-foreground" />
-                {selectedPrompt.tags.map((tag) => (
-                  <Badge key={tag} variant="secondary" className="text-[10px] h-5">
-                    {tag}
-                  </Badge>
-                ))}
               </div>
 
               {/* Model selector */}
@@ -310,9 +346,9 @@ export default function PromptsPage() {
                 size="sm"
                 className="h-7 gap-1.5 text-xs"
                 onClick={handleSave}
-                disabled={!hasUnsavedChanges}
+                disabled={!hasUnsavedChanges || saving}
               >
-                <Save className="size-3.5" />
+                {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
                 Save{hasUnsavedChanges ? ' *' : ''}
               </Button>
             </div>
@@ -342,7 +378,7 @@ export default function PromptsPage() {
               </Suspense>
             </div>
 
-            {/* Variable bar at bottom */}
+            {/* Variable bar */}
             {variables.length > 0 && (
               <div className="h-10 border-t border-border flex items-center px-4 gap-2 bg-muted/30 shrink-0">
                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-semibold shrink-0">
@@ -376,7 +412,6 @@ export default function PromptsPage() {
         )}
       </div>
 
-      {/* Click outside to close model dropdown */}
       {showModelDropdown && (
         <div
           className="fixed inset-0 z-40"

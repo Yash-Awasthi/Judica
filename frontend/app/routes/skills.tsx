@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "~/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "~/components/ui/card";
 import { Badge } from "~/components/ui/badge";
@@ -32,6 +32,7 @@ import {
   FileJson,
   FileText,
   Loader2,
+  Trash2,
 } from "lucide-react";
 
 interface Skill {
@@ -43,7 +44,52 @@ interface Skill {
   code: string;
 }
 
-const mockSkills: Skill[] = [
+// ── API helpers ────────────────────────────────────────────────────────────
+async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
+  const res = await fetch(url, {
+    ...init,
+    headers: { "Content-Type": "application/json", ...init?.headers },
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error((body as { message?: string }).message ?? `Request failed: ${res.status}`);
+  }
+  return res.json() as Promise<T>;
+}
+
+interface BackendSkill {
+  id: string;
+  name: string;
+  description: string;
+  code: string;
+  language: string;
+  version: string;
+  parameters: Record<string, unknown>;
+  createdAt: string;
+}
+
+function normalizeLanguage(lang: string): Skill["language"] {
+  const map: Record<string, Skill["language"]> = {
+    python: "Python",
+    typescript: "TypeScript",
+    javascript: "JavaScript",
+  };
+  return map[lang.toLowerCase()] ?? "Python";
+}
+
+function toSkill(b: BackendSkill): Skill {
+  return {
+    id: b.id,
+    name: b.name,
+    description: b.description,
+    language: normalizeLanguage(b.language),
+    tags: [],
+    code: b.code,
+  };
+}
+
+// Keep a handful of offline examples shown when the user has no skills yet
+const EXAMPLE_SKILLS: Skill[] = [
   {
     id: "sk_1",
     name: "Web Scraper",
@@ -439,6 +485,8 @@ def to_csv_string(rows: list[dict]) -> str:
   },
 ];
 
+// ─────────────────────────────────────────────────────────────────────────────
+
 const languageColors: Record<Skill["language"], string> = {
   Python: "text-blue-400 border-blue-400/30 bg-blue-400/10",
   TypeScript: "text-sky-400 border-sky-400/30 bg-sky-400/10",
@@ -719,7 +767,9 @@ function ImportDialog({
 // ─── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function SkillsPage() {
-  const [skills, setSkills] = useState<Skill[]>(mockSkills);
+  const [skills, setSkills] = useState<Skill[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null);
   const [addOpen, setAddOpen] = useState(false);
@@ -733,6 +783,24 @@ export default function SkillsPage() {
     code: "",
   });
 
+  // ── Load skills from API ─────────────────────────────────────────────────
+  useEffect(() => {
+    let cancelled = false;
+    setLoading(true);
+    apiFetch<{ skills: BackendSkill[] }>('/api/skills')
+      .then(({ skills: list }) => {
+        if (!cancelled) {
+          setSkills(list.length > 0 ? list.map(toSkill) : EXAMPLE_SKILLS);
+        }
+      })
+      .catch(() => {
+        // Fall back to examples on auth/network error
+        if (!cancelled) setSkills(EXAMPLE_SKILLS);
+      })
+      .finally(() => { if (!cancelled) setLoading(false); });
+    return () => { cancelled = true; };
+  }, []);
+
   const filtered = skills.filter(
     (s) =>
       s.name.toLowerCase().includes(search.toLowerCase()) ||
@@ -743,22 +811,53 @@ export default function SkillsPage() {
   const handleAddSkill = async () => {
     if (!addForm.name || !addForm.language) return;
     setAddLoading(true);
-    await new Promise((r) => setTimeout(r, 600));
-    const newSkill: Skill = {
-      id: `sk_${Date.now()}`,
-      name: addForm.name,
-      description: addForm.description || "No description",
-      language: addForm.language as Skill["language"],
-      tags: addForm.tags
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean),
-      code: addForm.code || "# No code provided",
-    };
-    setSkills((prev) => [newSkill, ...prev]);
-    setAddLoading(false);
-    setAddOpen(false);
-    setAddForm({ name: "", description: "", language: "", tags: "", code: "" });
+    try {
+      const created = await apiFetch<BackendSkill>('/api/skills', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: addForm.name,
+          description: addForm.description || 'No description',
+          language: addForm.language.toLowerCase(),
+          code: addForm.code || '# No code provided',
+        }),
+      });
+      setSkills((prev) => [toSkill(created), ...prev]);
+      setAddOpen(false);
+      setAddForm({ name: "", description: "", language: "", tags: "", code: "" });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to create skill');
+    } finally {
+      setAddLoading(false);
+    }
+  };
+
+  const handleDeleteSkill = async (id: string) => {
+    if (!confirm('Delete this skill?')) return;
+    try {
+      await apiFetch(`/api/skills/${id}`, { method: 'DELETE' });
+      setSkills((prev) => prev.filter((s) => s.id !== id));
+      if (selectedSkill?.id === id) setSelectedSkill(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to delete skill');
+    }
+  };
+
+  const handleImportSkill = async (skill: Skill) => {
+    try {
+      const created = await apiFetch<BackendSkill>('/api/skills', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: skill.name,
+          description: skill.description,
+          language: skill.language.toLowerCase(),
+          code: skill.code,
+        }),
+      });
+      setSkills((prev) => [toSkill(created), ...prev]);
+    } catch {
+      // If API fails, still show it locally
+      setSkills((prev) => [skill, ...prev]);
+    }
   };
 
   const handleExport = (skill: Skill, format: "json" | "yaml") => {
@@ -792,8 +891,22 @@ export default function SkillsPage() {
     }
   };
 
+  if (loading) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <Loader2 className="size-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 overflow-y-auto">
+      {error && (
+        <div className="fixed top-4 right-4 z-50 bg-destructive text-destructive-foreground text-xs px-3 py-2 rounded-md shadow-lg flex items-center gap-2">
+          {error}
+          <button onClick={() => setError(null)} className="font-bold">✕</button>
+        </div>
+      )}
       <div className="max-w-6xl mx-auto p-6 space-y-6">
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -898,6 +1011,13 @@ export default function SkillsPage() {
                       >
                         <FileText className="size-3.5" />
                         Export as YAML
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        className="text-xs gap-2 text-destructive focus:text-destructive"
+                        onClick={() => handleDeleteSkill(skill.id)}
+                      >
+                        <Trash2 className="size-3.5" />
+                        Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
@@ -1048,7 +1168,7 @@ export default function SkillsPage() {
       <ImportDialog
         open={importOpen}
         onOpenChange={setImportOpen}
-        onImport={(skill) => setSkills((prev) => [skill, ...prev])}
+        onImport={handleImportSkill}
       />
     </div>
   );
