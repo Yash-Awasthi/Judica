@@ -17,6 +17,10 @@ import {
   Clock, FileText, ChevronDown, ChevronRight, BookOpen,
   Lightbulb, Layers, Cpu, BarChart3,
 } from "lucide-react";
+import { CitationRenderer } from "~/components/CitationRenderer";
+import { CitationsSidebar } from "~/components/CitationsSidebar";
+import { RelatedQuestions } from "~/components/RelatedQuestions";
+import type { Citation as CardCitation } from "~/components/CitationCard";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -108,6 +112,23 @@ function usePastJobs() {
   return { jobs, loading, refresh };
 }
 
+// ── Normalize Citation for CitationCard ────────────────────────────────────────
+
+function normalizeCitations(citations: Citation[]): CardCitation[] {
+  return citations.map((c, i) => {
+    let domain = "";
+    try { domain = new URL(c.url).hostname.replace("www.", ""); } catch {}
+    return {
+      id: i + 1,
+      url: c.url,
+      title: c.title,
+      domain,
+      snippet: c.excerpt,
+      confidence_score: 0.75 - (i * 0.02), // decay slightly per source
+    };
+  });
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 export default function DeepResearchPage() {
@@ -115,6 +136,9 @@ export default function DeepResearchPage() {
   const [job, setJob]               = useState<ResearchJob | null>(null);
   const [expandedSteps, setExpanded] = useState<Set<string>>(new Set());
   const [expandCitations, setExpandCitations] = useState(false);
+  const [showCitationsSidebar, setShowCitationsSidebar] = useState(false);
+  const [relatedQuestions, setRelatedQuestions]           = useState<string[]>([]);
+  const [relatedLoading, setRelatedLoading]               = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   const { jobs: pastJobs, refresh: refreshPast } = usePastJobs();
 
@@ -224,6 +248,18 @@ export default function DeepResearchPage() {
                 totalMs: ev.totalMs,
               } : j);
               refreshPast();
+              // Fetch related questions after report is complete (non-blocking)
+              if (job?.query) {
+                setRelatedLoading(true);
+                fetch("/api/research/related-questions", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({ query: job.query, report_summary: "" }),
+                })
+                  .then(r => r.ok ? r.json() : { questions: [] })
+                  .then(d => { setRelatedQuestions(d.questions ?? []); setRelatedLoading(false); })
+                  .catch(() => setRelatedLoading(false));
+              }
 
             } else if (ev.type === "error") {
               throw new Error(ev.message ?? "Research failed");
@@ -292,7 +328,8 @@ export default function DeepResearchPage() {
         </ScrollArea>
       </aside>
 
-      {/* Main area */}
+      {/* Main area + Citations sidebar */}
+      <div className="flex flex-1 overflow-hidden">
       <div className="flex-1 flex flex-col overflow-hidden">
 
         {/* Header */}
@@ -317,7 +354,13 @@ export default function DeepResearchPage() {
                   </Button>
                 </>
               )}
-              {job.status === "done" && (
+              <button
+              onClick={() => setShowCitationsSidebar(v => !v)}
+              className={`text-xs px-2 py-1 rounded border transition-colors ${showCitationsSidebar ? "bg-primary/10 border-primary/40 text-primary" : "border-border text-muted-foreground hover:text-foreground"}`}
+            >
+              Sources {job.citations.length > 0 ? `(${job.citations.length})` : ""}
+            </button>
+          {job.status === "done" && (
                 <Badge variant="outline" className="text-xs gap-1 text-green-400 border-green-400/30">
                   <CheckCircle2 className="size-2.5" />
                   {job.totalMs ? `${(job.totalMs / 1000).toFixed(0)}s` : "Done"}
@@ -460,11 +503,21 @@ export default function DeepResearchPage() {
                     </Button>
                   </div>
                   <div
-                    className="rounded-xl p-5 text-sm leading-relaxed whitespace-pre-wrap"
+                    className="rounded-xl p-5 text-sm leading-relaxed"
                     style={{ background: "hsl(var(--card))", border: "1px solid hsl(var(--border))" }}
                   >
-                    {job.report}
+                    <CitationRenderer
+                      content={job.report}
+                      citations={normalizeCitations(job.citations)}
+                    />
                   </div>
+                  {job.status === "done" && (
+                    <RelatedQuestions
+                      questions={relatedQuestions}
+                      isLoading={relatedLoading}
+                      onSelect={(q) => { setQuery(q); setRelatedQuestions([]); }}
+                    />
+                  )}
                 </div>
               )}
 
@@ -500,6 +553,15 @@ export default function DeepResearchPage() {
             </div>
           )}
         </ScrollArea>
+      </div>
+      </div>
+      {showCitationsSidebar && (
+        <CitationsSidebar
+          citations={normalizeCitations(job?.citations ?? [])}
+          isOpen={showCitationsSidebar}
+          onClose={() => setShowCitationsSidebar(false)}
+        />
+      )}
       </div>
     </div>
   );

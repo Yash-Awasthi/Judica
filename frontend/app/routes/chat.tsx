@@ -1,6 +1,10 @@
 import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { loadActiveSTM, applySTM, STM_MODULES, type STMModuleId } from "~/lib/stm";
 import type { Route } from "./+types/chat";
+import { useContextMention } from '~/hooks/useContextMention';
+import { ContextPill, type MentionType } from '~/components/ContextPill';
+
+interface Mention { type: MentionType; label: string; value: string }
 import {
   deliberate,
   onOpinion,
@@ -115,6 +119,8 @@ export default function Chat() {
   const [showThreads, setShowThreads]   = useState(false);
   const [showHelp, setShowHelp]         = useState(false);
   const [glassOn, setGlassOn]           = useState(false);
+  const [mentions, setMentions]         = useState<Mention[]>([]);
+  const mention                         = useContextMention(taRef);
 
   const colRefs    = useRef<Record<string, HTMLDivElement | null>>({});
   const verdictRef = useRef<HTMLDivElement | null>(null);
@@ -325,10 +331,12 @@ export default function Chat() {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (mention.onKeyDown(e)) return; // picker consumed the key
     if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(); }
   };
 
   const handleTextareaInput = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    mention.onTextareaChange(e);
     setInput(e.target.value);
     const ta = e.target;
     ta.style.height = "20px";
@@ -651,6 +659,14 @@ export default function Chat() {
       {/* ─── Input row ──────────────────────────────────────────────────── */}
       <div style={{ display: "flex", alignItems: "flex-end", gap: "10px", padding: "10px 14px", background: C.bgAlt, flexShrink: 0 }}>
         <span style={{ color: C.green, fontSize: "15px", flexShrink: 0, marginBottom: "1px", opacity: 0.8 }}>›</span>
+        {mentions.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "2px", alignSelf: "center" }}>
+            {mentions.map((m, i) => (
+              <ContextPill key={i} type={m.type} label={m.label} value={m.value}
+                onRemove={() => setMentions(prev => prev.filter((_,j) => j !== i))} />
+            ))}
+          </div>
+        )}
         <textarea
           ref={taRef}
           value={input}
@@ -677,6 +693,21 @@ export default function Chat() {
           </button>
         )}
       </div>
+
+
+      {/* ─── @context picker overlay ────────────────────────────────── */}
+      {mention.isOpen && (
+        <div style={{ position: "fixed", top: mention.anchorPos.top, left: mention.anchorPos.left, zIndex: 9000, background: "#111", border: `1px solid ${C.border}`, borderRadius: 8, width: 300, maxHeight: 260, overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 8px 32px #000b" }}>
+          <div style={{ padding: "5px 10px", borderBottom: `1px solid #222`, fontSize: 10, color: C.greenDim, letterSpacing: "0.1em" }}>
+            {mention.mentionType ? mention.mentionType.toUpperCase() : "CONTEXT"} · {mention.query || "type to search…"}
+          </div>
+          <div style={{ overflowY: "auto", flex: 1 }}>
+            <div style={{ padding: "8px 10px", color: C.textDim, fontSize: 11 }}>
+              type @file: · @symbol: · @web: then search
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ─── Settings panel ─────────────────────────────────────────────── */}
       {showSettings && (
