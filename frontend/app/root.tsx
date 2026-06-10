@@ -58,6 +58,8 @@ import {
   Radio,
   Terminal,
   Bot,
+  Key,
+  Flag,
 } from "lucide-react";
 
 import { TooltipProvider } from "~/components/ui/tooltip";
@@ -169,6 +171,7 @@ const navGroups = [
       { to: "/settings", icon: Settings, label: "Settings" },
       { to: "/profile", icon: UserCircle, label: "Profile" },
       { to: "/billing", icon: CreditCard, label: "Billing" },
+      { to: "/api-tokens", icon: Key, label: "API Tokens" },
       { to: "/web-search", icon: Globe, label: "Web Search" },
       { to: "/rooms", icon: Radio, label: "Rooms" },
     ],
@@ -181,6 +184,7 @@ const navGroups = [
       { to: "/admin/system", icon: Server, label: "System" },
       { to: "/admin/audit", icon: ScrollText, label: "Audit Log" },
       { to: "/admin/traces", icon: Activity, label: "Traces" },
+      { to: "/admin/feature-flags", icon: Flag, label: "Feature Flags" },
     ],
   },
 ];

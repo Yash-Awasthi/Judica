@@ -77,4 +77,6 @@ export default [
   route("rooms", "routes/rooms.tsx"),
   route("sandbox", "routes/sandbox.tsx"),
   route("agents", "routes/agents.tsx"),
+  route("api-tokens", "routes/api-tokens.tsx"),
+  route("admin/feature-flags", "routes/admin-feature-flags.tsx"),
 ] satisfies RouteConfig;
