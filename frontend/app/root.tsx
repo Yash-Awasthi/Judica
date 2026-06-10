@@ -74,11 +74,15 @@ import type { Route } from "./+types/root";
 import "./app.css";
 
 const PUBLIC_PATHS = new Set([
-  "/", "/login", "/setup",
+  "/", "/login", "/register", "/setup",
 ]);
 
 function isPublicPath(pathname: string) {
-  return PUBLIC_PATHS.has(pathname) || pathname.startsWith("/product/");
+  return (
+    PUBLIC_PATHS.has(pathname) ||
+    pathname.startsWith("/product/") ||
+    pathname.startsWith("/api/")
+  );
 }
 
 export const links: Route.LinksFunction = () => [
